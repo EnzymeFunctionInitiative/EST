@@ -21,8 +21,8 @@ $configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
 eval $configfile;
 
 #$db="efi_20140729";
-#$username='efignn';
-#$password='c@lcgnn';
+#$username='';
+#$password='';
 #$dbh = DBI->connect("DBI:mysql:$db;host=10.1.1.3;port=3307", $username, $password, { RaiseError => 1 });
 
 
