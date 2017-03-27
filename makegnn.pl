@@ -29,6 +29,7 @@ sub findneighbors {
 #print "select * from combined where AC='$ac'\n";
   $sth=$dbh->prepare("select * from combined where AC='$ac';");
   $sth->execute;
+#print "after id search\n";
   if($sth->rows>0){
     while(my $row=$sth->fetchrow_hashref){
 
@@ -72,7 +73,8 @@ $result=GetOptions ("ssnin=s"		=> \$ssnin,
 		    "nomatch=s"		=> \$nomatch,
 		    "gnn=s"		=> \$gnn,
 		    "ssnout=s"		=> \$ssnout,
-		    "incfrac=i"		=> \$incfrac
+		    "incfrac=i"		=> \$incfrac,
+		    "stats=s"		=> \$stats
 		    );
 
 $usage="usage makegnn.pl -ssnin <filename> -n <positive integer> -nomatch <filename> -gnn <filename> -ssnout <filename>\n-ssnin\t name of original ssn network to process\n-n\t distance (+/-) to search for neighbors\n-nomatch output file that contains sequences without neighbors\n-gnn\t filename of genome neighborhood network output file\n-ssnout\t output filename for colorized sequence similarity network\n";
@@ -109,7 +111,11 @@ if($incfrac=~/^\d+$/){
   $incfrac=0.20;  
 }
 
-
+if($stats=~/\w+/){
+  open STATS, ">$stats" or die "could not write to $stats\n";
+}else{
+  open STATS, ">/dev/null" or die "could nto dump stats info to dev null\n";
+}
 
 #use sqlite not working atm
 #$db='/home/groups/efi/gnn/databases/gnn.db';
@@ -196,6 +202,7 @@ foreach $node (@nodes){
 print "parse edges to determine clusters\n";
 $newnode=1;
 foreach $edge (@edges){
+#print $edge->getAttribute('source').",".$edge->getAttribute('target')."\n";
   #if source exists, add target to source sc
   if(exists $constellations{$nodenames{$edge->getAttribute('source')}}){
     #if target also already existed, add target data to source 
@@ -230,6 +237,7 @@ foreach $edge (@edges){
     push @{$supernodes{$constellations{$nodenames{$edge->getAttribute('target')}}}}, @{$nodehash{$nodenames{$edge->getAttribute('source')}}}
   }else{
     #neither exists, add both to same sc, and add accessions to supernode
+#print $edge->getAttribute('source').",".$edge->getAttribute('target')."\n";
     $constellations{$nodenames{$edge->getAttribute('source')}}=$newnode;
     $constellations{$nodenames{$edge->getAttribute('target')}}=$newnode;
     push @{$supernodes{$newnode}}, @{$nodehash{$nodenames{$edge->getAttribute('source')}}};
@@ -237,12 +245,15 @@ foreach $edge (@edges){
     #increment for next sc node
     $newnode++;
   }
+
 }
 
 #remove any duplicates (they are possible)
 foreach $key (keys %supernodes){
   @{$supernodes{$key}}=uniq @{$supernodes{$key}};
 }
+
+
 print "find neighbors\n\n";
 
 #gather neighbors of each supernode and store in the $pfams data structure
@@ -252,7 +263,10 @@ foreach $key (sort {$a <=> $b} keys %supernodes){
   print "Supernode $key, ".scalar @{$supernodes{$key}}." original accessions, simplenumber $simplenumber\n";
   $numbermatch{$key}=$simplenumber;
   foreach $accession (uniq @{$supernodes{$key}}){
+#    print "$accession\n";
+#    print "\tsearch\n";
     $pfamsearch=findneighbors $accession, $n, $dbh, $nomatch_fh;
+#    print "\tafter search\n";
     foreach $result (keys %{${$pfamsearch}{'neigh'}}){
       if(exists $pfams{$result}{$key}{'size'}){
 	$pfams{$result}{$key}{'size'}+=scalar @{${$pfamsearch}{'neigh'}{$result}}       
@@ -281,6 +295,10 @@ foreach $key (keys %pfams){
   $concount=0;
   $pdbcount=0;
   $eccount=0;
+  $sth=$dbh->prepare("select * from pfam_info where pfam='$key';");
+  $sth->execute;
+  $pfam_info=$sth->fetchrow_hashref;
+  $pfam_short=$pfam_info->{short_name};
   foreach $sc (keys $pfams{$key}){
 #do not dray node if incfrac<ClustrFraction
     if($incfrac<=( scalar(@{$pfams{$key}{$sc}{'dist'}})/scalar(@{$supernodes{$sc}}))){
@@ -313,18 +331,24 @@ foreach $key (keys %pfams){
 	  $pdbcount++;
 	}
 	#print $row->{EC}.",".$row->{accession}.",$element\n";
-	if($row->{EC}=~/\w+/){
+	if($row->{EC}=~/\w+/ and $row->{EC} ne 'None'){
 	  $eccount++;
 	}
       }
 	  $gnnwriter->endTag();
       push @allneigh, @{$pfams{$key}{$sc}{'neigh'}};
 	  $gnnwriter->startTag('att', 'type' => 'list', 'name' => 'Distance');
+      $absDistSum=0;
+      $distCount=0;
       foreach $element (@{$pfams{$key}{$sc}{'dist'}}){
 	$gnnwriter->emptyTag('att', 'type' => 'string', 'name' => 'Distance', 'value' => $element);
+	$distCount++;
+	@element=split ':', $element;
+	$absDistSum+=abs @element[2];
       }
 	  $gnnwriter->endTag;
-      $gnnwriter->emptyTag('att', 'name' => 'ClusterFraction', 'type' => 'string', 'value' => ( scalar(@{$pfams{$key}{$sc}{'dist'}})/scalar(@{$supernodes{$sc}})));
+      $clusterfraction=int(scalar(@{$pfams{$key}{$sc}{'dist'}})/scalar(@{$supernodes{$sc}})*1000)/1000;
+      $gnnwriter->emptyTag('att', 'name' => 'ClusterFraction', 'type' => 'real', 'value' => $clusterfraction);
       $gnnwriter->emptyTag('att', 'name' => 'Num_Ratio', 'type' => 'string', 'value' =>  scalar(@{$pfams{$key}{$sc}{'dist'}})."/".scalar(@{$supernodes{$sc}}));
       $gnnwriter->emptyTag('att', 'name' => 'SSNClusterSize', 'type' => 'integer', 'value' => scalar(@{$supernodes{$sc}}));
       if($pdbcount>0 and $eccount>0){
@@ -338,15 +362,18 @@ foreach $key (keys %pfams){
       }
 	$gnnwriter->endTag();
       $gnnwriter->startTag('edge', 'label' => "$key to $key;$sc", 'source' => $key, 'target' => "$key;$sc");
+        $gnnwriter->emptyTag('att', 'name' => 'SSNClusterSize', 'type' => 'string', 'value' => ( scalar(@{$pfams{$key}{$sc}{'dist'}})/scalar(@{$supernodes{$sc}})));
       $gnnwriter->endTag();
+      $absAvg=int($absDistSum/$distCount*1000)/1000;
+      print STATS "$numbermatch{$sc}\t$key\t$pfam_short\t$clusterfraction\t$absAvg\n";
     }
   }
 #Do not Draw hub node if there are no spoke nodes
   if($concount>0){
-    $sth=$dbh->prepare("select * from pfam_info where pfam='$key';");
-    $sth->execute;
-    $pfam_info=$sth->fetchrow_hashref;
-    $gnnwriter->startTag('node', 'id' => $key, 'label' => $pfam_info->{short_name});
+    #$sth=$dbh->prepare("select * from pfam_info where pfam='$key';");
+    #$sth->execute;
+    #3$pfam_info=$sth->fetchrow_hashref;
+    $gnnwriter->startTag('node', 'id' => $key, 'label' => $pfam_short);
     $gnnwriter->emptyTag('att', 'name' => 'node.shape', 'type' => 'string', 'value' => 'hexagon');
     $gnnwriter->emptyTag('att', 'name' => 'node.size', 'type' => 'string', 'value' => '70.0');
     $gnnwriter->emptyTag('att', 'name' => 'pfam', 'type' => 'string', 'value' => $key);
@@ -364,7 +391,10 @@ foreach $key (keys %pfams){
       $sth=$dbh->prepare("select * from annotations where accession='$element';");
       $sth->execute;
       $row=$sth->fetchrow_hashref;
-      $gnnwriter->emptyTag('att', 'type' => 'string', 'name' => 'Neighbor_Accessions', 'value' => "$element:TODO:EC:PDB:PDBhit:".$row->{STATUS});
+      $sth=$dbh->prepare("select * from pdbhits where ACC='$element';");
+      $sth->execute;
+      $pdbdata=$sth->fetchrow_hashref;
+      $gnnwriter->emptyTag('att', 'type' => 'string', 'name' => 'Neighbor_Accessions', 'value' => "$element:".$row->{EC}.":".$pdbdata->{PDB}.":".$pdbdata->{e}.":".$row->{STATUS});
     }
     $gnnwriter->endTag();
     $gnnwriter->emptyTag('att', 'name' => 'Num_queries', 'type' => 'integer', 'value' => scalar @allorig);
@@ -409,7 +439,7 @@ foreach $node (@nodes){
 foreach $edge (@edges){
   $writer->startTag('edge', 'id' => $edge->getAttribute('id'), 'label' => $edge->getAttribute('label'), 'source' => $nodenames{$edge->getAttribute('source')}, 'target' => $nodenames{$edge->getAttribute('target')});
   foreach $attribute ($edge->getElementsByTagName('att')){
-    if($attribute->getAttribute('name') eq 'interaction'){
+    if($attribute->getAttribute('name') eq 'interaction' or $attribute->getAttribute('name')=~/rep-net/){
       #print "do nothing\n";
       #this tag causes problems and it is not needed, so we do not include it
     }else{
@@ -419,3 +449,5 @@ foreach $edge (@edges){
   $writer->endTag;
 }
 $writer->endTag();
+
+print "makegnn.pl finished\n";

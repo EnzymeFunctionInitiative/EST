@@ -1,4 +1,7 @@
 #!/usr/bin/env perl      
+
+#version 0.9.2	no changes
+
 use GD::Graph::boxplot;
 use GD;
 use Getopt::Long;

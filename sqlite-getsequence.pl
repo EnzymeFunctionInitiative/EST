@@ -3,6 +3,7 @@
 
 #version 0.9.0 moved from getting accesions by grepping files to using sqlite database
 #version 0.9.0 options of specifing ssf and gene3d numbers added
+#version 0.9.2 modified to accept 6-10 characters as accession ids
 
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
@@ -116,7 +117,7 @@ while(scalar @accessions){
   #print "fastacmd -d $combined -s $batchline\n";
   @sequences=split /\n/, `fastacmd -d $combined -s $batchline`;
   foreach $sequence (@sequences){ 
-    $sequence=~s/^>\w\w\|(\w{6}).*/>$1/;
+    $sequence=~s/^>\w\w\|(\w{6,10})\|.*/>$1/;
     print OUT "$sequence\n";
   }
   

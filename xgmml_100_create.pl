@@ -3,6 +3,9 @@
 #version 0.9.1 Changed to using xml creation packages (xml::writer) instead of writing out xml myself
 #version 0.9.1 Removed dat file parser (not used anymore)
 #version 0.9.1 Remove a bunch of commented out stuff
+#version 0.9.2 no changes
+
+#this program creates an xgmml with all nodes and edges
 
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;

@@ -1,5 +1,7 @@
 #!/bin/env perl
 
+#version 0.9.2 no changes to this file
+
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::SQLite;

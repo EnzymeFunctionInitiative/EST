@@ -1,5 +1,9 @@
 #!/usr/bin/env perl
 
+#version 0.9.2 no changes
+
+#filters out extra data based on sequence length (minlen, maxlen) or the value of some specifed filter (eval pid or bit)
+
 use Getopt::Long;
 
 $result=GetOptions ("blastin=s"	=> \$blast,

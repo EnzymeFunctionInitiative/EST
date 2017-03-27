@@ -12,10 +12,20 @@
 #version 0.8.5 Added $maxhits (set to 50,000 for now) so we can get up to 50k results from a single blast search
 #version 0.9.0 Updated from the getsequence.pl progrma to sqlite-getsequence (new file uses sqlite db of match_coplete and also allows for ssf and gene3d numbers to generate networks.
 #version 0.9.1 Added abiltity to use non database informations through fasta files and struct.out files
-#version 0.9.1 Changed xgmml creation files to use xml creation packages for writing instead of doing it myself
 #version 0.9.1 Filterblast section renamed blastreduce to avoid confusion with filtering from analyze data step
 #version 0.9.1 blast-X.fa.tab and fracfile-X.fa files are now removed after blast results are concatenated together
 #version 0.9.1 blastfinal.tab is now removed after the 1.out file is created int he blastreduce step
+#version 0.9.2 no changes to this file
+
+#this program creates scripts and submits them on clusters with torque schedulers
+#sqlite-getsequence.pl		grabs sequence data for input (other than taxid)
+#getannotations.pl		grabs annotations for input (other than taxid) creates struct.out file
+#getseqtaxid.pl			get sequence data and annotations based on taxid
+#fracsequence.pl		breaks fasta sequence into np parts for blasting
+#blastreduce.pl			removes extranious blast resuts (removes AA and BA searches but keeps AB) creates 1.out file
+#quart-align.pl			generates the alignment length quartile graph
+#quart-perid.pl			generates the percent identity quartile graph
+#sipmlegraphs.pl		generates sequence length and alignment score distributions
 
 #perl module for loading command line options
 use Getopt::Long;
@@ -166,8 +176,6 @@ if($pfam or $ipro or $userfasta=~/\w+/){
   print "import job is:\n $importjob";
   @importjobline=split /\./, $importjob;
 
-
-#exit;
 }elsif($taxid){
     #create fasta and struct.out files
   open(QSUB,">$tmpdir/initial_import.sh") or die "could not create blast submission script $tmpdir/createdb.sh\n";
@@ -187,7 +195,7 @@ if($pfam or $ipro or $userfasta=~/\w+/){
   print "import job is:\n $importjob";
   @importjobline=split /\./, $importjob;
 }else{
-  die "Error Submitting Import Job\n";
+  die "Error Submitting Import Job\n$importjob\n";
 }
 
 

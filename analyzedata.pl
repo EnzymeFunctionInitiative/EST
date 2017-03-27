@@ -1,5 +1,17 @@
 #!/usr/bin/env perl
 
+#version 0.9.2 no changes
+
+#this program will analyze data from a folder created in the generatedata step, the most important parts being the 1.out and struct.out files
+
+#this program creates scripts and submits them on clusters with torque schedulers
+#filterblast.pl			Filters 1.out files to remove unwanted information, creates 2.out file
+#xgmml_100_create.pl		Creates a truely 100% xgmml (all nodes and edges) from stuct.out and 2.out files
+#xgmml_create_al.pl		Creates xgmml repnode networks from struct.out, 2.out, and cdit output
+#stats.pl			Displays number of edges and nodes in each xgmml
+
+
+
 use Getopt::Long;
 
 $result=GetOptions ("filter=s"  => \$filter,

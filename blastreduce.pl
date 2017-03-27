@@ -5,6 +5,7 @@
 #version 0.8.5 Changed the blastfile loop from foreach to while to reduce memory
 #version 0.9.1 After much thought, this step of the program will remain seperate
 #version 0.9.1 Renamed blastreduce.pl from step_2.2-filterblast.pl
+#version 0.9.2 Modifiied to accept 6-10 digit accessions
 
 
 $filename=@ARGV[0];
@@ -18,7 +19,7 @@ $sequence="";
 while (<FASTA>){
   $line=$_;
   chomp $line;
-  if($line=~/^>(\w{6})/){
+  if($line=~/^>(\w{6,10})/){
     $seqlengths{$key}=length $sequence;
     $sequence="";
     $key=$1;
@@ -40,7 +41,7 @@ while (<BLASTFILE>){
     my @lineary=split /\t/,$line;
     my $sequencea=@lineary[0];
     my $sequenceb=@lineary[1];
-    unless($sequencea eq $sequenceb or defined $searches{"$sequencea$sequenceb"}or defined $searches{"$sequenceb$sequencea"} ){
+    unless(defined $searches{"$sequencea$sequenceb"} or defined $searches{"$sequenceb$sequencea"} or $sequencea eq $sequenceb ){
       $searches{"$sequencea$sequenceb"}=1;
       #$id=@lineary[11]/100;
       $id=@lineary[2]/100;

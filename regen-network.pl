@@ -7,7 +7,7 @@ $result=GetOptions ("xgmml=s"		=> \$xgmml,
 		    "oldtmp=s"		=> \$oldtmp,
 		    "newtmp=s"		=> \$newtmp);
 
-$combined="/home/groups/efi/devel/data_files/combined.fasta";
+$combined="/home/groups/efi/alpha/data_files/combined.fasta";
 $perpass=1000;
 
 #system("cp $oldtmp/1.out $newtmp/1.out");
@@ -64,8 +64,8 @@ print "Parse 1.out for edges\n";
 foreach $accession (@allaccessions){
   $acchash{$accession}=1;
 }
-open(OLDBLAST, "$oldtmp/1.out") or die "Could not open blast file in original folder\n";
-open(NEWBLAST, ">$newtmp/1.out") or die "Could not write to new blast file\n";
+open(OLDBLAST, "$oldtmp/1.out") or die "Could not open blast file in original folder $oldtmp/1.out\n";
+open(NEWBLAST, ">$newtmp/1.out") or die "Could not write to new blast file $newtmp/1.out\n";
 while(<OLDBLAST>){
   $line=$_;
   chomp $line;
