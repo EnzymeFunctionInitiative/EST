@@ -1,25 +1,33 @@
 #!/usr/bin/env perl
 
 #version 0.9.2 no changes
+#version 0.9.7 added options and code for working with Slurm scheduler
 
 #this program allows you to filter the results of generatedata and see the graph results
 
 #this program creates scrpts and submit them on clusters with torque that use the following perl files
-#filterblast.pl			Filters 1.out files to remove unwanted information, creates 2.out file
-#quart-align.pl			generates the alignment length quartile graph
-#quart-perid.pl			generates the percent identity quartile graph
-#sipmlegraphs.pl		generates sequence length and alignment score distributions
+#filterblast.pl            Filters 1.out files to remove unwanted information, creates 2.out file
+#quart-align.pl            generates the alignment length quartile graph
+#quart-perid.pl            generates the percent identity quartile graph
+#sipmlegraphs.pl        generates sequence length and alignment score distributions
 
+use lib "../";
 use Getopt::Long;
+use Biocluster::SchedulerApi;
 
-$result=GetOptions ("filter=s"  => \$filter,
-		    "minval=s"	=> \$minval,
-		    "queue=s"	=> \$queue,
-		    "tmp=s"	=> \$tmpdir,
-		    "maxlen=i"	=> \$maxlen,
-		    "minlen=i"	=> \$minlen,
-		    "incfrac=f"	=> \$incfrac);
+$result=GetOptions ("filter=s"      => \$filter,
+                    "minval=s"      => \$minval,
+                    "queue=s"       => \$queue,
+                    "tmp=s"         => \$tmpdir,
+                    "maxlen=i"      => \$maxlen,
+                    "minlen=i"      => \$minlen,
+                    "incfrac=f"     => \$incfrac,
+                    "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm
+                    "dryrun"        => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
+                    "oldapps"       => \$oldapps        # to module load oldapps for biocluster2 testing
+                );
 
+require "shared.pl";
 
 $toolpath=$ENV{'EFIEST'};
 $efiestmod=$ENV{'EFIESTMOD'};
@@ -80,23 +88,29 @@ if(-s "$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png"){
 
 print "Data from runs will be saved to $tmpdir/$filter-$minval-$minlen-$maxlen/\n";
 
+my $schedType = "torque";
+$schedType = "slurm" if defined($scheduler) and $scheduler eq "slurm";
+my $S = new Biocluster::SchedulerApi('type' => $schedType);
+my $B = $S->getBuilder();
+$B->queue($queue);
+$B->resource(1, 1);
+
 #dont refilter if it has already been done
 unless( -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
   mkdir "$tmpdir/$filter-$minval-$minlen-$maxlen" or die "could not make analysis folder $tmpdir/$filter-$minval-$minlen-$maxlen\n";
 
   #submit the job for filtering out extraneous edges
 
-  open(QSUB,">$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh") or die "could not create blast submission script $tmpdir/fullxgmml.sh\n";
-  print QSUB "#!/bin/bash\n";
-  print QSUB "#PBS -j oe\n";
-  print QSUB "#PBS -S /bin/bash\n";
-  print QSUB "#PBS -q $queue\n";
-  print QSUB "#PBS -l nodes=1:ppn=1\n";
-  print QSUB "module load $efiestmod\n";
-  print QSUB "$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/sequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen\n";
-  close QSUB;
+  $fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun) or die "could not create blast submission script $tmpdir/fullxgmml.sh\n";
+  $B->queue($queue);
+  $B->resource(1, 1);
+  $B->render($fh);
+  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load $efiestmod\n";
+  print $fh "$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/sequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen\n";
+  closeFH($fh, dryrun);
 
-  $filterjob=`qsub $tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh`;
+  $filterjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun, $schedType);
   print "Filterblast job is:\n $filterjob";
 
   @filterjobline=split /\./, $filterjob;
@@ -107,51 +121,55 @@ unless( -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
 #submit the quartiles scripts, should not run until filterjob is finished
 #nothing else depends on this scipt
 
-open(QSUB,">$tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh") or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh\n";
-print QSUB "#!/bin/bash\n";
-print QSUB "#PBS -j oe\n";
-print QSUB "#PBS -S /bin/bash\n";
-print QSUB "#PBS -q $queue\n";
-print QSUB "#PBS -l nodes=1:ppn=1\n";
+$fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh", $dryrun) or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh\n";
+$B->queue($queue);
+$B->resource(1, 1);
 if(defined $filterjob){
-  print QSUB "#PBS -W depend=afterok:@filterjobline[0]\n"; 
+  $B->dependency(0, @filterjobline[0]); 
 }
-print QSUB "module load $efiestmod\n";
-print QSUB "$toolpath/quart-align.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -align $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/alignment_length.png\n";
-close QSUB;
+$B->render($fh);
+print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load $efiestmod\n";
+print $fh "$toolpath/quart-align.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -align $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/alignment_length.png\n";
+closeFH($fh, dryrun);
 
-$quartalignjob=`qsub $tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh`;
+$quartalignjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh", $dryrun, $schedType);
 print "Quartile Align job is:\n $quartalignjob";
 
-open(QSUB,">$tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh") or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlenr/quartpid.sh\n";
-print QSUB "#!/bin/bash\n";
-print QSUB "#PBS -j oe\n";
-print QSUB "#PBS -S /bin/bash\n";
-print QSUB "#PBS -q $queue\n";
-print QSUB "#PBS -l nodes=1:ppn=1\n";
+$fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh", $dryrun) or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlenr/quartpid.sh\n";
+$B->queue($queue);
+$B->resource(1, 1);
 if(defined $filterjob){
-  print QSUB "#PBS -W depend=afterok:@filterjobline[0]\n"; 
-} 
-print QSUB "#PBS -m e\n";
-print QSUB "module load $efiestmod\n";
-print QSUB "$toolpath/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -pid $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png\n";
-close QSUB;
+  $B->dependency(0, @filterjobline[0]); 
+}
+$B->mailEnd();
+$B->render($fh);
+print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load $efiestmod\n";
+print $fh "$toolpath/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -pid $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png\n";
+closeFH($fh, dryrun);
 
-$quartpidjob=`qsub $tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh`;
+$quartpidjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh", $dryrun, $schedType);
 print "Quartiles Percent Identity job is:\n $quartpidjob";
 
-open(QSUB,">$tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh") or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh\n";
-print QSUB "#!/bin/bash\n";
-print QSUB "#PBS -j oe\n";
-print QSUB "#PBS -S /bin/bash\n";
-print QSUB "#PBS -q $queue\n";
-print QSUB "#PBS -l nodes=1:ppn=1\n";
+$fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh", $dryrun) or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh\n";
+print $fh "#!/bin/bash\n";
+print $fh "#PBS -j oe\n";
+print $fh "#PBS -S /bin/bash\n";
+$B->queue($queue);
+$B->resource(1, 1);
 if(defined $filterjob){
-  print QSUB "#PBS -W depend=afterok:@filterjobline[0]\n"; 
+  $B->dependency(0, @filterjobline[0]); 
 }
-print QSUB "module load $efiestmod\n";
-print QSUB "$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -maxlen $maxlen -minlen $minlen -edges $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/length_histogram.png -incfrac $incfrac\n";
-close QSUB;
+$B->render($fh);
+print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load $efiestmod\n";
+print $fh "$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -maxlen $maxlen -minlen $minlen -edges $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/length_histogram.png -incfrac $incfrac\n";
+closeFH($fh, dryrun);
 
-$simplegraphjob=`qsub $tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh`;
+$simplegraphjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh", $dryrun, $schedType);
 print "Simplegraphs job is:\n $simplegraphjob";
+
+
+
+
