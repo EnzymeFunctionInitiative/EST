@@ -7,7 +7,7 @@ $result=GetOptions ("xgmml=s"		=> \$xgmml,
 		    "oldtmp=s"		=> \$oldtmp,
 		    "newtmp=s"		=> \$newtmp);
 
-$combined=$ENV{'EFIEST'}."/data_files/combined.fasta";
+$combined="/home/groups/efi/devel/data_files/combined.fasta";
 $perpass=1000;
 
 #system("cp $oldtmp/1.out $newtmp/1.out");
@@ -30,8 +30,8 @@ while( <XGMML> ){
 #print "$line\n";
     if($line=~/<att type="list" name="ACC">(.*?)<\/att>/ or $line=~/<att name="ACC" type="list">(.*?)<\/att>/){
       $acc=$1;
-print "Match ACC\t$acc\n";
-      push @accessions, $acc=~/value=\"(\w{6,10})\"/g;
+#print "Match ACC\t$acc\n";
+      push @accessions, $acc=~/value=\"(\w{6})\"/g;
       #$acc=~/value="(\w{6})"/g;
 #print "match: $1\n\ncount ".scalar @accessions."\n";      
       $line="";
@@ -54,7 +54,7 @@ while(scalar @accessions){
   #print "fastacmd -d $combined -s $batchline\n";
   @sequences=split /\n/, `fastacmd -d $combined -s $batchline`;
   foreach $sequence (@sequences){ 
-    $sequence=~s/^>\w\w\|(\w{6,10}).*/>$1/;
+    $sequence=~s/^>\w\w\|(\w{6}).*/>$1/;
     print FASTA "$sequence\n";
   } 
 }

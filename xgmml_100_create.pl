@@ -3,9 +3,6 @@
 #version 0.9.1 Changed to using xml creation packages (xml::writer) instead of writing out xml myself
 #version 0.9.1 Removed dat file parser (not used anymore)
 #version 0.9.1 Remove a bunch of commented out stuff
-#version 0.9.2 no changes
-
-#this program creates an xgmml with all nodes and edges
 
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
@@ -18,17 +15,7 @@ $result=GetOptions ("blast=s"	=> \$blast,
 		    "fasta=s"	=> \$fasta,
 		    "struct=s"	=> \$struct,
 		    "output=s"	=> \$output,
-		    "title=s"	=> \$title,
-		    "maxfull=i"	=> \$maxfull);
-
-
-if(defined $maxfull){
-  unless($maxfull=~/^\d+$/){
-    die "maxfull must be an integer\n";
-  }
-}else{
-  $maxfull=10000000;
-}
+		    "title=s"	=> \$title);
 
 
 $edge=$node=0;
@@ -38,29 +25,11 @@ $edge=$node=0;
 
 @uprotnumbers=();
 
-$blastlength=`wc -l $blast`;
-@blastlength=split( "\s+" , $blastlength);
-if(int(@blastlength[0])>$maxfull){
-  open(OUTPUT, ">$output") or die "cannot write to $output\n";
-  chomp @blastlength[0];
-  print OUTPUT "Too many edges (@blastlength[0]) not creating file\n";
-  print OUTPUT "Maximum edges is $maxfull\n";
-  exit;
-}
-
-
 $parser=XML::LibXML->new();
 $output=new IO::File(">$output");
 $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
 
-print time."check length of 2.out file\n";
-
-
-
-
-
-print time."Reading in uniprot numbers from fasta file\n";
-
+print "Reading in uniprot numbers from fasta file\n";
 open(FASTA, $fasta) or die "could not open $fasta\n";
 foreach $line (<FASTA>){
   if($line=~/>(\w+)/){
@@ -68,9 +37,9 @@ foreach $line (<FASTA>){
   }
 }
 close FASTA;
-print time."Finished reading in uniprot numbers\n";
+print "Finished reading in uniprot numbers\n";
 
-print time."Read in annotation data\n";
+
 #if struct file (annotation information) exists, use that to generate annotation information
 if(-e $struct){
 print "populating annotation structure from file\n";
@@ -94,10 +63,9 @@ print "populating annotation structure from file\n";
   }
   close STRUCT;
 }
-print time."done reading in annotation data\n";
 
 
-print time."Open struct file and get a annotation keys\n";
+print "Open struct file and get a annotation keys\n";
 open STRUCT, $struct or die "could not open $struct\n";
 <STRUCT>;
 @metas=();
@@ -113,15 +81,15 @@ while (<STRUCT>){
 
 $metaline=join ',', @metas;
 
-print time."Metadata keys are $metaline\n";
-print time."Start nodes\n";
+print "Metadata keys are $metaline\n";
+
 $writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
 foreach my $element (@uprotnumbers){
-  #print "$element\n";;
+  print "$element\n";;
   $node++;
   $writer->startTag('node', 'id' => $element, 'label' => $element);
   foreach my $key (@metas){
-    #print "\t$key\t$uprot{$element}{$key}\n";
+    print "\t$key\t$uprot{$element}{$key}\n";
     if($key eq "IPRO" or $key eq "GI" or $key eq "PDB" or $key eq "PFAM" or $key eq "GO"  or $key eq "HMP_Body_Site" or $key eq "CAZY"){
       $writer->startTag('att', 'type' => 'list', 'name' => $key);
       foreach my $piece (@{$uprot{$element}{$key}}){
@@ -135,10 +103,9 @@ foreach my $element (@uprotnumbers){
   $writer->endTag();
 }
 
-print time."Writing Edges\n";
+print "Writing Edges\n";
 open BLASTFILE, $blast or die "could not open blast file $blast\n";
-while (<BLASTFILE>){
-  my $line=$_;
+foreach my $line (<BLASTFILE>){
   $edge++;
   chomp $line;
   my @line=split /\t/, $line;
@@ -151,7 +118,7 @@ while (<BLASTFILE>){
   $writer->endTag();
 }
 close BLASTFILE;
-print time."Finished writing edges\n";
+print "Finished writing edges\n";
 #print the footer
 $writer->endTag;
 print "finished writing xgmml file\n";

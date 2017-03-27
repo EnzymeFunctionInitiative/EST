@@ -3,9 +3,6 @@
 #version 0.9.1 Now using xml::writer to create xgmml instead of just writing out the data
 #version 0.9.1 Removed .dat parser (not used anymore)
 #version 0.9.1 Remove a lot of unused commented out lines
-#version 0.9.2 no changes
-
-#this program is used to create repnode networks using information from cd-hit
 
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
@@ -119,7 +116,7 @@ while (<CDHIT>){
     $count=0;
   }else{
     my @lineary=split /\s+/, $line;
-    if(@lineary[2]=~/^>(\w{6,10})\.\.\./){
+    if(@lineary[2]=~/^>(\w{6})\.\.\./){
       $element=$1;
 
       $count++;
@@ -162,8 +159,7 @@ $clusterdata=();
 print "Writing Edges\n";
 
 open BLASTFILE, $blast or die "could not open blast file $blast\n";
-while (<BLASTFILE>){
-  my $line=$_;
+foreach my $line (<BLASTFILE>){
   chomp $line;
   my @line=split /\t/, $line;
   if(exists $headuprot{@line[0]} and exists $headuprot{@line[1]}){

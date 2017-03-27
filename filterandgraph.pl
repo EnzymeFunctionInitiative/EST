@@ -1,14 +1,6 @@
 #!/usr/bin/env perl
 
-#version 0.9.2 no changes
 
-#this program allows you to filter the results of generatedata and see the graph results
-
-#this program creates scrpts and submit them on clusters with torque that use the following perl files
-#filterblast.pl			Filters 1.out files to remove unwanted information, creates 2.out file
-#quart-align.pl			generates the alignment length quartile graph
-#quart-perid.pl			generates the percent identity quartile graph
-#sipmlegraphs.pl		generates sequence length and alignment score distributions
 
 use Getopt::Long;
 

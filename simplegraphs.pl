@@ -1,7 +1,4 @@
-#!/usr/bin/env perl
-
-#version 0.9.2	no changes
-      
+#!/usr/bin/env perl      
 use GD::Graph::bars;
 use GD;
 use Getopt::Long;

@@ -78,7 +78,7 @@ foreach $accession (@annoaccessions){
   $sth= $dbh->prepare("select * from annotations where accession = '$accession'");
   $sth->execute;
   $row = $sth->fetch;
-  print OUT $row->[0]."\n\tUniprot_ID\t".$row->[1]."\n\tSTATUS\t".$row->[2]."\n\tSequence_Length\t".$row->[3]."\n\tTaxonomy_ID\t".$row->[4]."\n\tGDNA\t".$row->[5]."\n\tDescription\t".$row->[6]."\n\tOrganism\t".$row->[7]."\n\tDomain\t".$row->[8]."\n\tGN\t".$row->[9]."\n\tPFAM\t".$row->[10]."\n\tPDB\t".$row->[11]."\n\tIPRO\t".$row->[12]."\n\tGO\t".$row->[13]."\n\tGI\t".$row->[14]."\n\tHMP_Body_Site\t".$row->[15]."\n\tHMP_Oxygen\t".$row->[16]."\n\tEFI_ID\t".$row->[17]."\n\tEC\t".$row->[18]."\n\tClassi\t".$row->[19] . "\n\tPHYLUM\t".$row->[20] . "\n\tCLASS\t".$row->[21] . "\n\tORDER\t".$row->[22] . "\n\tFAMILY\t".$row->[23] . "\n\tGENUS\t".$row->[24] . "\n\tSPECIES\t".$row->[25] . "\n\tCAZY\t".$row->[26] . "\n\tSEQ\t".$row->[27]."\n";
+  print OUT $row->[0]."\n\tUniprot_ID\t".$row->[1]."\n\tSTATUS\t".$row->[2]."\n\tSequence_Length\t".$row->[3]."\n\tTaxonomy_ID\t".$row->[4]."\n\tGDNA\t".$row->[5]."\n\tDescription\t".$row->[6]."\n\tOrganism\t".$row->[7]."\n\tDomain\t".$row->[8]."\n\tGN\t".$row->[9]."\n\tPFAM\t".$row->[10]."\n\tPDB\t".$row->[11]."\n\tIPRO\t".$row->[12]."\n\tGO\t".$row->[13]."\n\tGI\t".$row->[14]."\n\tHMP_Body_Site\t".$row->[15]."\n\tHMP_Oxygen\t".$row->[16]."\n\tEFI_ID\t".$row->[17]."\n\tSEQ\t".$row->[18]."\n";
   #print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$giline\t$TID\t$sequence\n";
 
 }
@@ -101,11 +101,6 @@ print "Filter Blast\n";
 $filterblast=`$ENV{EFIEST}/step_2.2-filterblast.pl $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sequences.fa > $ENV{PWD}/$tmpdir/1.out`;
 
 print "$fileterblast\n";
-if ( -z "$ENV{PWD}/$tmpdir/1.out" ) {
-	$fail_file="$ENV{PWD}/$tmpdir/1.out.failed";
-        system("touch $fail_file");
-        die "Empty 1.out file\n";
-}
 
 #create graphs
 print "$ENV{EFIEST}/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/1.out -pid $ENV{PWD}/$tmpdir/percent_identity.png\n";
@@ -117,7 +112,6 @@ print "$quartiles\n";
 print "$ENV{EFIEST}/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -edges $ENV{PWD}/$tmpdir/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/length_histogram.png -incfrac $incfrac\n";
 $simplegraph=`$ENV{EFIEST}/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -edges $ENV{PWD}/$tmpdir/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/length_histogram.png -incfrac $incfrac`;
 print "$simplegraph\n";
-
 
 #print "Create Full Network\n";
 #print "$ENV{EFIEST}/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/1.out -fasta $ENV{PWD}/$tmpdir/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.tab -out $ENV{PWD}/$tmpdir/full.xgmml -title=\"Blast Network\"\n";

@@ -1,17 +1,5 @@
 #!/usr/bin/env perl
 
-#version 0.9.2 no changes
-
-#this program will analyze data from a folder created in the generatedata step, the most important parts being the 1.out and struct.out files
-
-#this program creates scripts and submits them on clusters with torque schedulers
-#filterblast.pl			Filters 1.out files to remove unwanted information, creates 2.out file
-#xgmml_100_create.pl		Creates a truely 100% xgmml (all nodes and edges) from stuct.out and 2.out files
-#xgmml_create_al.pl		Creates xgmml repnode networks from struct.out, 2.out, and cdit output
-#stats.pl			Displays number of edges and nodes in each xgmml
-
-
-
 use Getopt::Long;
 
 $result=GetOptions ("filter=s"  => \$filter,
@@ -20,8 +8,7 @@ $result=GetOptions ("filter=s"  => \$filter,
 		    "tmp=s"	=> \$tmpdir,
 		    "maxlen:i"	=> \$maxlen,
 		    "minlen:i"	=> \$minlen,
-		    "title:s"	=> \$title,
-		    "maxfull:i"	=> \$maxfull);
+		    "title:s"	=> \$title);
 
 $toolpath=$ENV{'EFIEST'};
 $efiestmod=$ENV{'EFIESTMOD'};
@@ -30,14 +17,6 @@ $efiestmod=$ENV{'EFIESTMOD'};
 if(defined $minlen){
 }else{
   $minlen=0;
-}
-
-if(defined $maxfull){
-  unless($maxfull=~/^\d+$/){
-    die "maxfull must be an integer\n";
-  }
-}else{
-  $maxfull=10000000;
 }
 
 if(defined $maxlen){
@@ -98,7 +77,7 @@ unless( -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
   print QSUB "#PBS -q $queue\n";
   print QSUB "#PBS -l nodes=1:ppn=1\n";
   print QSUB "module load perl/5.16.1\n";
-  print QSUB "$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/allsequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen\n";
+  print QSUB "$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/sequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen\n";
   close QSUB;
 
   $filterjob=`qsub $tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh`;
@@ -121,7 +100,7 @@ print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@filterjobline[0]\n";
 print QSUB "module load $efiestmod\n";
-print QSUB "$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title=\"$title\" -maxfull $maxfull\n";
+print QSUB "$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title=\"$title\"\n";
 close QSUB;
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
@@ -141,7 +120,7 @@ print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
-print QSUB "#PBS -W depend=afterok:@filterjobline[0]\n";
+print QSUB "#PBS -W depend=afterok:@fulljobline[0]\n"; 
 print QSUB "module load $efiestmod\n";
 #print QSUB "module load cd-hit\n";
 print QSUB "CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)\n";
@@ -155,28 +134,6 @@ print "Repnodes job is:\n $repnodejob";
 
 
 @repnodejobline=split /\./, $repnodejob;
-#@repnodejobline[0]=~s/\[\]//g;
-
-#test to fix dependancies
-#depends on cdhit.sh
-open(QSUB,">$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh") or die "could not create blast submission script $tmpdir/repnodes.sh\n";
-print QSUB "#!/bin/bash\n";
-print QSUB "#PBS -j oe\n";
-print QSUB "#PBS -S /bin/bash\n";
-print QSUB "#PBS -q $queue\n";
-print QSUB "#PBS -l nodes=1:ppn=1\n";
-print QSUB "#PBS -W depend=afterokarray:@repnodejobline[0]\n";
-print QSUB "#PBS -m e\n";
-print QSUB "module load $efiestmod\n";
-print QSUB "sleep 5\n";
-close QSUB;
-
-#submit the filter script, job dependences should keep it from running till all blast out files are combined
-
-$fixjob=`qsub $tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh`;
-print "qsub $tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh\n";
-print "Fix job is:\n $fixjob";
-@fixjobline=split /\./, $fixjob;
 
 #submit series of repnode network calculations
 #depends on filterblast
@@ -186,16 +143,12 @@ print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
-print QSUB "#PBS -W depend=afterok:@fulljobline[0]:$fixjobline[0]\n";
-#print QSUB "#PBS -W depend=afterok:@fulljobline[0],afterokarray:@repnodejobline[0]\n";
-#print QSUB "#PBS -W depend=afterok:@fulljobline[0]\n"; 
+print QSUB "#PBS -W depend=afteranyarray:@repnodejobline[0]\n";
 print QSUB "#PBS -m e\n";
 print QSUB "module load $efiestmod\n";
 print QSUB "$toolpath/stats.pl -tmp $ENV{PWD}/$tmpdir -run $filter-$minval-$minlen-$maxlen -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/stats.tab\n";
 close QSUB;
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
-
 $statjob=`qsub $tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh`;
-print "qsub $tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh\n";
 print "Stats job is:\n $statjob";

@@ -2,7 +2,6 @@
 
 #version 0.5.0  fixed a problem where one less file was created if number of sequences were around the value of np
 #version 0.8.1  rewrote program to use an array of filehandles instead of chopping into parts.
-#version 0.9.2	no changes
 
 use Getopt::Long;
 
