@@ -17,16 +17,18 @@ $result=GetOptions (	"seq=s"	=> \$seq,
 			"np=i"		=> \$np,
 			"blasthits=i"	=> \$blasthits,
 			"queue=s"	=> \$queue,
-			"memqueue=s"	=> \$memqueue
+			"memqueue=s"	=> \$memqueue,
+			"nresults=i"    => \$nresults,
+
 		    );
 
 $configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
 eval $configfile;
-print "$configfile\n";
 
 $efiestmod=$ENV{'EFIDBMOD'};
 $toolpath=$ENV{'EFIEST'};
 
+print "db is: $db\n";
 mkdir $tmpdir or die "Could not make directory $tmpdir\n";
 
 #$db="$ENV{EFIEST}/data_files/combined.fasta";
@@ -34,10 +36,18 @@ mkdir $tmpdir or die "Could not make directory $tmpdir\n";
 $db="$data_files/combined.fasta";
 $perpass=1000;
 $incfrac=0.95;
-$maxhits=50000;
+$maxhits=5000;
 $sortdir='/state/partition1';
 
-print "db is: $db\n";
+#default e value must also be set for blast, default set if not specified
+unless(defined $evalue){
+  print "-evalue not specified, using default of 5\n";
+  $evalue="1e-5";
+}else{
+  if( $evalue =~ /^\d+$/ ) {
+    $evalue="1e-$evalue";
+  } 
+}
 
 #defaults and error checking for multiplexing
 if($multiplexing eq "on"){
@@ -94,6 +104,7 @@ unless(defined $memqueue){
   $memqueue="efi";
 }
 
+#$seq=s/\s+//g;
 open(QUERY, ">$ENV{PWD}/$tmpdir/query.fa") or die "Cannot write out Query File to \n";
 print QUERY ">000000\n$seq\n";
 close QUERY;
@@ -109,7 +120,7 @@ print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "module load $efiestmod\n";
 print QSUB "cd $ENV{PWD}/$tmpdir\n";
 print QSUB "which perl\n";
-print QSUB "blastall -p blastp -i $ENV{PWD}/$tmpdir/query.fa -d $db -m 8 -e $evalue -b $maxhits -o $ENV{PWD}/$tmpdir/initblast.out\n";
+print QSUB "blastall -p blastp -i $ENV{PWD}/$tmpdir/query.fa -d $db -m 8 -e $evalue -b $nresults -o $ENV{PWD}/$tmpdir/initblast.out\n";
 print QSUB "cat $ENV{PWD}/$tmpdir/initblast.out |grep -v '#'|cut -f 1,2,3,4,12 |sort -k5,5nr >$ENV{PWD}/$tmpdir/blastfinal.tab\n";
 #print QSUB "rm $ENV{PWD}/$tmpdir/initblast.out";
 #print QSUB "$toolpath/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa\n";
@@ -129,7 +140,7 @@ print QSUB "#PBS -W depend=afterok:@initblastjobline[0]\n";
 print QSUB "module load $efiestmod\n";
 print QSUB "cd $ENV{PWD}/$tmpdir\n";
 print QSUB "which perl\n";
-print QSUB "$toolpath/blasthits-getmatches.pl -blastfile $ENV{PWD}/$tmpdir/blastfinal.tab -accessions $ENV{PWD}/$tmpdir/accessions.txt -max $maxhits\n";
+print QSUB "$toolpath/blasthits-getmatches.pl -blastfile $ENV{PWD}/$tmpdir/blastfinal.tab -accessions $ENV{PWD}/$tmpdir/accessions.txt -max $nresults\n";
 close QSUB;
 
 $getmatchesjob=`qsub $tmpdir/blasthits_getmatches.sh`;

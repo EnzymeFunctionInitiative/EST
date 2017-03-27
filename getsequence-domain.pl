@@ -13,6 +13,7 @@ use DBD::SQLite;
 use DBD::mysql;
 use File::Slurp;
 
+print "config file is located at: ".$ENV{'EFICFG'}."\n";
 $configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
 eval $configfile;
 
@@ -94,6 +95,9 @@ foreach $element (@ipros){
     push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
+@accessions=keys %accessionhash;
+print "Initial ".scalar @accessions."sequences in IPR\n";
+
 foreach $element (@pfams){
   $sth=$dbh->prepare("select accession,start,end from PFAM where id = '$element'");
   $sth->execute;
@@ -101,6 +105,9 @@ foreach $element (@pfams){
     push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
+@accessions=keys %accessionhash;
+print "Initial ".scalar @accessions."sequences in PFAM\n";
+
 foreach $element (@gene3ds){
   $sth=$dbh->prepare("select accession,start,end from GENE3D where id = '$element'");
   $sth->execute;
@@ -108,6 +115,9 @@ foreach $element (@gene3ds){
     push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
+@accessions=keys %accessionhash;
+print "Initial ".scalar @accessions."sequences in G3D\n";
+
 foreach $element (@ssfs){
   $sth=$dbh->prepare("select accession,start,end from SSF where id = '$element'");
   $sth->execute;
@@ -115,15 +125,20 @@ foreach $element (@ssfs){
     push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
+@accessions=keys %accessionhash;
+print "Initial ".scalar @accessions."sequences in SSF\n";
+@accessions=uniq @accessions;
+print scalar @accessions." after uniquing\n";
+
 
 #one more unique in case of accessions being added in multiple databases
 @accessions=keys %accessionhash;
 
-if(scalar @accessions>$maxsequence and $maxsequence!=0){
-  open ERROR, ">$access.failed" or die "cannot write error output file $access.failed\n";
-  print ERROR "Number of sequences ".scalar @accessions." exceeds maximum specified $maxsequence\n";
+if(int(scalar @accessions/$fraction)>$maxsequence and $maxsequence!=0){
+ open ERROR, ">$access.failed" or die "cannot write error output file $access.failed\n";
+  print ERROR "Number of sequences ".int(scalar @accessions/$fraction)." exceeds maximum specified $maxsequence\n";
   close ERROR;
-  die "Number of sequences ".scalar @accessions." exceeds maximum specified $maxsequence\n";
+  die "Number of sequences ".int(scalar @accessions/$fraction)." exceeds maximum specified $maxsequence\n";
 }
 print "Print out accessions\n";
 open GREP, ">$access" or die "Could not write to $access\n";
@@ -141,8 +156,8 @@ foreach $accession (keys %accessionhash){
 }
 close GREP;
 
-print "Grab Sequences\n";
-print "there are ".scalar @accessions." accessions\n";
+
+print "there are ".scalar @accessions." accessions before removing fractions\n";
 
 if($fraction>1){
     print "removing all but one of $fraction accessions\n";
@@ -158,7 +173,8 @@ if($fraction>1){
     @accessions=@modaccessions;
     print "There are ".scalar @accessions." after keeping one of $fraction\n";
 }
-
+print "Final accession count ".scalar @accessions."\n";
+print "Grab Sequences\n";
 open OUT, ">$out" or die "Cannot write to output fasta $out\n";
 while(scalar @accessions){
   @batch=splice(@accessions, 0, $perpass);

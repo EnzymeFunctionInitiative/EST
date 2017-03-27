@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 
 use Getopt::Long;
-use DBD::SQLite;
-use DBD::mysql;
-use File::Slurp;
+#use DBD::SQLite;
+#use DBD::mysql;
+#use File::Slurp;
 
-$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
-eval $configfile;
+#$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
+#eval $configfile;
 
 $result=GetOptions (	"in=s"	=> \$in,
 			"out=s"	=> \$out
