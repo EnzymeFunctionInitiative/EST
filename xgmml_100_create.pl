@@ -4,6 +4,8 @@
 #version 0.9.1 Removed dat file parser (not used anymore)
 #version 0.9.1 Remove a bunch of commented out stuff
 #version 0.9.2 no changes
+#version 0.9.5 added an xml comment that holds the database name, for future use with gnns and all around good practice
+#version 0.9.5 changed -log10E edge attribue to be named alignment_score
 
 #this program creates an xgmml with all nodes and edges
 
@@ -19,7 +21,8 @@ $result=GetOptions ("blast=s"	=> \$blast,
 		    "struct=s"	=> \$struct,
 		    "output=s"	=> \$output,
 		    "title=s"	=> \$title,
-		    "maxfull=i"	=> \$maxfull);
+		    "maxfull=i"	=> \$maxfull,
+		    "dbver=s"	=> \$dbver);
 
 
 if(defined $maxfull){
@@ -63,7 +66,7 @@ print time."Reading in uniprot numbers from fasta file\n";
 
 open(FASTA, $fasta) or die "could not open $fasta\n";
 foreach $line (<FASTA>){
-  if($line=~/>(\w+)/){
+  if($line=~/>([A-Za-z0-9:]+)/){
     push @uprotnumbers, $1;
   }
 }
@@ -77,7 +80,7 @@ print "populating annotation structure from file\n";
   open STRUCT, $struct or die "could not open $struct\n";
   foreach $line (<STRUCT>){
     chomp $line;
-    if($line=~/^(\w+)/){
+    if($line=~/^([A-Za-z0-9\:]+)/){
       $id=$1;
     }else{
       @lineary=split "\t",$line;
@@ -85,7 +88,7 @@ print "populating annotation structure from file\n";
 	@lineary[2]='None';
       }
       unless(@lineary[1] eq "IPRO" or @lineary[1] eq "GI" or @lineary[1] eq "PDB" or @lineary[1] eq "PFAM" or @lineary[1] eq "GO"  or @lineary[1] eq "HMP_Body_Site" or @lineary[1] eq "CAZY"){
-        $uprot{$id}{@lineary[1]}=@lineary[2]; 
+	  $uprot{$id}{@lineary[1]}=@lineary[2]; 
       }else{
         my @tmpline=split ",", @lineary[2];
         push @{$uprot{$id}{@lineary[1]}}, @tmpline;
@@ -115,21 +118,38 @@ $metaline=join ',', @metas;
 
 print time."Metadata keys are $metaline\n";
 print time."Start nodes\n";
+$writer->comment("Database: $dbver");
 $writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
 foreach my $element (@uprotnumbers){
   #print "$element\n";;
+  $origelement=$element;
   $node++;
   $writer->startTag('node', 'id' => $element, 'label' => $element);
+  if($element=~/(\w{6,10}):/){
+    $element=$1;
+  }
   foreach my $key (@metas){
     #print "\t$key\t$uprot{$element}{$key}\n";
     if($key eq "IPRO" or $key eq "GI" or $key eq "PDB" or $key eq "PFAM" or $key eq "GO"  or $key eq "HMP_Body_Site" or $key eq "CAZY"){
       $writer->startTag('att', 'type' => 'list', 'name' => $key);
       foreach my $piece (@{$uprot{$element}{$key}}){
+	$piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
 	$writer->emptyTag('att', 'type' => 'string', 'name' => $key, 'value' => $piece);
       }
       $writer->endTag();
     }else{
-      $writer->emptyTag('att', 'name' => $key, 'type' => 'string', 'value' => $uprot{$element}{$key});
+      $uprot{$element}{$key}=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+      if($key eq "Sequence_Length" and $origelement=~/\w{6,10}:(\d+):(\d+)/){
+	my $piece=$2-$1+1;
+	print "start:$1\tend$2\ttotal:$piece\n";
+        $writer->emptyTag('att', 'name' => $key, 'type' => 'integer', 'value' => $piece);
+      }else{
+	if($key eq "Sequence_Length"){
+	  $writer->emptyTag('att', 'name' => $key, 'type' => 'integer', 'value' => $uprot{$element}{$key});
+	}else{
+	  $writer->emptyTag('att', 'name' => $key, 'type' => 'string', 'value' => $uprot{$element}{$key});
+	}
+      }
     }
   }
   $writer->endTag();
@@ -146,7 +166,7 @@ while (<BLASTFILE>){
   my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
   $writer->startTag('edge', 'id' => "@line[0],@line[1]", 'label' => "@line[0],@line[1]", 'source' => @line[0], 'target' => @line[1]);
   $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[2]);
-  $writer->emptyTag('att', 'name' => '-log10(E)', 'type'=> 'real', 'value' => $log);
+  $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $log);
   $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => @line[3]);
 
   $writer->endTag();

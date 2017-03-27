@@ -1,6 +1,7 @@
 #!/bin/env perl
 
 #version 0.9.2 no changes to this file
+#version 0.9.5 fixed a bug in creating struct.out file where not all annotation information was being written
 
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
@@ -33,7 +34,8 @@ foreach $taxid (@taxids){
   $sth= $dbh->prepare("select * from annotations where Taxonomy_ID = '$taxid'");
   $sth->execute;
   while($row = $sth->fetch){
-    print STRUCT $row->[0]."\n\tUniprot_ID\t".$row->[1]."\n\tSTATUS\t".$row->[2]."\n\tSequence_Length\t".$row->[3]."\n\tTaxonomy_ID\t".$row->[4]."\n\tGDNA\t".$row->[5]."\n\tDescription\t".$row->[6]."\n\tSwissProt_Description\t".$row->[7]."\n\tOrganism\t".$row->[8]."\n\tDomain\t".$row->[9]."\n\tGN\t".$row->[10]."\n\tPFAM\t".$row->[11]."\n\tPDB\t".$row->[12]."\n\tIPRO\t".$row->[13]."\n\tGO\t".$row->[14]."\n\tGI\t".$row->[15]."\n\tHMP_Body_Site\t".$row->[16]."\n\tHMP_Oxygen\t".$row->[17]."\n\tEFI_ID\t".$row->[18]."\n";
+    print STRUCT $row->[0]."\n\tUniprot_ID\t".$row->[1]."\n\tSTATUS\t".$row->[2]."\n\tSequence_Length\t".$row->[3]."\n\tTaxonomy_ID\t".$row->[4]."\n\tGDNA\t".$row->[5]."\n\tDescription\t".$row->[6]."\n\tSwissprot_Description\t".$row->[7]."\n\tOrganism\t".$row->[8]."\n\tDomain\t".$row->[9]."\n\tGN\t".$row->[10]."\n\tPFAM\t".$row->[11]."\n\tPDB\t".$row->[12]."\n\tIPRO\t".$row->[13]."\n\tGO\t".$row->[14]."\n\tGI\t".$row->[15]."\n\tHMP_Body_Site\t".$row->[16]."\n\tHMP_Oxygen\t".$row->[17]."\n\tEFI_ID\t".$row->[18]."\n\tEC\t".$row->[19]."\n\tPHYLUM\t".$row->[20]."\n\tCLASS\t".$row->[21]."\n\tORDER\t".$row->[22]."\n\tFAMILY\t".$row->[23]."\n\tGENUS\t".$row->[24]."\n\tSPECIES\t".$row->[25]."\n\tCAZY\t".$row->[26]."\n";
+    #print STRUCT $row->[0]."\n\tUniprot_ID\t".$row->[1]."\n\tSTATUS\t".$row->[2]."\n\tSequence_Length\t".$row->[3]."\n\tTaxonomy_ID\t".$row->[4]."\n\tGDNA\t".$row->[5]."\n\tDescription\t".$row->[6]."\n\tSwissProt_Description\t".$row->[7]."\n\tOrganism\t".$row->[8]."\n\tDomain\t".$row->[9]."\n\tGN\t".$row->[10]."\n\tPFAM\t".$row->[11]."\n\tPDB\t".$row->[12]."\n\tIPRO\t".$row->[13]."\n\tGO\t".$row->[14]."\n\tGI\t".$row->[15]."\n\tHMP_Body_Site\t".$row->[16]."\n\tHMP_Oxygen\t".$row->[17]."\n\tEFI_ID\t".$row->[18]."\n";
     #print FASTA ">".$row->[0]."\n".$row->[18]."\n";
     push @accessions,$row->[0];
     $count++;

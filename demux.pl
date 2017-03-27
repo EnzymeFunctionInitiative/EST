@@ -22,6 +22,7 @@ open BLASTOUT, ">$blastout" or die "cannnot write to blast output file $blastout
 #parse the clstr file
 print "Read in clusters\n";
 while(<CLUSTER>){
+print "$line";
   my $line=$_;
   chomp $line;
   if($line=~/^>/){
@@ -30,16 +31,16 @@ while(<CLUSTER>){
       @{$tree{$head}}=@children;
     }
     @children=();
-  }elsif($line=~/ >(\w{6,10})\.\.\. \*$/){
+  }elsif($line=~/ >(\w{6,10})\.\.\. \*$/ or $line=~/ >(\w{6,10}:\d+:\d+)\.\.\. \*$/ ){
     #print "head\t$1\n";
     push @children, $1;
     $head=$1;
     #print "$1\n";
-  }elsif($line=~/^\d+.*>(\w{6,10})\.\.\. at/){
-    #print "child\t$1\n";
+  }elsif($line=~/^\d+.*>(\w{6,10})\.\.\. at/ or $line=~/^\d+.*>(\w{6,10}:\d+:\d+)\.\.\. at/){
+    print "$head\tchild\t$1\n";
     push @children, $1;
   }else{
-    die "$line\n";
+    warn "no match in $line\n";
   }
 }
 
@@ -58,7 +59,7 @@ while(<BLASTIN>){
     for(my $i=0;$i<scalar @{$tree{$linesource}};$i++){
       for(my $j=$i+1;$j<scalar @{$tree{$linesource}};$j++){
 	print BLASTOUT  "@{$tree{$linesource}}[$i]\t@{$tree{$linesource}}[$j]\t".join("\t", @lineary)."\n";
-	#print "likewise demux\t@{$tree{$linesource}}[$i]\t@{$tree{$linesource}}[$j]\n";
+	print "likewise demux\t@{$tree{$linesource}}[$i]\t@{$tree{$linesource}}[$j]\n";
       }
     }
   }else{

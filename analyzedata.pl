@@ -26,6 +26,9 @@ $result=GetOptions ("filter=s"  => \$filter,
 $toolpath=$ENV{'EFIEST'};
 $efiestmod=$ENV{'EFIESTMOD'};
 
+$dbver=`head -1 $tmpdir/database_version`;
+chomp $dbver;
+
 #minlen and maxlen defaulted to zero if not assigned.
 if(defined $minlen){
 }else{
@@ -121,7 +124,7 @@ print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@filterjobline[0]\n";
 print QSUB "module load $efiestmod\n";
-print QSUB "$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title=\"$title\" -maxfull $maxfull\n";
+print QSUB "$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title=\"$title\" -maxfull $maxfull -dbver $dbver\n";
 close QSUB;
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
@@ -146,7 +149,7 @@ print QSUB "module load $efiestmod\n";
 #print QSUB "module load cd-hit\n";
 print QSUB "CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)\n";
 print QSUB "cd-hit -i $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0\n";
-print QSUB "$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/repnode-\$CDHIT.xgmml -title=\"$title\"\n";
+print QSUB "$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/repnode-\$CDHIT.xgmml -title=\"$title\" -dbver $dbver\n";
 close QSUB;
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined

@@ -23,6 +23,7 @@
 #version 0.9.4 changed name of get sequence script from sqlite-getsequence.pl to getsequence.pl
 #version 0.9.4 moved from specific fracfile.pl to general splitsequence.pl for splitting up blast files
 #version 0.9.4 started removing *blastfinal.tab files in demux step
+#version 0.9.5 added code to hold database version, stores in database_version in the SDF
 
 #this program creates bash scripts and submits them on clusters with torque schedulers, overview of steps below
 #Step 1 fetch sequences and get annotations
@@ -89,13 +90,34 @@ $result=GetOptions ("np=i"		=> \$np,
 		    "userfasta=s"	=> \$userfasta,
 		    "lengthdif=f"	=> \$lengthdif,
 		    "sim=f"		=> \$sim,
-		    "multiplex=s"	=> \$multiplexing);
+		    "multiplex=s"	=> \$multiplexing,
+		    "domain=s"		=> \$domain,
+		    "fraction=i"	=> \$fraction);
 
 $toolpath=$ENV{'EFIEST'};
-$efiestmod=$ENV{'EFIESTMOD'};
+$efiestmod=$ENV{'EFIDBMOD'};
+$efidbmod=$efiestmod;
 $sortdir='/state/partition1';
 
-#print "taxid is $taxid\n";
+#defaults and error checking for splitting sequences into domains
+
+if(defined $domain){
+  unless($domain eq "off" or $domain eq "on"){
+    die "domain value of $domain is not valid, must be either on or off\n";
+  }
+}else{
+  $domain="off";
+}
+
+#defaults for fraction of sequences to fetch
+
+if(defined $fraction){
+  unless($fraction=~/^\d+$/ and $fraction >0){
+    die "if fraction is defined, it must be greater than zero\n";
+  }
+}else{
+  $fraction=1;
+}
 
 #defaults and error checking for multiplexing
 if($multiplexing eq "on"){
@@ -113,6 +135,21 @@ if($multiplexing eq "on"){
   }else{
     $sim=1;
   }
+}elsif($multiplexing eq "off"){
+   if(defined $lengthdif){
+    unless($lengthdif=~/\d*\.\d+/){
+      die "lengthdif must be in a format like 0.9\n";
+    }
+  }else{
+    $lengthdif=1;
+  }
+  if(defined $sim){
+    unless($sim=~/\d*\.\d+/){
+      die "sim must be in a format like 0.9\n";
+    }   
+  }else{
+    $sim=1;
+  } 
 }elsif(!(defined $multiplexing)){
   $multiplexing="on";
   if(defined $lengthdif){
@@ -221,32 +258,42 @@ if(defined $userfasta and -e $userfasta){
   unless(($userfasta=~/^\// or $userfasta=~/^~/) and defined $userfasta){
     $userfasta=$ENV{PWD}."/$userfasta";
   }
-  $userfasta="-userfasta $userfasta";
+  $userfasta="-userfasta $userfasta"
 }elsif(defined $userfasta){
   die "$userfasta does not exist\n";
 }else{
   $userfasta="";
+  #die "this should never happen, may be userfasta flagged but not given\n";
 }
 
-unless(($userdat=~/^\// or $userdat=~/^~/) and defined $userdat){
-  $userdat=$ENV{PWD}."/$userdat";
-}
+
+
 
 if(defined $userdat and -e $userdat){
+  unless(($userdat=~/^\// or $userdat=~/^~/) and defined $userdat){
+    $userdat=$ENV{PWD}."/$userdat";
+  }
   $userdat="-userdat $userdat";
 }elsif(defined $userdat){
   die "$userdat does not exist\n";
 }else{
+  print "this is userdat:$userdat:\n";
   $userdat="";
+  #die "this should never happen, maybe uerdat flagged but not given\n";
 }
 
 #create tmp directories
 mkdir $tmpdir;
 
+#write out the database version to a file
+$efidbmod=~/(\d+)$/;
+print "database version is $1 of $efidbmod\n";
+system("echo $1 >$tmpdir/database_version");
+
 #get sequences and annotations, tax id code is different, so it is exclusive
 #creates fasta and struct.out files
 print "userfasta $userfasta\n";
-if($pfam or $ipro or $ssf or $gene3d or $userfasta=~/\w+/){
+if($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid)){
   #make the qsub file
   open(QSUB,">$tmpdir/initial_import.sh") or die "could not create blast submission script $tmpdir/createdb.sh\n";
   print QSUB "#!/bin/bash\n";
@@ -257,7 +304,7 @@ if($pfam or $ipro or $ssf or $gene3d or $userfasta=~/\w+/){
   print QSUB "module load $efiestmod\n";
   print QSUB "cd $ENV{PWD}/$tmpdir\n";
   print QSUB "which perl\n";
-  print QSUB "$toolpath/getsequence.pl $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -access ".$ENV{PWD}."/$tmpdir/accession.txt\n";
+  print QSUB "$toolpath/getsequence-domain.pl -domain $domain $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -access ".$ENV{PWD}."/$tmpdir/accession.txt\n";
   print QSUB "$toolpath/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa\n";
   close QSUB;
 
@@ -277,6 +324,14 @@ if($pfam or $ipro or $ssf or $gene3d or $userfasta=~/\w+/){
   print QSUB "module load $efiestmod\n";
   print QSUB "cd $ENV{PWD}/$tmpdir\n";
   print QSUB "$toolpath/getseqtaxid.pl -fasta allsequences.fa -struct struct.out -taxid $taxid\n";
+  if($userfasta=~/\w+/){
+    $userfasta=~s/^-userfasta //;
+    print QSUB "cat $userfasta >> allsequences.fa\n";
+  }
+  if($userdat=~/\w+/){
+    $userdat=~s/^-userdat //;
+    print QSUB "cat $userdat >>struct.out\n";
+  }
   close QSUB;
 
   #submit job and keep job id for next dependancy
@@ -284,7 +339,7 @@ if($pfam or $ipro or $ssf or $gene3d or $userfasta=~/\w+/){
   print "import job is:\n $importjob";
   @importjobline=split /\./, $importjob;
 }else{
-  die "Error Submitting Import Job\n$importjob\n";
+  die "Error Submitting Import Job\n$importjob\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
 }
 
 #if multiplexing is on, run an initial cdhit to get a reduced set of "more" unique sequences
@@ -336,7 +391,7 @@ print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@fracfilejobline[0]\n";
 print QSUB "module load $efiestmod\n";
 print QSUB "cd $ENV{PWD}/$tmpdir\n";
-print QSUB "formatdb -i sequences.fa -n database\n";
+print QSUB "formatdb -i sequences.fa -n database -p T -o T \n";
 close QSUB;
 
 $createdbjob=`qsub $tmpdir/createdb.sh`;
@@ -374,8 +429,8 @@ print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterokarray:@blastjobline[0]\n"; 
 print QSUB "cat $ENV{PWD}/$tmpdir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$ENV{PWD}/$tmpdir/blastfinal.tab\n";
-print QSUB "rm  $ENV{PWD}/$tmpdir/blastout-*.tab\n";
-print QSUB "rm  $ENV{PWD}/$tmpdir/fracfile-*.fa\n";
+#print QSUB "rm  $ENV{PWD}/$tmpdir/blastout-*.tab\n";
+#print QSUB "rm  $ENV{PWD}/$tmpdir/fracfile-*.fa\n";
 close QSUB;
 $catjob=`qsub $tmpdir/catjob.sh`;
 print "Cat job is:\n $catjob";

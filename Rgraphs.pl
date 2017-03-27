@@ -2,6 +2,7 @@
 
 #version 0.9.3	Script Created
 #version 0.9.3	Script to write out tables for R, replacement for doing with perl (this is over 25X more effecient)
+#version 0.9.5	Fixed a problem where non text characters in SDF name would cause program to crash
 
 use GD::Graph::boxplot;
 use GD;
@@ -76,7 +77,7 @@ foreach $file (@align){
     die "something is wrong, file does not have home in name\n";
   }
   if($removefile==0){
-    $file=~/\s*(\d+)\s+([\w-\/]+)/;
+    $file=~/\s*(\d+)\s+([\w-\/.]+)/;
     $file=$2;
     $edgecount=$1;
     if($1>$edgelimit){
@@ -90,7 +91,7 @@ foreach $file (@align){
       #print "unlink $file\n";
       unlink $file or die "could not remove $file\n";
       #although we are only looking at align files, the perid ones have to go as well
-      $file=~s/align/perid/;
+      $file=~s/align(\d+)$/perid$1/;
       #print "unlink $file\n";
       unlink $file or die "could not remove $file\n";
       #if we have already saved some data, do not save any more (sets right side of graph)
@@ -99,13 +100,13 @@ foreach $file (@align){
       }
     }
   }else{
-    $file=~/\s*(\d+)\s+([\w-\/]+)/; 
+    $file=~/\s*(\d+)\s+([\w-\/.]+)/; 
     $file=$2;
     #print "unlink $file\n";
     #once we find one value at the end of the graph to remove, we remove the rest
     unlink $file or die "could not remove $file\n";
     #although we are only looking at align files, the perid ones have to go as well
-    $file=~s/align/perid/;
+    $file=~s/align(\d+)$/perid$1/;
     #print "unlink $file\n";
     unlink $file or die "could not remove $file\n";
   }

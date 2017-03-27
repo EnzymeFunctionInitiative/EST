@@ -6,43 +6,22 @@
 #version 0.9.1 After much thought, this step of the program will remain seperate
 #version 0.9.1 Renamed blastreduce.pl from step_2.2-filterblast.pl
 #version 0.9.2 Modifiied to accept 6-10 digit accessions
-#version 0.9.4 moved searches hash to disk by using DBM::Deep
+#version 0.9.4 Modified to remove a line if the first two columns are the same as the prior line, this allows removing dups through sorting
 
 use Getopt::Long;
 
 
-$result=GetOptions ("fasta=s" => \$fasta,
-		    "blast=s"  => \$blast,
+$result=GetOptions ("blast=s"  => \$blast,
 		    "out=s" => \$out);
 
-%seqlengths=();
-
-open FASTA, $fasta or die "Could not open fasta file $fasta\n";
-
-$sequence="";
-while (<FASTA>){
-  $line=$_;
-  chomp $line;
-  if($line=~/^>(\w{6,10})/){
-    $seqlengths{$key}=length $sequence;
-    $sequence="";
-    $key=$1;
-  }else{
-    $sequence.=$line;
-  }
-}
-$seqlengths{$key}=length $sequence;
-close FASTA;
-
-open(BLASTFILE,$blast) or die "Could not open blast output $blast\n";
-open(OUT,">$out") or die "Could not write to $out\n";
-$first="";
-$second="";
+open(BLASTFILE, $blast) or die "cannot open blastfile $blastfile for writing\n";
+open(OUT, ">$out") or die "cannot write to output file $out\n";
 
 while (<BLASTFILE>){
   $line=$_;
   chomp $line;
-  $line=~/^(\w+)\t(\w+)/;
+
+  $line=~/^([a-zA-Z0-9\:]+)\t([a-zA-Z0-9\:]+)/;
   unless($1 eq $first and $2 eq $second){
     print OUT "$line\n";
     $first=$1;

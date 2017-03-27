@@ -26,12 +26,14 @@ $result=GetOptions (	"ipro=s"	=> \$ipro,
 			"maxsequence=s"	=> \$maxsequence,
 			"out=s"		=> \$out,
 			"userfasta=s"	=> \$userfasta,
-			"domain=s"	=> \$domain
+			"domain=s"	=> \$domain,
+			"fraction=i"	=> \$fraction
 		    );
 
 @accessions=();
 $perpass=$ENV{'EFIPASS'};
 %ids=();
+%accessionhash=();
 
 if(defined $domain){
   unless($domain eq "off" or $domain eq "on"){
@@ -39,6 +41,14 @@ if(defined $domain){
   }
 }else{
   $domain="off";
+}
+
+if(defined $fraction){
+  unless($fraction=~/^\d+$/ and $fraction >0){
+    die "if fraction is defined, it must be greater than zero\n";
+  }
+}else{
+  $fraction=1;
 }
 
 if(defined $ipro and $ipro ne 0){
@@ -55,7 +65,7 @@ if(defined $pfam and $pfam ne 0){
 }
 if(defined $gene3d and $gene3d ne 0){
   print ":$gene3d:\n";
-  @gene3ds=split /,/, $gene3ds;
+  @gene3ds=split /,/, $gene3d;
 }else{
   @gene3ds=();
 }
@@ -78,36 +88,36 @@ print "Getting Acession Numbers in specified Families\n";
 
 
 foreach $element (@ipros){
-  $sth=$dbh->prepare("select accession from INTERPRO where id = '$element'");
+  $sth=$dbh->prepare("select accession,start,end from INTERPRO where id = '$element'");
   $sth->execute;
   while($row = $sth->fetch){
-    push @accessions, $row->[0];
+    push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
 foreach $element (@pfams){
-  $sth=$dbh->prepare("select accession from PFAM where id = '$element'");
+  $sth=$dbh->prepare("select accession,start,end from PFAM where id = '$element'");
   $sth->execute;
   while($row = $sth->fetch){
-    push @accessions, $row->[0];
+    push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
 foreach $element (@gene3ds){
-  $sth=$dbh->prepare("select accession from GENE3D where id = '$element'");
+  $sth=$dbh->prepare("select accession,start,end from GENE3D where id = '$element'");
   $sth->execute;
   while($row = $sth->fetch){
-    push @accessions, $row->[0];
+    push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
 foreach $element (@ssfs){
-  $sth=$dbh->prepare("select accession from SSF where id = '$element'");
+  $sth=$dbh->prepare("select accession,start,end from SSF where id = '$element'");
   $sth->execute;
   while($row = $sth->fetch){
-    push @accessions, $row->[0];
+    push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
   }
 }
 
 #one more unique in case of accessions being added in multiple databases
-@accessions=uniq @accessions;
+@accessions=keys %accessionhash;
 
 if(scalar @accessions>$maxsequence and $maxsequence!=0){
   open ERROR, ">$access.failed" or die "cannot write error output file $access.failed\n";
@@ -117,22 +127,68 @@ if(scalar @accessions>$maxsequence and $maxsequence!=0){
 }
 print "Print out accessions\n";
 open GREP, ">$access" or die "Could not write to $access\n";
-foreach $accession (@accessions){
-  print GREP "$accession\n";
+foreach $accession (keys %accessionhash){
+  my @domains=@{$accessionhash{$accession}};
+  foreach $piece (@domains){
+    if($domain eq "off"){
+      print GREP "$accession\n";
+    }elsif($domain eq "on"){
+      print GREP "$accession:${$piece}{'start'}:${$piece}{'end'}\n"
+    }else{
+      die "domain must be set to either on or off\n";
+    }
+  }
 }
 close GREP;
 
 print "Grab Sequences\n";
 print "there are ".scalar @accessions." accessions\n";
 
+if($fraction>1){
+    print "removing all but one of $fraction accessions\n";
+    my $modcount=1;
+    my @modaccessions=();
+    foreach my $accession (@accessions){
+      if(($modcount%$fraction)==0){
+	#print "keeping $modcount\n";
+	push @modaccessions, $accession;
+      }
+      $modcount++;
+    }
+    @accessions=@modaccessions;
+    print "There are ".scalar @accessions." after keeping one of $fraction\n";
+}
+
 open OUT, ">$out" or die "Cannot write to output fasta $out\n";
 while(scalar @accessions){
   @batch=splice(@accessions, 0, $perpass);
   $batchline=join ',', @batch;
-  @sequences=split /\n/, `fastacmd -d $data_files/combined.fasta -s $batchline`;
+  @sequences=split /\n>/, `fastacmd -d $data_files/combined.fasta -s $batchline`;
   foreach $sequence (@sequences){ 
-    $sequence=~s/^>\w\w\|(\w{6,10})\|.*/>$1/;
-    print OUT "$sequence\n";
+    #print "raw $sequence\n";
+    if($sequence=~s/^\w\w\|(\w{6,10})\|.*//){
+      $accession=$1;
+    }else{
+      $accession="";
+    }
+    if($domain eq "off" and $accession ne ""){
+      print OUT ">$accession$sequence\n";
+      #print "accession: $accession\n$sequence\n";
+    }elsif($domain eq "on" and $accession ne ""){
+      $sequence=~s/\s+//g;
+      my @domains=@{$accessionhash{$accession}};
+      #print "accession $accession has ".scalar(@domains)." domains\n";
+      foreach my $piece (@domains){
+	my $thissequence=join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
+	print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n";
+	#print "$accession:${$piece}{'start'}:${$piece}{'end'}\t".length substr $sequence,${$piece}{'start'}-1,(${$piece}{'end'}-${$piece}{'start'}+1)."\n";
+	#print "\n";
+      }
+    }elsif($accession eq ""){
+      #do nothing
+    }else{
+      die "Domain must be either on or off\n";
+    }
   }
   
 }

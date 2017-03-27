@@ -45,3 +45,4 @@ while (<SEQUENCES>){
     $sequence.=$line;
   }
 }
+print {@filehandles[$arrayid]} $sequence;

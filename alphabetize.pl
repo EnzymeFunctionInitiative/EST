@@ -23,7 +23,7 @@ $sequence="";
 while (<FASTA>){
   $line=$_;
   chomp $line;
-  if($line=~/^>(\w{6,10})/){
+  if($line=~/^>(\w{6,10})$/  or $line=~/^>(\w{6,10}\:\d+\:\d+)$/){
     $seqlengths{$key}=length $sequence;
     $sequence="";
     $key=$1;
@@ -37,8 +37,7 @@ close FASTA;
 while(<IN>){
   $line=$_;
   chomp $line;
-  $line=~/^(\w+)\t(\w+)\t(.*)$/;
-  my $mult=$seqlengths{$1}*$seqlengths{$2};
+  $line=~/^([A-Za-z0-9:]+)\t([A-Za-z0-9:]+)\t(.*)$/;
   if($1 lt $2){
     print OUT "$line\t$seqlengths{$1}\t$seqlengths{$2}\n";
     #print "forward\n";

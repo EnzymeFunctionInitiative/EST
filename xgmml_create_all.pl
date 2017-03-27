@@ -4,6 +4,9 @@
 #version 0.9.1 Removed .dat parser (not used anymore)
 #version 0.9.1 Remove a lot of unused commented out lines
 #version 0.9.2 no changes
+#version 0.9.5 added an xml comment that holds the database name, for future use with gnns and all around good practice
+#version 0.9.5 changed -log10E edge attribue to be named alignment_score
+#version 0.9.5 changed sequence_length node attribute to be a list of integers instead of strings
 
 #this program is used to create repnode networks using information from cd-hit
 
@@ -19,7 +22,8 @@ $result=GetOptions ("blast=s"	=> \$blast,
 		    "fasta=s"	=> \$fasta,
 		    "struct=s"	=> \$struct,
 		    "output=s"	=> \$output,
-		    "title=s"	=> \$title);
+		    "title=s"	=> \$title,
+		    "dbver=s"	=> \$dbver);
 
 $uniprotgi='/home/groups/efi/devel/idmapping/gionly.dat';
 $uniprotref='/home/groups/efi/devel/idmapping/RefSeqonly.dat';
@@ -41,7 +45,7 @@ print "populating annotation structure from file\n";
   open STRUCT, $struct or die "could not open $struct\n";
   foreach $line (<STRUCT>){
     chomp $line;
-    if($line=~/^(\w+)/){
+    if($line=~/^([A-Za-z0-9:]+)/){
       $id=$1;
     }else{
       @lineary=split "\t",$line;
@@ -49,9 +53,7 @@ print "populating annotation structure from file\n";
 	@lineary[2]='None';
       }
       unless(@lineary[1] eq "IPRO" or @lineary[1] eq "GI" or @lineary[1] eq "PDB" or @lineary[1] eq "PFAM" or @lineary[1] eq "GO" or @lineary[1] eq "HMP_Body_Site" or @lineary[1] eq "CAZY"){
-        unless(@lineary[1] eq "SEQ"){
-	  $uprot{$id}{@lineary[1]}=@lineary[2]; 
-	}
+	  $uprot{$id}{@lineary[1]}=@lineary[2];
       }else{
         my @tmpline=split ",", @lineary[2];
         push @{$uprot{$id}{@lineary[1]}}, @tmpline;
@@ -89,6 +91,8 @@ if($cdhit=~/cdhit\.*([\d\.]+)\.clstr$/){
   die "Title Broken\n";
 }
 
+
+$writer->comment("Database: $dbver");
 #write the top container
 $writer->startTag('graph', 'label' => "$title", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
 
@@ -107,7 +111,16 @@ while (<CDHIT>){
       @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
       $writer->startTag('att', 'type' => 'list', 'name' => $key);
       foreach my $piece (@{$clusterdata{$key}}){
-	$writer->emptyTag('att', 'type' => 'string', 'name' => $key, 'value' => $piece);
+	#remove illegal xml characters from annotation data
+	$piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+	if($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/){
+	  $piece=$2-$1+1;
+	}
+	unless($key eq "Sequence_Length"){
+	  $writer->emptyTag('att', 'type' => 'string', 'name' => $key, 'value' => $piece);
+	}else{
+	  $writer->emptyTag('att', 'type' => 'integer', 'name' => $key, 'value' => $piece);
+	}
       }
       $writer->endTag();
     }
@@ -117,9 +130,8 @@ while (<CDHIT>){
     $count=0;
   }else{
     my @lineary=split /\s+/, $line;
-    if(@lineary[2]=~/^>(\w{6,10})\.\.\./){
+    if(@lineary[2]=~/^>(\w{6,10})\.\.\./ or @lineary[2]=~/^>([A-Za-z0-9:]+)\.\.\./){
       $element=$1;
-
       $count++;
     }else{
       die "malformed line $line in cdhit file\n";
@@ -129,6 +141,9 @@ while (<CDHIT>){
       $headuprot{$head}=1;
     }
     foreach my $key (@metas){
+      if($element=~/(\w{6,10}):/){
+	$element=$1;
+      }
       if($key eq "ACC"){
 	push @{$clusterdata{$key}}, $element;
       }elsif(is_array($uprot{$element}{$key})){
@@ -170,7 +185,7 @@ while (<BLASTFILE>){
     $edgecount++;
     $writer->startTag('edge', 'id' => "@line[0],@line[1]", 'label'=> "@line[0],@line[1]", 'source' => @line[0], 'target' => @line[1]);
     $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[2]);
-    $writer->emptyTag('att', 'name' => '-log10(E)', 'type' => 'real', 'value' => $log);
+    $writer->emptyTag('att', 'name' => 'alignment_score', 'type' => 'real', 'value' => $log);
     $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => @line[3]);
     $writer->endTag;
   }
