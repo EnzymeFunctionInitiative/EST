@@ -7,7 +7,7 @@ $result=GetOptions ("xgmml=s"		=> \$xgmml,
 		    "oldtmp=s"		=> \$oldtmp,
 		    "newtmp=s"		=> \$newtmp);
 
-$combined="/home/groups/efi/alpha/data_files/combined.fasta";
+$combined=$ENV{'EFIEST'}."/data_files/combined.fasta";
 $perpass=1000;
 
 #system("cp $oldtmp/1.out $newtmp/1.out");
@@ -30,8 +30,8 @@ while( <XGMML> ){
 #print "$line\n";
     if($line=~/<att type="list" name="ACC">(.*?)<\/att>/ or $line=~/<att name="ACC" type="list">(.*?)<\/att>/){
       $acc=$1;
-#print "Match ACC\t$acc\n";
-      push @accessions, $acc=~/value=\"(\w{6})\"/g;
+print "Match ACC\t$acc\n";
+      push @accessions, $acc=~/value=\"(\w{6,10})\"/g;
       #$acc=~/value="(\w{6})"/g;
 #print "match: $1\n\ncount ".scalar @accessions."\n";      
       $line="";
@@ -54,7 +54,7 @@ while(scalar @accessions){
   #print "fastacmd -d $combined -s $batchline\n";
   @sequences=split /\n/, `fastacmd -d $combined -s $batchline`;
   foreach $sequence (@sequences){ 
-    $sequence=~s/^>\w\w\|(\w{6}).*/>$1/;
+    $sequence=~s/^>\w\w\|(\w{6,10}).*/>$1/;
     print FASTA "$sequence\n";
   } 
 }
@@ -64,8 +64,8 @@ print "Parse 1.out for edges\n";
 foreach $accession (@allaccessions){
   $acchash{$accession}=1;
 }
-open(OLDBLAST, "$oldtmp/1.out") or die "Could not open blast file in original folder $oldtmp/1.out\n";
-open(NEWBLAST, ">$newtmp/1.out") or die "Could not write to new blast file $newtmp/1.out\n";
+open(OLDBLAST, "$oldtmp/1.out") or die "Could not open blast file in original folder\n";
+open(NEWBLAST, ">$newtmp/1.out") or die "Could not write to new blast file\n";
 while(<OLDBLAST>){
   $line=$_;
   chomp $line;

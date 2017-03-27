@@ -4,13 +4,29 @@
 #version 0.9.0 moved from getting accesions by grepping files to using sqlite database
 #version 0.9.0 options of specifing ssf and gene3d numbers added
 #version 0.9.2 modified to accept 6-10 characters as accession ids
+#version 0.9.3 modified to use cfg file to load location of variables for database
 
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::SQLite;
+use DBD::mysql;
+use File::Slurp;
 
-$combined=$ENV{'EFIEST'}."/data_files/combined.fasta";
-$db=$ENV{'EFIEST'}."/data_files/uniprot_combined.db";
+#moving config files to efi.cfg
+#$combined=$ENV{'EFIEST'}."/data_files/combined.fasta";
+#$db=$ENV{'EFIEST'}."/data_files/uniprot_combined.db";
+#my $dbh = DBI->connect("dbi:SQLite:$db","","");
+
+$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
+eval $configfile;
+
+#$db="efi_20140729";
+#$username='efignn';
+#$password='c@lcgnn';
+#$dbh = DBI->connect("DBI:mysql:$db;host=10.1.1.3;port=3307", $username, $password, { RaiseError => 1 });
+
+
+print "Configfile is \n$configfile\n";
 
 $result=GetOptions (	"ipro=s"	=> \$ipro,
 			"pfam=s"	=> \$pfam,
@@ -60,7 +76,7 @@ unless(defined $maxsequence){
 
 print "Getting Acession Numbers in specified Families\n";
 
-my $dbh = DBI->connect("dbi:SQLite:$db","","");
+
 
 foreach $element (@ipros){
   $sth=$dbh->prepare("select accession from INTERPRO where id = '$element'");

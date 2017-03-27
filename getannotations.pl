@@ -5,8 +5,14 @@
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::SQLite;
+use DBD::mysql;
+use File::Slurp;
 
-$db=$ENV{'EFIEST'}."/data_files/uniprot_combined.db";
+#removed in favor of cfg file
+#$db=$ENV{'EFIEST'}."/data_files/uniprot_combined.db";
+#my $dbh = DBI->connect("dbi:SQLite:$db","","");
+$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
+eval $configfile;
 
 $result=GetOptions ("fasta=s"		=> \$fasta,
 		    "out=s"		=> \$out,
@@ -18,7 +24,7 @@ print "$fasta\n";
 
 open OUT, ">$out" or die "cannot write struct.out file $out\n";
 
-my $dbh = DBI->connect("dbi:SQLite:$db","","");
+
 foreach $accession (@accessions){
   #print "$accession\n";
   $sth= $dbh->prepare("select * from annotations where accession = '$accession'");

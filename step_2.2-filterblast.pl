@@ -18,7 +18,7 @@ $sequence="";
 while (<FASTA>){
   $line=$_;
   chomp $line;
-  if($line=~/^>(\w{6,10})/){
+  if($line=~/^>(\w{6})/){
     $seqlengths{$key}=length $sequence;
     $sequence="";
     $key=$1;

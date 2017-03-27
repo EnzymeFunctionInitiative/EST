@@ -162,7 +162,8 @@ $clusterdata=();
 print "Writing Edges\n";
 
 open BLASTFILE, $blast or die "could not open blast file $blast\n";
-foreach my $line (<BLASTFILE>){
+while (<BLASTFILE>){
+  my $line=$_;
   chomp $line;
   my @line=split /\t/, $line;
   if(exists $headuprot{@line[0]} and exists $headuprot{@line[1]}){

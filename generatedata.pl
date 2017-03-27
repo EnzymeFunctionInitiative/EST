@@ -16,32 +16,63 @@
 #version 0.9.1 blast-X.fa.tab and fracfile-X.fa files are now removed after blast results are concatenated together
 #version 0.9.1 blastfinal.tab is now removed after the 1.out file is created int he blastreduce step
 #version 0.9.2 no changes to this file
+#version 0.9.3 added options and features for multiplexing to shorten number of blast queries
+#version 0.9.3 removed code (via comment) for creating perl based graphs
+#version 0.9.3 added code for creating graphs via R
+#version 0.9.3 added sort code to blastreduce step so that best edge (via bitscore) is always chosen
 
-#this program creates scripts and submits them on clusters with torque schedulers
-#sqlite-getsequence.pl		grabs sequence data for input (other than taxid)
-#getannotations.pl		grabs annotations for input (other than taxid) creates struct.out file
-#getseqtaxid.pl			get sequence data and annotations based on taxid
-#fracsequence.pl		breaks fasta sequence into np parts for blasting
-#blastreduce.pl			removes extranious blast resuts (removes AA and BA searches but keeps AB) creates 1.out file
-#quart-align.pl			generates the alignment length quartile graph
-#quart-perid.pl			generates the percent identity quartile graph
-#sipmlegraphs.pl		generates sequence length and alignment score distributions
+#this program creates bash scripts and submits them on clusters with torque schedulers, overview of steps below
+#Step 1 fetch sequences and get annotations
+  #initial_import.sh		generates initial_import script that contains getsequence.pl and getannotation.pl or just getseqtaxid.pl if input was from taxid
+    #getsequence.pl		grabs sequence data for input (other than taxid) submits jobs that do the following makes allsequences.fa
+    #getannotations.pl		grabs annotations for input (other than taxid) creates struct.out file makes struct.out
+    #getseqtaxid.pl		get sequence data and annotations based on taxid makes both struct.out and allsequences.fa
+#Step 2 reduce number of searches
+  #multiplex.sh			performs a cdhit on the input 
+    #cdhit is an open source tool that groups sequences based on similarity and length, unique sequences in sequences.fa
+    #cdhit also creates sequences.fa.clustr for demultiplexing sequences later
+    #if multiplexing is turned off, then this just copies allsequences.fa to sequences.fa
+#Step 3 break up the sequences so we can use more processors
+  #fracfile.sh			breaks sequences.fa into -np parts for basting
+    #fracsequence.pl		breaks fasta sequence into np parts for blasting
+#Step 4 Make fasta database
+  #createdb.sh			makes fasta database out of sequences.fa
+    #formatdb			blast program to format sequences.fa into database
+#Step 5 Blast
+  #blast-qsub.sh		job array of np elements that blasts each fraction of sequences.fa against database of sequences.fa
+    #blastall			blast program that does the compares
+#Step 6 Combine blasts back together
+  #catjob.sh			concationates blast output files together into blastfinal.tab
+    #cat			linux program to read a file out
+#Step 7 Remove extra edge information
+  #blastreduce.sh		removes like and reverse matches of blastfinal.tab and saves as 1.out
+    #sort			sort blast results so that the best blast results (via bitscore) are first
+    #blastreduce.pl		actually does the heavy lifting
+    #rm 			removes blastfinal.tab
+#Step 8 Add back in edges removed by step 2
+  #demux.sh			adds blast results back in for sequences that were removed in multiplex step
+    #mv				moves current 1.out to mux.out
+    #demux.pl			reads in mux.out and sequences.fa.clustr and generates new 1.out
+#Step 9 Make graphs 
+  #graphs.sh			creates percent identity and alignment length quartiles as well as sequence length and edge value bar graphs
+    #mkidr			makes directory for R quartile information (rdata)
+    #Rgraphs.pl			reads through 1.out and saves tab delimited files for use in bar graphs (length.tab edge.tab)
+    #Rgraphs.pl			saves quartile data into rdata
+    #paste			makes tab delimited files like R needs from rdata/align* and rdata/perid* and makes align.tab and perid.tab
+    #quart-align.r		Makes alignment length quartile graph (r_quartile_align.png) from tab file
+    #quart-perid.r		Makes percent identity quartile graph (r_quartile_perid.png) from tab file
+    #hist-length.r		Makes sequence length bar graph (r_hist_length.png) from tab file
+    #hist-edges.r		Makes edges bar graph (r_hist_edges.png) from tab file
+
 
 #perl module for loading command line options
 use Getopt::Long;
 
 
-$result=GetOptions ("fasta=s"		=> \$file,
-		    "np=i"		=> \$np,
+$result=GetOptions ("np=i"		=> \$np,
 		    "queue=s"		=> \$queue,
 		    "tmp=s"		=> \$tmpdir,
 		    "evalue=s"		=> \$evalue,
-		    "flat=s"		=> \$flat,
-		    "hilen=i"		=> \$hilen,
-		    "lowlen=i"		=> \$lowlen,
-		    "maxlen=i"		=> \$maxlen,
-		    "minlen=i"		=> \$minlen,
-		    "expression=s"	=> \$expression,
 		    "incfrac=f"		=> \$incfrac,
 		    "ipro=s"		=> \$ipro,
 		    "pfam=s"		=> \$pfam,
@@ -52,23 +83,67 @@ $result=GetOptions ("fasta=s"		=> \$file,
 		    "memqueue=s"	=> \$memqueue,
 		    "maxsequence=s"	=> \$maxsequence,
 		    "userdat=s"		=> \$userdat,
-		    "userfasta=s"	=> \$userfasta);
+		    "userfasta=s"	=> \$userfasta,
+		    "lengthdif=f"	=> \$lengthdif,
+		    "sim=f"		=> \$sim,
+		    "multiplex=s"	=> \$multiplexing);
 
 $toolpath=$ENV{'EFIEST'};
 $efiestmod=$ENV{'EFIESTMOD'};
+$sortdir='/state/partition1';
 
+#defaults and error checking for multiplexing
+if($multiplexing eq "on"){
+  if(defined $lengthdif){
+    unless($lengthdif=~/\d*\.\d+/){
+      die "lengthdif must be in a format like 0.9\n";
+    }
+  }else{
+    $lengthdif=1;
+  }
+  if(defined $sim){
+    unless($sim=~/\d*\.\d+/){
+      die "sim must be in a format like 0.9\n";
+    }   
+  }else{
+    $sim=1;
+  }
+}elsif(!(defined $multiplexing)){
+  $multiplexing="on";
+  if(defined $lengthdif){
+    unless($lengthdif=~/\d*\.\d+/){
+      die "lengthdif must be in a format like 0.9\n";
+    }
+  }else{
+    $lengthdif=1;
+  }
+  if(defined $sim){
+    unless($sim=~/\d*\.\d+/){
+      die "sim must be in a format like 0.9\n";
+    }   
+  }else{
+    $sim=1;
+  }
+}else{
+  die "valid variables for multiplexing are either on or off\n";
+}
 
+#max number of hits for an individual sequence, normally set ot max value
 unless(defined $blasthits){
   $blasthits=50000;  
 }
 
-unless(defined $userfasta or defined $ipro or defined $pfam or defined $taxid){
+#at least one of tehse inputs are required to get sequences for the program
+unless(defined $userfasta or defined $ipro or defined $pfam or defined $taxid or defined $ssf or defined $gene3d){
   die "You must spedify the -fasta, -ipro, -taxid, or -pfam variables\n";
 }
 
+#you also have to specify the number of processors for blast
 unless(defined $np){
   die "You must spedify the -np variable\n";
 }
+
+#default queues
 unless(defined $queue){
   print "-queue not specified, using default\n";
   $queue="default";
@@ -78,9 +153,12 @@ unless(defined $memqueue){
   $memqueue="default";
 }
 
+#working directory must be defined
 unless(defined $tmpdir){
   die "You must spedify the -tmp variable\n";
 }
+
+#default e value must also be set for blast, default set if not specified
 unless(defined $evalue){
   print "-evalue not specified, using default of 5\n";
   $evalue="1e-5";
@@ -90,6 +168,8 @@ unless(defined $evalue){
   }
 }
 
+
+#set input families to zero if they are not specified
 unless(defined $pfam){
   $pfam=0;
 }
@@ -109,22 +189,29 @@ unless(defined $ssf){
   $ssf=0;
 }
 
+#default values for bandpass filter, 0,0 disables it, which is the default
 unless(defined $maxlen){
   $maxlen=0;
 }
 unless(defined $minlen){
   $minlen=0;
 }
+
+#fraction of sequences to include in graphs, reduces effects of outliers
 unless(defined $incfrac){
   print "-incfrac not specified, using default of 0.99\n";
   $incfrac=0.99;
 }
 
+#maximum number of sequences to process, 0 disables it
 unless(defined $maxsequence){
   $maxsequence=0;
 }
 
-unless(($userfasta=~/^\// or $userfasta=~/^~/) and defined $userfasta){
+
+#error checking for user supplied dat and fa files
+if($userfasta=~/\w+/){
+#($userfasta=~/^\// or $userfasta=~/^~/)
   $userfasta=$ENV{PWD}."/$userfasta";
 }
 
@@ -151,11 +238,11 @@ if(defined $userdat and -e $userdat){
 #create tmp directories
 mkdir $tmpdir;
 
-#sequence length filter (optional)
-
-print "$file\n";
-if($pfam or $ipro or $userfasta=~/\w+/){
-  #create fasta and struct.out files
+#get sequences and annotations, tax id code is different, so it is exclusive
+#creates fasta and struct.out files
+print "$pfam, $ipro, $ssf, $gene3d, $userfasta\n";
+if($pfam or $ipro or $ssf or $gene3d or $userfasta=~/\w+/){
+  #make the qsub file
   open(QSUB,">$tmpdir/initial_import.sh") or die "could not create blast submission script $tmpdir/createdb.sh\n";
   print QSUB "#!/bin/bash\n";
   print QSUB "#PBS -j oe\n";
@@ -163,21 +250,19 @@ if($pfam or $ipro or $userfasta=~/\w+/){
   print QSUB "#PBS -q $queue\n";
   print QSUB "#PBS -l nodes=1:ppn=1\n";
   print QSUB "module load $efiestmod\n";
-#  print QSUB "module load blast\n";
   print QSUB "cd $ENV{PWD}/$tmpdir\n";
   print QSUB "which perl\n";
-  #print QSUB "$toolpath/initial_import.py -u $dbusername -p $dbpassword -d $dbusername -f $file -t ".$ENV{PWD}."/$tmpdir -a $flat -e $expression\n";
-  print QSUB "$toolpath/sqlite-getsequence.pl $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -out ".$ENV{PWD}."/$tmpdir/sequences.fa -maxsequence $maxsequence -access ".$ENV{PWD}."/$tmpdir/accession.txt\n";
-  print QSUB "$toolpath/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/sequences.fa\n";
-
+  print QSUB "$toolpath/sqlite-getsequence.pl $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -access ".$ENV{PWD}."/$tmpdir/accession.txt\n";
+  print QSUB "$toolpath/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa\n";
   close QSUB;
 
+  #submit and keep the job id for next dependancy
   $importjob=`qsub $ENV{PWD}/$tmpdir/initial_import.sh`;
   print "import job is:\n $importjob";
   @importjobline=split /\./, $importjob;
 
 }elsif($taxid){
-    #create fasta and struct.out files
+  #create taxid qsub file
   open(QSUB,">$tmpdir/initial_import.sh") or die "could not create blast submission script $tmpdir/createdb.sh\n";
   print QSUB "#!/bin/bash\n";
   print QSUB "#PBS -j oe\n";
@@ -186,11 +271,10 @@ if($pfam or $ipro or $userfasta=~/\w+/){
   print QSUB "#PBS -l nodes=1:ppn=1\n";
   print QSUB "module load $efiestmod\n";
   print QSUB "cd $ENV{PWD}/$tmpdir\n";
-  #print QSUB "$toolpath/initial_import.py -u $dbusername -p $dbpassword -d $dbusername -f $file -t ".$ENV{PWD}."/$tmpdir -a $flat -e $expression\n";
-  print QSUB "getseqtaxid.pl -fasta sequences.fa -struct struct.out -taxid $taxid\n";
-
+  print QSUB "$toolpath/getseqtaxid.pl -fasta allsequences.fa -struct struct.out -taxid $taxid\n";
   close QSUB;
 
+  #submit job and keep job id for next dependancy
   $importjob=`qsub $ENV{PWD}/$tmpdir/initial_import.sh`;
   print "import job is:\n $importjob";
   @importjobline=split /\./, $importjob;
@@ -198,16 +282,38 @@ if($pfam or $ipro or $userfasta=~/\w+/){
   die "Error Submitting Import Job\n$importjob\n";
 }
 
-
-#qsub script to create fracfiles
-
-open(QSUB,">$tmpdir/fracfile.sh") or die "could not create blast submission script $tmpdir/fracfile.sh\n";
+#if multiplexing is on, run an initial cdhit to get a reduced set of "more" unique sequences
+#if not, just copy allsequences.fa to sequences.fa so next part of program is set up right
+open(QSUB,">$tmpdir/multiplex.sh") or die "could not create blast submission script $tmpdir/multiplex.sh\n";
 print QSUB "#!/bin/bash\n";
 print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@importjobline[0]\n"; 
+print QSUB "module load $efiestmod\n";
+#  print QSUB "module load blast\n";
+print QSUB "cd $ENV{PWD}/$tmpdir\n";
+if($multiplexing eq "on"){
+  print QSUB "cd-hit -c $sim -s $lengthdif -i $ENV{PWD}/$tmpdir/allsequences.fa -o $ENV{PWD}/$tmpdir/sequences.fa\n";
+}else{
+  print QSUB "cp $ENV{PWD}/$tmpdir/allsequences.fa $ENV{PWD}/$tmpdir/sequences.fa\n";
+}
+close QSUB;
+
+$muxjob=`qsub $ENV{PWD}/$tmpdir/multiplex.sh`;
+print "mux job is:\n $muxjob";
+@muxjobline=split /\./, $muxjob;
+
+
+#break sequenes.fa into $np parts for blast
+open(QSUB,">$tmpdir/fracfile.sh") or die "could not create blast submission script $tmpdir/fracfile.sh\n";
+print QSUB "#!/bin/bash\n";
+print QSUB "#PBS -j oe\n";
+print QSUB "#PBS -S /bin/bash\n";
+print QSUB "#PBS -q $queue\n";
+print QSUB "#PBS -l nodes=1:ppn=1\n";
+print QSUB "#PBS -W depend=afterok:@muxjobline[0]\n"; 
 print QSUB "$toolpath/fracsequence.pl -np $np -tmp ".$ENV{PWD}."/$tmpdir\n";
 close QSUB;
 
@@ -223,10 +329,8 @@ print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@fracfilejobline[0]\n";
-#print QSUB "module load blast+\n";
 print QSUB "module load $efiestmod\n";
 print QSUB "cd $ENV{PWD}/$tmpdir\n";
-#print QSUB "makeblastdb -in sequences.fa -out database";
 print QSUB "formatdb -i sequences.fa -n database\n";
 close QSUB;
 
@@ -234,10 +338,7 @@ $createdbjob=`qsub $tmpdir/createdb.sh`;
 print "createdb job is:\n $createdbjob";
 @createdbjobline=split /\./, $createdbjob;
 
-#generate qsub scripts
-#one for every fracfile-* script created above
-
-
+#generate $np blast scripts for files from fracfile step
 open(QSUB,">$tmpdir/blast-qsub.sh") or die "could not create blast submission script $tmpdir/blast-qsub-$i.sh\n";
 print QSUB "#!/bin/bash\n";
 print QSUB "#PBS -t 1-$np\n";
@@ -258,8 +359,8 @@ $blastjob=`qsub $tmpdir/blast-qsub.sh`;
 print "blast job is:\n $blastjob";
 @blastjobline=split /\./, $blastjob;
 
-#submit qsub scripts
 
+#join all the blast outputs back together
 open(QSUB,">$tmpdir/catjob.sh") or die "could not create blast submission script $tmpdir/catjob.sh\n";
 print QSUB "#!/bin/bash\n";
 print QSUB "#PBS -j oe\n";
@@ -271,44 +372,60 @@ print QSUB "cat $ENV{PWD}/$tmpdir/blastout-*.tab |grep -v '#' >$ENV{PWD}/$tmpdir
 print QSUB "rm  $ENV{PWD}/$tmpdir/blastout-*.tab\n";
 print QSUB "rm  $ENV{PWD}/$tmpdir/fracfile-*.fa\n";
 close QSUB;
-
-#submit the cat script, job dependences should keep it from running till all blasts are done
-
 $catjob=`qsub $tmpdir/catjob.sh`;
 print "Cat job is:\n $catjob";
-
-#create submit script for filtering out duplicates and likewise compares
-
 @catjobline=split /\./, $catjob;
 
-open(QSUB,">$tmpdir/blastreduce.sh") or die "could not create blast submission script $tmpdir/filterjob.sh\n";
+
+#Remove like vs like and reverse matches
+open(QSUB,">$tmpdir/blastreduce.sh") or die "could not create blast submission script $tmpdir/blastreduce.sh\n";
 print QSUB "#!/bin/bash\n";
 print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $memqueue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@catjobline[0]\n"; 
+print QSUB "mv $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.blastfinal.tab\n";
+print QSUB "sort -T $sortdir -k 12,12 -nr -t\$\'\\t\' $ENV{PWD}/$tmpdir/unsorted.blastfinal.tab >$ENV{PWD}/$tmpdir/blastfinal.tab\n";
 print QSUB "$toolpath/blastreduce.pl $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sequences.fa > $ENV{PWD}/$tmpdir/1.out\n";
-print QSUB "rm $ENV{PWD}/$tmpdir/blastfinal.tab\n";
+#print QSUB "rm $ENV{PWD}/$tmpdir/blastfinal.tab\n";
 close QSUB;
-
-#submit the filter script, job dependences should keep it from running till all blast out files are combined
 
 $blastreducejob=`qsub $tmpdir/blastreduce.sh`;
 print "Blastreduce job is:\n $blastreducejob";
 
 @blastreducejobline=split /\./, $blastreducejob;
 
-#submit the quartiles scripts, should not run until filterjob is finished
-#nothing else depends on this scipt
+#if multiplexing is on, demultiplex sequences back so all are present
 
-open(QSUB,">$tmpdir/quartalign.sh") or die "could not create blast submission script $tmpdir/quartalign.sh\n";
+open(QSUB,">$tmpdir/demux.sh") or die "could not create blast submission script $tmpdir/demux.sh\n";
 print QSUB "#!/bin/bash\n";
 print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $memqueue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@blastreducejobline[0]\n"; 
+if($multiplexing eq "on"){
+  print QSUB "mv $ENV{PWD}/$tmpdir/1.out $ENV{PWD}/$tmpdir/mux.out\n";
+  print QSUB "$toolpath/demux.pl -blastin $ENV{PWD}/$tmpdir/mux.out -blastout $ENV{PWD}/$tmpdir/1.out -cluster $ENV{PWD}/$tmpdir/sequences.fa.clstr\n";
+}
+close QSUB;
+
+$demuxjob=`qsub $tmpdir/demux.sh`;
+print "Demux job is:\n $demuxjob";
+@demuxjobline=split /\./, $demuxjob;
+
+#removed in favor of R, comments kept in case someone ever wants to use the pure perl solution
+=pod Start comment
+#submit the quartiles scripts, should not run until filterjob is finished
+#nothing else depends on this scipt
+open(QSUB,">$tmpdir/quartalign.sh") or die "could not create blast submission script $tmpdir/quartalign.sh\n";
+print QSUB "#!/bin/bash\n";
+print QSUB "#PBS -j oe\n";
+print QSUB "#PBS -S /bin/bash\n";
+print QSUB "#PBS -q $memqueue\n";
+print QSUB "#PBS -l nodes=1:ppn=1\n";
+print QSUB "#PBS -W depend=afterok:@demuxjobline[0]\n"; 
 print QSUB "module load $efiestmod\n";
 print QSUB "$toolpath/quart-align.pl -blastout $ENV{PWD}/$tmpdir/1.out -align $ENV{PWD}/$tmpdir/alignment_length.png\n";
 close QSUB;
@@ -322,7 +439,7 @@ print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $memqueue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
-print QSUB "#PBS -W depend=afterok:@blastreducejobline[0]\n"; 
+print QSUB "#PBS -W depend=afterok:@demuxjobline[0]\n"; 
 print QSUB "#PBS -m e\n";
 print QSUB "module load $efiestmod\n";
 print QSUB "$toolpath/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/1.out -pid $ENV{PWD}/$tmpdir/percent_identity.png\n";
@@ -337,13 +454,40 @@ print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $memqueue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
-print QSUB "#PBS -W depend=afterok:@blastreducejobline[0]\n"; 
+print QSUB "#PBS -W depend=afterok:@demuxjobline[0]\n"; 
 print QSUB "module load $efiestmod\n";
-print QSUB "$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -edges $ENV{PWD}/$tmpdir/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/length_histogram.png -incfrac $incfrac\n";
+print QSUB "$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -edges $ENV{PWD}/$tmpdir/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/allsequences.fa -lengths $ENV{PWD}/$tmpdir/length_histogram.png -incfrac $incfrac\n";
 close QSUB;
 
 $simplegraphjob=`qsub $tmpdir/simplegraphs.sh`;
 print "Simplegraphs job is:\n $simplegraphjob";
+=cut end comment
 
 
+#create information for R to make graphs and then have R make them
+open(QSUB,">$tmpdir/graphs.sh") or die "could not create blast submission script $tmpdir/graphs.sh\n";
+print QSUB "#!/bin/bash\n";
+print QSUB "#PBS -j oe\n";
+print QSUB "#PBS -S /bin/bash\n";
+print QSUB "#PBS -q $memqueue\n";
+print QSUB "#PBS -l nodes=1:ppn=1\n";
+print QSUB "#PBS -W depend=afterok:@demuxjobline[0]\n"; 
+print QSUB "#PBS -m e\n";
+print QSUB "module load $efiestmod\n";
+print QSUB "module load R/3.1.0\n";
+print QSUB "mkdir $ENV{PWD}/$tmpdir/rdata\n";
+print QSUB "$toolpath/Rgraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -rdata  $ENV{PWD}/$tmpdir/rdata -edges  $ENV{PWD}/$tmpdir/edge.tab -fasta  $ENV{PWD}/$tmpdir/allsequences.fa -length  $ENV{PWD}/$tmpdir/length.tab -incfrac $incfrac\n";
+print QSUB "FIRST=`ls $ENV{PWD}/$tmpdir/rdata/perid*| head -1`\n";
+print QSUB "FIRST=`head -1 \$FIRST`\n";
+print QSUB "LAST=`ls $ENV{PWD}/$tmpdir/rdata/perid*| tail -1`\n";
+print QSUB "LAST=`head -1 \$LAST`\n";
+print QSUB "MAXALIGN=`head -1 $ENV{PWD}/$tmpdir/rdata/maxyal`\n";
+print QSUB "Rscript $toolpath/quart-align.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/r_quartile_align.png \$FIRST \$LAST \$MAXALIGN\n";
+print QSUB "Rscript $toolpath/quart-perid.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/r_quartile_perid.png \$FIRST \$LAST\n";
+print QSUB "Rscript $toolpath/hist-length.r  $ENV{PWD}/$tmpdir/length.tab  $ENV{PWD}/$tmpdir/r_hist_length.png\n";
+print QSUB "Rscript $toolpath/hist-edges.r $ENV{PWD}/$tmpdir/edge.tab $ENV{PWD}/$tmpdir/r_hist_edges.png\n"; 
+close QSUB;
+
+$graphjob=`qsub $tmpdir/graphs.sh`;
+print "Graph job is:\n $graphjob";
 

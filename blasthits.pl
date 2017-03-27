@@ -64,7 +64,7 @@ while(scalar @accessions){
   #print "fastacmd -d $combined -s $batchline\n";
   @sequences=split /\n/, `fastacmd -d $db -s $batchline`;
   foreach $sequence (@sequences){ 
-    $sequence=~s/^>\w\w\|(\w{6,10}).*/>$1/;
+    $sequence=~s/^>\w\w\|(\w{6}).*/>$1/;
     print OUT "$sequence\n";
   }
   
@@ -98,7 +98,7 @@ print "$allbyall\n";
 
 print "Filter Blast\n";
 
-$filterblast=`$ENV{EFIEST}/blastreduce.pl $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sequences.fa > $ENV{PWD}/$tmpdir/1.out`;
+$filterblast=`$ENV{EFIEST}/step_2.2-filterblast.pl $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sequences.fa > $ENV{PWD}/$tmpdir/1.out`;
 
 print "$fileterblast\n";
 if ( -z "$ENV{PWD}/$tmpdir/1.out" ) {

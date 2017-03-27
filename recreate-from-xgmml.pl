@@ -34,8 +34,7 @@ print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
-print QSUB "module load perl/5.16.1\n";
-print QSUB "module load efiest/alpha\n";
+print QSUB "module load $efiestmod\n";
 print QSUB "$toolpath/regen-network.pl -oldtmp $oldtmp -newtmp $newtmp -xgmml $xgmml\n";
 close QSUB;
 

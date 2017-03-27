@@ -348,7 +348,7 @@ foreach $key (keys %pfams){
       }
 	  $gnnwriter->endTag;
       $clusterfraction=int(scalar(@{$pfams{$key}{$sc}{'dist'}})/scalar(@{$supernodes{$sc}})*1000)/1000;
-      $gnnwriter->emptyTag('att', 'name' => 'ClusterFraction', 'type' => 'real', 'value' => $clusterfraction);
+      $gnnwriter->emptyTag('att', 'name' => 'ClusterFraction', 'type' => 'double', 'value' => $clusterfraction);
       $gnnwriter->emptyTag('att', 'name' => 'Num_Ratio', 'type' => 'string', 'value' =>  scalar(@{$pfams{$key}{$sc}{'dist'}})."/".scalar(@{$supernodes{$sc}}));
       $gnnwriter->emptyTag('att', 'name' => 'SSNClusterSize', 'type' => 'integer', 'value' => scalar(@{$supernodes{$sc}}));
       if($pdbcount>0 and $eccount>0){
@@ -439,7 +439,7 @@ foreach $node (@nodes){
 foreach $edge (@edges){
   $writer->startTag('edge', 'id' => $edge->getAttribute('id'), 'label' => $edge->getAttribute('label'), 'source' => $nodenames{$edge->getAttribute('source')}, 'target' => $nodenames{$edge->getAttribute('target')});
   foreach $attribute ($edge->getElementsByTagName('att')){
-    if($attribute->getAttribute('name') eq 'interaction' or $attribute->getAttribute('name')=~/rep-net/){
+    if($attribute->getAttribute('name') eq 'interaction'){
       #print "do nothing\n";
       #this tag causes problems and it is not needed, so we do not include it
     }else{
