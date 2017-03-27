@@ -24,6 +24,9 @@
 #version 0.9.4 moved from specific fracfile.pl to general splitsequence.pl for splitting up blast files
 #version 0.9.4 started removing *blastfinal.tab files in demux step
 #version 0.9.5 added code to hold database version, stores in database_version in the SDF
+#version 0.9.6 modified graph creation to use hdf5 instead of plain files
+#version 0.9.6 hdf5 creating program is in python due to poor hdf5 perl libraries
+#version 0.9.6 added blast option to generatedata.pl to choose between blast, blast+, and diamond (default is blast)
 
 #this program creates bash scripts and submits them on clusters with torque schedulers, overview of steps below
 #Step 1 fetch sequences and get annotations
@@ -71,6 +74,7 @@
 
 #perl module for loading command line options
 use Getopt::Long;
+use POSIX qw(ceil);
 
 
 $result=GetOptions ("np=i"		=> \$np,
@@ -92,12 +96,25 @@ $result=GetOptions ("np=i"		=> \$np,
 		    "sim=f"		=> \$sim,
 		    "multiplex=s"	=> \$multiplexing,
 		    "domain=s"		=> \$domain,
-		    "fraction=i"	=> \$fraction);
+		    "fraction=i"	=> \$fraction,
+		    "blast=s"		=> \$blast);
 
 $toolpath=$ENV{'EFIEST'};
 $efiestmod=$ENV{'EFIDBMOD'};
 $efidbmod=$efiestmod;
 $sortdir='/state/partition1';
+
+#defaults and error checking for choosing of blast program
+
+if(defined $blast){
+  unless($blast eq "blast" or $blast eq "blast+" or $blast eq "diamond" or $blast eq 'diamondsensitive'){
+    die "blast program value of $blast is not valid, must be blast, blast+, diamondsensitive, or diamond\n";
+  }
+}else{
+  $blast="blast";
+}
+
+print "Blast is $blast\n";
 
 #defaults and error checking for splitting sequences into domains
 
@@ -184,6 +201,9 @@ unless(defined $userfasta or defined $ipro or defined $pfam or defined $taxid or
 unless(defined $np){
   die "You must spedify the -np variable\n";
 }
+if($blast=~/diamond/){
+  $np=ceil($np/24);
+}
 
 #default queues
 unless(defined $queue){
@@ -192,7 +212,7 @@ unless(defined $queue){
 }
 unless(defined $memqueue){
   print "-memqueue not specifiied, using default\n";
-  $memqueue="efi";
+  $memqueue="efi-mem";
 }
 
 #working directory must be defined
@@ -391,7 +411,12 @@ print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@fracfilejobline[0]\n";
 print QSUB "module load $efiestmod\n";
 print QSUB "cd $ENV{PWD}/$tmpdir\n";
-print QSUB "formatdb -i sequences.fa -n database -p T -o T \n";
+if($blast eq 'diamond' or $blast eq 'diamondsensitive'){
+  print QSUB "module load diamond\n";
+  print QSUB "diamond makedb --in sequences.fa -d database\n";
+}else{
+  print QSUB "formatdb -i sequences.fa -n database -p T -o T \n";
+}
 close QSUB;
 
 $createdbjob=`qsub $tmpdir/createdb.sh`;
@@ -405,13 +430,33 @@ print QSUB "#PBS -t 1-$np\n";
 print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
-print QSUB "#PBS -l nodes=1:ppn=1\n";
+if($blast=~/diamond/){
+  print QSUB "#PBS -l nodes=1:ppn=24\n";
+}else{
+  print QSUB "#PBS -l nodes=1:ppn=1\n";
+}
 print QSUB "#PBS -W depend=afterok:@createdbjobline[0]\n";
 print QSUB "export BLASTDB=$ENV{PWD}/$tmpdir\n";
 #print QSUB "module load blast+\n";
 #print QSUB "blastp -query  $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue\n";
 print QSUB "module load $efiestmod\n";
-print QSUB "blastall -p blastp -i $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -m 8 -e $evalue -b $blasthits -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab\n";
+if($blast eq "blast"){
+  print QSUB "module load blast\n";
+  print QSUB "blastall -p blastp -i $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -m 8 -e $evalue -b $blasthits -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab\n";
+}elsif($blast eq "blast+"){
+  print QSUB "module load blast+\n";
+  print QSUB "blastp -query  $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue\n";
+}elsif($blast eq "diamond"){
+  print QSUB "module load diamond\n";
+  print QSUB "diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
+  print QSUB "diamond view -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
+}elsif($blast eq "diamondsensitive"){
+  print QSUB "module load diamond\n";
+  print QSUB "diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
+  print QSUB "diamond view -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
+}else{
+  die "Blast control not set properly.  Can only be blast, blast+, or diamond.\n";
+}
 close QSUB;
 
 
@@ -442,7 +487,7 @@ open(QSUB,">$tmpdir/blastreduce.sh") or die "could not create blast submission s
 print QSUB "#!/bin/bash\n";
 print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
-print QSUB "#PBS -q $memqueue\n";
+print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@catjobline[0]\n"; 
 #print QSUB "mv $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.blastfinal.tab\n";
@@ -463,9 +508,10 @@ open(QSUB,">$tmpdir/demux.sh") or die "could not create blast submission script 
 print QSUB "#!/bin/bash\n";
 print QSUB "#PBS -j oe\n";
 print QSUB "#PBS -S /bin/bash\n";
-print QSUB "#PBS -q $memqueue\n";
+print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@blastreducejobline[0]\n"; 
+print QSUB "module load $efiestmod\n";
 if($multiplexing eq "on"){
   print QSUB "mv $ENV{PWD}/$tmpdir/1.out $ENV{PWD}/$tmpdir/mux.out\n";
   print QSUB "$toolpath/demux.pl -blastin $ENV{PWD}/$tmpdir/mux.out -blastout $ENV{PWD}/$tmpdir/1.out -cluster $ENV{PWD}/$tmpdir/sequences.fa.clstr\n";
@@ -539,19 +585,13 @@ print QSUB "#PBS -q $memqueue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@demuxjobline[0]\n"; 
 print QSUB "#PBS -m e\n";
+print QSUB "module load ".$ENV{'EFIESTMOD'}."\n";
 print QSUB "module load $efiestmod\n";
-print QSUB "module load R/3.1.0\n";
-print QSUB "mkdir $ENV{PWD}/$tmpdir/rdata\n";
-print QSUB "$toolpath/Rgraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -rdata  $ENV{PWD}/$tmpdir/rdata -edges  $ENV{PWD}/$tmpdir/edge.tab -fasta  $ENV{PWD}/$tmpdir/allsequences.fa -length  $ENV{PWD}/$tmpdir/length.tab -incfrac $incfrac\n";
-print QSUB "FIRST=`ls $ENV{PWD}/$tmpdir/rdata/perid*| head -1`\n";
-print QSUB "FIRST=`head -1 \$FIRST`\n";
-print QSUB "LAST=`ls $ENV{PWD}/$tmpdir/rdata/perid*| tail -1`\n";
-print QSUB "LAST=`head -1 \$LAST`\n";
-print QSUB "MAXALIGN=`head -1 $ENV{PWD}/$tmpdir/rdata/maxyal`\n";
-print QSUB "Rscript $toolpath/quart-align.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/alignment_length.png \$FIRST \$LAST \$MAXALIGN\n";
-print QSUB "Rscript $toolpath/quart-perid.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/percent_identity.png \$FIRST \$LAST\n";
-print QSUB "Rscript $toolpath/hist-length.r  $ENV{PWD}/$tmpdir/length.tab  $ENV{PWD}/$tmpdir/length_histogram.png\n";
-print QSUB "Rscript $toolpath/hist-edges.r $ENV{PWD}/$tmpdir/edge.tab $ENV{PWD}/$tmpdir/number_of_edges.png\n";
+print QSUB "$toolpath/R-hdf-graph.py -b $ENV{PWD}/$tmpdir/1.out -f $ENV{PWD}/$tmpdir/rdata.hdf5 -a $ENV{PWD}/$tmpdir/allsequences.fa -i $incfrac\n";
+print QSUB "Rscript $toolpath/quart-align-hdf5.r $ENV{PWD}/$tmpdir/rdata.hdf5 $ENV{PWD}/$tmpdir/alignment_length.png\n";
+print QSUB "Rscript $toolpath/quart-perid-hdf5.r $ENV{PWD}/$tmpdir/rdata.hdf5 $ENV{PWD}/$tmpdir/percent_identity.png\n";
+print QSUB "Rscript $toolpath/hist-hdf5-length.r  $ENV{PWD}/$tmpdir/rdata.hdf5  $ENV{PWD}/$tmpdir/length_histogram.png\n";
+print QSUB "Rscript $toolpath/hist-hdf5-edges.r $ENV{PWD}/$tmpdir/rdata.hdf5 $ENV{PWD}/$tmpdir/number_of_edges.png\n";
 print QSUB "touch  $ENV{PWD}/$tmpdir/1.out.completed\n";
 #print QSUB "rm $ENV{PWD}/$tmpdir/alphabetized.blastfinal.tab $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sorted.alphabetized.blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.1.out\n";
 close QSUB;

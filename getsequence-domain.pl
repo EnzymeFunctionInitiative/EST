@@ -134,11 +134,11 @@ print scalar @accessions." after uniquing\n";
 #one more unique in case of accessions being added in multiple databases
 @accessions=keys %accessionhash;
 
-if(int(scalar @accessions/$fraction)>$maxsequence and $maxsequence!=0){
- open ERROR, ">$access.failed" or die "cannot write error output file $access.failed\n";
-  print ERROR "Number of sequences ".int(scalar @accessions/$fraction)." exceeds maximum specified $maxsequence\n";
+if(scalar @accessions>$maxsequence and $maxsequence!=0){
+  open ERROR, ">$access.failed" or die "cannot write error output file $access.failed\n";
+  print ERROR "Number of sequences ".scalar @accessions." exceeds maximum specified $maxsequence\n";
   close ERROR;
-  die "Number of sequences ".int(scalar @accessions/$fraction)." exceeds maximum specified $maxsequence\n";
+  die "Number of sequences ".scalar @accessions." exceeds maximum specified $maxsequence\n";
 }
 print "Print out accessions\n";
 open GREP, ">$access" or die "Could not write to $access\n";

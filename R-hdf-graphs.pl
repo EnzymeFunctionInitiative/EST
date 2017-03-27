@@ -5,7 +5,9 @@
 
 use Getopt::Long;
 use Data::Dumper;
-use PDL::IO::HDF5;
+use DBD::SQLite;
+
+
 
 $result=GetOptions ("blastout=s"=>	\$blastfile,
 		    "edges=s"	=>	\$edges,
@@ -14,9 +16,12 @@ $result=GetOptions ("blastout=s"=>	\$blastfile,
 		    "fasta=s"	=>	\$fasta,
 		    "incfrac=f"=>	\$incfrac);
 
-$hdffile=new PDL::IO::HDF5("$rdata/graphs.hdf");
-$peridgroup=$hdffile->group('/perid');
-$aligngroup=$hdffile->group('/align');
+$dbh=DBI->connect("dbi:SQLite:dbname=$rdata","","");
+$dbh->do("PRAGMA sychronous = OFF");
+$dbh->do("PRAGMA cache_size = 1000000");
+$dbh->do("PRAGMA journal_mode = OFF");
+$dbh->do("create table align (evalue int, value int)");
+$dbh->do("create table perid (evalue int, value float)");
 
 %periddata=();
 %aligndata=();
@@ -29,14 +34,17 @@ $edgelimit=10;
 %maxalign=();
 $lastmax=0;
 
-open(LENHIST, ">$lenhist") or die "could not write to $lenhist\n";
-open(EDGES, ">$edges") or die "could not wirte to $edges\n";
+#open(LENHIST, ">$lenhist") or die "could not write to length histogram $lenhist\n";
+#open(EDGES, ">$edges") or die "could not wirte to edge histogram $edges\n";
 open(BLAST, $blastfile) or die "cannot open blast output file $blastfile\n";
-open(MAXALIGN, ">$rdata/maxyal") or die "cannot write out maximium alignment length to $rdata/maxyal\n";
+#open(MAXALIGN, ">$rdata/maxyal") or die "cannot write out maximium alignment length to $rdata/maxyal\n";
+$dbh->do('BEGIN TRANSACTION');
 while (<BLAST>){
   $line=$_;
   my @line=split /\t/, $line;
   my $evalue=int(-(log(@line[3])/log(10))+@line[2]*log(2)/log(10));
+  my $lzeroevalue=sprintf("%5d",$evalue);
+  $lzeroevalue=~tr/ /0/;
   my $pid=@line[5]*100;
   my $align=@line[4];
   if($align>$lastmax){
@@ -50,28 +58,18 @@ while (<BLAST>){
     #print {$peridhandles{$evalue}} "$pid\n";
 $periddata{$evalue}{'count'}++;
 $aligndata{$evalue}{'count'}++;
-$periddata{$evalue}{'handle'}->attrSet($periddata{$evalue}{'count'} =>$pid);
-$aligndata{$evalue}{'handle'}->attrSet($aligndata{$evalue}{'count'} =>$align);
+#$periddata{$evalue}{'handle'}->attrSet($periddata{$evalue}{'count'} =>$pid);
+#$aligndata{$evalue}{'handle'}->attrSet($aligndata{$evalue}{'count'} =>$align);
   }else{
     @edges[$evalue]=1;
-    $lzeroevalue=sprintf("%5d",$evalue);
-    $lzeroevalue=~tr/ /0/;
-    #open($alignhandles{$evalue}, ">$rdata/align$lzeroevalue") or die "cannot open alignment file for $evalue\n";
-    #open($peridhandles{$evalue}, ">$rdata/perid$lzeroevalue") or die "cannot open perid file for $evalue\n";
-$periddata{$evalue}{'handle'}=$peridgroup->dataset($evalue);
-$aligndata{$evalue}{'handle'}=$aligngroup->dataset($evalue);
-$periddata{$evalue}{'count'}=1;
-$aligndata{$evalue}{'count'}=1;
-$periddata{$evalue}{'handle'}->attrSet($periddata{$evalue}{'count'} =>$pid);
-$aligndata{$evalue}{'handle'}->attrSet($aligndata{$evalue}{'count'} =>$align);
-$periddata{$evalue}{'count'}++;
-$aligndata{$evalue}{'count'}++;
 
-    #print {$alignhandles{$evalue}} "$evalue\n$align\n";
-    #print {$peridhandles{$evalue}} "$evalue\n$pid\n";
   }
+  $dbh->do("insert into align (evalue, value) values($evalue,$align)");
+  $dbh->do("insert into perid (evalue, value) values($evalue,$pid)");
 }
-
+exit;
+$dbh->do('COMMIT');
+exit;
 #get list of alignment files
 @align=`wc -l $rdata/align*`;
 #last line is a summary, we dont need that so pop it off

@@ -39,15 +39,6 @@ $incfrac=0.95;
 $maxhits=5000;
 $sortdir='/state/partition1';
 
-#default e value must also be set for blast, default set if not specified
-unless(defined $evalue){
-  print "-evalue not specified, using default of 5\n";
-  $evalue="1e-5";
-}else{
-  if( $evalue =~ /^\d+$/ ) {
-    $evalue="1e-$evalue";
-  } 
-}
 
 #defaults and error checking for multiplexing
 if($multiplexing eq "on"){
@@ -104,7 +95,6 @@ unless(defined $memqueue){
   $memqueue="efi";
 }
 
-#$seq=s/\s+//g;
 open(QUERY, ">$ENV{PWD}/$tmpdir/query.fa") or die "Cannot write out Query File to \n";
 print QUERY ">000000\n$seq\n";
 close QUERY;
