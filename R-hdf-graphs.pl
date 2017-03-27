@@ -3,11 +3,9 @@
 #version 0.9.3	Script Created
 #version 0.9.3	Script to write out tables for R, replacement for doing with perl (this is over 25X more effecient)
 
-use GD::Graph::boxplot;
-use GD;
 use Getopt::Long;
-use Statistics::R;
 use Data::Dumper;
+use PDL::IO::HDF5;
 
 $result=GetOptions ("blastout=s"=>	\$blastfile,
 		    "edges=s"	=>	\$edges,
@@ -15,6 +13,14 @@ $result=GetOptions ("blastout=s"=>	\$blastfile,
 		    "rdata=s"	=>	\$rdata,
 		    "fasta=s"	=>	\$fasta,
 		    "incfrac=f"=>	\$incfrac);
+
+$hdffile=new PDL::IO::HDF5("$rdata/graphs.hdf");
+$peridgroup=$hdffile->group('/perid');
+$aligngroup=$hdffile->group('/align');
+
+%periddata=();
+%aligndata=();
+
 
 $edgelimit=10;
 @evalues=();
@@ -30,12 +36,9 @@ open(MAXALIGN, ">$rdata/maxyal") or die "cannot write out maximium alignment len
 while (<BLAST>){
   $line=$_;
   my @line=split /\t/, $line;
-  #my $evalue=int(-(log(@line[3])/log(10))+@line[2]*log(2)/log(10));
-  my $evalue=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
-  #my $pid=@line[5]*100;
-  my $pid=@line[2];
-  #my $align=@line[4];
-  my $align=@line[3];
+  my $evalue=int(-(log(@line[3])/log(10))+@line[2]*log(2)/log(10));
+  my $pid=@line[5]*100;
+  my $align=@line[4];
   if($align>$lastmax){
     $lastmax=$align;
     $maxalign{$evalue}=$align;
@@ -43,16 +46,29 @@ while (<BLAST>){
   }
   if(defined @edges[$evalue]){
     @edges[$evalue]++;
-    print {$alignhandles{$evalue}} "$align\n";
-    print {$peridhandles{$evalue}} "$pid\n";
+    #print {$alignhandles{$evalue}} "$align\n";
+    #print {$peridhandles{$evalue}} "$pid\n";
+$periddata{$evalue}{'count'}++;
+$aligndata{$evalue}{'count'}++;
+$periddata{$evalue}{'handle'}->attrSet($periddata{$evalue}{'count'} =>$pid);
+$aligndata{$evalue}{'handle'}->attrSet($aligndata{$evalue}{'count'} =>$align);
   }else{
     @edges[$evalue]=1;
     $lzeroevalue=sprintf("%5d",$evalue);
     $lzeroevalue=~tr/ /0/;
-    open($alignhandles{$evalue}, ">$rdata/align$lzeroevalue") or die "cannot open alignment file for $evalue\n";
-    open($peridhandles{$evalue}, ">$rdata/perid$lzeroevalue") or die "cannot open perid file for $evalue\n";
-    print {$alignhandles{$evalue}} "$evalue\n$align\n";
-    print {$peridhandles{$evalue}} "$evalue\n$pid\n";
+    #open($alignhandles{$evalue}, ">$rdata/align$lzeroevalue") or die "cannot open alignment file for $evalue\n";
+    #open($peridhandles{$evalue}, ">$rdata/perid$lzeroevalue") or die "cannot open perid file for $evalue\n";
+$periddata{$evalue}{'handle'}=$peridgroup->dataset($evalue);
+$aligndata{$evalue}{'handle'}=$aligngroup->dataset($evalue);
+$periddata{$evalue}{'count'}=1;
+$aligndata{$evalue}{'count'}=1;
+$periddata{$evalue}{'handle'}->attrSet($periddata{$evalue}{'count'} =>$pid);
+$aligndata{$evalue}{'handle'}->attrSet($aligndata{$evalue}{'count'} =>$align);
+$periddata{$evalue}{'count'}++;
+$aligndata{$evalue}{'count'}++;
+
+    #print {$alignhandles{$evalue}} "$evalue\n$align\n";
+    #print {$peridhandles{$evalue}} "$evalue\n$pid\n";
   }
 }
 
@@ -61,7 +77,7 @@ while (<BLAST>){
 #last line is a summary, we dont need that so pop it off
 pop @align;
 
-
+exit;
 
 #remove files that represent e-values that are cut off (keeps x axis from being crazy long)
 #also populates .tab file for edges histogram at the same time

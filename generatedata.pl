@@ -20,6 +20,9 @@
 #version 0.9.3 removed code (via comment) for creating perl based graphs
 #version 0.9.3 added code for creating graphs via R
 #version 0.9.3 added sort code to blastreduce step so that best edge (via bitscore) is always chosen
+#version 0.9.4 changed name of get sequence script from sqlite-getsequence.pl to getsequence.pl
+#version 0.9.4 moved from specific fracfile.pl to general splitsequence.pl for splitting up blast files
+#version 0.9.4 started removing *blastfinal.tab files in demux step
 
 #this program creates bash scripts and submits them on clusters with torque schedulers, overview of steps below
 #Step 1 fetch sequences and get annotations
@@ -92,6 +95,8 @@ $toolpath=$ENV{'EFIEST'};
 $efiestmod=$ENV{'EFIESTMOD'};
 $sortdir='/state/partition1';
 
+#print "taxid is $taxid\n";
+
 #defaults and error checking for multiplexing
 if($multiplexing eq "on"){
   if(defined $lengthdif){
@@ -130,7 +135,7 @@ if($multiplexing eq "on"){
 
 #max number of hits for an individual sequence, normally set ot max value
 unless(defined $blasthits){
-  $blasthits=50000;  
+  $blasthits=1000000;  
 }
 
 #at least one of tehse inputs are required to get sequences for the program
@@ -146,11 +151,11 @@ unless(defined $np){
 #default queues
 unless(defined $queue){
   print "-queue not specified, using default\n";
-  $queue="default";
+  $queue="efi";
 }
 unless(defined $memqueue){
   print "-memqueue not specifiied, using default\n";
-  $memqueue="default";
+  $memqueue="efi";
 }
 
 #working directory must be defined
@@ -209,13 +214,13 @@ unless(defined $maxsequence){
 }
 
 
-#error checking for user supplied dat and fa files
-if($userfasta=~/\w+/){
-#($userfasta=~/^\// or $userfasta=~/^~/)
-  $userfasta=$ENV{PWD}."/$userfasta";
-}
+
 
 if(defined $userfasta and -e $userfasta){
+#error checking for user supplied dat and fa files
+  unless(($userfasta=~/^\// or $userfasta=~/^~/) and defined $userfasta){
+    $userfasta=$ENV{PWD}."/$userfasta";
+  }
   $userfasta="-userfasta $userfasta";
 }elsif(defined $userfasta){
   die "$userfasta does not exist\n";
@@ -240,7 +245,7 @@ mkdir $tmpdir;
 
 #get sequences and annotations, tax id code is different, so it is exclusive
 #creates fasta and struct.out files
-print "$pfam, $ipro, $ssf, $gene3d, $userfasta\n";
+print "userfasta $userfasta\n";
 if($pfam or $ipro or $ssf or $gene3d or $userfasta=~/\w+/){
   #make the qsub file
   open(QSUB,">$tmpdir/initial_import.sh") or die "could not create blast submission script $tmpdir/createdb.sh\n";
@@ -252,7 +257,7 @@ if($pfam or $ipro or $ssf or $gene3d or $userfasta=~/\w+/){
   print QSUB "module load $efiestmod\n";
   print QSUB "cd $ENV{PWD}/$tmpdir\n";
   print QSUB "which perl\n";
-  print QSUB "$toolpath/sqlite-getsequence.pl $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -access ".$ENV{PWD}."/$tmpdir/accession.txt\n";
+  print QSUB "$toolpath/getsequence.pl $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -access ".$ENV{PWD}."/$tmpdir/accession.txt\n";
   print QSUB "$toolpath/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa\n";
   close QSUB;
 
@@ -314,7 +319,7 @@ print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@muxjobline[0]\n"; 
-print QSUB "$toolpath/fracsequence.pl -np $np -tmp ".$ENV{PWD}."/$tmpdir\n";
+print QSUB "$toolpath/splitfasta.pl -parts $np -tmp ".$ENV{PWD}."/$tmpdir -source $ENV{PWD}/$tmpdir/sequences.fa\n";
 close QSUB;
 
 $fracfilejob=`qsub $tmpdir/fracfile.sh`;
@@ -368,7 +373,7 @@ print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $queue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterokarray:@blastjobline[0]\n"; 
-print QSUB "cat $ENV{PWD}/$tmpdir/blastout-*.tab |grep -v '#' >$ENV{PWD}/$tmpdir/blastfinal.tab\n";
+print QSUB "cat $ENV{PWD}/$tmpdir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$ENV{PWD}/$tmpdir/blastfinal.tab\n";
 print QSUB "rm  $ENV{PWD}/$tmpdir/blastout-*.tab\n";
 print QSUB "rm  $ENV{PWD}/$tmpdir/fracfile-*.fa\n";
 close QSUB;
@@ -385,10 +390,11 @@ print QSUB "#PBS -S /bin/bash\n";
 print QSUB "#PBS -q $memqueue\n";
 print QSUB "#PBS -l nodes=1:ppn=1\n";
 print QSUB "#PBS -W depend=afterok:@catjobline[0]\n"; 
-print QSUB "mv $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.blastfinal.tab\n";
-print QSUB "sort -T $sortdir -k 12,12 -nr -t\$\'\\t\' $ENV{PWD}/$tmpdir/unsorted.blastfinal.tab >$ENV{PWD}/$tmpdir/blastfinal.tab\n";
-print QSUB "$toolpath/blastreduce.pl $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sequences.fa > $ENV{PWD}/$tmpdir/1.out\n";
-#print QSUB "rm $ENV{PWD}/$tmpdir/blastfinal.tab\n";
+#print QSUB "mv $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.blastfinal.tab\n";
+print QSUB "$toolpath/alphabetize.pl -in $ENV{PWD}/$tmpdir/blastfinal.tab -out $ENV{PWD}/$tmpdir/alphabetized.blastfinal.tab -fasta $ENV{PWD}/$tmpdir/sequences.fa\n";
+print QSUB "sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $ENV{PWD}/$tmpdir/alphabetized.blastfinal.tab > $ENV{PWD}/$tmpdir/sorted.alphabetized.blastfinal.tab\n";
+print QSUB "$toolpath/blastreduce-alpha.pl -blast $ENV{PWD}/$tmpdir/sorted.alphabetized.blastfinal.tab -fasta $ENV{PWD}/$tmpdir/sequences.fa -out $ENV{PWD}/$tmpdir/unsorted.1.out\n";
+print QSUB "sort -T $sortdir -k5,5nr -t\$\'\\t\' $ENV{PWD}/$tmpdir/unsorted.1.out >$ENV{PWD}/$tmpdir/1.out\n";
 close QSUB;
 
 $blastreducejob=`qsub $tmpdir/blastreduce.sh`;
@@ -408,7 +414,12 @@ print QSUB "#PBS -W depend=afterok:@blastreducejobline[0]\n";
 if($multiplexing eq "on"){
   print QSUB "mv $ENV{PWD}/$tmpdir/1.out $ENV{PWD}/$tmpdir/mux.out\n";
   print QSUB "$toolpath/demux.pl -blastin $ENV{PWD}/$tmpdir/mux.out -blastout $ENV{PWD}/$tmpdir/1.out -cluster $ENV{PWD}/$tmpdir/sequences.fa.clstr\n";
+}else{
+  print QSUB "mv $ENV{PWD}/$tmpdir/1.out $ENV{PWD}/$tmpdir/mux.out\n";
+  print QSUB "$toolpath/removedups.pl -in $ENV{PWD}/$tmpdir/mux.out -out $ENV{PWD}/$tmpdir/1.out\n";
 }
+#print QSUB "rm $ENV{PWD}/$tmpdir/*blastfinal.tab\n";
+#print QSUB "rm $ENV{PWD}/$tmpdir/mux.out\n";
 close QSUB;
 
 $demuxjob=`qsub $tmpdir/demux.sh`;
@@ -482,10 +493,12 @@ print QSUB "FIRST=`head -1 \$FIRST`\n";
 print QSUB "LAST=`ls $ENV{PWD}/$tmpdir/rdata/perid*| tail -1`\n";
 print QSUB "LAST=`head -1 \$LAST`\n";
 print QSUB "MAXALIGN=`head -1 $ENV{PWD}/$tmpdir/rdata/maxyal`\n";
-print QSUB "Rscript $toolpath/quart-align.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/r_quartile_align.png \$FIRST \$LAST \$MAXALIGN\n";
-print QSUB "Rscript $toolpath/quart-perid.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/r_quartile_perid.png \$FIRST \$LAST\n";
-print QSUB "Rscript $toolpath/hist-length.r  $ENV{PWD}/$tmpdir/length.tab  $ENV{PWD}/$tmpdir/r_hist_length.png\n";
-print QSUB "Rscript $toolpath/hist-edges.r $ENV{PWD}/$tmpdir/edge.tab $ENV{PWD}/$tmpdir/r_hist_edges.png\n"; 
+print QSUB "Rscript $toolpath/quart-align.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/alignment_length.png \$FIRST \$LAST \$MAXALIGN\n";
+print QSUB "Rscript $toolpath/quart-perid.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/percent_identity.png \$FIRST \$LAST\n";
+print QSUB "Rscript $toolpath/hist-length.r  $ENV{PWD}/$tmpdir/length.tab  $ENV{PWD}/$tmpdir/length_histogram.png\n";
+print QSUB "Rscript $toolpath/hist-edges.r $ENV{PWD}/$tmpdir/edge.tab $ENV{PWD}/$tmpdir/number_of_edges.png\n";
+print QSUB "touch  $ENV{PWD}/$tmpdir/1.out.completed\n";
+#print QSUB "rm $ENV{PWD}/$tmpdir/alphabetized.blastfinal.tab $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sorted.alphabetized.blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.1.out\n";
 close QSUB;
 
 $graphjob=`qsub $tmpdir/graphs.sh`;

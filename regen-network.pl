@@ -2,13 +2,21 @@
 
 use Getopt::Long;
 use File::Copy;
+use File::Slurp;
+use DBD::SQLite;
+use DBD::mysql;
 
 $result=GetOptions ("xgmml=s"		=> \$xgmml,
 		    "oldtmp=s"		=> \$oldtmp,
 		    "newtmp=s"		=> \$newtmp);
 
-$combined=$ENV{'EFIEST'}."/data_files/combined.fasta";
-$perpass=1000;
+$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
+eval $configfile;
+$combined=$data_files."/combined.fasta";
+#$perpass=1000;
+#print "$configfile\n";
+print "pass size $perpass\n";
+
 
 #system("cp $oldtmp/1.out $newtmp/1.out");
 #system("cp $oldtmp/struct.out $newtmp/struct.out");
@@ -30,7 +38,7 @@ while( <XGMML> ){
 #print "$line\n";
     if($line=~/<att type="list" name="ACC">(.*?)<\/att>/ or $line=~/<att name="ACC" type="list">(.*?)<\/att>/){
       $acc=$1;
-print "Match ACC\t$acc\n";
+#print "Match ACC\t$acc\n";
       push @accessions, $acc=~/value=\"(\w{6,10})\"/g;
       #$acc=~/value="(\w{6})"/g;
 #print "match: $1\n\ncount ".scalar @accessions."\n";      
@@ -47,15 +55,18 @@ print "found ".scalar @accessions." accessions in xgmml\n";
 
 print "Fetch fasta sequences\n";
 #create sequences.fa file from accessions
-open(FASTA, ">$newtmp/sequences.fa");
+open(FASTA, ">$newtmp/allsequences.fa");
 while(scalar @accessions){
   @batch=splice(@accessions, 0, $perpass);
   $batchline=join ',', @batch;
+  #print "fastacmd -d $combined -s $batchline\n";
+  print "Get next $perpass sequences\n";
   #print "fastacmd -d $combined -s $batchline\n";
   @sequences=split /\n/, `fastacmd -d $combined -s $batchline`;
   foreach $sequence (@sequences){ 
     $sequence=~s/^>\w\w\|(\w{6,10}).*/>$1/;
     print FASTA "$sequence\n";
+    #print "$sequence\n";
   } 
 }
 close FASTA;

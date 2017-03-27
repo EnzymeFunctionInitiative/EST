@@ -71,9 +71,7 @@ while (<STRUCT>){
   chomp $line;
   if($line=~/^\s/){
     @lineary=split /\t/, $line;
-    unless(@lineary[1] eq "SEQ"){
-      push @metas, @lineary[1];
-    }
+    push @metas, @lineary[1];
   }
 }
 
@@ -167,12 +165,13 @@ while (<BLASTFILE>){
   chomp $line;
   my @line=split /\t/, $line;
   if(exists $headuprot{@line[0]} and exists $headuprot{@line[1]}){
-    my $log=-(log(@line[3])/log(10))+@line[2]*log(2)/log(10);
+    #my $log=-(log(@line[3])/log(10))+@line[2]*log(2)/log(10);
+    my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
     $edgecount++;
     $writer->startTag('edge', 'id' => "@line[0],@line[1]", 'label'=> "@line[0],@line[1]", 'source' => @line[0], 'target' => @line[1]);
-    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[5]);
+    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[2]);
     $writer->emptyTag('att', 'name' => '-log10(E)', 'type' => 'real', 'value' => $log);
-    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => @line[9]);
+    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => @line[3]);
     $writer->endTag;
   }
 }

@@ -8,7 +8,8 @@ $result=GetOptions ("xgmml=s"		=> \$xgmml,
 		    "newtmp=s"		=> \$newtmp,
 		    "queue=s"		=> \$queue);
 
-$toolpath="/home/groups/efi/devel";
+$toolpath=$ENV{'EFIEST'};
+$efiestmod=$ENV{'EFIESTMOD'};
 
 unless($xgmml=~/^\//){
   $xgmml="$ENV{PWD}/$xgmml";

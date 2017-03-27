@@ -12,7 +12,8 @@ $result=GetOptions ("source=s" => \$source,
 		    "tmp=s"    => \$tmpdir);
 
 if(-e $tmpdir){
-  die "directory $tmpdir already exists\n";
+  warn "directory $tmpdir already exists\n";
+  sleep 5;
 }else{
   mkdir $tmpdir;
 }

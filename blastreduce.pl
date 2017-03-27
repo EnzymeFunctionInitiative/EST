@@ -46,8 +46,7 @@ while (<BLASTFILE>){
       #$id=@lineary[11]/100;
       $id=@lineary[2]/100;
       #print "@lineary[0]\t@lineary[1]\t@lineary[2]\t".@lineary[4]*@lineary[5]."\t@lineary[6]\t$id\t@lineary[3]\t@lineary[8]\t@lineary[9]\t@lineary[10]\t@lineary[4]\t@lineary[5]\n";
-      print "@lineary[0]\t@lineary[1]\t@lineary[11]\t".$seqlengths{@lineary[0]}*$seqlengths{@lineary[1]}."\t@lineary[3]\t$id\t@lineary[6]\t@lineary[7]\t@lineary[8]\t@lineary[9]\t$seqlengths{@lineary[0]}\t$seqlengths{@lineary[1]}\n";
-
+      print "@lineary[0]\t@lineary[1]\t@lineary[11]\t$id\t$seqlengths{@lineary[0]}\t$seqlengths{@lineary[1]}\n";
     }
   }
 }

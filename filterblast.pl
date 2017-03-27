@@ -66,16 +66,21 @@ while (<BLAST>){
   chomp $line;
   my @line=split /\t/, $line;
   if($evalue){
-    my $log=-(log(@line[3])/log(10))+@line[2]*log(2)/log(10);
-    if($log>=$minval and @line[10]>=$minlen and @line[11]>=$minlen and ((@line[10]<=$maxlen and @line[11]<=$maxlen) or $maxlen==0)){
+    #my $log=-(log(@line[3])/log(10))+@line[12]*log(2)/log(10);
+    my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
+    if($log>=$minval and @line[5]>=$minlen and @line[6]>=$minlen and ((@line[5]<=$maxlen and @line[6]<=$maxlen) or $maxlen==0)){
       print OUT "$origline";
+    }elsif($log<$minval){
+      last;
     }
   }elsif($bitscore){
-    if(@line[2]>=$minval and @line[10]>=$minlen and @line[11]>=$minlen and ((@line[10]<=$maxlen and @line[11]<=$maxlen) or $maxlen==0)){
+    if(@line[4]>=$minval and @line[5]>=$minlen and @line[6]>=$minlen and ((@line[5]<=$maxlen and @line[5]<=$maxlen) or $maxlen==0)){
       print OUT "$origline";
+    }elsif(@line[2]<$minval){
+      last;
     }
   }elsif($pid){
-    if(@line[5]>=$minval and @line[10]>=$minlen and @line[11]>=$minlen and ((@line[10]<=$maxlen and @line[11]<=$maxlen) or $maxlen==0)){
+    if(@line[2]>=$minval and @line[5]>=$minlen and @line[6]>=$minlen and ((@line[5]<=$maxlen and @line[6]<=$maxlen) or $maxlen==0)){
       print OUT "$origline";
     }
   }

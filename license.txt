@@ -1,0 +1,10 @@
+Copyright and License information
+=================================
+
+EFIEST is Copyright 2012-2015 University of Illinois. The EFIEST creators are
+John Gerlt, Katie Whalen, Boris Sadkhin, David Slater, Heidi Imker, and Daniel Davidson.
+
+EFIEST is largely available under the GNU Lesser GPL; see the file COPYING.LGPL
+for the full text of this license. Some EFIEST modules are available under the
+GNU GPL (see the file COPYING.GPL). Please refer to the documentation at
+http://www-app2.igb.illinois.edu/wikis/efi/index.php/Main_Page for more detail.
