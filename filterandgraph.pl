@@ -89,7 +89,13 @@ if(-s "$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png"){
 print "Data from runs will be saved to $tmpdir/$filter-$minval-$minlen-$maxlen/\n";
 
 my $schedType = "torque";
-$schedType = "slurm" if defined($scheduler) and $scheduler eq "slurm";
+$schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
+my $usesSlurm = $schedType eq "slurm";
+if (defined($oldapps)) {
+    $oldapps = $usesSlurm;
+} else {
+    $oldapps = 0;
+}
 my $S = new Biocluster::SchedulerApi('type' => $schedType);
 my $B = $S->getBuilder();
 $B->queue($queue);
@@ -99,13 +105,13 @@ $B->resource(1, 1);
 unless( -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
   mkdir "$tmpdir/$filter-$minval-$minlen-$maxlen" or die "could not make analysis folder $tmpdir/$filter-$minval-$minlen-$maxlen\n";
 
-  #submit the job for filtering out extraneous edges
+  submit the job for filtering out extraneous edges
 
   $fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun) or die "could not create blast submission script $tmpdir/fullxgmml.sh\n";
   $B->queue($queue);
   $B->resource(1, 1);
   $B->render($fh);
-  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load oldapps\n" if $oldapps;
   print $fh "module load $efiestmod\n";
   print $fh "$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/sequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen\n";
   closeFH($fh, dryrun);
@@ -128,7 +134,7 @@ if(defined $filterjob){
   $B->dependency(0, @filterjobline[0]); 
 }
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/quart-align.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -align $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/alignment_length.png\n";
 closeFH($fh, dryrun);
@@ -144,7 +150,7 @@ if(defined $filterjob){
 }
 $B->mailEnd();
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -pid $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png\n";
 closeFH($fh, dryrun);
@@ -162,7 +168,7 @@ if(defined $filterjob){
   $B->dependency(0, @filterjobline[0]); 
 }
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -maxlen $maxlen -minlen $minlen -edges $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/length_histogram.png -incfrac $incfrac\n";
 closeFH($fh, dryrun);

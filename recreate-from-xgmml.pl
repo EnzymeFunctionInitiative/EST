@@ -42,7 +42,13 @@ unless($queue=~/\w/){
 mkdir $newtmp or die "cannnot create new temporary directory $newtmp\n";
 
 my $schedType = "torque";
-$schedType = "slurm" if defined($scheduler) and $scheduler eq "slurm";
+$schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
+my $usesSlurm = $schedType eq "slurm";
+if (defined($oldapps)) {
+    $oldapps = $usesSlurm;
+} else {
+    $oldapps = 0;
+}
 my $S = new Biocluster::SchedulerApi('type' => $schedType);
 my $B = $S->getBuilder();
 $B->queue($queue);
@@ -51,7 +57,7 @@ $B->resource(1, 1);
 $fh = getFH(">$newtmp/regen-network.sh", $dryrun) or die "could not create blast submission script $tmpdir/regen-network.sh\n";
 $B->queue($queue);
 $B->resource(1, 1);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/regen-network.pl -oldtmp $oldtmp -newtmp $newtmp -xgmml $xgmml\n";
 closeFH($fh, $dryrun);

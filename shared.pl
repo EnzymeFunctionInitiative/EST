@@ -38,5 +38,14 @@ sub doQsub {
     return $result;
 }
 
+sub usesSlurm {
+    my $usesSlurm = `which sbatch 2>/dev/null`;
+    if (length $usesSlurm > 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 1;
 

@@ -95,7 +95,13 @@ if(-s "$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml"){
 }
 
 my $schedType = "torque";
-$schedType = "slurm" if defined($scheduler) and $scheduler eq "slurm";
+$schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
+my $usesSlurm = $schedType eq "slurm";
+if (defined($oldapps)) {
+    $oldapps = $usesSlurm;
+} else {
+    $oldapps = 0;
+}
 my $S = new Biocluster::SchedulerApi('type' => $schedType);
 my $B = $S->getBuilder();
 $B->queue($queue);
@@ -112,7 +118,7 @@ unless( -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
   $B->queue($queue);
   $B->resource(1, 1);
   $B->render($fh);
-  print $fh "module load oldapps\n" if $schedType eq "slurm";
+  print $fh "module load oldapps\n" if $usesSlurm;
   print $fh "module load perl/5.16.1\n";
   print $fh "$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/allsequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen\n";
   closeFH($fh, dryrun);
@@ -134,7 +140,7 @@ $B->queue($queue);
 $B->resource(1, 1);
 $B->dependency(0, @filterjobline[0]);
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm";
+print $fh "module load oldapps\n" if $usesSlurm;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title=\"$title\" -maxfull $maxfull -dbver $dbver\n";
 closeFH($fh, dryrun);
@@ -155,7 +161,7 @@ $B->queue($queue);
 $B->resource(1, 1);
 $B->dependency(0, @filterjobline[0]);
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm";
+print $fh "module load oldapps\n" if $usesSlurm;
 print $fh "module load $efiestmod\n";
 #print $fh "module load cd-hit\n";
 print $fh "CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)\n";
@@ -177,7 +183,7 @@ $B->queue($queue);
 $B->resource(1, 1);
 $B->dependency(1, @repnodejobline[0]);
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm";
+print $fh "module load oldapps\n" if $usesSlurm;
 print $fh "module load $efiestmod\n";
 print $fh "sleep 5\n";
 closeFH($fh, dryrun);
@@ -197,7 +203,7 @@ $B->dependency(0, @fulljobline[0] . ":" . $fixjobline[0]);
 #$B->dependency(0, @fulljobline[0]); 
 $B->mailEnd();
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm";
+print $fh "module load oldapps\n" if $usesSlurm;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/stats.pl -tmp $ENV{PWD}/$tmpdir -run $filter-$minval-$minlen-$maxlen -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/stats.tab\n";
 closeFH($fh, dryrun);

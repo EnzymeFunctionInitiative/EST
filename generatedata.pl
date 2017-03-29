@@ -319,7 +319,13 @@ print "database version is $1 of $efidbmod\n";
 system("echo $1 >$tmpdir/database_version");
 
 my $schedType = "torque";
-$schedType = "slurm" if defined($scheduler) and $scheduler eq "slurm";
+$schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
+my $usesSlurm = $schedType eq "slurm";
+if (defined($oldapps)) {
+    $oldapps = $usesSlurm;
+} else {
+    $oldapps = 0;
+}
 my $S = new Biocluster::SchedulerApi('type' => $schedType);
 my $B = $S->getBuilder();
 $B->queue($queue);
@@ -333,7 +339,7 @@ if($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid)){
 
   $fh = getFH(">$tmpdir/initial_import.sh", $dryrun) or die "could not create blast submission script $tmpdir/createdb.sh\n";
   $B->render($fh);
-  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load oldapps\n" if $oldapps;
   print $fh "module load $efiestmod\n";
   print $fh "cd $ENV{PWD}/$tmpdir\n";
   print $fh "which perl\n";
@@ -350,7 +356,7 @@ if($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid)){
   #create taxid qsub file
   $fh = getFH(">$tmpdir/initial_import.sh", $dryrun) or die "could not create blast submission script $tmpdir/createdb.sh\n";
   $B->render($fh);
-  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load oldapps\n" if $oldapps;
   print $fh "module load $efiestmod\n";
   print $fh "cd $ENV{PWD}/$tmpdir\n";
   print $fh "$toolpath/getseqtaxid.pl -fasta allsequences.fa -struct struct.out -taxid $taxid\n";
@@ -379,7 +385,7 @@ $B->queue($queue);
 $B->resource(1, 1);
 $B->dependency(0, @importjobline[0]);
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 #print $fh "module load blast\n";
 print $fh "cd $ENV{PWD}/$tmpdir\n";
@@ -414,7 +420,7 @@ $B->queue($queue);
 $B->resource(1, 1);
 $B->dependency(0, @fracfilejobline[0]);
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "cd $ENV{PWD}/$tmpdir\n";
 if($blast eq 'diamond' or $blast eq 'diamondsensitive'){
@@ -441,25 +447,25 @@ if($blast=~/diamond/){
 }
 $B->render($fh);
 print $fh "export BLASTDB=$ENV{PWD}/$tmpdir\n";
-#print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+#print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load blast+\n";
 #print $fh "blastp -query  $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue\n";
 print $fh "module load $efiestmod\n";
 if($blast eq "blast"){
-  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load oldapps\n" if $oldapps;
   print $fh "module load blast\n";
   print $fh "blastall -p blastp -i $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -m 8 -e $evalue -b $blasthits -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab\n";
 }elsif($blast eq "blast+"){
-  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load oldapps\n" if $oldapps;
   print $fh "module load blast+\n";
   print $fh "blastp -query  $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue\n";
 }elsif($blast eq "diamond"){
-  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load oldapps\n" if $oldapps;
   print $fh "module load diamond\n";
   print $fh "diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
   print $fh "diamond view -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
 }elsif($blast eq "diamondsensitive"){
-  print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+  print $fh "module load oldapps\n" if $oldapps;
   print $fh "module load diamond\n";
   print $fh "diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
   print $fh "diamond view -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.daa\n";
@@ -514,7 +520,7 @@ $B->queue($queue);
 $B->resource(1, 1);
 $B->dependency(0, @blastreducejobline[0]); 
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 if($multiplexing eq "on"){
   print $fh "mv $ENV{PWD}/$tmpdir/1.out $ENV{PWD}/$tmpdir/mux.out\n";
@@ -540,7 +546,7 @@ $B->queue($memqueue);
 $B->resource(1, 1);
 $B->dependency(0, @demuxjobline[0]); 
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/quart-align.pl -blastout $ENV{PWD}/$tmpdir/1.out -align $ENV{PWD}/$tmpdir/alignment_length.png\n";
 closeFH($fh, dryrun);
@@ -554,7 +560,7 @@ $B->resource(1, 1);
 $B->dependency(0, @demuxjobline[0]); 
 $B->render($fh);
 print $fh "#PBS -m e\n";
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/1.out -pid $ENV{PWD}/$tmpdir/percent_identity.png\n";
 closeFH($fh, dryrun);
@@ -567,7 +573,7 @@ $B->queue($memqueue);
 $B->resource(1, 1);
 $B->dependency(0, @demuxjobline[0]); 
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -edges $ENV{PWD}/$tmpdir/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/allsequences.fa -lengths $ENV{PWD}/$tmpdir/length_histogram.png -incfrac $incfrac\n";
 closeFH($fh, dryrun);
@@ -583,7 +589,7 @@ $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]);
 $B->mailEnd();
 $B->render($fh);
-print $fh "module load oldapps\n" if $schedType eq "slurm" and defined($oldapps);
+print $fh "module load oldapps\n" if $oldapps;
 print $fh "module load ".$ENV{'EFIESTMOD'}."\n";
 print $fh "module load $efiestmod\n";
 print $fh "$toolpath/R-hdf-graph.py -b $ENV{PWD}/$tmpdir/1.out -f $ENV{PWD}/$tmpdir/rdata.hdf5 -a $ENV{PWD}/$tmpdir/allsequences.fa -i $incfrac\n";
