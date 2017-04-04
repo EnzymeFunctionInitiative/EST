@@ -86,10 +86,58 @@ open OUT, ">$ENV{PWD}/$tmpdir/struct.out" or die "cannot write to struct.out\n";
 foreach $accession (@annoaccessions){
   $sth= $dbh->prepare("select * from annotations where accession = '$accession'");
   $sth->execute;
-  $row = $sth->fetch;
-  #print OUT $row->[0]."\n\tUniprot_ID\t".$row->[1]."\n\tSTATUS\t".$row->[2]."\n\tSequence_Length\t".$row->[3]."\n\tTaxonomy_ID\t".$row->[4]."\n\tGDNA\t".$row->[5]."\n\tDescription\t".$row->[6]."\n\tOrganism\t".$row->[7]."\n\tDomain\t".$row->[8]."\n\tGN\t".$row->[9]."\n\tPFAM\t".$row->[10]."\n\tPDB\t".$row->[11]."\n\tIPRO\t".$row->[12]."\n\tGO\t".$row->[13]."\n\tGI\t".$row->[14]."\n\tHMP_Body_Site\t".$row->[15]."\n\tHMP_Oxygen\t".$row->[16]."\n\tEFI_ID\t".$row->[17]."\n\tSEQ\t".$row->[18]."\n";
+  $row = $sth->fetchrow_hashref;
+  #print OUT 
+  #  $row->{"accession"} . 
+  #  "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} . 
+  #  "\n\tSTATUS\t" . $row->{"STATUS"} . 
+  #  "\n\tSequence_Length\t" . $row->{"Squence_Length"} . 
+  #  "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
+  #  "\n\tGDNA\t" . $row->{"GDNA"} . 
+  #  "\n\tDescription\t" . $row->{"Description"} . 
+  #  "\n\tOrganism\t" . $row->{"Organism"} . 
+  #  "\n\tDomain\t" . $row->{"Domain"} . 
+  #  "\n\tGN\t" . $row->{"GN"} . 
+  #  "\n\tPFAM\t" . $row->{"PFAM"} . 
+  #  "\n\tPDB\t" . $row->{"pdb"} . 
+  #  "\n\tIPRO\t" . $row->{"IPRO"} . 
+  #  "\n\tGO\t" . $row->{"GO"} . 
+  #  "\n\tGI\t" . $row->{"GI"} . 
+  #  "\n\tHMP_Body_Site\t" . $row->{"HMP_Body_Site"} . 
+  #  "\n\tHMP_Oxygen\t" . $row->{"HMP_Oxygen"} . 
+  #  "\n\tEFI_ID\t" . $row->{"EFI_ID"} . 
+  #  "\n\tSEQ\t" . $row->{"SEQ"} . 
+  #  "\n";
   #print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$giline\t$TID\t$sequence\n";
-  print OUT $row->[0]."\n\tUniprot_ID\t".$row->[1]."\n\tSTATUS\t".$row->[2]."\n\tSequence_Length\t".$row->[3]."\n\tTaxonomy_ID\t".$row->[4]."\n\tGDNA\t".$row->[5]."\n\tDescription\t".$row->[6]."\n\tSwissprot_Description\t".$row->[7]."\n\tOrganism\t".$row->[8]."\n\tDomain\t".$row->[9]."\n\tGN\t".$row->[10]."\n\tPFAM\t".$row->[11]."\n\tPDB\t".$row->[12]."\n\tIPRO\t".$row->[13]."\n\tGO\t".$row->[14]."\n\tGI\t".$row->[15]."\n\tHMP_Body_Site\t".$row->[16]."\n\tHMP_Oxygen\t".$row->[17]."\n\tEFI_ID\t".$row->[18]."\n\tEC\t".$row->[19]."\n\tPHYLUM\t".$row->[20]."\n\tCLASS\t".$row->[21]."\n\tORDER\t".$row->[22]."\n\tFAMILY\t".$row->[23]."\n\tGENUS\t".$row->[24]."\n\tSPECIES\t".$row->[25]."\n\tCAZY\t".$row->[26]."\n";
+  print OUT
+    $row->{"accession"} . 
+    "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} . 
+    "\n\tSTATUS\t" . $row->{"STATUS"} . 
+    "\n\tSequence_Length\t" . $row->{"Squence_Length"} . 
+    "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
+    "\n\tGDNA\t" . $row->{"GDNA"} . 
+    "\n\tDescription\t" . $row->{"Description"} . 
+    "\n\tSwissprot_Description\t" . $row->{"SwissProt_Description"} . 
+    "\n\tOrganism\t" . $row->{"Organism"} . 
+    "\n\tDomain\t" . $row->{"Domain"} . 
+    "\n\tGN\t" . $row->{"GN"} . 
+    "\n\tPFAM\t" . $row->{"PFAM"} . 
+    "\n\tPDB\t" . $row->{"pdb"} . 
+    "\n\tIPRO\t" . $row->{"IPRO"} . 
+    "\n\tGO\t" . $row->{"GO"} . 
+    "\n\tGI\t" . $row->{"GI"} . 
+    "\n\tHMP_Body_Site\t" . $row->{"HMP_Body_Site"} . 
+    "\n\tHMP_Oxygen\t" . $row->{"HMP_Oxygen"} . 
+    "\n\tEFI_ID\t" . $row->{"EFI_ID"} . 
+    "\n\tEC\t" . $row->{"EC"} . 
+    "\n\tPHYLUM\t" . $row->{"Phylum"} . 
+    "\n\tCLASS\t" . $row->{"Class"} . 
+    "\n\tORDER\t" . $row->{"TaxOrder"} . 
+    "\n\tFAMILY\t" . $row->{"Family"} . 
+    "\n\tGENUS\t" . $row->{"Genus"} . 
+    "\n\tSPECIES\t" . $row->{"Species"} . 
+    "\n\tCAZY\t" . $row->{"Cazy"} . 
+    "\n";
 }
 close OUT;
 

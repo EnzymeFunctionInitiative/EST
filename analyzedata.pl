@@ -12,7 +12,9 @@
 #stats.pl			Displays number of edges and nodes in each xgmml
 
 
-use lib "../";
+use File::Basename;
+use Cwd qw(abs_path);
+use lib dirname(abs_path(__FILE__));
 use Getopt::Long;
 use Biocluster::SchedulerApi;
 

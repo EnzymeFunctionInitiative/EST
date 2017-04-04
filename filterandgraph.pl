@@ -11,7 +11,9 @@
 #quart-perid.pl            generates the percent identity quartile graph
 #sipmlegraphs.pl        generates sequence length and alignment score distributions
 
-use lib "../";
+use File::Basename;
+use Cwd qw(abs_path);
+use lib dirname(abs_path(__FILE__));
 use Getopt::Long;
 use Biocluster::SchedulerApi;
 

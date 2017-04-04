@@ -74,7 +74,9 @@
 
 
 #perl module for loading command line options
-use lib "../";
+use File::Basename;
+use Cwd qw(abs_path);
+use lib dirname(abs_path(__FILE__));
 use Getopt::Long;
 use POSIX qw(ceil);
 use Biocluster::SchedulerApi;
