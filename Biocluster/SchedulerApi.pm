@@ -197,6 +197,15 @@ sub new {
         $self->{'type'} = TORQUE;
     }
     $T = $self->{'type'};
+    
+    $self->{'queue'} = $args{'queue'};
+    $self->{'resource'} = $args{'resource'};
+
+    if (exists($args{'dryrun'})) {
+        $self->{'dryrun'} = $args{'dryrun'};
+    } else {
+        $self->{'dryrun'} = 0;
+    }
 
     return $self;
 }
@@ -204,11 +213,30 @@ sub new {
 sub getBuilder {
     my ($self) = @_;
 
+    my $b;
+
     if ($self->{'type'} == SLURM) {
-        return new Biocluster::SchedulerApi::SlurmBuilder();
+        $b = new Biocluster::SchedulerApi::SlurmBuilder();
     } else {
-        return new Biocluster::SchedulerApi::TorqueBuilder();
+        $b = new Biocluster::SchedulerApi::TorqueBuilder();
     }
+
+    $b->queue($self->{'queue'}) if defined $self->{'queue'};
+    $b->resource($self->{'resource'}[0], $self->{'resource'}[1]) if defined $self->{'resource'};
+
+    return $b;
+}
+
+sub submit {
+    my ($self, $script) = @_;
+
+    my $result = "1.biocluster\n";
+    if (not $self->{'dryrun'}) {
+        my $submit = $self->{'type'} == SLURM ? "sbatch" : "qsub";
+        $result = `$submit $script`;
+    }
+
+    return $result;
 }
 
 
