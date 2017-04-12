@@ -8,7 +8,7 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 $VERSION     = 1.00;
 @ISA         = qw(Exporter);
 @EXPORT      = ();
-@EXPORT_OK   = qw(usesSlrum getSchedulerType);
+@EXPORT_OK   = qw(usesSlurm getSchedulerType);
 #%EXPORT_TAGS = (DEFAULT => [qw(&func1)], Both    => [qw(&func1 &func2)]);
 
 

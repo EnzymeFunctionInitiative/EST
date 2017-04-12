@@ -81,30 +81,31 @@ use Getopt::Long;
 use POSIX qw(ceil);
 use Biocluster::SchedulerApi;
 
-$result=GetOptions ("np=i"          => \$np,
-                    "queue=s"       => \$queue,
-                    "tmp=s"         => \$tmpdir,
-                    "evalue=s"      => \$evalue,
-                    "incfrac=f"     => \$incfrac,
-                    "ipro=s"        => \$ipro,
-                    "pfam=s"        => \$pfam,
-                    "taxid=s"       => \$taxid,
-                    "gene3d=s"      => \$gene3d,
-                    "ssf=s"         => \$ssf,
-                    "blasthits=i"   => \$blasthits,
-                    "memqueue=s"    => \$memqueue,
-                    "maxsequence=s" => \$maxsequence,
-                    "userdat=s"     => \$userdat,
-                    "userfasta=s"   => \$userfasta,
-                    "lengthdif=f"   => \$lengthdif,
-                    "sim=f"         => \$sim,
-                    "multiplex=s"   => \$multiplexing,
-                    "domain=s"      => \$domain,
-                    "fraction=i"    => \$fraction,
-                    "blast=s"       => \$blast,
-                    "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm 
-                    "dryrun"        => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
-                    "oldapps"       => \$oldapps        # to module load oldapps for biocluster2 testing
+$result=GetOptions ("np=i"              => \$np,
+                    "queue=s"           => \$queue,
+                    "tmp=s"             => \$tmpdir,
+                    "evalue=s"          => \$evalue,
+                    "incfrac=f"         => \$incfrac,
+                    "ipro=s"            => \$ipro,
+                    "pfam=s"            => \$pfam,
+                    "accession-id=s"    => \$accessionId,
+                    "taxid=s"           => \$taxid,
+                    "gene3d=s"          => \$gene3d,
+                    "ssf=s"             => \$ssf,
+                    "blasthits=i"       => \$blasthits,
+                    "memqueue=s"        => \$memqueue,
+                    "maxsequence=s"     => \$maxsequence,
+                    "userdat=s"         => \$userdat,
+                    "userfasta=s"       => \$userfasta,
+                    "lengthdif=f"       => \$lengthdif,
+                    "sim=f"             => \$sim,
+                    "multiplex=s"       => \$multiplexing,
+                    "domain=s"          => \$domain,
+                    "fraction=i"        => \$fraction,
+                    "blast=s"           => \$blast,
+                    "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
+                    "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
+                    "oldapps"           => \$oldapps        # to module load oldapps for biocluster2 testing
                 );
 
 require "shared.pl";
@@ -261,6 +262,10 @@ unless(defined $ssf){
   $ssf=0;
 }
 
+unless (defined $accessionId) {
+    $accessionId = 0;
+}
+
 #default values for bandpass filter, 0,0 disables it, which is the default
 unless(defined $maxlen){
   $maxlen=0;
@@ -336,7 +341,7 @@ $B->resource(1, 1);
 #get sequences and annotations, tax id code is different, so it is exclusive
 #creates fasta and struct.out files
 print "userfasta $userfasta\n";
-if($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid)){
+if ($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid) or $accessionId) {
   #make the qsub file
 
   $fh = getFH(">$tmpdir/initial_import.sh", $dryrun) or die "could not create blast submission script $tmpdir/createdb.sh\n";
@@ -345,7 +350,7 @@ if($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid)){
   print $fh "module load $efiestmod\n";
   print $fh "cd $ENV{PWD}/$tmpdir\n";
   print $fh "which perl\n";
-  print $fh "$toolpath/getsequence-domain.pl -domain $domain $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -access ".$ENV{PWD}."/$tmpdir/accession.txt\n";
+  print $fh "$toolpath/getsequence-domain.pl -domain $domain $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt\n";
   print $fh "$toolpath/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa\n";
   closeFH($fh, dryrun);
 
