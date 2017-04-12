@@ -1,5 +1,5 @@
 
-package Biocluster::IdMapping;
+package Biocluster::IdMappingBuilder;
 
 use strict;
 use lib "../";
@@ -8,7 +8,7 @@ use DBI;
 use Log::Message::Simple qw[:STD :CARP];
 use Biocluster::Config qw(biocluster_configure);
 use Biocluster::SchedulerApi;
-use Biocluster::Database;
+use Biocluster::Database::Schema;
 
 
 my $localFile = "idmapping.dat";
@@ -26,10 +26,32 @@ sub new {
     $self->{batch_mode} = 0;
     $self->{batch_mode} = 1 if exists $args{batch_mode} and defined $args{batch_mode} and $args{batch_mode};
 
-    $self->{db} = new Biocluster::Database(%args);
-
     return $self;
 }
+
+
+#######################################################################################################################
+# DATABASE-RELATED METHODS
+#
+
+sub getTableSchema {
+    my ($self) = @_;
+    
+    my $schema = new Biocluster::Database::Schema(table_name => $self->{id_mapping_table});
+    $schema->columnDefinitions("Uniprot_ID varchar(15), GI_ID varchar(15), Genbank_ID varchar(15), NCBI_ID varchar(15)");
+    
+    return $schema;
+}
+
+
+
+
+
+
+
+
+
+
 
 
 sub getLocalFileName {
