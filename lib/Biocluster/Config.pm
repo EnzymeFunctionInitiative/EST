@@ -23,6 +23,7 @@ use constant {
     IDMAPPING_TABLE_NAME        => "table_name",
     IDMAPPING_MAP_SECTION       => "idmapping.maps",
     IDMAPPING_REMOTE_URL        => "remote_url",
+    IDMAPPING_UNIPROT_ID        => "uniprot_id",
 
     CLUSTER_SECTION             => "cluster",
     CLUSTER_QUEUE               => "queue",
@@ -72,41 +73,42 @@ sub parseConfig {
     my $cfg = new Config::IniFiles(-file => $object->{config_file_path});
     croak "Unable to parse config file: " . join("; ", @Config::IniFiles::errors), "\n" if not defined $cfg;
 
-    $object->{db_user} = $cfg->val(DATABASE_SECTION, DATABASE_USER);
-    $object->{db_password} = $cfg->val(DATABASE_SECTION, DATABASE_PASSWORD);
-    $object->{db_host} = $cfg->val(DATABASE_SECTION, DATABASE_HOST, "localhost");
-    $object->{db_port} = $cfg->val(DATABASE_SECTION, DATABASE_PORT, "3306");
+    $object->{db}->{user} = $cfg->val(DATABASE_SECTION, DATABASE_USER);
+    $object->{db}->{password} = $cfg->val(DATABASE_SECTION, DATABASE_PASSWORD);
+    $object->{db}->{host} = $cfg->val(DATABASE_SECTION, DATABASE_HOST, "localhost");
+    $object->{db}->{port} = $cfg->val(DATABASE_SECTION, DATABASE_PORT, "3306");
 
     if (exists $ENV{ENVIRONMENT_DB}) {
-        $object->{db_name} = $ENV{ENVIRONMENT_DB};
+        $object->{db}->{name} = $ENV{ENVIRONMENT_DB};
     } else {
-        $object->{db_name} = $cfg->val(DATABASE_SECTION, DATABASE_NAME);
+        $object->{db}->{name} = $cfg->val(DATABASE_SECTION, DATABASE_NAME);
     }
 
-    croak getError(DATABASE_USER)                   if not defined $object->{db_user};
-    croak getError(DATABASE_PASSWORD)               if not defined $object->{db_password};
-    croak getError(DATABASE_NAME)                   if not defined $object->{db_name};
+    croak getError(DATABASE_USER)                   if not defined $object->{db}->{user};
+    croak getError(DATABASE_PASSWORD)               if not defined $object->{db}->{password};
+    croak getError(DATABASE_NAME)                   if not defined $object->{db}->{name};
     
     
-    $object->{id_mapping_table} = $cfg->val(IDMAPPING_SECTION, IDMAPPING_TABLE_NAME);
-    $object->{id_mapping_remote_url} = $cfg->val(IDMAPPING_SECTION, IDMAPPING_REMOTE_URL);
+    $object->{id_mapping}->{table} = $cfg->val(IDMAPPING_SECTION, IDMAPPING_TABLE_NAME);
+    $object->{id_mapping}->{remote_url} = $cfg->val(IDMAPPING_SECTION, IDMAPPING_REMOTE_URL);
+    $object->{id_mapping}->{uniprot_id} = $cfg->val(IDMAPPING_SECTION, IDMAPPING_UNIPROT_ID);
+        
+    $object->{id_mapping}->{map} = {};
     if ($cfg->SectionExists(IDMAPPING_MAP_SECTION)) {
         my @idParms = $cfg->Parameters(IDMAPPING_MAP_SECTION);
         foreach my $p (@idParms) {
             my ($col, $ord) = split m/\|/, $cfg->val(IDMAPPING_MAP_SECTION, $p);
-            $object->{id_mapping_map}->{$p} = [$ord, $col];
+            $object->{id_mapping}->{map}->{$p} = [$ord, $col];
         }
-    } else {
-        $object->{id_mapping_map} = {};
     }
 
-    croak getError(IDMAPPING_TABLE_NAME)            if not defined $object->{id_mapping_table};
-    croak getError(IDMAPPING_REMOTE_URL)            if not defined $object->{id_mapping_remote_url};
+    croak getError(IDMAPPING_TABLE_NAME)            if not defined $object->{id_mapping}->{table};
+    croak getError(IDMAPPING_REMOTE_URL)            if not defined $object->{id_mapping}->{remote_url};
 
 
-    $object->{cluster_queue} = $cfg->val(CLUSTER_SECTION, CLUSTER_QUEUE);
+    $object->{cluster}->{queue} = $cfg->val(CLUSTER_SECTION, CLUSTER_QUEUE);
 
-    croak getError(CLUSTER_QUEUE)                   if not defined $object->{cluster_queue};
+    croak getError(CLUSTER_QUEUE)                   if not defined $object->{cluster}->{queue};
 
     return 1;
 }

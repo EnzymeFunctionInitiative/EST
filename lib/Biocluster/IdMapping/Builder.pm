@@ -1,14 +1,17 @@
 
-package Biocluster::IdMappingBuilder;
+package Biocluster::IdMapping::Builder;
 
 use strict;
-use lib "../";
+use lib "../../";
 
+use Exporter qw(import);
 use DBI;
 use Log::Message::Simple qw[:STD :CARP];
 use Biocluster::Config qw(biocluster_configure);
 use Biocluster::SchedulerApi;
 use Biocluster::Database::Schema;
+
+our @EXPORT_OK = qw(getMapKeysSorted);
 
 
 my $localFile = "idmapping.dat";
@@ -36,16 +39,28 @@ sub new {
 
 sub getTableSchema {
     my ($self) = @_;
-    
-    my $schema = new Biocluster::Database::Schema(table_name => $self->{id_mapping_table});
-    $schema->columnDefinitions("Uniprot_ID varchar(15), GI_ID varchar(15), Genbank_ID varchar(15), NCBI_ID varchar(15)");
+
+    my $schema = new Biocluster::Database::Schema(table_name => $self->{id_mapping}->{table});
+   
+    my $map = $self->{id_mapping}->{map};
+   
+    my $sql = $self->{id_mapping}->{uniprot_id} . " varchar(15)";
+    foreach my $colKey (getMapKeysSorted($self)) {
+        $sql .= ", " . $map->{$colKey}->[1] . " varchar(15)";
+    }
+
+    $schema->columnDefinitions($sql);
     
     return $schema;
 }
 
 
+sub getMapKeysSorted {
+    my ($config) = @_;
 
-
+    my $m = $config->{id_mapping}->{map};
+    return sort { $m->{$a}->[0] cmp $m->{$b}->[0] } keys %$m;
+}
 
 
 
@@ -70,7 +85,7 @@ sub download {
     unlink "$dir/.tmp01101987";
 
     my $ext = "";
-    my $url = $self->{id_mapping_remote_url};
+    my $url = $self->{id_mapping}->{remote_url};
     $ext = ".gz" if $url =~ m/\.gz$/;
 
     my $file = "$localFile.gz";
@@ -171,7 +186,7 @@ sub doParse {
     open MAP, "$inputFile" or die "Unable to open input file '$inputFile': $!";
     open TAB, "> $outputFile" or die "Unable to open output file '$outputFile': $!";
 
-    my $map = $self->{id_mapping_map};
+    my $map = $self->{id_mapping}->{map};
 
     my %defaultMap;
     map { $defaultMap{lc $_} = $map->{$_}->[0] } keys %$map;

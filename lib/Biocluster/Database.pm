@@ -107,7 +107,6 @@ sub createTable {
     my $dbh = $self->getHandle();
 
     my $sql = $schema->getCreateSql();
-
     my $ok = $dbh->do($sql);
 
     #my $ok = $dbh->do("create table $tableName ($columnDefs)");
@@ -146,12 +145,12 @@ sub getHandle {
 
     my $connStr =
         "DBI:mysql" .
-        ":database=" . $self->{db_name} .
-        ":host=" . $self->{db_host} .
-        ":port=" . $self->{db_port};
+        ":database=" . $self->{db}->{name} .
+        ":host=" . $self->{db}->{host} .
+        ":port=" . $self->{db}->{port};
     $connStr .= ";mysql_local_infile=1" if $self->{load_infile};
 
-    my $dbh = DBI->connect($connStr, $self->{db_user}, $self->{db_password});
+    my $dbh = DBI->connect($connStr, $self->{db}->{user}, $self->{db}->{password});
 
     return $dbh;
 }

@@ -32,23 +32,24 @@ sub writeTestConfig {
     open TESTCONFIG, "> $file" or die "Unable to open $file for writing: $!";
     print TESTCONFIG <<MULTILINE;
 [database]
-user=testuser
-password=testpassword
-host=10.1.1.3
-port=3307
-database=efi_test
+user=$ENV{TEST_USER}
+password=$ENV{TEST_PASSWORD}
+host=$ENV{TEST_HOST}
+port=$ENV{TEST_PORT}
+database=$ENV{TEST_DB}
 
 [idmapping]
 remote_url=ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping.dat.example
 table_name=idmapping
+uniprot_id=Uniprot_ID
 
 [idmapping.maps]
-GI=gi|0
-EMBL-CDS=genbank|1
-RefSeq=ncbi|2
+GI=GI_ID|0
+EMBL-CDS=Genbank_ID|1
+RefSeq=NCBI_ID|2
 
 [cluster]
-queue=efi
+queue=$ENV{TEST_QUEUE}
 
 MULTILINE
     ;
