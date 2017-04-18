@@ -75,6 +75,8 @@ sub renderToFile {
         open(FH, "> $filePath") or die "Unable to open job script file $filePath for writing: $!";
         $self->render(\*FH);
         close(FH);
+    } else {
+        $self->render(\*STDOUT);
     }
 }
 
@@ -86,7 +88,7 @@ use base qw(Biocluster::SchedulerApi::Builder);
 sub new {
     my ($class, %args) = @_;
 
-    my $self = Biocluster::SchedulerApi::Builder->new();
+    my $self = Biocluster::SchedulerApi::Builder->new(%args);
     $self->{output} = "-j oe";
     $self->{shell} = "-S /bin/bash";
     $self->{pfx} = "#PBS";
@@ -146,7 +148,7 @@ use base qw(Biocluster::SchedulerApi::Builder);
 sub new {
     my ($class, %args) = @_;
 
-    my $self = Biocluster::SchedulerApi::Builder->new();
+    my $self = Biocluster::SchedulerApi::Builder->new(%args);
     $self->{pfx} = "#SBATCH";
 
     return bless($self, $class);
@@ -208,7 +210,6 @@ use lib "../";
 use Biocluster::Util qw(usesSlurm);
 
 
-my $T = TORQUE;
 
 sub new {
     my ($class, %args) = @_;
@@ -219,7 +220,6 @@ sub new {
     } else {
         $self->{type} = TORQUE;
     }
-    $T = $self->{type};
     
     $self->{queue} = $args{queue};
 

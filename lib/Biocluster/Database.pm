@@ -140,6 +140,20 @@ sub createTable {
 #
 
 
+sub getCommandLineConnString {
+    my ($self) = @_;
+
+    my $connStr =
+        "mysql"
+        . " -u " . $self->{db}->{user}
+        . " -p"
+        . " -P " . $self->{db}->{port}
+        . " -h " . $self->{db}->{host};
+
+    return $connStr;
+}
+
+
 sub getHandle {
     my ($self) = @_;
 
