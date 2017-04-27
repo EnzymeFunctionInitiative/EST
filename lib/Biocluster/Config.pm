@@ -24,6 +24,7 @@ use constant {
     IDMAPPING_MAP_SECTION       => "idmapping.maps",
     IDMAPPING_REMOTE_URL        => "remote_url",
     IDMAPPING_UNIPROT_ID        => "uniprot_id",
+    IDMAPPING_ENABLED           => "enabled",
 
     CLUSTER_SECTION             => "cluster",
     CLUSTER_QUEUE               => "queue",
@@ -47,7 +48,7 @@ sub biocluster_configure {
     } elsif (exists $ENV{ENVIRONMENT_CONFIG}) {
         $object->{config_file_path} = $ENV{ENVIRONMENT_CONFIG};
     }
-
+    
     if (exists $args{dryrun}) {
         $object->{dryrun} = $args{dryrun};
     } else {
@@ -102,8 +103,10 @@ sub parseConfig {
     if ($cfg->SectionExists(IDMAPPING_MAP_SECTION)) {
         my @idParms = $cfg->Parameters(IDMAPPING_MAP_SECTION);
         foreach my $p (@idParms) {
-            my ($col, $ord) = split m/\|/, $cfg->val(IDMAPPING_MAP_SECTION, $p);
-            $object->{id_mapping}->{map}->{$p} = [$ord, $col];
+            $object->{id_mapping}->{map}->{lc $p} = 
+                $cfg->val(IDMAPPING_MAP_SECTION, $p) eq IDMAPPING_ENABLED ?
+                1 :
+                0;
         }
     }
 
@@ -133,7 +136,6 @@ sub getError {
 
     return "The configuration file must provide the $key parameter.";
 }
-
 
 
 1;

@@ -21,11 +21,12 @@ print "$fasta\n";
 
 @accessions=apply {chomp $_} apply {$_=~s/:\d+:\d+//} apply {$_=~s/^>//} `grep "\>" $fasta`;
 
+
 open OUT, ">$out" or die "cannot write struct.out file $out\n";
 
 
 foreach $accession (@accessions){
-  #print "$accession\n";
+  print "$accession\n";
   unless($accession=~/^z/){
     $sth= $dbh->prepare("select * from annotations where accession = '$accession'");
     $sth->execute;

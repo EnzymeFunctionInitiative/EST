@@ -21,14 +21,11 @@ is($cfg->{db}->{port}, "3307", "db_port");
 is($cfg->{id_mapping}->{table}, "idmapping", "id_mapping_table");
 is($cfg->{id_mapping}->{remote_url}, "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping.dat.example", "id_mapping_remote_url");
 is(scalar keys %{ $cfg->{id_mapping}->{map}}, 3, "# id mappings");
-is($cfg->{id_mapping}->{map}->{"GI"}->[0], 0, "gi index");
-is($cfg->{id_mapping}->{map}->{"GI"}->[1], "GI_ID", "gi ID");
-is($cfg->{id_mapping}->{map}->{"EMBL-CDS"}->[0], 1, "genbank index");
-is($cfg->{id_mapping}->{map}->{"EMBL-CDS"}->[1], "Genbank_ID", "genbank ID");
-is($cfg->{id_mapping}->{map}->{"RefSeq"}->[0], 2, "RefSeq index");
-is($cfg->{id_mapping}->{map}->{"RefSeq"}->[1], "NCBI_ID", "RefSeq ID");
+is($cfg->{id_mapping}->{map}->{"GI"}, "enabled", "gi ID");
+is($cfg->{id_mapping}->{map}->{"EMBL-CDS"}, "enabled", "genbank ID");
+is($cfg->{id_mapping}->{map}->{"RefSeq"}, "enabled", "RefSeq ID");
 is($cfg->{cluster}->{queue}, "efi", "cluster_queue");
 
-done_testing(14);
+done_testing(11);
 
 

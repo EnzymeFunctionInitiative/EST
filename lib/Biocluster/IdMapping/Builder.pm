@@ -1,17 +1,18 @@
 
 package Biocluster::IdMapping::Builder;
 
+use File::Basename;
+use Cwd qw(abs_path);
 use strict;
-use lib "../../";
+use lib abs_path(dirname(__FILE__)) . "/../../";
 
-use Exporter qw(import);
 use DBI;
+use POSIX qw(floor);
 use Log::Message::Simple qw[:STD :CARP];
 use Biocluster::Config qw(biocluster_configure);
 use Biocluster::SchedulerApi;
 use Biocluster::Database::Schema;
-
-our @EXPORT_OK = qw(getMapKeysSorted);
+use Biocluster::IdMapping::Util;
 
 
 my $localFile = "idmapping.dat";
@@ -45,23 +46,20 @@ sub getTableSchema {
     my $map = $self->{id_mapping}->{map};
    
     my $sql = $self->{id_mapping}->{uniprot_id} . " varchar(15)";
-    foreach my $colKey (getMapKeysSorted($self)) {
-        $sql .= ", " . $map->{$colKey}->[1] . " varchar(15)";
-    }
+    $sql .= ", foreign_id_type varchar(15), foreign_id varchar(20)";
+    $schema->addIndex(formatIndex($self->{id_mapping}->{uniprot_id}));
+    $schema->addIndex("foreign_id_Index", "foreign_id");
 
     $schema->columnDefinitions($sql);
     
     return $schema;
 }
 
+sub formatIndex {
+    my ($colName) = @_;
 
-sub getMapKeysSorted {
-    my ($config) = @_;
-
-    my $m = $config->{id_mapping}->{map};
-    return sort { $m->{$a}->[0] cmp $m->{$b}->[0] } keys %$m;
+    return ("${colName}_Index", $colName);
 }
-
 
 
 
@@ -153,8 +151,10 @@ sub batchJob {
 
 
 sub parse {
-    # overrideInputFile is used exclusively for testing purposes.
-    my ($self, $outputFile, $jobId, $overrideInputFile) = @_;
+    # overrideInputFile is used for standalone parsing or testing purposes. It is a path to an input file.
+    my ($self, $outputFile, $jobId, $overrideInputFile, $showProgress) = @_;
+
+    $showProgress = 0 unless (defined $showProgress);
 
     my $dir = $self->{build_dir};
 
@@ -170,7 +170,7 @@ sub parse {
     } else {
         my $file = "$dir/$localFile";
         $file = $overrideInputFile if defined $overrideInputFile and length $overrideInputFile;
-        $self->doParse($outputFile, $file);
+        $self->doParse($outputFile, $file, $showProgress);
     }
 
     return 1;
@@ -178,40 +178,42 @@ sub parse {
 
 
 sub doParse {
-    my ($self, $outputFile, $inputFile) = @_;
+    my ($self, $outputFile, $inputFile, $showProgress) = @_;
 
     my $dir = $self->{build_dir};
 
+
+    if ($showProgress) {
+        print "Reading $inputFile\n";
+        print "Writing to $outputFile\n";
+    }
 
     open MAP, "$inputFile" or die "Unable to open input file '$inputFile': $!";
     open TAB, "> $outputFile" or die "Unable to open output file '$outputFile': $!";
 
     my $map = $self->{id_mapping}->{map};
 
-    my %defaultMap;
-    map { $defaultMap{lc $_} = $map->{$_}->[0] } keys %$map;
-    my @emptyMapping = ("") x scalar keys %defaultMap;
-
-    my @mappings = @emptyMapping;
-    my $curId = "";
+    my $fileSize = -s $inputFile;
+    my $pct = 0;
+    $|++ if $showProgress;
+    print "Progress: 0%" if $showProgress;
 
     while (my $line = <MAP>) {
         chomp $line;
         my ($uniProtId, $otherIdType, $otherId) = split /\t/, $line;
-        if ($curId ne $uniProtId) {
-            if (length $curId > 0) {
-                writeMapRecord(\*TAB, $curId, @mappings);
-            }
-            $curId = $uniProtId;
-            @mappings = @emptyMapping;
-        }
         $otherIdType = lc $otherIdType;
-        $mappings[$defaultMap{$otherIdType}] = $otherId if exists $defaultMap{$otherIdType};
+
+        print TAB join("\t", $uniProtId, $otherIdType, $otherId), "\n"
+            if exists $map->{$otherIdType} and $map->{$otherIdType};
+
+        if ($showProgress) {
+            my $newPct = floor((tell MAP) * 100 / $fileSize);
+            print "\rProgress: $newPct%" if $newPct > $pct;
+            $pct = $newPct;
+        }
     }
 
-    if (length $curId > 0) {
-        writeMapRecord(\*TAB, $curId, @mappings);
-    }
+    print "\n" if $showProgress;
 
     close TAB;
     close MAP;

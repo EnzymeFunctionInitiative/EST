@@ -12,6 +12,10 @@ use List::MoreUtils qw{apply uniq any} ;
 use DBD::SQLite;
 use DBD::mysql;
 use File::Slurp;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use Biocluster::IdMapping;
+
 
 print "config file is located at: ".$ENV{'EFICFG'}."\n";
 $configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
@@ -26,10 +30,13 @@ $result = GetOptions("ipro=s"               => \$ipro,
                      "accession-output=s"   => \$access,
                      "maxsequence=s"        => \$maxsequence,
                      "accession-id=s"       => \$manualAccession,
+                     "accession-file=s"     => \$accessionFile,
                      "out=s"                => \$out,
                      "userfasta=s"          => \$userfasta,
                      "domain=s"             => \$domain,
-                     "fraction=i"           => \$fraction
+                     "fraction=i"           => \$fraction,
+                     "no-match-file=s"      => \$noMatchFile,
+                     "config=s"             => \$configFile,
                     );
 
 @accessions = ();
@@ -88,10 +95,23 @@ if (defined $manualAccession and $manualAccession ne 0) {
     @manualAccessions = ();
 }
 
+if (defined $accessionFile and -f $accessionFile) {
+    print ":accessionFile $accessionFile:\n";
+    push(@manualAccessions, grep m/.+/, map { $_ =~ s/[\s\r\n]//g; split(",", $_) } read_file($accessionFile));
+}
+
+
 unless(defined $maxsequence) {
     $maxsequence=0;
 }
 
+
+my $showNoMatches = $#manualAccessions >= 0 ? 1 : 0;
+my $idMapper;
+if ($showNoMatches) {
+    die "Config file (--config=...) option is required" unless (defined $configFile and -f $configFile);
+    $idMapper = new Biocluster::IdMapping(config_file_path => $configFile);
+}
 
 
 print "Getting Acession Numbers in specified Families\n";
@@ -138,16 +158,34 @@ foreach $element (@ssfs) {
 @accessions=keys %accessionhash;
 print "Initial ".scalar @accessions."sequences in SSF\n";
 
+
+# Reverse map any IDs that aren't UniProt.
+#TODO: need to add this in when the idmapping table is populated
+#my ($uniprotIds, $noMatches) = $idMapper->reverseLookup(AUTO, @manualAccessions)
+#    if $#manualAccessions >= 0;
+
+# Write out the no matches to a file.
+if (defined $noMatches and $showNoMatches) {
+    open NOMATCH, "> $noMatchFile" or die "Unable to create nomatch file: $!" if (defined $noMatchFile);
+    foreach my $noMatch (@$noMatches) {
+        print "$noMatch\n" if not defined $noMatchFile;
+        print NOMATCH "$noMatch\n" if defined $noMatchFile;
+    }
+    close NOMATCH if defined $noMatches;
+}
+
+# Lookup each manual accession ID to get the domain as well as verify that it exists.
 foreach $element (@manualAccessions) {
-    print "select $element\n";
+    $sql = "select accession,start,end from PFAM where accession = '$element'";
     $sth=$dbh->prepare("select accession,start,end from PFAM where accession = '$element'");
     $sth->execute;
+    print "SQL: $sql\n";
     while($row = $sth->fetch) {
         push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
     }
 }
 @accessions=keys %accessionhash;
-print "Initial ".scalar @accessions."sequences in manual accessions PFAM\n";
+print "Initial ".scalar @accessions."sequences in manual accessions\n";
 
 @accessions=uniq @accessions;
 print scalar @accessions." after uniquing\n";
@@ -211,7 +249,7 @@ while(scalar @accessions) {
             $accession="";
         }
         if ($domain eq "off" and $accession ne "") {
-            print OUT ">$accession > $sequence\n";
+            print OUT ">$accession$sequence\n";
             #print "accession: $accession\n > $sequence\n";
         } elsif ($domain eq "on" and $accession ne "") {
             $sequence =~ s/\s+//g;
@@ -219,7 +257,7 @@ while(scalar @accessions) {
             #print "accession $accession has ".scalar(@domains)." domains\n";
             foreach my $piece (@domains) {
                 my $thissequence=join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
-                print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n > $thissequence\n";
+                print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n";
                 #print "$accession:${$piece}{'start'}:${$piece}{'end'}\t".length substr $sequence,${$piece}{'start'}-1,(${$piece}{'end'}-${$piece}{'start'}+1)."\n";
                 #print "\n";
             }

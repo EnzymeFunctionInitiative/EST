@@ -13,8 +13,11 @@ use Biocluster::Database;
 our ($cfgFile, $cfg, $db, $buildDir);
 do "initializeTest.pl";
 
+
+print "$cfgFile\n";
 my $mapBuilder = new Biocluster::IdMapping::Builder(config_file_path => $cfgFile, build_dir => $buildDir);
 
+print "POST INIT\n";
 
 #######################################################################################################################
 # TEST PARSE LOCAL FILE
@@ -38,7 +41,7 @@ if ($db->tableExists($mapTable)) {
     $numTests++;
     ok($db->dropTable($mapTable), "Drop $mapTable");
 }
-
+print $mapBuilder->getTableSchema()->getCreateSql(), "\n\n";
 ok($db->createTable($mapBuilder->getTableSchema()), "Create $mapTable");
 ok($db->tableExists($mapTable), "$mapTable exists");
 ok($db->loadTabular($mapTable, "$FindBin::Bin/build/test_idmapping.tab"), "Tabular data load into $mapTable");

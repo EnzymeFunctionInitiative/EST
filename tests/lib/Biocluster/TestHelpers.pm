@@ -41,15 +41,20 @@ database=$ENV{TEST_DB}
 [idmapping]
 remote_url=ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping.dat.example
 table_name=idmapping
-uniprot_id=Uniprot_ID
+uniprot_id=uniprot_id
 
 [idmapping.maps]
-GI=GI_ID|0
-EMBL-CDS=Genbank_ID|1
-RefSeq=NCBI_ID|2
+GI=enabled
+EMBL-CDS=enabled
+RefSeq=enabled
 
 [cluster]
 queue=$ENV{TEST_QUEUE}
+
+[database-build]
+uniprot_url=ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase
+interpro_url=ftp://ftp.ebi.ac.uk/pub/databases/interpro/current
+pfam_info_url=ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.clans.tsv.gz
 
 MULTILINE
     ;

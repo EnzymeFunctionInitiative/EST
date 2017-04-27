@@ -4,21 +4,13 @@ package Biocluster::IdMapping;
 use strict;
 use lib "../";
 
-use Exporter qw(import);
 use DBI;
 use Log::Message::Simple qw[:STD :CARP];
 use Biocluster::Config qw(biocluster_configure);
 use Biocluster::SchedulerApi;
 use Biocluster::Database;
-use Biocluster::IdMapping::Builder qw(getMapKeysSorted);
+use Biocluster::IdMapping::Util;
 
-our @EXPORT = qw(sanitize_id);
-
-#use constant {
-#    GENBANK     => "genbank",
-#    NCBI        => "ncbi",
-#    GI          => "gi",
-#};
 
 
 sub new {
@@ -48,7 +40,11 @@ sub reverseLookup {
 
     my $m = $self->getMap();
 
-    if (not grep {$m->{$_}->[1] eq $type} getMapKeysSorted($self)) {
+    if ($type eq UNIPROT) {
+        return (\@ids, \[]);
+    }
+
+    if ($type ne AUTO and not exists $m->{$_}) { #grep {$m->{$_}->[1] eq $type} get_map_keys_sorted($self)) {
         return (undef, undef);
     }
 
@@ -58,6 +54,7 @@ sub reverseLookup {
     my @noMatch;
 
     foreach my $id (@ids) {
+        $type = check_id_type($id) if $type eq AUTO;
         my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where $type = '$id'";
         my $row = $dbh->selectrow_arrayref($querySql);
         if (defined $row) {
@@ -85,16 +82,5 @@ sub reverseLookup {
     return (\@uniprotIds, \@noMatch);
 }
 
-
-sub sanitize_id {
-    my ($id) = @_;
-
-    $id =~ s/[^A-Za-z0-9_]/_/g;
-
-    return $id;
-}
-
-
 1;
-
 

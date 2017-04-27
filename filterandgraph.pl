@@ -11,81 +11,51 @@
 #quart-perid.pl            generates the percent identity quartile graph
 #sipmlegraphs.pl        generates sequence length and alignment score distributions
 
-use File::Basename;
-use Cwd qw(abs_path);
-use lib dirname(abs_path(__FILE__));
+use FindBin;
+use lib "$FindBin::Bin/lib";
 use Getopt::Long;
 use Biocluster::SchedulerApi;
+use Biocluster::Util qw(usesSlurm);
 
-$result=GetOptions ("filter=s"      => \$filter,
-                    "minval=s"      => \$minval,
-                    "queue=s"       => \$queue,
-                    "tmp=s"         => \$tmpdir,
-                    "maxlen=i"      => \$maxlen,
-                    "minlen=i"      => \$minlen,
-                    "incfrac=f"     => \$incfrac,
-                    "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm
-                    "dryrun"        => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
-                    "oldapps"       => \$oldapps        # to module load oldapps for biocluster2 testing
-                );
-
-require "shared.pl";
-
-$toolpath=$ENV{'EFIEST'};
-$efiestmod=$ENV{'EFIESTMOD'};
-#$toolpath="/home/groups/efi/devel";
-$graphmultiplier=1.4;
-$xinfo=500;
-#$queue.=" -l nodes=compute-4-0";
-
-#because variable values are important for filterblast and creating folder names we need to set defaults
-
-#minlen and maxlen defaulted to zero if not assigned.
-if(defined $minlen){
-}else{
-  $minlen=0;
-}
-
-if(defined $maxlen){
-
-}else{
-  $maxlen=0;
-}
-
-#if no filter set to bit
-if(defined $filter){
-
-}else{
-  $filter="bit";
-}
-
-#if no minval, set to zero
-
-if(defined $minval){
-
-}else{
-  $minval=0;
-}
+$result = GetOptions(
+    "filter=s"       => \$filter,
+    "minval=s"       => \$minval,
+    "queue=s"        => \$queue,
+    "tmp=s"          => \$tmpdir,
+    "maxlen=i"       => \$maxlen,
+    "minlen=i"       => \$minlen,
+    "incfrac=f"      => \$incfrac,
+    "scheduler=s"    => \$scheduler,     # to set the scheduler to slurm
+    "dryrun"         => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
+    "oldapps"        => \$oldapps        # to module load oldapps for biocluster2 testing
+);
 
 
-if(defined $queue){
-}else{
-  $queue="default";
-}
+$toolpath = $ENV{'EFIEST'};
+$efiestmod = $ENV{'EFIESTMOD'};
+#$toolpath = "/home/groups/efi/devel";
+$graphmultiplier = 1.4;
+$xinfo = 500;
+#$queue. = " -l nodes = compute-4-0";
+
+# Because variable values are important for filterblast and creating folder names we need to set defaults
+
+$minlen = 0 if not defined $minlen;
+$maxlen = 0 if not defined $maxlen;
+$filter = "bit" if not defined $filter;
+$minval = 0 if not defined $minval;
+$queue = "default" if not defined $queue;
+$incfrac = .99 if not defined $incfrac;
+
 print "queue is $queue\n";
-
-if(defined $incfrac){
-}else{
-  $incfrac=.99;
-}
 print "incfrac is $incfrac\n";
 
 
 #quit if the xgmml files have been created in this directory
 #testing with percent_identity.png because I am lazy
-if(-s "$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png"){
-  print "Graphs appears to have already been completed, exiting\n";
-  exit;
+if (-s "$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png") {
+    print "Graphs appears to have already been completed, exiting\n";
+    exit;
 }
 
 print "Data from runs will be saved to $tmpdir/$filter-$minval-$minlen-$maxlen/\n";
@@ -93,89 +63,73 @@ print "Data from runs will be saved to $tmpdir/$filter-$minval-$minlen-$maxlen/\
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
 my $usesSlurm = $schedType eq "slurm";
-if (defined($oldapps)) {
+if (defined $oldapps) {
     $oldapps = $usesSlurm;
 } else {
     $oldapps = 0;
 }
-my $S = new Biocluster::SchedulerApi('type' => $schedType);
+my $S = new Biocluster::SchedulerApi(type  => $schedType, dryrun  => $dryrun, $queue  => $queue, resource  => [1, 1]);
 my $B = $S->getBuilder();
-$B->queue($queue);
-$B->resource(1, 1);
 
-#dont refilter if it has already been done
-unless( -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
-  mkdir "$tmpdir/$filter-$minval-$minlen-$maxlen" or die "could not make analysis folder $tmpdir/$filter-$minval-$minlen-$maxlen\n";
+# Don't refilter if it has already been done
+unless (-d "$tmpdir/$filter-$minval-$minlen-$maxlen") {
+    mkdir "$tmpdir/$filter-$minval-$minlen-$maxlen" or die "could not make analysis folder $tmpdir/$filter-$minval-$minlen-$maxlen\n";
 
-  submit the job for filtering out extraneous edges
+    # submit the job for filtering out extraneous edges
+    $B->addAction("module load oldapps") if $oldapps;
+    $B->addAction("module load $efiestmod");
+    $B->addAction("$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/sequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
+    $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh");
 
-  $fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun) or die "could not create blast submission script $tmpdir/fullxgmml.sh\n";
-  $B->queue($queue);
-  $B->resource(1, 1);
-  $B->render($fh);
-  print $fh "module load oldapps\n" if $oldapps;
-  print $fh "module load $efiestmod\n";
-  print $fh "$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/sequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen\n";
-  closeFH($fh, dryrun);
+    $filterjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh");
+    print "Filterblast job is:\n $filterjob";
 
-  $filterjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun, $schedType);
-  print "Filterblast job is:\n $filterjob";
-
-  @filterjobline=split /\./, $filterjob;
-}else{
-  print "Using prior filter\n";
+    @filterjobline = split /\./, $filterjob;
+} else {
+    print "Using prior filter\n";
 }
 
 #submit the quartiles scripts, should not run until filterjob is finished
 #nothing else depends on this scipt
 
-$fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh", $dryrun) or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh\n";
-$B->queue($queue);
-$B->resource(1, 1);
-if(defined $filterjob){
-  $B->dependency(0, @filterjobline[0]); 
-}
-$B->render($fh);
-print $fh "module load oldapps\n" if $oldapps;
-print $fh "module load $efiestmod\n";
-print $fh "$toolpath/quart-align.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -align $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/alignment_length.png\n";
-closeFH($fh, dryrun);
+$B = $S->getBuilder();
 
-$quartalignjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh", $dryrun, $schedType);
+if (defined $filterjob) {
+    $B->dependency(0, @filterjobline[0]); 
+}
+$B->addAction("module load oldapps") if $oldapps;
+$B->addAction("module load $efiestmod");
+$B->addAction("$toolpath/quart-align.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -align $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/alignment_length.png");
+$B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh");
+
+$quartalignjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/quartalign.sh");
 print "Quartile Align job is:\n $quartalignjob";
 
-$fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh", $dryrun) or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlenr/quartpid.sh\n";
-$B->queue($queue);
-$B->resource(1, 1);
-if(defined $filterjob){
-  $B->dependency(0, @filterjobline[0]); 
+$B = $S->getBuilder();
+
+if (defined $filterjob) {
+    $B->dependency(0, @filterjobline[0]); 
 }
 $B->mailEnd();
-$B->render($fh);
-print $fh "module load oldapps\n" if $oldapps;
-print $fh "module load $efiestmod\n";
-print $fh "$toolpath/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -pid $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png\n";
-closeFH($fh, dryrun);
+$B->addAction("module load oldapps") if $oldapps;
+$B->addAction("module load $efiestmod");
+$B->addAction("$toolpath/quart-perid.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -pid $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/percent_identity.png");
+$B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh");
 
-$quartpidjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh", $dryrun, $schedType);
+$quartpidjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/quartpid.sh");
 print "Quartiles Percent Identity job is:\n $quartpidjob";
 
-$fh = getFH(">$tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh", $dryrun) or die "could not create blast submission script $tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh\n";
-print $fh "#!/bin/bash\n";
-print $fh "#PBS -j oe\n";
-print $fh "#PBS -S /bin/bash\n";
-$B->queue($queue);
-$B->resource(1, 1);
-if(defined $filterjob){
-  $B->dependency(0, @filterjobline[0]); 
-}
-$B->render($fh);
-print $fh "module load oldapps\n" if $oldapps;
-print $fh "module load $efiestmod\n";
-print $fh "$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -maxlen $maxlen -minlen $minlen -edges $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/length_histogram.png -incfrac $incfrac\n";
-closeFH($fh, dryrun);
+$B = $S->getBuilder();
 
-$simplegraphjob=doQsub("$tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh", $dryrun, $schedType);
+if (defined $filterjob) {
+    $B->dependency(0, @filterjobline[0]); 
+}
+$B->addAction("module load oldapps") if $oldapps;
+$B->addAction("module load $efiestmod");
+$B->addAction("$toolpath/simplegraphs.pl -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -maxlen $maxlen -minlen $minlen -edges $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/number_of_edges.png -fasta $ENV{PWD}/$tmpdir/sequences.fa -lengths $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/length_histogram.png -incfrac $incfrac");
+$B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh");
+
+$simplegraphjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/simplegraphs.sh");
 print "Simplegraphs job is:\n $simplegraphjob";
 
 
