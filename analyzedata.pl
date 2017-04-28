@@ -116,7 +116,7 @@ $B->dependency(0, @filterjobline[0])
     if not $priorFilter;
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiestmod");
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title\"$title\" -maxfull $maxfull -dbver $dbver");
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title=\"$title\" -maxfull $maxfull -dbver $dbver");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh");
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
@@ -137,7 +137,7 @@ $B->addAction("module load $efiestmod");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)");
 $B->addAction("cd-hit -i $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/repnode-\$CDHIT.xgmml -titlei\"$title\" -dbver $dbver");
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/repnode-\$CDHIT.xgmml -title=\"$title\" -dbver $dbver");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined

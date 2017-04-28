@@ -29,7 +29,7 @@ $efiestmod=$ENV{'EFIDBMOD'};
 $toolpath=$ENV{'EFIEST'};
 
 print "db is: $db\n";
-mkdir $tmpdir or die "Could not make directory $tmpdir\n";
+mkdir $tmpdir or die "Could not make directory $tmpdir\n" if not -d $tmpdir ;
 
 #$db="$ENV{EFIEST}/data_files/combined.fasta";
 #$sqlite="$ENV{EFIEST}/data_files/uniprot_combined.db";
