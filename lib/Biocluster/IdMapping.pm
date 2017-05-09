@@ -36,15 +36,15 @@ sub getMap {
 
 
 sub reverseLookup {
-    my ($self, $type, @ids) = @_;
+    my ($self, $typeHint, @ids) = @_;
 
     my $m = $self->getMap();
 
-    if ($type eq UNIPROT) {
+    if ($typeHint eq Biocluster::IdMapping::Util::UNIPROT) {
         return (\@ids, \[]);
     }
 
-    if ($type ne AUTO and not exists $m->{$_}) { #grep {$m->{$_}->[1] eq $type} get_map_keys_sorted($self)) {
+    if ($typeHint ne Biocluster::IdMapping::Util::AUTO and not exists $m->{$typeHint}) { #grep {$m->{$_}->[1] eq $typeHint} get_map_keys_sorted($self)) {
         return (undef, undef);
     }
 
@@ -54,28 +54,24 @@ sub reverseLookup {
     my @noMatch;
 
     foreach my $id (@ids) {
-        $type = check_id_type($id) if $type eq AUTO;
-        my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where $type = '$id'";
-        my $row = $dbh->selectrow_arrayref($querySql);
-        if (defined $row) {
-            push(@uniprotIds, $row->[0]);
+        my $type = $typeHint;
+        $type = check_id_type($id) if $typeHint eq Biocluster::IdMapping::Util::AUTO;
+        if ($type eq Biocluster::IdMapping::Util::UNIPROT) {
+            $id =~ s/\.\d+$//;
+            push(@uniprotIds, $id);
         } else {
-            push(@noMatch, $id);
+            my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where foreign_id = '$id' and foreign_id_type = '$type'";
+            #print $querySql, "   ";
+            my $row = $dbh->selectrow_arrayref($querySql);
+            if (defined $row) {
+                #print "found\n";
+                push(@uniprotIds, $row->[0]);
+            } else {
+                #print "nomatch\n";
+                push(@noMatch, $id);
+            }
         }
     }
-
-    #my $idSqlList = join(", ", map { "'$_'" } @ids);
-    #my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where $type in ($idSqlList)";
-
-    #my $sth = $dbh->prepare($querySql);
-    #if (not $sth->exeucte()) {
-    #    $dbh->disconnect();
-    #    return (undef, undef);
-    #}
-
-    #while (my $row = $sth->fetchrow_arrayref()) {
-    #    push(@uniprotIds, $row->[0]);
-    #}
 
     $dbh->disconnect();
     

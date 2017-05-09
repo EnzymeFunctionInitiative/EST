@@ -30,7 +30,7 @@ my $resCode = $mapBuilder->parse($testOutput, undef, $testInput);
 
 ok(verifyParseTestIdMapping($testOutput));
 
-my $numTests = 9;
+my $numTests = 17;
 
 #######################################################################################################################
 # TEST ADDING THE TABLE TO THE DATABASE
@@ -59,8 +59,12 @@ sub verifyParseTestIdMapping {
     my $lineCount = 0;
 
     my @expected = (
-        ["Q6GZX4", "49237298", "AAT09660.1", "YP_031579.1"],
-        ["Q6GZX3", "", "AAT09661.1", ""]
+        ["Q6GZX4", "gi", "81941549"],
+        ["Q6GZX4", "gi", "49237298"],
+        ["Q6GZX4", "embl-cds", "AAT09660.1"],
+        ["Q6GZX4", "refseq", "YP_031579.1"],
+        ["Q6GZX3", "embl-cds", "AAT09661.1"],
+        ["Q6GZX3", "pdb", "1DTN"],
     );
 
     open TAB, $testOutput;
@@ -75,7 +79,7 @@ sub verifyParseTestIdMapping {
     }
     close TAB;
 
-    is($lineCount, 2, "Number of lines");
+    is($lineCount + 1, 6, "Number of lines");
 
     return $ok;
 }

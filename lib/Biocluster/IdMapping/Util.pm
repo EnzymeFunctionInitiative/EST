@@ -6,11 +6,11 @@ use lib "../../";
 use Exporter;
 
 our @ISA        = qw(Exporter);
-our @EXPORT     = qw(sanitize_id check_id_type             GENBANK NCBI GI UNIPROT PDB UNKNOWN AUTO);
+our @EXPORT     = qw(sanitize_id check_id_type GENBANK NCBI GI UNIPROT PDB UNKNOWN AUTO);
 
-use constant GENBANK     => "EMBL-CDS";
-use constant NCBI        => "RefSeq";
-use constant GI          => "GI";
+use constant GENBANK     => "embl-cds";
+use constant NCBI        => "refseq";
+use constant GI          => "gi";
 use constant UNIPROT     => "uniprot";
 use constant PDB         => "pdb";
 use constant UNKNOWN     => "unknown";
@@ -36,12 +36,31 @@ sub check_id_type {
         return GENBANK;
     } elsif ($id =~ m/^[A-Za-z]{2}_\d+(\.\d+)?$/) {
         return NCBI;
-    } elsif ($id =~ m/^[A-Za-z]\d[A-Za-z0-9]{3,8}$/) {
+    } elsif ($id =~ m/^[A-Za-z]\d[A-Za-z0-9]{3,8}(\.\d+)?$/) {
         return UNIPROT;
+    } elsif ($id =~ m/^[A-Za-z0-9]{4}$/) {
+        return PDB;
     } else {
         return UNKNOWN;
     }
 }
+
+#sub get_fasta_header_ids {
+#    my ($line) = @_;
+#
+#    chomp $line;
+#    my @ids;
+#
+#    my @headers = split(m/>/, $line);
+#    foreach my $id (@headers) {
+#        continue if m/^\s*$/;
+#        $id =~ s/^\s*(tr|sp|pdb)\|//;
+#        $id =~ s/^([^\|]+)\|/$1/;
+#        push(@ids, $id); # if (check_id_type($id) ne UNKNOWN);
+#    }
+#
+#    return @ids;
+#}
 
 
 #sub get_map_keys_sorted {

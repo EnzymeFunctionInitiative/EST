@@ -38,6 +38,10 @@ use constant {
     ENVIRONMENT_CONFIG          => "EFICONFIG",
 };
 
+use constant NO_ACCESSION_MATCHES_FILENAME => "no_accession_matches.txt";
+use constant FASTA_ID_FILENAME => "userfasta.ids.txt";
+use constant FASTA_META_FILENAME => "fasta.metadata";
+
 
 sub biocluster_configure {
     my ($object, %args) = @_;

@@ -8,36 +8,48 @@ use List::MoreUtils qw{apply uniq any} ;
 use DBD::SQLite;
 use DBD::mysql;
 use File::Slurp;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use Biocluster::Database;
 
 
-$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
-eval $configfile;
 
-$result=GetOptions ("fasta=s"		=> \$fasta,
-		    "out=s"		=> \$out,
-		    "userdat=s"		=> \$userdat
-		    );
-print "$fasta\n";
+#$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
+#eval $configfile;
+
+$result = GetOptions(
+    "fasta=s"               => \$fasta,
+    "out=s"                 => \$annoOut,
+    "fasta-meta-file=s"     => \$metaFileIn,
+    "config=s"              => \$configFile,
+);
+die "Config file (--config=...) option is required" unless (defined $configFile and -f $configFile);
+
+print "Using $fasta as the input FASTA file\n";
 
 @accessions=apply {chomp $_} apply {$_=~s/:\d+:\d+//} apply {$_=~s/^>//} `grep "\>" $fasta`;
 
+my $db = new Biocluster::Database(config_file_path => $configFile);
 
-open OUT, ">$out" or die "cannot write struct.out file $out\n";
+open OUT, ">$annoOut" or die "cannot write struct.out file $annoOut\n";
 
+my $dbh = $db->getHandle();
 
 foreach $accession (@accessions){
-  print "$accession\n";
-  unless($accession=~/^z/){
-    $sth= $dbh->prepare("select * from annotations where accession = '$accession'");
-    $sth->execute;
-    $row = $sth->fetchrow_hashref;
-    print OUT $row->{"accession"} . 
+    print "$accession\n";
+    unless($accession=~/^z/){
+        $sth = $dbh->prepare("select * from annotations where accession = '$accession'");
+        $sth->execute;
+        $row = $sth->fetchrow_hashref;
+        print OUT $row->{"accession"} . 
         "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} . 
         "\n\tSTATUS\t" . $row->{"STATUS"} . 
         "\n\tSequence_Length\t" . $row->{"Squence_Length"} . 
         "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
         "\n\tGDNA\t" . $row->{"GDNA"} . 
         "\n\tDescription\t" . $row->{"Description"} . 
+        #"\n\tOriginal_Primary_ID\t" . $row->{"Uniprot_ID"} .
+        "\n\tAnnotation_Source\t" . "FAMILY" .
         "\n\tSwissprot_Description\t" . $row->{"SwissProt_Description"} . 
         "\n\tOrganism\t" . $row->{"Organism"} . 
         "\n\tDomain\t" . $row->{"Domain"} . 
@@ -59,12 +71,16 @@ foreach $accession (@accessions){
         "\n\tSPECIES\t" . $row->{"Species"} . 
         "\n\tCAZY\t" . $row->{"Cazy"} . 
         "\n";
-  }
+        $sth->finish();
+    }
 }
+
+$dbh->disconnect();
 
 close OUT;
 
-if($userdat=~/\w+/ and -s $userdat){
-  #add user supplied dat info tio struct.out
-  system("cat $userdat >> $out");
+if($metaFileIn=~/\w+/ and -s $metaFileIn){
+    #add user supplied dat info tio struct.out
+    system("cat $metaFileIn >> $annoOut");
 }
+

@@ -47,12 +47,12 @@ sub addIndex {
 sub getCreateSql {
     my ($self) = @_;
 
-    my $sql = "create table " . $self->{table_name} . " (" . $self->{column_defs} . ");";
+    my @sql = ("create table " . $self->{table_name} . " (" . $self->{column_defs} . ")");
     foreach my $idx (@{ $self->{indices} }) {
-        $sql .= "\ncreate index " . $idx->{name} . " on " . $self->{table_name} . " (" . $idx->{definition} . ");";
+        push(@sql, "create index " . $idx->{name} . " on " . $self->{table_name} . " (" . $idx->{definition} . ")");
     }
 
-    return $sql;
+    return @sql;
 }
 
 

@@ -35,3 +35,4 @@ while(<IN>){
   }
 }
 print DAT "\tSequence_Length\t$length\n";
+

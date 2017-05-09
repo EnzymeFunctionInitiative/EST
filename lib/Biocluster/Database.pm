@@ -106,15 +106,11 @@ sub createTable {
 
     my $dbh = $self->getHandle();
 
-    my $sql = $schema->getCreateSql();
-    my $ok = $dbh->do($sql);
-
-    #my $ok = $dbh->do("create table $tableName ($columnDefs)");
-    #if (not $ok) { $dbh->disconnect(); return $ok; }
-    #foreach my $idx (@indexes) {
-    #    $ok = $dbh->do("create index " . $idx->[0] . " on $tableName (" . $idx->[1] . ")");
-    #    if (not $ok) { $dbh->disconnect(); return $ok; }
-    #}
+    my @sql = $schema->getCreateSql();
+    my $ok;
+    foreach my $sql (@sql) {
+        $ok = $dbh->do($sql);
+    }
 
     $dbh->disconnect();
 

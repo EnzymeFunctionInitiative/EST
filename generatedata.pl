@@ -46,11 +46,13 @@
 
 use FindBin;
 use Cwd qw(abs_path);
+use File::Basename;
 use lib "$FindBin::Bin/lib";
 use Getopt::Long;
 use POSIX qw(ceil);
 use Biocluster::SchedulerApi;
 use Biocluster::Util qw(usesSlurm);
+use Biocluster::Config;
 
 $result = GetOptions(
     "np=i"              => \$np,
@@ -68,8 +70,9 @@ $result = GetOptions(
     "blasthits=i"       => \$blasthits,
     "memqueue=s"        => \$memqueue,
     "maxsequence=s"     => \$maxsequence,
-    "userdat=s"         => \$userdat,
-    "userfasta=s"       => \$userfasta,
+#    "userdat=s"         => \$userHeaderFile,
+    "userfasta=s"       => \$fastaFile,
+    "use-fasta-headers" => \$useFastaHeaders,
     "lengthdif=f"       => \$lengthdif,
     "sim=f"             => \$sim,
     "multiplex=s"       => \$multiplexing,
@@ -155,7 +158,7 @@ if ($multiplexing eq "on") {
 
 
 # At least one of tehse inputs are required to get sequences for the program
-unless (defined $userfasta or defined $ipro or defined $pfam or defined $taxid or defined $ssf or defined $gene3d or
+unless (defined $fastaFile or defined $ipro or defined $pfam or defined $taxid or defined $ssf or defined $gene3d or
         defined $accessionId or defined $accessionFile) {
     die "You must spedify the -fasta, -ipro, -taxid, -pfam, -accession-id, or -useraccession arguments\n";
 }
@@ -229,18 +232,10 @@ unless (defined $incfrac) {
 
 
 # Error checking for user supplied dat and fa files
-if (defined $userfasta and -e $userfasta) {
-    $userfasta = $ENV{PWD}."/$userfasta" unless ($userfasta=~/^\// or $userfasta=~/^~/);
-    $userfasta = "-userfasta $userfasta"
-} elsif (defined $userfasta) {
-    die "$userfasta does not exist\n";
-} else {
-    $userfasta = "";
-}
-
-
+my $noMatchFile = "";
 if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $ENV{PWD} . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
+    $noMatchFile = "-no-match-file " . dirname($accessionFile) . "/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME;
     $accessionFile = "-accession-file $accessionFile";
 } elsif (defined $accessionFile) {
     die "accession file $accessionFile does not exist\n";
@@ -249,15 +244,28 @@ if (defined $accessionFile and -e $accessionFile) {
 }
 
 
-if (defined $userdat and -e $userdat) {
-    $userdat = $ENV{PWD}."/$userdat" unless ($userdat=~/^\// or $userdat=~/^~/);
-    $userdat = "-userdat $userdat";
-} elsif (defined $userdat) {
-    die "$userdat does not exist\n";
+#if (defined $fastaFile and -e $fastaFile) { # and -e $userHeaderFile) {
+##} elsif (defined $userHeaderFile) {
+#} else {
+#    die "$userHeaderFile does not exist\n";
+##} else {
+##    print "this is userdat:$userHeaderFile:\n";
+##    $userHeaderFile = "";
+#}
+
+my $userHeaderFile = "";
+if (defined $fastaFile and -e $fastaFile) {
+    $fastaFile = $ENV{PWD}."/$fastaFile" unless ($fastaFile=~/^\// or $fastaFile=~/^~/);
+    $userHeaderFile = dirname($fastaFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
+    $fastaFile = "-fasta-file $fastaFile";
+    $fastaFile .= " -use-fasta-headers" if defined $useFastaHeaders;
+    $userHeaderFile = "-fasta-meta-file $userHeaderFile";
+} elsif (defined $fastaFile) {
+    die "$fastaFile does not exist\n";
 } else {
-    print "this is userdat:$userdat:\n";
-    $userdat = "";
+    $fastaFile = "";
 }
+
 
 # Create tmp directories
 mkdir $tmpdir;
@@ -285,16 +293,15 @@ my $S = new Biocluster::SchedulerApi(type => $schedType, queue => $queue, resour
 # Get sequences and annotations.  This creates fasta and struct.out files.
 #
 my $B = $S->getBuilder();
-print "userfasta $userfasta\n";
-if ($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
+if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
 
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiestmod");
     $B->addAction("cd $ENV{PWD}/$tmpdir");
     $B->addAction("which perl");
-    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $userfasta -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt --config=$config");
-    $B->addAction("$toolpath/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa");
+    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFile $userHeaderFile -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$config");
+    $B->addAction("$toolpath/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFile -config=$config");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
     # Submit and keep the job id for next dependancy
@@ -310,13 +317,14 @@ if ($pfam or $ipro or $ssf or $gene3d or ($userfasta=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiestmod");
     $B->addAction("cd $ENV{PWD}/$tmpdir");
     $B->addAction("$toolpath/getseqtaxid.pl -fasta allsequences.fa -struct struct.out -taxid $taxid");
-    if ($userfasta=~/\w+/) {
-        $userfasta=~s/^-userfasta //;
-        $B->addAction("cat $userfasta >> allsequences.fa");
+    if ($fastaFile=~/\w+/) {
+        $fastaFile=~s/^-userfasta //;
+        $B->addAction("cat $fastaFile >> allsequences.fa");
     }
-    if ($userdat=~/\w+/) {
-        $userdat=~s/^-userdat //;
-        $B->addAction("cat $userdat >>struct.out");
+    #TODO: handle the header file for this case....
+    if ($userHeaderFile=~/\w+/) {
+        $userHeaderFile=~s/^-userdat //;
+        $B->addAction("cat $userHeaderFile >> struct.out");
     }
     $B->renderToFile("$tmpdir/initial_import.sh");
 
@@ -400,7 +408,7 @@ if ($blast =~ /diamond/){
 }
 $B->addAction("export BLASTDB=$ENV{PWD}/$tmpdir");
 #$B->addAction("module load oldapps") if $oldapps;
-$B->addAction("module load blast+");
+#$B->addAction("module load blast+");
 #$B->addAction("blastp -query  $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
 $B->addAction("module load $efiestmod");
 if ($blast eq "blast") {

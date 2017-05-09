@@ -39,6 +39,14 @@ $incfrac=0.95;
 $maxhits=5000;
 $sortdir='/state/partition1';
 
+unless(defined $evalue){
+  print "-evalue not specified, using default of 5\n";
+  $evalue="1e-5";
+}else{
+  if( $evalue =~ /^\d+$/ ) {
+    $evalue="1e-$evalue";
+  }
+}
 
 #defaults and error checking for multiplexing
 if($multiplexing eq "on"){
