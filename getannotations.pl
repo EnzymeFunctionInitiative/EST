@@ -17,13 +17,16 @@ use Biocluster::Database;
 #$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
 #eval $configfile;
 
+my ($fasta, $annoOut, $metaFileIn, $configFile);
 $result = GetOptions(
     "fasta=s"               => \$fasta,
     "out=s"                 => \$annoOut,
     "fasta-meta-file=s"     => \$metaFileIn,
     "config=s"              => \$configFile,
 );
-die "Config file (--config=...) option is required" unless (defined $configFile and -f $configFile);
+
+die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
+die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
 print "Using $fasta as the input FASTA file\n";
 

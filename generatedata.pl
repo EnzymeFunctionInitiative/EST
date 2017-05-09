@@ -82,14 +82,15 @@ $result = GetOptions(
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
-    "config=s"          => \$config,        # new-style config file
+    "config=s"          => \$configFile,        # new-style config file
 );
 
+die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
-$toolpath = $ENV{'EFIEST'};
-$efiestmod = $ENV{'EFIDBMOD'};
-$efidbmod = $efiestmod;
-$sortdir = '/state/partition1';
+my $toolpath = $ENV{EFIEST};
+my $efiestmod = $ENV{EFIDBMOD};
+my $efidbmod = $efiestmod;
+my $sortdir = '/state/partition1';
 
 #defaults and error checking for choosing of blast program
 
@@ -193,9 +194,9 @@ unless (defined $evalue) {
     }
 }
 
-if (not defined $config or not -f $config) {
+if (not defined $configFile or not -f $configFile) {
     if (exists $ENV{EFICONFIG}) {
-        $config = $ENV{EFICONFIG};
+        $configFile = $ENV{EFICONFIG};
     } else {
         die "--config file parameter is not specified.  module load efiest_v2 should take care of this.";
     }
@@ -300,8 +301,8 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiestmod");
     $B->addAction("cd $ENV{PWD}/$tmpdir");
     $B->addAction("which perl");
-    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFile $userHeaderFile -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$config");
-    $B->addAction("$toolpath/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFile -config=$config");
+    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFile $userHeaderFile -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$configFile");
+    $B->addAction("$toolpath/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFile -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
     # Submit and keep the job id for next dependancy
@@ -316,7 +317,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiestmod");
     $B->addAction("cd $ENV{PWD}/$tmpdir");
-    $B->addAction("$toolpath/getseqtaxid.pl -fasta allsequences.fa -struct struct.out -taxid $taxid");
+    $B->addAction("$toolpath/getseqtaxid.pl -fasta allsequences.fa -struct struct.out -taxid $taxid -config=$configFile");
     if ($fastaFile=~/\w+/) {
         $fastaFile=~s/^-userfasta //;
         $B->addAction("cat $fastaFile >> allsequences.fa");

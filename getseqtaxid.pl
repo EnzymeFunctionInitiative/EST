@@ -8,33 +8,47 @@ use List::MoreUtils qw{apply uniq any} ;
 use DBD::SQLite;
 use DBD::mysql;
 use File::Slurp;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use Biocluster::Database;
+
 
 #removed in favor of cfg file
 #$db=$ENV{'EFIEST'}."/data_files/uniprot_combined.db";
 #my $dbh = DBI->connect("dbi:SQLite:$db","","");
-$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
-eval $configfile;
+#$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
+#eval $configfile;
 
 #$db="/quest_data/";
-$result=GetOptions ("fasta=s"		=> \$fasta,
-		    "struct=s"		=> \$struct,
-		    "taxid=s"		=> \$taxid
-		    );
+my ($fasta, $struct, $taxid, $configFile);
+my $result = GetOptions(
+    "fasta=s"       => \$fasta,
+    "struct=s"      => \$struct,
+    "taxid=s"       => \$taxid,
+    "config=s"      => \$configFile,
+);
 
-open(FASTA, ">$fasta") or die "could not create fasta file $fasta\n";
+die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
+die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
+
+my $db = new Biocluster::Database(config_file_path => $configFile);
+my $dbh = $db->getHandle();
+
+
 open(STRUCT, ">$struct") or die "could not create struct file $struct\n";
-print "database $db\n";
+print "database $ENV{EFIDB}\n";
 
-@accessions=();
-$perpass=$ENV{'EFIPASS'};
-@taxids=split /,/, $taxid;
-foreach $taxid (@taxids){
-  print "getting resuts for $taxid\n";
-  $count=0;
-  $sth= $dbh->prepare("select * from annotations where Taxonomy_ID = '$taxid'");
-  $sth->execute;
-  while($row = $sth->fetchrow_hashref){
-    print STRUCT
+my @accessions = ();
+my $perpass = $ENV{EFIPASS};
+my @taxids = split /,/, $taxid;
+
+foreach my $taxid (@taxids){
+    print "getting resuts for $taxid\n";
+    my $count = 0;
+    my $sth = $dbh->prepare("select * from annotations where Taxonomy_ID = '$taxid'");
+    $sth->execute;
+    while ($row = $sth->fetchrow_hashref) {
+        print STRUCT
             $row->{"accession"} .
             "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} .
             "\n\tSTATUS\t" . $row->{"STATUS"} .
@@ -63,45 +77,24 @@ foreach $taxid (@taxids){
             "\n\tSPECIES\t" . $row->{"Species"} .
             "\n\tCAZY\t" . $row->{"Cazy"} .
             "\n";
-    #print STRUCT $row->{"accession"} .
-    #        "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} .
-    #        "\n\tSTATUS\t" . $row->{"STATUS"} .
-    #        "\n\tSequence_Length\t" . $row->{"Squence_Length"} .
-    #        "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} .
-    #        "\n\tGDNA\t" . $row->{"GDNA"} .
-    #        "\n\tDescription\t" . $row->{"Description"} .
-    #        "\n\tSwissProt_Description\t" . $row->{"SwissProt_Description"} .
-    #        "\n\tOrganism\t" . $row->{"Organism"} .
-    #        "\n\tDomain\t" . $row->{"Domain"} .
-    #        "\n\tGN\t" . $row->{"GN"} .
-    #        "\n\tPFAM\t" . $row->{"PFAM"} .
-    #        "\n\tPDB\t" . $row->{"pdb"} .
-    #        "\n\tIPRO\t" . $row->{"IPRO"} .
-    #        "\n\tGO\t" . $row->{"GO"} .
-    #        "\n\tGI\t" . $row->{"GI"} .
-    #        "\n\tHMP_Body_Site\t" . $row->{"HMP_Body_Site"} .
-    #        "\n\tHMP_Oxygen\t" . $row->{"HMP_Oxygen"} .
-    #        "\n\tEFI_ID\t" . $row->{"EFI_ID"} . 
-    #        "\n";
-    #print FASTA ">" . $row->{"accession"} . "\n" . $row->{"EFI_ID"} . "\n";
 
-    push @accessions,$row->{"accessions"];
-    $count++;
-    #print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$giline\t$TID\t$sequence\n";
-  }
-  print "$taxid has $count matches\n";
+        push @accessions,$row->{"accessions"};
+        $count++;
+    }
+    print "$taxid has $count matches\n";
 }
+close STRUCT;
 
-open FASTA, ">$fasta" or die "Cannot write to output fasta $out\n";
-while(scalar @accessions){
-  @batch=splice(@accessions, 0, $perpass);
-  $batchline=join ',', @batch;
-  @sequences=split /\n/, `fastacmd -d $data_files/combined.fasta -s $batchline`;
-  foreach $sequence (@sequences){ 
-    $sequence=~s/^>\w\w\|(\w{6,10})\|.*/>$1/;
-    print FASTA "$sequence\n";
-  }
-  
+open FASTA, ">$fasta" or die "Cannot write to output fasta $fasta\n";
+while (scalar @accessions) {
+    @batch = splice(@accessions, 0, $perpass);
+    $batchline = join ',', @batch;
+    @sequences = split /\n/, `fastacmd -d $data_files/combined.fasta -s $batchline`;
+    foreach $sequence (@sequences) {
+        $sequence =~ s/^>\w\w\|(\w{6,10})\|.*/>$1/;
+        print FASTA "$sequence\n";
+    }
+
 }
 close FASTA;
-close STRUCT;
+

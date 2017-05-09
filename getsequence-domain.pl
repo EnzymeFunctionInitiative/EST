@@ -27,7 +27,9 @@ use Biocluster::Database;
 #
 #print "Configfile is \n > $configfile\n";
 
-$result = GetOptions("ipro=s"               => \$ipro,
+my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $fastaFileOut, $fastaFileIn, $fastaMetaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile, $configFile);
+my $result = GetOptions(
+    "ipro=s"               => \$ipro,
     "pfam=s"               => \$pfam,
     "gene3d=s"             => \$gene3d,
     "ssf=s"                => \$ssf,
@@ -44,6 +46,9 @@ $result = GetOptions("ipro=s"               => \$ipro,
     "no-match-file=s"      => \$noMatchFile,
     "config=s"             => \$configFile,
 );
+
+die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
+die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
 my @accessions = ();
 my $perpass = $ENV{EFIPASS};
