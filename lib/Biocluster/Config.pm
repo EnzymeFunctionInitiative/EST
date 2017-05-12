@@ -49,8 +49,8 @@ sub biocluster_configure {
     $object->{config_file_path} = $FindBin::Bin . "/" . "efi.config";
     if (exists $args{config_file_path}) {
         $object->{config_file_path} = $args{config_file_path};
-    } elsif (exists $ENV{ENVIRONMENT_CONFIG}) {
-        $object->{config_file_path} = $ENV{ENVIRONMENT_CONFIG};
+    } elsif (exists $ENV{EFICONFIG}) {
+        $object->{config_file_path} = $ENV{EFICONFIG};
     }
     
     if (exists $args{dryrun}) {

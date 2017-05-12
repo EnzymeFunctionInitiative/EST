@@ -16,8 +16,9 @@ sub new {
     $self->{res} = [];
     $self->{mail} = "";
     $self->{deps} = "";
-    $self->{pfx} = "";
+    $self->{sched_prefix} = "";
     $self->{actions} = [];
+    $self->{working_dir} = "";
     $self->{dryrun} = exists $args{dryrun} ? $args{dryrun} : 0;
 
     return $self;
@@ -43,6 +44,10 @@ sub dependency {
     my ($self, $isArray, $jobId) = @_;
 }
 
+sub workingDirectory {
+    my ($self, $workingDir) = @_;
+}
+
 sub addAction {
     my ($self, $actionLine) = @_;
 
@@ -53,8 +58,8 @@ sub render {
     my ($self, $fh) = @_;
 
     print $fh ("#!/bin/bash\n");
-    my $pfx = $self->{pfx};
-    print $fh ("$pfx " . $self->{array} . "\n") if length($self->{array}) > 0;
+    my $pfx = $self->{sched_prefix};
+    print $fh ("$pfx " . $self->{array} . "\n") if length($self->{array});
     print $fh ("$pfx " . $self->{output} . "\n") if length($self->{output});
     print $fh ("$pfx " . $self->{shell} . "\n") if length($self->{shell});
     print $fh ("$pfx " . $self->{queue} . "\n") if length($self->{queue});
@@ -63,6 +68,7 @@ sub render {
     }
     print $fh ("$pfx " . $self->{deps} . "\n") if length($self->{deps});
     print $fh ("$pfx " . $self->{mail} . "\n") if length($self->{mail});
+    print $fh ("$pfx " . $self->{working_dir} . "\n") if length($self->{working_dir});
     foreach my $action (@{$self->{actions}}) {
         print $fh "$action\n";
     }
@@ -91,7 +97,7 @@ sub new {
     my $self = Biocluster::SchedulerApi::Builder->new(%args);
     $self->{output} = "-j oe";
     $self->{shell} = "-S /bin/bash";
-    $self->{pfx} = "#PBS";
+    $self->{sched_prefix} = "#PBS";
 
     return bless($self, $class);
 }
@@ -135,6 +141,11 @@ sub dependency {
     $self->{deps} = "-W depend=$okStr:$jobId";
 }
 
+sub workingDirectory {
+    my ($self, $workingDir) = @_;
+    $self->{working_dir} = "-d $workingDir";
+}
+
 
 
 
@@ -149,7 +160,7 @@ sub new {
     my ($class, %args) = @_;
 
     my $self = Biocluster::SchedulerApi::Builder->new(%args);
-    $self->{pfx} = "#SBATCH";
+    $self->{sched_prefix} = "#SBATCH";
 
     return bless($self, $class);
 }
@@ -193,6 +204,11 @@ sub dependency {
     $self->{deps} = "--dependency=$okStr:$jobId";
 }
 
+sub workingDirectory {
+    my ($self, $workingDir) = @_;
+    $self->{working_dir} = "-D $workingDir";
+}
+
 
 
 
@@ -206,7 +222,9 @@ use warnings;
 use constant TORQUE => 1;
 use constant SLURM  => 2;
 
-use lib "../";
+use File::Basename;
+use Cwd 'abs_path';
+use lib abs_path(dirname(__FILE__) . "/../");
 use Biocluster::Util qw(usesSlurm);
 
 
