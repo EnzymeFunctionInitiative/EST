@@ -210,7 +210,7 @@ foreach $element (@$uniprotIds) {
     if ($row = $sth->fetch) {
         push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
     } else {
-        print NOMATCH "$element\tPFAM\n" if $showNoMatches;
+        print NOMATCH "$element\tUNIPROT\n" if $showNoMatches;
     }
 }
 @accessions=keys %accessionhash;
@@ -223,12 +223,7 @@ $dbh->disconnect();
 #
 if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     $useFastaHeaders = defined $useFastaHeaders ? 1 : 0;
-#    if (defined $useFastaHeaders) {
     parseFastaHeaders($fastaFileIn, $fastaFileOut, $fastaMetaFileOut, $useFastaHeaders, $idMapper, $configFile);
-#    } else {
-#        #add user supplied fasta to the list
-#        system("cat $fastaFileIn >> $fastaFileOut");
-#    }
 }
 
 
@@ -296,7 +291,7 @@ while(scalar @accessions) {
     push(@err, $fastaErr);
     #print "fastacmd -d $data_files/combined.fasta -s $batchline\n"; #[[[$fastacmdOutput]]]\n";
     @sequences=split /\n>/, $fastacmdOutput;
-    $sequences[0] = substr($sequences[0], 1) if $#sequences >= 0 and substr($sequences[0], 0, 1) eq ">";
+    $seq[0] = substr($seq[0], 1) if $#sequences >= 0 and substr($seq[0], 0, 1) eq ">";
     foreach $sequence (@sequences) { 
         print "raw $sequence\n";
         if ($sequence =~ s/^\w\w\|(\w{6,10})\|.*//) {
@@ -360,6 +355,7 @@ close NOMATCH if $showNoMatches;
 
 
 
+use Data::Dumper;
 
 sub parseFastaHeaders {
     my ($fastaFileIn, $fastaFileOut, $metadataFile, $useFastaHeaders, $idMapper, $configFile) = @_;
@@ -370,79 +366,125 @@ sub parseFastaHeaders {
     open META, ">$metadataFile" or die "Unable to open user fasta ID file '$metadataFile' for writing: $!";
     open FASTAOUT, ">$fastaFileOut";
 
-    my $lastId = "";
+    my $id;
     my $seqLength = 0;
     my $seqCount = 0;
     while (my $line = <INFASTA>) {
         chomp $line;
 
-        my $headerLine = "";
+        my $headerLine = 0;
         my $writeSeq = 0;
-        my $id;
 
+        # Option E
         if ($useFastaHeaders) {
             my $result = $parser->parse_line_for_headers($line);
+
+            # When we get here we are at the end of the headers and have started reading a sequence.
             if ($result->{state} eq Biocluster::Fasta::Headers::FLUSH) {
                 # Here we save the first Uniprot ID (reversed-mapped if necessary from above) that was found in the
                 # header list to the FASTA file so that it can be used later in the process.
 
-                # $id is saved at the bottom of the while loop.
-                if (not defined $result->{primary_id}) {
+                # $id is written to the file at the bottom of the while loop.
+                #
+                # The primary ID is the first Uniprot ID that was found. If there were no primary IDs found,
+                # we treat the sequence like Option C and assign an internal zzz sequence ID, and save the
+                # header(s) as the description. If a primary ID was found, then save the original unmapped
+                # ID that was in the file (for example the NCBI ID that mapped to the Uniprot ID we are using.
+
+                my $ss = {};
+                if (not scalar @{ $result->{uniprot_ids} }) {
                     $id = makeSequenceId($seqCount);
-                    $headerLine = "Description\t" . substr($result->{raw_headers}, 0, 200);
+                    push(@{ $seq{$id} }, $ss);
+                    $ss->{description} = substr($result->{raw_headers}, 0, 200);
+                    $ss->{query_id} = "";
                 } else {
-                    $id = $result->{primary_id};
-                    $headerLine = "Original_Primary_ID\t" . $result->{orig_primary_id}; 
+                    my $primaryId = ${$result->{uniprot_ids}}[0];
+                    $id = $primaryId->{uniprot_id};
+                    push(@{ $seq{$id} }, $ss);
+                    $ss->{query_id} = $primaryId->{other_id}; #$result->{primary_id}->{other_id};
                 }
-              
-                #if ($#{ $result->{ids} } >= 0) { 
-                #    #$headerLine .= "Description\t" . join("\t", @{ $result->{ids} });
-                #    $headerLine = " ";
-                #} else {
-                    
-                #}
+                $ss->{uniprot_ids} = [ grep { $_->{uniprot_id} ne $id } @{ $result->{uniprot_ids} } ];
+                $ss->{duplicates} = $result->{duplicates};
+                
+                # Any other IDs (either Uniprot or non-Uniprot) that were found in the header(s) are saved
+                # to the metadata file here.
+                $ss->{other_ids} = $result->{other_ids};
             
+                # Ensure that the first line of the sequence is written to the file.
+                $writeSeq = 1;
                 $seqCount++;
+                $headerLine = 1;
+
+            # Here we have encountered a sequence line.
             } elsif ($result->{state} eq Biocluster::Fasta::Headers::SEQUENCE) {
                 $writeSeq = 1;
             }
+        # Option C
         } else {
+            # Custom header for Option C
             if ($line =~ s/^>//) {
-                # $id is saved at the bottom of the while loop.
+                # $id is written to the file at the bottom of the while loop.
                 $id = makeSequenceId($seqCount);
-                $headerLine = "Description\t$line";
+                my $ss = {};
+                push(@{ $seq{$id} }, $ss);
+                $ss->{description} = $line;
                 $seqCount++;
+                $writeSeq = 1;
+                $headerLine = 1;
             } else {
                 $writeSeq = 1;
             }
         }
 
         if ($writeSeq) {
-            print FASTAOUT $line, "\n";
-            $line =~ s/\s//g;
+            my $ss = @{ $seq{$id} }[-1];
+            if (not exists $ss->{seq}) {
+                $ss->{seq} = $line . "\n";
+            } else {
+                $ss->{seq} .= $line . "\n";
+            }
             $seqLength += length($line);
         }
 
         if ($headerLine) {
-            if ($seqLength > 0 and $lastId =~ /^z/) {
-                print META "\tSequence_Length\t$seqLength\n";
-            }
+            my $ss = @{ $seq{$id} }[-1];
+            $ss->{seq_length} = $seqLength    if $id =~ /^z/;
+            $ss->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
             $seqLength = 0;
-
-            $lastId = $id;
-
-            print FASTAOUT ">$id\n";
-            print META "$id\n";
-            print META "\t", $headerLine, "\n" if $headerLine =~ /\S/;
-            print META "\tAnnotation_Source\tFASTA\n";
         }
     }
 
-    print META "\tSequence_Length\t$seqLength\n" if $lastId =~ /^z/;
+    foreach my $id (sort keys %seq) {
+        foreach my $ss (@{ $seq{$id} }) {
+            writeSeqData($id, $ss, \*FASTAOUT, \*META);
+        }
+    }
 
     close FASTAOUT;
     close META;
     close INFASTA;
+}
+
+
+sub writeSeqData {
+    my ($id, $seq, $ffh, $mfh) = @_;
+
+    my $firstOne = 1;
+    foreach my $upId ({ uniprot_id => $id, other_id => $seq->{query_id} }, @{ $seq->{uniprot_ids} }) {
+        print $ffh ">" . $upId->{uniprot_id} . "\n";
+        print $ffh $seq->{seq};
+    
+        print $mfh $upId->{uniprot_id} . "\n";
+        print $mfh "\tDescription\t" . $seq->{description} . "\n"                               if $seq->{description};
+        print $mfh "\tSequence_Length\t" . $seq->{seq_length} . "\n"                            if exists $seq->{seq_length};
+        print $mfh "\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . $seq->{src} . "\n"     if exists $seq->{src};
+        print $mfh "\tQuery_ID\t" . $upId->{other_id}. "\n"                                     if $upId->{uniprot_id} !~ /^z/;
+        print $mfh "\tOther_IDs\t" . join(";", @{ $seq->{other_ids} }) . "\n"                   if exists $seq->{other_ids} and $firstOne;
+        my @dups = ();
+        @dups = @{ $seq->{duplicates}->{$upId->{uniprot_id}} }                                  if exists $seq->{duplicates}->{$upId->{uniprot_id}};
+        print $mfh "\tDuplicate_IDs\t" . join(",", @dups) . "\n"                                if scalar @dups;
+        $firstOne = 0;
+    }
 }
 
 

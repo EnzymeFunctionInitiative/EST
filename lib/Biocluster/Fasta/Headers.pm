@@ -60,24 +60,13 @@ sub get_fasta_header_ids {
 }
 
 
-sub get_state {
-    my ($self) = @_;
-
-    my $result = { state => HEADER, ids => [], primary_id => undef };
-    $result->{primary_id} = $self->{primary_id};
-    $result->{ids} = $self->{ids};
-
-    return $result;
-}
-
-
 sub reset {
     my ($self) = @_;
 
-    $self->{primary_id} = undef;
-    $self->{ids} = [];
-    $self->{orig_primary_id} = "";
+    $self->{other_ids} = [];
     $self->{raw_headers} = "";
+    $self->{uniprot_ids} = [];
+    $self->{duplicates} = {};
 }
 
 
@@ -100,16 +89,13 @@ sub parse_line_for_headers {
         foreach my $id (get_fasta_header_ids($line)) {
             # Check the ID type and if it's unknown, we add it to the ID list and move on.
             my $idType = check_id_type($id);
-            my $queryId = $id;
             if ($idType eq Biocluster::IdMapping::Util::UNKNOWN) {
-                #push(@{ $self->{ids} }, $id);
                 next;
-            } elsif ($idType eq Biocluster::IdMapping::Util::UNIPROT) {
-                ($queryId = $id) =~ s/\..+$//;
             }
 
             # Check if the ID is in the idmapping database
-            my $upId = $queryId;
+            my $upId = $id;
+            $upId =~ s/\..+$// if $idType eq Biocluster::IdMapping::Util::UNIPROT;
             if ($idType ne Biocluster::IdMapping::Util::UNIPROT) {
                 my ($uniprotId, $noMatch) = $self->{id_mapper}->reverseLookup($idType, $id);
                 if (defined $uniprotId and $#$uniprotId >= 0) {
@@ -119,32 +105,35 @@ sub parse_line_for_headers {
             }
 
             # Check if we known anything about the accession ID by querying the database.
-            if (not defined $self->{primary_id} and $idType eq Biocluster::IdMapping::Util::UNIPROT) {
+            if ($idType eq Biocluster::IdMapping::Util::UNIPROT) {
                 my $sql = "select accession from PFAM where accession = '$upId'";
                 my $sth = $dbh->prepare($sql);
                 $sth->execute();
 
                 # We need to have a primary ID so we set that here if we haven't yet.
                 if ($sth->fetch) {
-                    $self->{primary_id} = $upId;
-                    $self->{orig_primary_id} = $queryId;
+                    if (not grep { $_->{uniprot_id} eq $upId } @{ $self->{uniprot_ids} }) {
+                        push(@{ $self->{uniprot_ids} }, { uniprot_id => $upId, other_id => $id });
+                        $self->{duplicates}->{$upId} = [];
+                    } elsif (not grep { $_->{other_id} eq $id } @{ $self->{uniprot_ids} }) {
+                        push(@{ $self->{duplicates}->{$upId} }, $id) if not grep { $_ eq $id } @{ $self->{duplicates}->{$upId} };
+                    }
+                } else {
+                    push(@{ $self->{other_ids} }, $id);
                 }
-                # else {
-                    push(@{ $self->{ids} }, $id);
-                    #}
             } else {
-                push(@{ $self->{ids} }, $id);
+                push(@{ $self->{other_ids} }, $id);
             }
         }
     } else {
         # If the line doesn't contain a whitespace character, and we have some IDs, we assume we have just
         # finished parsing the header, so we write the header info and reset the variables.
-        if ($line =~ m/\S/ and $self->{raw_headers}) { #$#{ $self->{ids} } >= 0) {
-            $result->{primary_id} = $self->{primary_id};
-            $result->{ids} = $self->{ids};
-            $result->{orig_primary_id} = $self->{orig_primary_id};
+        if ($line =~ m/\S/ and $self->{raw_headers}) { #$#{ $self->{other_ids} } >= 0) {
+            $result->{other_ids} = $self->{other_ids};
             ($result->{raw_headers} = $self->{raw_headers}) =~ s/^\s*>(.*?)\s*$/$1/g;
             $result->{state} = FLUSH;
+            $result->{uniprot_ids} = $self->{uniprot_ids};
+            $result->{duplicates} = $self->{duplicates};
             # Reset for the next header
             $self->reset();
         } else {

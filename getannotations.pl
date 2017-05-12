@@ -11,6 +11,7 @@ use File::Slurp;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 use Biocluster::Database;
+use Biocluster::Config;
 
 
 
@@ -51,8 +52,8 @@ foreach $accession (@accessions){
         "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
         "\n\tGDNA\t" . $row->{"GDNA"} . 
         "\n\tDescription\t" . $row->{"Description"} . 
-        #"\n\tOriginal_Primary_ID\t" . $row->{"Uniprot_ID"} .
-        "\n\tAnnotation_Source\t" . "FAMILY" .
+        "\n\tQuery_IDs\t" . #$row->{"Uniprot_ID"} .
+        "\n\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . Biocluster::Config::FIELD_SEQ_SRC_VALUE_FAMILY .
         "\n\tSwissprot_Description\t" . $row->{"SwissProt_Description"} . 
         "\n\tOrganism\t" . $row->{"Organism"} . 
         "\n\tDomain\t" . $row->{"Domain"} . 

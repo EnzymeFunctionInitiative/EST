@@ -236,8 +236,11 @@ unless (defined $incfrac) {
 my $noMatchFile = "";
 if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $ENV{PWD} . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
-    $noMatchFile = "-no-match-file " . dirname($accessionFile) . "/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME;
     $accessionFile = "-accession-file $accessionFile";
+
+    $noMatchFile = "$tmpdir/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME;
+    $noMatchFile = $ENV{PWD} . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
+    $noMatchFile = "-no-match-file $noMatchFile";
 } elsif (defined $accessionFile) {
     die "accession file $accessionFile does not exist\n";
 } else {

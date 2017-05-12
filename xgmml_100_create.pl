@@ -15,6 +15,9 @@ use IO;
 use XML::Writer;
 use XML::LibXML;
 use Getopt::Long;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use Biocluster::Config;
 
 $result=GetOptions ("blast=s"	=> \$blast,
     "fasta=s"	=> \$fasta,
@@ -23,6 +26,8 @@ $result=GetOptions ("blast=s"	=> \$blast,
     "title=s"	=> \$title,
     "maxfull=i"	=> \$maxfull,
     "dbver=s"	=> \$dbver);
+
+die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver;
 
 
 if(defined $maxfull){
@@ -73,6 +78,8 @@ foreach $line (<FASTA>){
 close FASTA;
 print time . " Finished reading in uniprot numbers\n";
 
+
+my @metas;
 print time . " Read in annotation data\n";
 #if struct file (annotation information) exists, use that to generate annotation information
 if(-e $struct){
@@ -87,7 +94,14 @@ if(-e $struct){
             unless(@lineary[2]){
                 @lineary[2]='None';
             }
-            unless(@lineary[1] eq "IPRO" or @lineary[1] eq "GI" or @lineary[1] eq "PDB" or @lineary[1] eq "PFAM" or @lineary[1] eq "GO"  or @lineary[1] eq "HMP_Body_Site" or @lineary[1] eq "CAZY"){
+            push(@metas, $lineary[1]) if not grep { $_ eq $lineary[1] } @metas;
+            if ($lineary[1] eq Biocluster::Config::FIELD_SEQ_SRC_KEY) {
+                if ($uprot{$id}{$lineary[1]} and $lineary[2] and $lineary[2] ne $uprot{$id}{$lineary[1]}) {
+                    $uprot{$id}{$lineary[1]} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_BOTH;
+                } else {
+                    $uprot{$id}{$lineary[1]} = $lineary[2];
+                }
+            } elsif (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and @lineary[1] ne "PFAM" and @lineary[1] ne "GO" and @lineary[1] ne "HMP_Body_Site" and @lineary[1] ne "CAZY") {
                 $uprot{$id}{@lineary[1]}=@lineary[2]; 
             }else{
                 my @tmpline=split ",", @lineary[2];
@@ -100,17 +114,19 @@ if(-e $struct){
 print time . " done reading in annotation data\n";
 
 
-print time . " Open struct file and get a annotation keys\n";
-open STRUCT, $struct or die "could not open $struct\n";
-<STRUCT>;
-@metas=();
-while (<STRUCT>){
-    last if /^\w/;
-    $line=$_;
-    chomp $line;
-    if($line=~/^\s/){
-        @lineary=split /\t/, $line;
-        push @metas, @lineary[1];
+if ($#metas < 0) {
+    print time . " Open struct file and get a annotation keys\n";
+    open STRUCT, $struct or die "could not open $struct\n";
+    <STRUCT>;
+    @metas=();
+    while (<STRUCT>){
+        last if /^\w/;
+        $line=$_;
+        chomp $line;
+        if($line=~/^\s/){
+            @lineary=split /\t/, $line;
+            push @metas, @lineary[1];
+        }
     }
 }
 
