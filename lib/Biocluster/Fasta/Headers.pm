@@ -131,6 +131,7 @@ sub parse_line_for_headers {
         if ($line =~ m/\S/ and $self->{raw_headers}) { #$#{ $self->{other_ids} } >= 0) {
             $result->{other_ids} = $self->{other_ids};
             ($result->{raw_headers} = $self->{raw_headers}) =~ s/^\s*>(.*?)\s*$/$1/g;
+            $result->{raw_headers} =~ s/[\n\r\t]+/ /g;
             $result->{state} = FLUSH;
             $result->{uniprot_ids} = $self->{uniprot_ids};
             $result->{duplicates} = $self->{duplicates};

@@ -101,7 +101,9 @@ if(-e $struct){
                 } else {
                     $uprot{$id}{$lineary[1]} = $lineary[2];
                 }
-            } elsif (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and @lineary[1] ne "PFAM" and @lineary[1] ne "GO" and @lineary[1] ne "HMP_Body_Site" and @lineary[1] ne "CAZY") {
+            } elsif (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and
+                     @lineary[1] ne "PFAM" and @lineary[1] ne "GO" and @lineary[1] ne "HMP_Body_Site" and 
+                     @lineary[1] ne "CAZY" and @lineary[1] ne "Query_IDs" and @lineary[1] ne "Other_IDs") {
                 $uprot{$id}{@lineary[1]}=@lineary[2]; 
             }else{
                 my @tmpline=split ",", @lineary[2];
