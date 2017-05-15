@@ -504,33 +504,33 @@ sub writeDownloadCommands {
 
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.dat.gz" and not -f "$InputDir/uniprot_sprot.dat") {
         logprint "#  Downloading $UniprotLocation/uniprot_sprot.dat.gz\n";
-        $B->addAction("curl $UniprotLocation/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.dat.gz" and not -f "$InputDir/uniprot_trembl.dat") {
         logprint "#  Downloading $UniprotLocation/uniprot_trembl.dat.gz\n";
-        $B->addAction("curl $UniprotLocation/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.fasta.gz" and not -f "$InputDir/uniprot_sprot.fasta") {
         logprint "#  Downloading $UniprotLocation/uniprot_sprot.fasta.gz\n";
-        $B->addAction("curl $UniprotLocation/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
+        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.fasta.gz" and not -f "$InputDir/uniprot_trembl.fasta") {
         logprint "#  Downloading $UniprotLocation/uniprot_trembl.fasta.gz\n";
-        $B->addAction("curl $UniprotLocation/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
+        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
     }
     if (not $skipIfExists or not -f "$InputDir/match_complete.xml.gz" and not -f "$InputDir/match_complete.xml") {
         logprint "#  Downloading $InterproLocation/match_complete.xml.gz\n";
-        $B->addAction("curl $InterproLocation/match_complete.xml.gz > $InputDir/match_complete.xml.gz");
+        $B->addAction("curl -sS $InterproLocation/match_complete.xml.gz > $InputDir/match_complete.xml.gz");
     }
     if (not $skipIfExists or not -f "$InputDir/idmapping.dat.gz" and not -f "$InputDir/idmapping.dat") {
         logprint "#  Downloading $UniprotLocation/idmapping/idpmapping.dat.gz\n";
-        $B->addAction("curl $UniprotLocation/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
     }
 
     my $pfamInfoUrl = $config->{build}->{pfam_info_url};
     if (not $skipIfExists or not -f "$InputDir/Pfam-A.clans.tsv.gz" and not -f "$InputDir/Pfam-A.clans.tsv") {
         logprint "#  Downloading $pfamInfoUrl\n";
-        $B->addAction("curl $pfamInfoUrl > $InputDir/Pfam-A.clans.tsv.gz");
+        $B->addAction("curl -sS $pfamInfoUrl > $InputDir/Pfam-A.clans.tsv.gz");
     }
 
     #Update ENA if needed
