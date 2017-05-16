@@ -408,7 +408,7 @@ print "createdb job is:\n $createdbjob";
 #
 $B = $S->getBuilder();
 
-$B->jobArray("1-20");
+$B->jobArray("1-$np");
 $B->dependency(0, @createdbjobline[0]);
 if ($blast =~ /diamond/){
     $B->resource(1, 24);
@@ -420,7 +420,7 @@ $B->addAction("export BLASTDB=$ENV{PWD}/$tmpdir");
 $B->addAction("module load $efiestmod");
 if ($blast eq "blast") {
     $B->addAction("module load oldapps") if $oldapps;
-    $B->addAction("module load blast");
+    #$B->addAction("module load blast");
     $B->addAction("blastall -p blastp -i $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -m 8 -e $evalue -b $blasthits -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab");
 } elsif ($blast eq "blast+") {
     $B->addAction("module load oldapps") if $oldapps;

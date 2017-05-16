@@ -113,9 +113,11 @@ sub parse_line_for_headers {
                 # We need to have a primary ID so we set that here if we haven't yet.
                 if ($sth->fetch) {
                     if (not grep { $_->{uniprot_id} eq $upId } @{ $self->{uniprot_ids} }) {
+#                        print "NEW $upId/$id\n";
                         push(@{ $self->{uniprot_ids} }, { uniprot_id => $upId, other_id => $id });
                         $self->{duplicates}->{$upId} = [];
                     } elsif (not grep { $_->{other_id} eq $id } @{ $self->{uniprot_ids} }) {
+#                        print "DUP $upId/$id\n";
                         push(@{ $self->{duplicates}->{$upId} }, $id) if not grep { $_ eq $id } @{ $self->{duplicates}->{$upId} };
                     }
                 } else {

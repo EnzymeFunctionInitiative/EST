@@ -333,20 +333,15 @@ while(scalar @accessions) {
             $accession="";
         }
         if ($domain eq "off" and $accession ne "") {
-            print OUT ">$accession$sequence\n";
-            #print "accession: $accession\n > $sequence\n";
+            print OUT ">$accession$sequence\n\n";
         } elsif ($domain eq "on" and $accession ne "") {
             $sequence =~ s/\s+//g;
             my @domains = @{$accessionhash{$accession}};
-            #print "accession $accession has ".scalar(@domains)." domains\n";
             foreach my $piece (@domains) {
                 my $thissequence=join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
-                print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n";
-                #print "$accession:${$piece}{'start'}:${$piece}{'end'}\t".length substr $sequence,${$piece}{'start'}-1,(${$piece}{'end'}-${$piece}{'start'}+1)."\n";
-                #print "\n";
+                print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n\n";
             }
         } elsif ($accession eq "") {
-            print "HELP\n";
             #do nothing
         } else {
             die "Domain must be either on or off\n";
@@ -404,7 +399,6 @@ sub parseFastaHeaders {
     my $seqLength = 0;
     my $seqCount = 0;
     while (my $line = <INFASTA>) {
-        #$line =~ s/^\s*(.*?)\s*$/$1/;
         $line =~ s/[\r\n]+$//;
 
         my $headerLine = 0;
@@ -416,47 +410,29 @@ sub parseFastaHeaders {
 
             # When we get here we are at the end of the headers and have started reading a sequence.
             if ($result->{state} eq Biocluster::Fasta::Headers::FLUSH) {
-                # Here we save the first Uniprot ID (reversed-mapped if necessary from above) that was found in the
-                # header list to the FASTA file so that it can be used later in the process.
-
-                # $id is written to the file at the bottom of the while loop.
-                #
-                # The primary ID is the first Uniprot ID that was found. If there were no primary IDs found,
-                # we treat the sequence like Option C and assign an internal zzz sequence ID, and save the
-                # header(s) as the description. If a primary ID was found, then save the original unmapped
-                # ID that was in the file (for example the NCBI ID that mapped to the Uniprot ID we are using.
-
-                my $ss = {};
+                
                 if (not scalar @{ $result->{uniprot_ids} }) {
                     $id = makeSequenceId($seqCount);
-                    $ss->{description} = substr($result->{raw_headers}, 0, 200);
-                    $ss->{query_id} = "";
+                    $seq{$id}->{description} = substr($result->{raw_headers}, 0, 200);
+                    $seq{$id}->{query_ids} = [];
+                    $seq{$id}->{other_ids} = $result->{other_ids};
                 } else {
-                    my $primaryId = ${$result->{uniprot_ids}}[0];
-                    $id = $primaryId->{uniprot_id};
-                    print "Merging sequence for $id\n" if exists $seq{$id};
-                    if (exists $seq{$id}) {
-                        $ss = $seq{$id};
-                        $ss->{num_seq_merged} = exists $ss->{num_seq_merged} ? $ss->{num_seq_merged} + 1 : 2;
+                    # We discard the sequences for known Uniprot IDs since we will look them up at a later point.
+                    $id = "discard_me";
+                    foreach my $res (@{ $result->{uniprot_ids} }) {
+                        #print ">>> ", $res->{uniprot_id}, "     ", $res->{other_id}, "\n";
+                        push(@{ $seq{$res->{uniprot_id}}->{query_ids} }, $res->{other_id});
+                        foreach my $dupId (@{ $result->{duplicates}->{$res->{uniprot_id}} }) {
+                            push(@{ $seq{$res->{uniprot_id}}->{query_ids} }, $dupId);
+                        }
+                        push(@{ $seq{$res->{uniprot_id}}->{other_ids} }, @{ $result->{other_ids} });
                     }
-                    $ss->{query_id} = $primaryId->{other_id}; #$result->{primary_id}->{other_id};
                 }
-                push(@{ $ss->{uniprot_ids} }, grep { $_->{uniprot_id} ne $id } @{ $result->{uniprot_ids} } );
-                push(@{ $ss->{duplicates} }, $result->{duplicates});
-                #$ss->{uniprot_ids} = [ grep { $_->{uniprot_id} ne $id } @{ $result->{uniprot_ids} } ];
-                #$ss->{duplicates} = $result->{duplicates};
                 
-                # Any other IDs (either Uniprot or non-Uniprot) that were found in the header(s) are saved
-                # to the metadata file here.
-                $ss->{other_ids} = $result->{other_ids};
-            
                 # Ensure that the first line of the sequence is written to the file.
                 $writeSeq = 1;
                 $seqCount++;
                 $headerLine = 1;
-
-                $seq{$id} = $ss;
-                #push(@{ $seq{$id} }, $ss);
 
             # Here we have encountered a sequence line.
             } elsif ($result->{state} eq Biocluster::Fasta::Headers::SEQUENCE) {
@@ -473,18 +449,15 @@ sub parseFastaHeaders {
                 $ss->{description} = $line;
 
                 $seqCount++;
-                #$writeSeq = 1;
                 $headerLine = 1;
 
                 $seq{$id} = $ss;
-                #push(@{ $seq{$id} }, $ss);
             } elsif ($line =~ /\S/) {
                 $writeSeq = 1;
             }
         }
 
         if ($writeSeq) {
-            #my $ss = @{ $seq{$id} }[-1];
             my $ss = $seq{$id};
             if (not exists $ss->{seq}) {
                 $ss->{seq} = $line . "\n";
@@ -496,7 +469,6 @@ sub parseFastaHeaders {
 
         if ($headerLine) {
             if ($lastId) {
-                #my $ss = @{ $seq{$id} }[-1];
                 my $ss = $seq{$lastId};
                 $ss->{seq_length} = $seqLength    if $lastId =~ /^z/;
                 $ss->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
@@ -509,11 +481,11 @@ sub parseFastaHeaders {
     $seq{$id}->{seq_length} = $seqLength    if $id =~ /^z/;
     $seq{$id}->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
 
+    my @seqToWrite;
     foreach my $id (sort sortFn keys %seq) {
-        #foreach my $ss (@{ $seq{$id} }) {
-        #    writeSeqData($id, $ss, \*FASTAOUT, \*META);
-        #}
-        print "Expanding sequence for ", join(", ", @{ $seq{$id}->{uniprot_ids} }), "\n" if scalar @{ $seq{$id}->{uniprot_ids} };
+        # Since multiple Uniprot IDs may map to the same sequence in the FASTA file, we need to write those
+        # as sepearate sequences which is what "Expanding" means.
+        push(@seqToWrite, $id);
         writeSeqData($id, $seq{$id}, \*FASTAOUT, \*META);
     }
 
@@ -521,45 +493,38 @@ sub parseFastaHeaders {
     close META;
     close INFASTA;
 
-    return sort sortFn grep !/^z/, keys %seq;
+    return sort sortFn grep !/^z/, @seqToWrite;
 }
 
 
 sub sortFn {
-    (my $aa = $a) =~ s/\D//g;
-    (my $bb = $b) =~ s/\D//g;
-
-    return $aa <=> $bb;
+    if ($a =~ /^z/ and $b =~ /^z/) {
+        (my $aa = $a) =~ s/\D//g;
+        (my $bb = $b) =~ s/\D//g;
+        return $aa <=> $bb;
+    } else {
+        return $a cmp $b;
+    }
 }
 
 
 sub writeSeqData {
     my ($id, $seq, $ffh, $mfh) = @_;
 
-    my $firstOne = 1;
-    foreach my $upId ({ uniprot_id => $id, other_id => $seq->{query_id} }, @{ $seq->{uniprot_ids} }) {
-        # Only write out sequences that do not have a Uniprot ID, instead we retrieve them from the database rather
-        # than use them from the FASTA file.
-        if ($upId->{uniprot_id} =~ /^z/) {
-            print $ffh ">" . $upId->{uniprot_id} . "\n";
-            print $ffh $seq->{seq};
-            print $ffh "\n";
-        }
-        
-        my @queryIds = ();
-        push(@queryIds, $upId->{other_id})                                                      if $upId->{uniprot_id} !~ /^z/;
-        push(@queryIds, @{ $seq->{duplicates}->{$upId->{uniprot_id}} })                         if exists $seq->{duplicates}->{$upId->{uniprot_id}};
-    
-        print $mfh $upId->{uniprot_id} . "\n";
-        print $mfh "\tDescription\t" . $seq->{description} . "\n"                               if $seq->{description};
-        print $mfh "\tSequence_Length\t" . $seq->{seq_length} . "\n"                            if exists $seq->{seq_length};
-        print $mfh "\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . $seq->{src} . "\n"     if exists $seq->{src};
-        print $mfh "\tOther_IDs\t" . join(",", @{ $seq->{other_ids} }) . "\n"                   if exists $seq->{other_ids};
-        print $mfh "\tQuery_IDs\t" . join(",", @queryIds) . "\n"                                if scalar @queryIds;
-        print $mfh "\tNum_Seq_Merged\t" . $seq->{num_seq_merged} . "\n"                         if exists $seq->{num_seq_merged};
-
-        $firstOne = 0;
+    # Only write out sequences that do not have a Uniprot ID, instead we retrieve them from the database rather
+    # than use them from the FASTA file.
+    if ($id =~ /^z/) {
+        print $ffh ">" . $id . "\n";
+        print $ffh $seq->{seq};
+        print $ffh "\n";
     }
+    
+    print $mfh $id . "\n";
+    print $mfh "\tDescription\t" . $seq->{description} . "\n"                               if $seq->{description};
+    print $mfh "\tSequence_Length\t" . $seq->{seq_length} . "\n"                            if exists $seq->{seq_length};
+    print $mfh "\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . $seq->{src} . "\n"     if exists $seq->{src};
+    print $mfh "\tOther_IDs\t" . join(",", @{ $seq->{other_ids} }) . "\n"                   if exists $seq->{other_ids};
+    print $mfh "\tQuery_IDs\t" . join(",", @{ $seq->{query_ids} }) . "\n";#                   if scalar @queryIds;
 }
 
 
