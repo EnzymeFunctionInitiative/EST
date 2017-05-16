@@ -22,7 +22,7 @@ my ($fasta, $annoOut, $metaFileIn, $configFile);
 $result = GetOptions(
     "fasta=s"               => \$fasta,
     "out=s"                 => \$annoOut,
-    "fasta-meta-file=s"     => \$metaFileIn,
+    "meta-file=s"           => \$metaFileIn,
     "config=s"              => \$configFile,
 );
 
@@ -52,7 +52,6 @@ foreach $accession (@accessions){
         "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
         "\n\tGDNA\t" . $row->{"GDNA"} . 
         "\n\tDescription\t" . $row->{"Description"} . 
-        "\n\tQuery_IDs\t" . #$row->{"Uniprot_ID"} .
         "\n\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . Biocluster::Config::FIELD_SEQ_SRC_VALUE_FAMILY .
         "\n\tSwissprot_Description\t" . $row->{"SwissProt_Description"} . 
         "\n\tOrganism\t" . $row->{"Organism"} . 

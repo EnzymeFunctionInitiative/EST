@@ -27,7 +27,7 @@ use Biocluster::Database;
 #
 #print "Configfile is \n > $configfile\n";
 
-my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $fastaFileOut, $fastaFileIn, $fastaMetaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile, $configFile);
+my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile, $configFile);
 my $result = GetOptions(
     "ipro=s"               => \$ipro,
     "pfam=s"               => \$pfam,
@@ -39,7 +39,7 @@ my $result = GetOptions(
     "accession-file=s"     => \$accessionFile,
     "out=s"                => \$fastaFileOut,
     "fasta-file=s"         => \$fastaFileIn,
-    "fasta-meta-file=s"    => \$fastaMetaFileOut,
+    "meta-file=s"          => \$metaFileOut,
     "use-fasta-headers"    => \$useFastaHeaders,
     "domain=s"             => \$domain,
     "fraction=i"           => \$fraction,
@@ -195,7 +195,7 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     # Returns the Uniprot IDs that were found in the file.  If there were sequences found that didn't map
     # to a Uniprot ID, they are written to the output FASTA file directly.  The sequences that corresponded
     # to a Uniprot ID are not written, they are retrieved from the sequences below.
-    @fastaUniprotIds = parseFastaHeaders($fastaFileIn, $fastaFileOut, $fastaMetaFileOut, $useFastaHeaders, $idMapper, $configFile);
+    @fastaUniprotIds = parseFastaHeaders($fastaFileIn, $fastaFileOut, $metaFileOut, $useFastaHeaders, $idMapper, $configFile);
     print "The uniprotIds that were found in the FASTA file:\n", "\t", join("\n\t", @fastaUniprotIds), "\n";
 }
 
@@ -203,8 +203,12 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
 # ADDING MANUAL ACCESSION IDS FROM FILE OR ARGUMENT
 #
 # Reverse map any IDs that aren't UniProt.
-my ($uniprotIds, $noMatches) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::AUTO, @manualAccessions)
-if $#manualAccessions >= 0;
+my $uniprotIds = [];
+my $noMatches = [];
+my $uniprotRevMap = {};
+if ($#manualAccessions >= 0) { 
+    ($uniprotIds, $noMatches, $uniprotRevMap) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::AUTO, @manualAccessions);
+}
 
 #print "There were ", scalar(@manualAccessions), " input ids, ", scalar(@$uniprotIds), " mapped ids, ", scalar(uniq(@$uniprotIds)), " unique mapped ids, and ", scalar(@$noMatches), " unmatched ids.\n";
 
@@ -218,22 +222,34 @@ if ($showNoMatches) {
 }
 
 
+my %inDb;
 # Lookup each manual accession ID to get the domain as well as verify that it exists.
 foreach $element (@$uniprotIds, @fastaUniprotIds) {
     $sql = "select accession,start,end from PFAM where accession = '$element'";
     $sth = $dbh->prepare("select accession,start,end from PFAM where accession = '$element'");
     $sth->execute;
     if ($row = $sth->fetch) {
-#        print "DUP ACCESSION ", $row->[0], "\n" if exists $accessionhash{$row->[0]};
         print NOMATCH "$element\tDUPLICATE\n" if exists $accessionhash{$row->[0]} and $showNoMatches;
         push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
+        $inDb{$element} = 1;
     } else {
         print NOMATCH "$element\tNOT_FOUND_DATABASE\n" if $showNoMatches;
     }
 }
-$sth->finish;
+
+$sth->finish if $sth;
 
 close NOMATCH if $showNoMatches;
+
+# Now write out the IDs that were included in the input file that mapped back to a Uniprot ID.
+if ($#manualAccessions >= 0) { 
+    open META, "> $metaFileOut";
+    foreach my $id (sort keys %inDb) {
+        print META "$id\n";
+        print META "\tQuery_IDs\t", join(",", uniq @{ $uniprotRevMap->{$id} }), "\n";
+    }
+    close META;
+}
 
 @accessions=keys %accessionhash;
 print "Initial " . scalar @accessions . " sequences after manual accessions\n";
@@ -425,8 +441,10 @@ sub parseFastaHeaders {
                     }
                     $ss->{query_id} = $primaryId->{other_id}; #$result->{primary_id}->{other_id};
                 }
-                $ss->{uniprot_ids} = [ grep { $_->{uniprot_id} ne $id } @{ $result->{uniprot_ids} } ];
-                $ss->{duplicates} = $result->{duplicates};
+                push(@{ $ss->{uniprot_ids} }, grep { $_->{uniprot_id} ne $id } @{ $result->{uniprot_ids} } );
+                push(@{ $ss->{duplicates} }, $result->{duplicates});
+                #$ss->{uniprot_ids} = [ grep { $_->{uniprot_id} ne $id } @{ $result->{uniprot_ids} } ];
+                #$ss->{duplicates} = $result->{duplicates};
                 
                 # Any other IDs (either Uniprot or non-Uniprot) that were found in the header(s) are saved
                 # to the metadata file here.
@@ -455,12 +473,12 @@ sub parseFastaHeaders {
                 $ss->{description} = $line;
 
                 $seqCount++;
-                $writeSeq = 1;
+                #$writeSeq = 1;
                 $headerLine = 1;
 
                 $seq{$id} = $ss;
                 #push(@{ $seq{$id} }, $ss);
-            } else {
+            } elsif ($line =~ /\S/) {
                 $writeSeq = 1;
             }
         }
@@ -525,6 +543,7 @@ sub writeSeqData {
         if ($upId->{uniprot_id} =~ /^z/) {
             print $ffh ">" . $upId->{uniprot_id} . "\n";
             print $ffh $seq->{seq};
+            print $ffh "\n";
         }
         
         my @queryIds = ();
@@ -535,7 +554,7 @@ sub writeSeqData {
         print $mfh "\tDescription\t" . $seq->{description} . "\n"                               if $seq->{description};
         print $mfh "\tSequence_Length\t" . $seq->{seq_length} . "\n"                            if exists $seq->{seq_length};
         print $mfh "\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . $seq->{src} . "\n"     if exists $seq->{src};
-        print $mfh "\tOther_IDs\t" . join(";", @{ $seq->{other_ids} }) . "\n"                   if exists $seq->{other_ids};
+        print $mfh "\tOther_IDs\t" . join(",", @{ $seq->{other_ids} }) . "\n"                   if exists $seq->{other_ids};
         print $mfh "\tQuery_IDs\t" . join(",", @queryIds) . "\n"                                if scalar @queryIds;
         print $mfh "\tNum_Seq_Merged\t" . $seq->{num_seq_merged} . "\n"                         if exists $seq->{num_seq_merged};
 

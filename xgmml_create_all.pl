@@ -72,8 +72,8 @@ if(-e $struct){
                      @lineary[1] ne "CAZY" and @lineary[1] ne "Query_IDs" and @lineary[1] ne "Other_IDs") {
                 $uprot{$id}{@lineary[1]}=@lineary[2];
             }else{
-                my @tmpline=split ",", @lineary[2];
-                push @{$uprot{$id}{@lineary[1]}}, @tmpline;
+                my @tmpline = grep /\S/, split(",", @lineary[2]);
+                $uprot{$id}{@lineary[1]} = \@tmpline;
             }
         }
     }

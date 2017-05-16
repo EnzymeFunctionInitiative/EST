@@ -231,16 +231,20 @@ unless (defined $incfrac) {
 
 
 
+my $userHeaderFile = "";
 
 # Error checking for user supplied dat and fa files
 my $noMatchFile = "";
 if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $ENV{PWD} . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
+    $userHeaderFile = dirname($accessionFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
     $accessionFile = "-accession-file $accessionFile";
 
     $noMatchFile = "$tmpdir/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME;
     $noMatchFile = $ENV{PWD} . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFile = "-no-match-file $noMatchFile";
+
+    $userHeaderFile = "-meta-file $userHeaderFile";
 } elsif (defined $accessionFile) {
     die "accession file $accessionFile does not exist\n";
 } else {
@@ -257,13 +261,12 @@ if (defined $accessionFile and -e $accessionFile) {
 ##    $userHeaderFile = "";
 #}
 
-my $userHeaderFile = "";
 if (defined $fastaFile and -e $fastaFile) {
     $fastaFile = $ENV{PWD}."/$fastaFile" unless ($fastaFile=~/^\// or $fastaFile=~/^~/);
     $userHeaderFile = dirname($fastaFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
     $fastaFile = "-fasta-file $fastaFile";
     $fastaFile .= " -use-fasta-headers" if defined $useFastaHeaders;
-    $userHeaderFile = "-fasta-meta-file $userHeaderFile";
+    $userHeaderFile = "-meta-file $userHeaderFile";
 } elsif (defined $fastaFile) {
     die "$fastaFile does not exist\n";
 } else {

@@ -52,14 +52,16 @@ sub reverseLookup {
 
     my @uniprotIds;
     my @noMatch;
+    my %uniprotRevMap;
 
     foreach my $id (@ids) {
         my $type = $typeHint;
         $id =~ s/^\s*(tr|sp|pdb)\|([^\s\|]+).*$/$2/;
         $type = check_id_type($id) if $typeHint eq Biocluster::IdMapping::Util::AUTO;
         if ($type eq Biocluster::IdMapping::Util::UNIPROT) {
-            $id =~ s/\.\d+$//;
-            push(@uniprotIds, $id);
+            (my $upId = $id) =~ s/\.\d+$//;
+            push(@uniprotIds, $upId);
+            push(@{ $uniprotRevMap{$upId} }, $id);
         } else {
             my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where foreign_id = '$id' and foreign_id_type = '$type'";
             #print $querySql, "   ";
@@ -67,6 +69,7 @@ sub reverseLookup {
             if (defined $row) {
                 #print "found\n";
                 push(@uniprotIds, $row->[0]);
+                push(@{ $uniprotRevMap{$row->[0]} }, $id);
             } else {
                 #print "nomatch\n";
                 push(@noMatch, $id);
@@ -76,7 +79,7 @@ sub reverseLookup {
 
     $dbh->disconnect();
     
-    return (\@uniprotIds, \@noMatch);
+    return (\@uniprotIds, \@noMatch, \%uniprotRevMap);
 }
 
 1;
