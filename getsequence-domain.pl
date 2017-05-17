@@ -109,7 +109,24 @@ if (defined $manualAccession and $manualAccession ne 0) {
 
 if (defined $accessionFile and -f $accessionFile) {
     print ":accessionFile $accessionFile:\n";
-    push(@manualAccessions, grep m/.+/, map { $_ =~ s/[\s\r\n]//g; split(",", $_) } read_file($accessionFile));
+    open ACCFILE, $accessionFile or die "Unable to open user accession file $accessionFile: $!";
+    
+    # Read the case where we have a mac file (CR \r only)
+    my $delim = $/;
+    $/ = undef;
+    my $line = <ACCFILE>;
+    $/ = $delim;
+    
+    my @lines = split /[\r\n\s]+/, $line;
+#    my $c = 1;
+    foreach my $line (grep m/.+/, map { split(",", $_) } @lines) {
+#        if ($fraction == 1 or $c % $fraction == 0) {
+            push(@manualAccessions, $line);
+#        }
+#        $c++;
+    }
+
+    print "There were ", scalar @manualAccessions, " manual accession IDs taken from ", scalar @lines, " lines in the accession file\n";
 }
 
 
@@ -134,56 +151,28 @@ my $dbh = $db->getHandle();
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO FAMILY(S)
 #
-foreach $element (@ipros) {
-    $sth = $dbh->prepare("select accession,start,end from INTERPRO where id = '$element'");
-    $sth->execute;
-    while($row = $sth->fetch) {
-        push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
-    }
-}
-@accessions=keys %accessionhash;
-print "Initial " . scalar @accessions . " sequences after INTERPRO\n";
+getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, @ipros);
 
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM PFAM FAMILY(S)
 #
-foreach $element (@pfams) {
-    $sth = $dbh->prepare("select accession,start,end from PFAM where id = '$element'");
-    $sth->execute;
-    while($row = $sth->fetch) {
-        push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
-    }
-}
-@accessions=keys %accessionhash;
-print "Initial " . scalar @accessions . " sequences after PFAM\n";
+getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, @pfams);
 
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM GENE3D FAMILY(S)
 #
-foreach $element (@gene3ds) {
-    $sth = $dbh->prepare("select accession,start,end from GENE3D where id = '$element'");
-    $sth->execute;
-    while($row = $sth->fetch) {
-        push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
-    }
-}
-@accessions=keys %accessionhash;
-print "Initial " . scalar @accessions . " sequences after G3D\n";
+getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, @gene3ds);
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM SSF FAMILY(S)
 #
-foreach $element (@ssfs) {
-    $sth = $dbh->prepare("select accession,start,end from SSF where id = '$element'");
-    $sth->execute;
-    while($row = $sth->fetch) {
-        push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
-    }
-}
-@accessions=keys %accessionhash;
-print "Initial " . scalar @accessions . " sequences after SSF\n";
+getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, @ssfs);
+
+
+# Save the accessions that are specified through a family.
+my %inFamilyIds = map { ($_, 1) } keys %accessionhash;
 
 
 #######################################################################################################################
@@ -195,22 +184,38 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     # Returns the Uniprot IDs that were found in the file.  If there were sequences found that didn't map
     # to a Uniprot ID, they are written to the output FASTA file directly.  The sequences that corresponded
     # to a Uniprot ID are not written, they are retrieved from the sequences below.
-    @fastaUniprotIds = parseFastaHeaders($fastaFileIn, $fastaFileOut, $metaFileOut, $useFastaHeaders, $idMapper, $configFile);
-    print "The uniprotIds that were found in the FASTA file:\n", "\t", join("\n\t", @fastaUniprotIds), "\n";
+    # The '1' parameter tells the function not to apply any fraction computation.
+    @fastaUniprotIds = parseFastaHeaders($fastaFileIn, $fastaFileOut, $metaFileOut, $useFastaHeaders, $idMapper, $configFile, 1);
+    print "The uniprot ids that were found in the FASTA file:\n", "\t", join("\n\t", @fastaUniprotIds), "\n";
 }
 
 #######################################################################################################################
 # ADDING MANUAL ACCESSION IDS FROM FILE OR ARGUMENT
 #
 # Reverse map any IDs that aren't UniProt.
-my $uniprotIds = [];
-my $noMatches = [];
 my $uniprotRevMap = {};
+my @uniprotIds;
+my $noMatches;
 if ($#manualAccessions >= 0) { 
-    ($uniprotIds, $noMatches, $uniprotRevMap) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::AUTO, @manualAccessions);
+    my $upIds = [];
+    ($upIds, $noMatches, $uniprotRevMap) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::AUTO, @manualAccessions);
+    @uniprotIds = @$upIds;
+    print "There were ", scalar @uniprotIds, " matches and ", scalar @$noMatches, " no matches\n";
+    print "The uniprot ids that were found in the accession file:\n", "\t", join("\n\t", @uniprotIds), "\n";
+
+    # This code could be used to apply a fraction to the user-supplied IDs, but that doesn't make a lot of sense, does it?
+    #my $c = 1;
+    #my %dups;
+    #foreach my $id (@$upIds) {
+    #    next if exists $dups{$id};
+    #    $dups{$id} = 1;
+    #    if ($fraction == 1 or $c % $fraction == 0) {
+    #        push(@uniprotIds, $id);
+    #    }
+    #    $c++;
+    #}
 }
 
-#print "There were ", scalar(@manualAccessions), " input ids, ", scalar(@$uniprotIds), " mapped ids, ", scalar(uniq(@$uniprotIds)), " unique mapped ids, and ", scalar(@$noMatches), " unmatched ids.\n";
 
 my $showNoMatches = $#manualAccessions >= 0 ? 1 : 0 and defined $noMatchFile;
 # Write out the no matches to a file.
@@ -222,39 +227,46 @@ if ($showNoMatches) {
 }
 
 
-my %inDb;
+#######################################################################################################################
+# VERIFY THAT THE ACCESSIONS ARE IN THE DATABASE AND RETRIEVE THE DOMAIN
+#
+my %inUserIds;
 # Lookup each manual accession ID to get the domain as well as verify that it exists.
-foreach $element (@$uniprotIds, @fastaUniprotIds) {
+foreach $element (@uniprotIds, @fastaUniprotIds) {
     $sql = "select accession,start,end from PFAM where accession = '$element'";
     $sth = $dbh->prepare("select accession,start,end from PFAM where accession = '$element'");
     $sth->execute;
     if ($row = $sth->fetch) {
-        print NOMATCH "$element\tDUPLICATE\n" if exists $accessionhash{$row->[0]} and $showNoMatches;
+        print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$row->[0]} and $showNoMatches;
         push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
-        $inDb{$element} = 1;
+        $inUserIds{$element} = 1;
     } else {
         print NOMATCH "$element\tNOT_FOUND_DATABASE\n" if $showNoMatches;
     }
 }
 
 $sth->finish if $sth;
+$dbh->disconnect();
 
-close NOMATCH if $showNoMatches;
 
-# Now write out the IDs that were included in the input file that mapped back to a Uniprot ID.
-if ($#manualAccessions >= 0) { 
-    open META, "> $metaFileOut";
-    foreach my $id (sort keys %inDb) {
-        print META "$id\n";
-        print META "\tQuery_IDs\t", join(",", uniq @{ $uniprotRevMap->{$id} }), "\n";
-    }
-    close META;
-}
+
+# Now write out the IDs that were included in the input manual user accession file that mapped back to a Uniprot ID.
+#if ($#manualAccessions >= 0) { 
+#    open META, "> $metaFileOut";
+#    foreach my $id (sort keys %inUserIds) {
+#        print META "$id\n";
+#        print META "\tSequence_Source\t";
+#        if (exists $inUserIds{$id} and exists $inFamilyIds{$id}) {
+#            print META "FAMILY+USER";
+#        } else {
+#            print META "USER";
+#        }
+#    }
+#    close META;
+#}
 
 @accessions=keys %accessionhash;
 print "Initial " . scalar @accessions . " sequences after manual accessions\n";
-
-$dbh->disconnect();
 
 
 #one more unique in case of accessions being added in multiple databases
@@ -270,6 +282,7 @@ if (scalar @accessions>$maxsequence and $maxsequence != 0) {
     close ERROR;
     die "Number of sequences ".scalar @accessions." exceeds maximum specified $maxsequence";
 }
+
 print "Print out accessions\n";
 open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
 foreach $accession (keys %accessionhash) {
@@ -287,24 +300,8 @@ foreach $accession (keys %accessionhash) {
 close GREP;
 
 
-print "there are ".scalar @accessions." accessions before removing fractions\n";
-
-if ($fraction>1) {
-    print "removing all but one of $fraction accessions\n";
-    my $modcount=1;
-    my @modaccessions = ();
-    foreach my $accession (@accessions) {
-        if (($modcount%$fraction) == 0) {
-            #print "keeping $modcount\n";
-            push @modaccessions, $accession;
-        }
-        $modcount++;
-    }
-    @accessions = @modaccessions;
-    print "There are ".scalar @accessions." after keeping one of $fraction\n";
-}
-print "Final accession count ".scalar @accessions."\n";
-print "Grab Sequences\n";
+print "Final accession count " . scalar @accessions . "\n";
+print "Retrieving Sequences\n";
 
 use Capture::Tiny ':all';
 my @err;
@@ -315,6 +312,7 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     open OUT, ">$fastaFileOut" or die "Cannot write to output fasta $fastaFileOut\n";
 }
 
+my @origAccessions = @accessions;
 while(scalar @accessions) {
     @batch=splice(@accessions, 0, $perpass);
     $batchline=join ',', @batch;
@@ -347,9 +345,35 @@ while(scalar @accessions) {
             die "Domain must be either on or off\n";
         }
     }
-
 }
 close OUT;
+
+
+if ($#fastaUniprotIds >= 0) {
+    open META, ">>$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+} else {
+    open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+}
+
+
+foreach my $acc (@origAccessions) {
+    print META "$acc\n";
+    if (exists $uniprotRevMap->{$acc}) {
+        print META "\tQuery_IDs\t", join(",", uniq @{ $uniprotRevMap->{$acc} }), "\n";
+    }
+    print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
+    if (exists $inUserIds{$acc} and exists $inFamilyIds{$acc}) {
+        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_BOTH;
+    } elsif (exists $inUserIds{$acc}) {
+        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+    } else {
+        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FAMILY;
+    }
+    print META "\n";
+}
+
+close META;
+
 
 foreach my $err (@err) {
     my @lines = split(m/[\r\n]+/, $err);
@@ -386,7 +410,7 @@ close NOMATCH if $showNoMatches;
 
 
 sub parseFastaHeaders {
-    my ($fastaFileIn, $fastaFileOut, $metadataFile, $useFastaHeaders, $idMapper, $configFile) = @_;
+    my ($fastaFileIn, $fastaFileOut, $metadataFile, $useFastaHeaders, $idMapper, $configFile, $fraction) = @_;
 
     my $parser = new Biocluster::Fasta::Headers(config_file_path => $configFile);
 
@@ -420,7 +444,6 @@ sub parseFastaHeaders {
                     # We discard the sequences for known Uniprot IDs since we will look them up at a later point.
                     $id = "discard_me";
                     foreach my $res (@{ $result->{uniprot_ids} }) {
-                        #print ">>> ", $res->{uniprot_id}, "     ", $res->{other_id}, "\n";
                         push(@{ $seq{$res->{uniprot_id}}->{query_ids} }, $res->{other_id});
                         foreach my $dupId (@{ $result->{duplicates}->{$res->{uniprot_id}} }) {
                             push(@{ $seq{$res->{uniprot_id}}->{query_ids} }, $dupId);
@@ -482,11 +505,15 @@ sub parseFastaHeaders {
     $seq{$id}->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
 
     my @seqToWrite;
+    my $c = 1;
     foreach my $id (sort sortFn keys %seq) {
-        # Since multiple Uniprot IDs may map to the same sequence in the FASTA file, we need to write those
-        # as sepearate sequences which is what "Expanding" means.
-        push(@seqToWrite, $id);
-        writeSeqData($id, $seq{$id}, \*FASTAOUT, \*META);
+        if ($fraction == 1 or $c % $fraction == 0) {
+            # Since multiple Uniprot IDs may map to the same sequence in the FASTA file, we need to write those
+            # as sepearate sequences which is what "Expanding" means.
+            push(@seqToWrite, $id);
+            writeSeqData($id, $seq{$id}, \*FASTAOUT, \*META);
+        }
+        $c++;
     }
 
     close FASTAOUT;
@@ -534,5 +561,27 @@ sub makeSequenceId {
     $id =~ tr/ /z/;
     return $id;
 }
+
+
+sub getDomainFromDb {
+    my ($dbh, $table, $accessionHash, $fraction, @elements) = @_;
+    my $c = 1;
+    print "Accessions found in $table:\n";
+    foreach my $element (@elements) {
+        my $sth = $dbh->prepare("select accession,start,end from $table where id = '$element'");
+        $sth->execute;
+        while (my $row = $sth->fetch) {
+            (my $uniprotId = $row->[0]) =~ s/\-\d+$//;
+            if ($fraction == 1 or $c % $fraction == 0) {
+                push @{$accessionHash->{$uniprotId}}, {'start' => $row->[1], 'end' => $row->[2]};
+            }
+            $c++;
+        }
+        $sth->finish;
+    }
+    my @accessions = keys %$accessionHash;
+    print "Initial " . scalar @accessions . " sequences after $table\n";
+}
+
 
 

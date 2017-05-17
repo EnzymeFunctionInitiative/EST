@@ -95,13 +95,7 @@ if(-e $struct){
                 @lineary[2]='None';
             }
             push(@metas, $lineary[1]) if not grep { $_ eq $lineary[1] } @metas;
-            if ($lineary[1] eq Biocluster::Config::FIELD_SEQ_SRC_KEY) {
-                if ($uprot{$id}{$lineary[1]} and $lineary[2] and $lineary[2] ne $uprot{$id}{$lineary[1]}) {
-                    $uprot{$id}{$lineary[1]} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_BOTH;
-                } else {
-                    $uprot{$id}{$lineary[1]} = $lineary[2];
-                }
-            } elsif (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and
+            if (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and
                      @lineary[1] ne "PFAM" and @lineary[1] ne "GO" and @lineary[1] ne "HMP_Body_Site" and 
                      @lineary[1] ne "CAZY" and @lineary[1] ne "Query_IDs" and @lineary[1] ne "Other_IDs") {
                 $uprot{$id}{@lineary[1]}=@lineary[2]; 

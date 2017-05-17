@@ -93,64 +93,60 @@ my $efidbmod = $efiestmod;
 my $sortdir = '/state/partition1';
 
 #defaults and error checking for choosing of blast program
-
 if (defined $blast and $blast ne "blast" and $blast ne "blast+" and $blast ne "diamond" and $blast ne 'diamondsensitive') {
     die "blast program value of $blast is not valid, must be blast, blast+, diamondsensitive, or diamond\n";
-} else {
+} elsif (not defined $blast) {
     $blast = "blast";
 }
 
-print "Blast is $blast\n";
-
 # Defaults and error checking for splitting sequences into domains
-
 if (defined $domain and $domain ne "off" and $domain ne "on") {
     die "domain value of $domain is not valid, must be either on or off\n";
-} else {
+} elsif (not defined $domain) {
     $domain = "off";
 }
 
 # Defaults for fraction of sequences to fetch
-
 if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
     die "if fraction is defined, it must be greater than zero\n";
-} else {
+} elsif (not defined $fraction) {
     $fraction=1;
 }
+
 
 # Defaults and error checking for multiplexing
 if ($multiplexing eq "on") {
     if (defined $lengthdif and $lengthdif !~ /\d*\.\d+/) {
         die "lengthdif must be in a format like 0.9\n";
-    } else {
+    } elsif (not defined $lengthdif) {
         $lengthdif=1;
     }
     if (defined $sim and $sim !~ /\d*\.\d+/) {
         die "sim must be in a format like 0.9\n";
-    } else {
+    } elsif (not defined $sim) {
         $sim=1;
     }
 } elsif ($multiplexing eq "off") {
     if (defined $lengthdif and $lengthdif !~ /\d*\.\d+/) {
         die "lengthdif must be in a format like 0.9\n";
-    } else {
+    } elsif (not defined $lengthdif) {
         $lengthdif=1;
     }
     if (defined $sim and $sim !~ /\d*\.\d+/) {
         die "sim must be in a format like 0.9\n";
-    } else {
+    } elsif (not defined $sim) {
         $sim=1;
     } 
 } elsif (!(defined $multiplexing)) {
     $multiplexing = "on";
     if (defined $lengthdif and $lengthdif !~ /\d*\.\d+/) {
         die "lengthdif must be in a format like 0.9\n";
-    } else {
+    } elsif (not defined $lengthdif) {
         $lengthdif=1;
     }
     if (defined $sim and $sim !~ /\d*\.\d+/) {
         die "sim must be in a format like 0.9\n";
-    } else {
+    } elsif (not defined $sim) {
         $sim=1;
     }
 } else {
@@ -229,6 +225,30 @@ unless (defined $incfrac) {
     $incfrac=0.99;
 }
 
+print "Blast is $blast\n";
+print "domain is $domain\n";
+print "fraction is $fraction\n";
+print "multiplexing is $multiplexing\n";
+print "lengthdif is $lengthdif\n";
+print "sim is $sim\n";
+print "fasta is $fastaFile\n";
+print "ipro is $ipro\n";
+print "pfam is $pfam\n";
+print "taxid is $taxid\n";
+print "ssf is $ssf\n";
+print "gene3d is $gene3d\n";
+print "accession-id is $accessionId\n";
+print "useraccession is $accessionFile\n";
+print "np is $np\n";
+print "queue is $queue\n";
+print "memqueue is $memqueue\n";
+print "tmpdir is $tmpdir\n";
+print "evalue is $evalue\n";
+print "config is $configFile\n";
+print "maxlen is $maxlen\n";
+print "minlen is $minlen\n";
+print "maxsequence is $maxsequence\n";
+print "incfrac is $incfrac\n";
 
 
 my $userHeaderFile = "";

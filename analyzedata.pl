@@ -47,6 +47,10 @@ $minval = 0             unless defined $minval;
 $title = "Untitled"     unless defined $title;
 $queue = "efi"          unless defined $queue;
 
+(my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
+$safeTitle .= "_";
+#my $safeTitle = "";
+
 if (defined $maxfull and $maxfull !~ /^\d+$/) {
     die "maxfull must be an integer\n";
 } else {
@@ -68,7 +72,7 @@ if (not defined $config or not -f $config) {
 
 #quit if the xgmml files have been created in this directory
 #testing with fullxgmml because I am lazy
-if (-s "$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml") {
+if (-s "$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}full.xgmml") {
     print "This run appears to have already been completed, exiting\n";
     exit;
 }
@@ -116,7 +120,9 @@ $B->dependency(0, @filterjobline[0])
     if not $priorFilter;
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiestmod");
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/full.xgmml -title=\"$title\" -maxfull $maxfull -dbver $dbver");
+my $outFile = "$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}full.xgmml";
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver");
+$B->addAction("zip -j $outFile.zip $outFile");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh");
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
@@ -137,7 +143,9 @@ $B->addAction("module load $efiestmod");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)");
 $B->addAction("cd-hit -i $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/repnode-\$CDHIT.xgmml -title=\"$title\" -dbver $dbver");
+$outFile = "$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}repnode-\$CDHIT.xgmml";
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $outFile -title=\"$title\" -dbver $dbver");
+$B->addAction("zip -j $outFile.zip $outFile");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined

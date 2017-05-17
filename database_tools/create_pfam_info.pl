@@ -1,4 +1,4 @@
-#!/usr/bin/env perl -w
+#!/usr/bin/env perl
 # Creates Pfam -> (short name, long name) tab file for import into database.
 # Usage:
 #    create_pfam_databases.pl [--short pfam_short_name.txt --long pfam_list.txt] | [--combined combined.tsv] --out output.tab

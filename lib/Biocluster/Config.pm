@@ -42,8 +42,8 @@ use constant NO_ACCESSION_MATCHES_FILENAME => "no_accession_matches.txt";
 use constant FASTA_ID_FILENAME => "userfasta.ids.txt";
 use constant FASTA_META_FILENAME => "fasta.metadata";
 use constant FIELD_SEQ_SRC_KEY => "Sequence_Source";
-use constant FIELD_SEQ_SRC_VALUE_BOTH => "BOTH";
-use constant FIELD_SEQ_SRC_VALUE_FASTA => "FASTA";
+use constant FIELD_SEQ_SRC_VALUE_BOTH => "FAMILY+USER";
+use constant FIELD_SEQ_SRC_VALUE_FASTA => "USER";
 use constant FIELD_SEQ_SRC_VALUE_FAMILY => "FAMILY";
 
 
