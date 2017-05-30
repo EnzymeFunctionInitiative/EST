@@ -237,8 +237,13 @@ foreach $element (@uniprotIds, @fastaUniprotIds) {
     $sth = $dbh->prepare("select accession,start,end from PFAM where accession = '$element'");
     $sth->execute;
     if ($row = $sth->fetch) {
-        print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$row->[0]} and $showNoMatches;
+        print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$element} and $showNoMatches;
         push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
+        $inUserIds{$element} = 1;
+    } elsif ($element !~ m/^z/) {
+        # No PFAM found so we use the entire sequence
+        print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$element} and $showNoMatches;
+        $accessionhash{$element} = [];
         $inUserIds{$element} = 1;
     } else {
         print NOMATCH "$element\tNOT_FOUND_DATABASE\n" if $showNoMatches;
@@ -335,9 +340,13 @@ while(scalar @accessions) {
         } elsif ($domain eq "on" and $accession ne "") {
             $sequence =~ s/\s+//g;
             my @domains = @{$accessionhash{$accession}};
-            foreach my $piece (@domains) {
-                my $thissequence=join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
-                print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n\n";
+            if (scalar @domains) {
+                foreach my $piece (@domains) {
+                    my $thissequence=join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
+                    print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n\n";
+                }
+            } else {
+                print OUT ">$accession$sequence\n\n";
             }
         } elsif ($accession eq "") {
             #do nothing
@@ -349,7 +358,7 @@ while(scalar @accessions) {
 close OUT;
 
 
-if ($#fastaUniprotIds >= 0) {
+if ($useFastaHeaders) {
     open META, ">>$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
 } else {
     open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
@@ -480,16 +489,6 @@ sub parseFastaHeaders {
             }
         }
 
-        if ($writeSeq) {
-            my $ss = $seq{$id};
-            if (not exists $ss->{seq}) {
-                $ss->{seq} = $line . "\n";
-            } else {
-                $ss->{seq} .= $line . "\n";
-            }
-            $seqLength += length($line);
-        }
-
         if ($headerLine) {
             if ($lastId) {
                 my $ss = $seq{$lastId};
@@ -499,10 +498,22 @@ sub parseFastaHeaders {
             $seqLength = 0;
             $lastId = $id;
         }
+
+        if ($writeSeq) {
+            my $ss = $seq{$id};
+            if (not exists $ss->{seq}) {
+                $ss->{seq} = $line . "\n";
+            } else {
+                $ss->{seq} .= $line . "\n";
+            }
+            $seqLength += length($line);
+        }
     }
 
-    $seq{$id}->{seq_length} = $seqLength    if $id =~ /^z/;
-    $seq{$id}->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+    if ($id ne "discard_me") {
+        $seq{$id}->{seq_length} = $seqLength    if $id =~ /^z/;
+        $seq{$id}->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+    }
 
     my @seqToWrite;
     my $c = 1;

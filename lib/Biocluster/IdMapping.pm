@@ -56,7 +56,7 @@ sub reverseLookup {
 
     foreach my $id (@ids) {
         my $type = $typeHint;
-        $id =~ s/^\s*(tr|sp|pdb)\|([^\s\|]+).*$/$2/;
+        $id =~ s/^\s*([^\|]*\|)?([^\s\|]+).*$/$2/;
         $type = check_id_type($id) if $typeHint eq Biocluster::IdMapping::Util::AUTO;
         if ($type eq Biocluster::IdMapping::Util::UNIPROT) {
             (my $upId = $id) =~ s/\.\d+$//;

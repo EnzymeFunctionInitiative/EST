@@ -48,11 +48,13 @@ sub get_fasta_header_ids {
     chomp $line;
     my @ids;
 
-    my @headers = split(m/>/, $line);
+    my @headers = split(m/[>\|]/, $line);
     foreach my $id (@headers) {
         next if $id =~ m/^\s*$/;
-        $id =~ s/^\s*(tr|sp|pdb)\|([^\s\|]+).*$/$2/;
-        $id =~ s/^(\S+)\s*.*$/$1/;
+        #$id =~ s/^\s*([^\|]+\|)?([^\s\|]+).*$/$2/;
+        #$id =~ s/^\s*(tr|sp)\|([^\s\|]+).*$/$2/;
+        $id =~ s/^\s*(\S+)\s*.*$/$1/;
+        next if length $id < 5;
         push(@ids, $id); # if (check_id_type($id) ne UNKNOWN);
     }
 
@@ -77,14 +79,17 @@ sub parse_line_for_headers {
 
     my $dbh = $self->{db_obj}->getHandle();
 
+    # This flag treats the line as an option C style format where the ID format is unknown.
+    my $saveAsUnknownHeader = 0;
+
     # This checks the user-fasta Option C case.
     if ($line =~ m/^>z/) {
-        ($self->{primary_id} = $line) =~ s/^>//;
-        push(@{ $self->{cur_ids} }, $self->{primary_id});
+        $saveAsUnknownHeader = 1;
 
     # Handle multiple headers on a single line.
     } elsif ($line =~ m/>/) {
         $self->{raw_headers} .= $line;
+        $saveAsUnknownHeader = 1;
         # Iterate over each ID in the header line to check if we know anything about it.
         foreach my $id (get_fasta_header_ids($line)) {
             # Check the ID type and if it's unknown, we add it to the ID list and move on.
@@ -92,6 +97,8 @@ sub parse_line_for_headers {
             if ($idType eq Biocluster::IdMapping::Util::UNKNOWN) {
                 next;
             }
+
+            $saveAsUnknownHeader = 0; # We found a valid header so don't treat this line as an unknown format (Option C)
 
             # Check if the ID is in the idmapping database
             my $upId = $id;
@@ -106,18 +113,16 @@ sub parse_line_for_headers {
 
             # Check if we known anything about the accession ID by querying the database.
             if ($idType eq Biocluster::IdMapping::Util::UNIPROT) {
-                my $sql = "select accession from PFAM where accession = '$upId'";
+                my $sql = "select accession from annotations where accession = '$upId'";
                 my $sth = $dbh->prepare($sql);
                 $sth->execute();
 
                 # We need to have a primary ID so we set that here if we haven't yet.
                 if ($sth->fetch) {
                     if (not grep { $_->{uniprot_id} eq $upId } @{ $self->{uniprot_ids} }) {
-#                        print "NEW $upId/$id\n";
                         push(@{ $self->{uniprot_ids} }, { uniprot_id => $upId, other_id => $id });
                         $self->{duplicates}->{$upId} = [];
                     } elsif (not grep { $_->{other_id} eq $id } @{ $self->{uniprot_ids} }) {
-#                        print "DUP $upId/$id\n";
                         push(@{ $self->{duplicates}->{$upId} }, $id) if not grep { $_ eq $id } @{ $self->{duplicates}->{$upId} };
                     }
                 } else {
@@ -142,6 +147,11 @@ sub parse_line_for_headers {
         } else {
             $result->{state} = SEQUENCE;
         }
+    }
+
+    if ($saveAsUnknownHeader) {
+        ($self->{primary_id} = $line) =~ s/^>//;
+        push(@{ $self->{cur_ids} }, $self->{primary_id});
     }
 
     $dbh->disconnect();
