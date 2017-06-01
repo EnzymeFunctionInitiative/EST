@@ -30,8 +30,16 @@ sub new {
     $self->reset();
     $self->{id_mapper} = new Biocluster::IdMapping(config_file_path => $args{config_file_path});
     $self->{db_obj} = new Biocluster::Database(%args);
+    $self->{dbh} = $self->{db_obj}->getHandle();
 
     return $self;
+}
+
+
+sub finish {
+    my ($self) = @_;
+
+    $self->{dbh}->disconnect();
 }
 
 
@@ -77,8 +85,6 @@ sub parse_line_for_headers {
 
     my $result = { state => HEADER, ids => [], primary_id => undef };
 
-    my $dbh = $self->{db_obj}->getHandle();
-
     # This flag treats the line as an option C style format where the ID format is unknown.
     my $saveAsUnknownHeader = 0;
 
@@ -114,7 +120,7 @@ sub parse_line_for_headers {
             # Check if we known anything about the accession ID by querying the database.
             if ($idType eq Biocluster::IdMapping::Util::UNIPROT) {
                 my $sql = "select accession from annotations where accession = '$upId'";
-                my $sth = $dbh->prepare($sql);
+                my $sth = $self->{dbh}->prepare($sql);
                 $sth->execute();
 
                 # We need to have a primary ID so we set that here if we haven't yet.
@@ -153,8 +159,6 @@ sub parse_line_for_headers {
         ($self->{primary_id} = $line) =~ s/^>//;
         push(@{ $self->{cur_ids} }, $self->{primary_id});
     }
-
-    $dbh->disconnect();
 
     return $result;
 }

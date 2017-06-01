@@ -242,7 +242,6 @@ foreach $element (@uniprotIds, @fastaUniprotIds) {
         $inUserIds{$element} = 1;
     } elsif ($element !~ m/^z/) {
         # No PFAM found so we use the entire sequence
-        print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$element} and $showNoMatches;
         $accessionhash{$element} = [];
         $inUserIds{$element} = 1;
     } else {
@@ -388,7 +387,7 @@ foreach my $err (@err) {
     my @lines = split(m/[\r\n]+/, $err);
     foreach my $line (@lines) {
         if ($line =~ s/^\[fastacmd\]\s+ERROR:\s+Entry\s+"([^"]+)"\s+not\s+found\s*$/$1/) {
-            print NOMATCH "$line\tFASTACMD\n" if $showNoMatches;
+            print NOMATCH "$line\tNOT_FOUND_DATABASE\n" if $showNoMatches;
         } else {
             print STDERR $line, "\n";
         }
@@ -530,6 +529,8 @@ sub parseFastaHeaders {
     close FASTAOUT;
     close META;
     close INFASTA;
+
+    $parser->finish();
 
     return sort sortFn grep !/^z/, @seqToWrite;
 }

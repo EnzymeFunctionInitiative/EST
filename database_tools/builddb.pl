@@ -36,6 +36,7 @@ my $configFile;
 my $sql;
 my $batchMode;
 my $noSubmit;
+my $dbName;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "no-download"   => \$noDownload,
@@ -49,6 +50,7 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "sql=s"         => \$sql,           # only output the SQL commands for importing data. no other args are required to use this option.
                         "no-prompt"     => \$batchMode,     # run without the GOLD version prompt
                         "no-submit"     => \$noSubmit,      # create the job scripts but don't submit them
+                        "db-name=s"     => \$dbName,        # the name of the database
                        );
 
 die "Working directory must be specified" if not $WorkingDir;
@@ -95,6 +97,11 @@ if (defined $sql and length $sql) {
 
 if (not defined $queue or length $queue == 0) {
     print "The --queue parameter is required.\n";
+    exit(1);
+}
+
+if (not $dbName) {
+    print "The -db-name parameter is required.\n";
     exit(1);
 }
 
@@ -154,7 +161,7 @@ my $enaJobId = submitEnaJob($S->getBuilder(), $ffJobId);
 
 # Create and import the data into the database
 logprint "\n\n\n#WRITING SQL SCRIPT FOR IMPORTING DATA INTO DATABASE\n";
-writeSqlCommands();
+writeSqlCommands($dbName);
 
 logprint "\n\n\n#FINISHED AT " . scalar localtime() . "\n";
 
@@ -193,7 +200,7 @@ close LOG;
 
 
 sub writeSqlCommands {
-    my ($outFile) = @_;
+    my ($outFile, $dbName) = @_;
 
     my $batchFile = "";
     if (not defined $outFile) {
@@ -204,7 +211,7 @@ sub writeSqlCommands {
     open OUT, "> $outFile" or die "Unable to open '$outFile' to save SQL commands: $!";
 
     my (undef, undef, undef, $mday, $mon, $year) = localtime(time);
-    my $dbName = "efi_" . sprintf("%d%02d%02d", $year + 1900, $mon + 1, $mday);
+    #my $dbName = "efi_" . sprintf("%d%02d%02d", $year + 1900, $mon + 1, $mday);
 
     my $sql = <<SQL;
 create database if not exists $dbName;
