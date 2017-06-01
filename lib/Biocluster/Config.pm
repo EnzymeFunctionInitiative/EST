@@ -92,8 +92,8 @@ sub parseConfig {
     $object->{db}->{host} = $cfg->val(DATABASE_SECTION, DATABASE_HOST, "localhost");
     $object->{db}->{port} = $cfg->val(DATABASE_SECTION, DATABASE_PORT, "3306");
 
-    if (exists $ENV{ENVIRONMENT_DB}) {
-        $object->{db}->{name} = $ENV{ENVIRONMENT_DB};
+    if (exists $ENV{&ENVIRONMENT_DB}) {
+        $object->{db}->{name} = $ENV{&ENVIRONMENT_DB};
     } else {
         $object->{db}->{name} = $cfg->val(DATABASE_SECTION, DATABASE_NAME);
     }
