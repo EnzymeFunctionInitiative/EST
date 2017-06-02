@@ -357,11 +357,7 @@ while(scalar @accessions) {
 close OUT;
 
 
-if ($useFastaHeaders) {
-    open META, ">>$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
-} else {
-    open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
-}
+open META, ">>$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
 
 
 foreach my $acc (@origAccessions) {
@@ -489,9 +485,9 @@ sub parseFastaHeaders {
         }
 
         if ($headerLine) {
-            if ($lastId) {
+            if ($lastId and $lastId =~ /^z/) {
                 my $ss = $seq{$lastId};
-                $ss->{seq_length} = $seqLength    if $lastId =~ /^z/;
+                $ss->{seq_length} = $seqLength;
                 $ss->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
             }
             $seqLength = 0;
@@ -509,8 +505,8 @@ sub parseFastaHeaders {
         }
     }
 
-    if ($id ne "discard_me") {
-        $seq{$id}->{seq_length} = $seqLength    if $id =~ /^z/;
+    if ($id =~ /^z/) {
+        $seq{$id}->{seq_length} = $seqLength;
         $seq{$id}->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
     }
 
