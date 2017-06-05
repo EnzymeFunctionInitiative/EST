@@ -179,13 +179,14 @@ my %inFamilyIds = map { ($_, 1) } keys %accessionhash;
 # PARSE FASTA FILE FOR HEADER IDS (IF ANY)
 #
 my @fastaUniprotIds;
+my $headerData = {};
 if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     $useFastaHeaders = defined $useFastaHeaders ? 1 : 0;
     # Returns the Uniprot IDs that were found in the file.  If there were sequences found that didn't map
     # to a Uniprot ID, they are written to the output FASTA file directly.  The sequences that corresponded
     # to a Uniprot ID are not written, they are retrieved from the sequences below.
     # The '1' parameter tells the function not to apply any fraction computation.
-    @fastaUniprotIds = parseFastaHeaders($fastaFileIn, $fastaFileOut, $metaFileOut, $useFastaHeaders, $idMapper, $configFile, 1);
+    ($headerData, @fastaUniprotIds) = parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $configFile, 1);
     print "The uniprot ids that were found in the FASTA file:\n", "\t", join("\n\t", @fastaUniprotIds), "\n";
 }
 
@@ -202,18 +203,6 @@ if ($#manualAccessions >= 0) {
     @uniprotIds = @$upIds;
     print "There were ", scalar @uniprotIds, " matches and ", scalar @$noMatches, " no matches\n";
     print "The uniprot ids that were found in the accession file:\n", "\t", join("\n\t", @uniprotIds), "\n";
-
-    # This code could be used to apply a fraction to the user-supplied IDs, but that doesn't make a lot of sense, does it?
-    #my $c = 1;
-    #my %dups;
-    #foreach my $id (@$upIds) {
-    #    next if exists $dups{$id};
-    #    $dups{$id} = 1;
-    #    if ($fraction == 1 or $c % $fraction == 0) {
-    #        push(@uniprotIds, $id);
-    #    }
-    #    $c++;
-    #}
 }
 
 
@@ -237,7 +226,7 @@ foreach $element (@uniprotIds, @fastaUniprotIds) {
     $sth = $dbh->prepare("select accession,start,end from PFAM where accession = '$element'");
     $sth->execute;
     if ($row = $sth->fetch) {
-        print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$element} and $showNoMatches;
+        #print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$element} and $showNoMatches;
         push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
         $inUserIds{$element} = 1;
     } elsif ($element !~ m/^z/) {
@@ -245,6 +234,7 @@ foreach $element (@uniprotIds, @fastaUniprotIds) {
         $accessionhash{$element} = [];
         $inUserIds{$element} = 1;
     } else {
+        print STDERR "$element\n";
         print NOMATCH "$element\tNOT_FOUND_DATABASE\n" if $showNoMatches;
     }
 }
@@ -252,22 +242,6 @@ foreach $element (@uniprotIds, @fastaUniprotIds) {
 $sth->finish if $sth;
 $dbh->disconnect();
 
-
-
-# Now write out the IDs that were included in the input manual user accession file that mapped back to a Uniprot ID.
-#if ($#manualAccessions >= 0) { 
-#    open META, "> $metaFileOut";
-#    foreach my $id (sort keys %inUserIds) {
-#        print META "$id\n";
-#        print META "\tSequence_Source\t";
-#        if (exists $inUserIds{$id} and exists $inFamilyIds{$id}) {
-#            print META "FAMILY+USER";
-#        } else {
-#            print META "USER";
-#        }
-#    }
-#    close META;
-#}
 
 @accessions=keys %accessionhash;
 print "Initial " . scalar @accessions . " sequences after manual accessions\n";
@@ -357,11 +331,19 @@ while(scalar @accessions) {
 close OUT;
 
 
-open META, ">>$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
 
 
-foreach my $acc (@origAccessions) {
+foreach my $acc (sort sortFn @origAccessions) {
     print META "$acc\n";
+
+    # For user-supplied FASTA sequences that have headers with metadata and that appear in an input
+    # PFAM family, write out the metadata.
+    if (exists $headerData->{$acc}) {
+        writeSeqData($acc, $headerData->{$acc}, \*META);
+        delete $headerData->{$acc}; # delete this key so we don't write the same entry again below.
+    }
+
     if (exists $uniprotRevMap->{$acc}) {
         print META "\tQuery_IDs\t", join(",", uniq @{ $uniprotRevMap->{$acc} }), "\n";
     }
@@ -374,6 +356,12 @@ foreach my $acc (@origAccessions) {
         print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FAMILY;
     }
     print META "\n";
+}
+
+# Write out the remaining zzz headers
+foreach my $acc (sort sortFn keys %$headerData) {
+    print META "$acc\n";
+    writeSeqData($acc, $headerData->{$acc}, \*META);
 }
 
 close META;
@@ -414,14 +402,14 @@ close NOMATCH if $showNoMatches;
 
 
 sub parseFastaHeaders {
-    my ($fastaFileIn, $fastaFileOut, $metadataFile, $useFastaHeaders, $idMapper, $configFile, $fraction) = @_;
+    my ($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $configFile, $fraction) = @_;
 
     my $parser = new Biocluster::Fasta::Headers(config_file_path => $configFile);
 
     open INFASTA, $fastaFileIn;
-    open META, ">$metadataFile" or die "Unable to open user fasta ID file '$metadataFile' for writing: $!";
     open FASTAOUT, ">$fastaFileOut";
 
+    my $lastLineIsHeader = 0;
     my $lastId = "";
     my $id;
     my $seqLength = 0;
@@ -468,7 +456,9 @@ sub parseFastaHeaders {
         # Option C
         } else {
             # Custom header for Option C
-            if ($line =~ s/^>//) {
+            if ($line =~ /^>/ and not $lastLineIsHeader) {
+                $line =~ s/^>//;
+
                 # $id is written to the file at the bottom of the while loop.
                 $id = makeSequenceId($seqCount);
                 my $ss = exists $seq{$id} ? $seq{$id} : {};
@@ -479,8 +469,10 @@ sub parseFastaHeaders {
                 $headerLine = 1;
 
                 $seq{$id} = $ss;
-            } elsif ($line =~ /\S/) {
+                $lastLineIsHeader = 1;
+            } elsif ($line =~ /\S/ and $line !~ /^>/) {
                 $writeSeq = 1;
+                $lastLineIsHeader = 0;
             }
         }
 
@@ -511,24 +503,28 @@ sub parseFastaHeaders {
     }
 
     my @seqToWrite;
-    my $c = 1;
     foreach my $id (sort sortFn keys %seq) {
-        if ($fraction == 1 or $c % $fraction == 0) {
-            # Since multiple Uniprot IDs may map to the same sequence in the FASTA file, we need to write those
-            # as sepearate sequences which is what "Expanding" means.
-            push(@seqToWrite, $id);
-            writeSeqData($id, $seq{$id}, \*FASTAOUT, \*META);
+        # Since multiple Uniprot IDs may map to the same sequence in the FASTA file, we need to write those
+        # as sepearate sequences which is what "Expanding" means.
+        push(@seqToWrite, $id);
+
+        # Only write out sequences that do not have a Uniprot ID, instead we retrieve them from the database rather
+        # than use them from the FASTA file.
+        if ($id =~ /^z/) {
+            print FASTAOUT ">" . $id . "\n";
+            print FASTAOUT $seq{$id}->{seq};
+            print FASTAOUT "\n";
         }
-        $c++;
+        
+        delete $seq{$id}->{seq}; # Delete the sequence so we don't carry it around when the %seq structure is returned from the function.
     }
 
     close FASTAOUT;
-    close META;
     close INFASTA;
 
     $parser->finish();
 
-    return sort sortFn grep !/^z/, @seqToWrite;
+    return (\%seq, sort sortFn grep !/^z/, @seqToWrite);
 }
 
 
@@ -544,20 +540,12 @@ sub sortFn {
 
 
 sub writeSeqData {
-    my ($id, $seq, $ffh, $mfh) = @_;
+    my ($id, $seq, $mfh) = @_;
 
-    # Only write out sequences that do not have a Uniprot ID, instead we retrieve them from the database rather
-    # than use them from the FASTA file.
-    if ($id =~ /^z/) {
-        print $ffh ">" . $id . "\n";
-        print $ffh $seq->{seq};
-        print $ffh "\n";
-    }
-    
-    print $mfh $id . "\n";
+    #print $mfh $id . "\n";
     print $mfh "\tDescription\t" . $seq->{description} . "\n"                               if $seq->{description};
     print $mfh "\tSequence_Length\t" . $seq->{seq_length} . "\n"                            if exists $seq->{seq_length};
-    print $mfh "\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . $seq->{src} . "\n"     if exists $seq->{src};
+    #print $mfh "\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . $seq->{src} . "\n"     if exists $seq->{src};
     print $mfh "\tOther_IDs\t" . join(",", @{ $seq->{other_ids} }) . "\n"                   if exists $seq->{other_ids};
     print $mfh "\tQuery_IDs\t" . join(",", @{ $seq->{query_ids} }) . "\n";#                   if scalar @queryIds;
 }
