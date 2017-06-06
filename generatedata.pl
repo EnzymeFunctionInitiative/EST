@@ -281,12 +281,14 @@ if (defined $accessionFile and -e $accessionFile) {
 ##    $userHeaderFile = "";
 #}
 
+my $fastaFileOption = "";
+my $userHeaderFileOption = "";
 if (defined $fastaFile and -e $fastaFile) {
     $fastaFile = $ENV{PWD}."/$fastaFile" unless ($fastaFile=~/^\// or $fastaFile=~/^~/);
     $userHeaderFile = dirname($fastaFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
-    $fastaFile = "-fasta-file $fastaFile";
-    $fastaFile .= " -use-fasta-headers" if defined $useFastaHeaders;
-    $userHeaderFile = "-meta-file $userHeaderFile";
+    $fastaFileOption = "-fasta-file $fastaFile";
+    $fastaFileOption .= " -use-fasta-headers" if defined $useFastaHeaders;
+    $userHeaderFileOption = "-meta-file $userHeaderFile";
 } elsif (defined $fastaFile) {
     die "$fastaFile does not exist\n";
 } else {
@@ -327,7 +329,9 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiestmod");
     $B->addAction("cd $ENV{PWD}/$tmpdir");
     $B->addAction("which perl");
-    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFile $userHeaderFile -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$configFile");
+    $B->addAction("dos2unix $fastaFile");
+    $B->addAction("mac2unix $fastaFile");
+    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$configFile");
     $B->addAction("$toolpath/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFile -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
