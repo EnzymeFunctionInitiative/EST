@@ -27,6 +27,8 @@ sub new {
     biocluster_configure($self, %args);
 
     $self->{build_dir} = $args{build_dir};
+    $self->{input_dir} = $args{build_dir} . "/../input";
+    $self->{output_dir} = $args{build_dir} . "/../output";
     $self->{batch_mode} = 0;
     $self->{batch_mode} = 1 if exists $args{batch_mode} and defined $args{batch_mode} and $args{batch_mode};
 
@@ -76,7 +78,7 @@ sub getLocalFileName {
 sub download {
     my ($self, $overwrite) = @_;
 
-    my $dir = $self->{build_dir};
+    my $dir = $self->{input_dir};
 
     open(TMP, "> $dir/.tmp01101987") or die "Unable to write to download directory '$dir': $!";
     close(TMP);
@@ -92,30 +94,33 @@ sub download {
     }
 
     my $cmd = "curl $url > $dir/$localFile$ext";
-    print "|$cmd|\n";
 
-    return $self->doAction($cmd, "download_idmapping", undef);
+    my $job = $self->doAction($cmd, "download_idmapping", undef);
+    chomp $job;
+    $job =~ s/^(\d+)\..*$/$1/;
+    return $job;
 }
 
 
 sub unzip {
     my ($self, $jobId) = @_;
 
-    my $dir = $self->{build_dir};
+    my $dir = $self->{input_dir};
 
     my $unzipCmd = "";
     if (-f "$dir/$localFile.gz") {
         $unzipCmd = "gunzip $dir/$localFile.gz";
     }
 
-    return $self->doAction($unzipCmd, "unzip_idmapping", $jobId);
+    my $job = $self->doAction($unzipCmd, "unzip_idmapping", $jobId);
+    chomp $job;
+    $job =~ s/^(\d+)\..*$/$1/;
+    return $job;
 }
 
 
 sub doAction {
     my ($self, $action, $jobName, $jobDependency) = @_;
-
-    my $dir = $self->{build_dir};
 
     if ($self->{batch_mode} and defined $jobName) {
         return $self->batchJob($action, $jobName, $jobDependency);
@@ -136,8 +141,8 @@ sub batchJob {
     my $batchFile = $self->{build_dir} . "/$jobName.sh";
     my $scheduler = new Biocluster::SchedulerApi(queue => $self->{cluster_queue}, dryrun => $self->{dryrun});
     my $B = $scheduler->getBuilder();
-    
-    $B->dependency($jobDependency) if defined $jobDependency;
+
+    $B->dependency(0, $jobDependency) if defined $jobDependency;
     $B->addAction($action);
 
     if ($self->{dryrun}) {
@@ -156,7 +161,7 @@ sub parse {
 
     $showProgress = 0 unless (defined $showProgress);
 
-    my $dir = $self->{build_dir};
+    my $dir = $self->{output_dir};
 
     if (defined $jobId and $self->{batch_mode}) {
         my $cmd = "$FindBin::Bin/$FindBin::Script";
@@ -166,7 +171,10 @@ sub parse {
         $cmd .= " --batch-mode";
         $cmd .= " --parse";
         $cmd .= " --output-file=" . $outputFile;
-        return $self->batchJob($cmd, "parse_idmapping", $jobId);
+        my $job = $self->batchJob($cmd, "parse_idmapping", $jobId);
+        chomp $job;
+        $job =~ s/^(\d+)\..*$/$1/;
+        return $job;
     } else {
         my $file = "$dir/$localFile";
         $file = $overrideInputFile if defined $overrideInputFile and length $overrideInputFile;
@@ -179,9 +187,6 @@ sub parse {
 
 sub doParse {
     my ($self, $outputFile, $inputFile, $showProgress) = @_;
-
-    my $dir = $self->{build_dir};
-
 
     if ($showProgress) {
         print "Reading $inputFile\n";

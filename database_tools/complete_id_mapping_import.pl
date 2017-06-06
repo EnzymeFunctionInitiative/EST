@@ -5,7 +5,7 @@ use Cwd;
 use FindBin;
 use Getopt::Long;
 use lib "$FindBin::Bin/../lib";
-use Biocluster::IdMapping;
+use Biocluster::IdMapping::Builder;
 use Biocluster::Database;
 
 my $outputFile = "idmapping.tab";
@@ -46,14 +46,20 @@ $dryRun = 0 if not defined $dryRun;
 $batchMode = 0 if not defined $batchMode;
 $doParse = 0 if not defined $doParse;
 $doDownload = 0 if not defined $doDownload;
+$configFile = $ENV{EFICONFIG} if not $configFile;
 
 my %args = ();
 $args{config_file_path} = $configFile if defined $configFile and -f $configFile;
 $args{build_dir} = $buildDir;
 $args{dryrun} = $dryRun;
-$args{batch_mode} = $batchMode;
+#$args{batch_mode} = $batchMode;
 
-my $mapper = new Biocluster::IdMapping(%args);
+my $mapper = new Biocluster::IdMapping::Builder(%args);
+
+
+
+
+
 
 if ($batchMode and $doParse) {
 

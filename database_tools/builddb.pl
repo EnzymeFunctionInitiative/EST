@@ -65,6 +65,7 @@ my $OutputDir = "$WorkingDir/output";
 my $CompletedFlagFile = "$BuildDir/progress/completed";
 my $LocalSupportDir = "$BuildDir/support";
 my $CombinedDir = "$BuildDir/combined";
+my $DbMod = $ENV{EFIDBMOD};
 
 
 
@@ -159,9 +160,14 @@ logprint "\n\n\n#CREATING ENA TABLE";
 my $enaJobId = submitEnaJob($S->getBuilder(), $ffJobId);
 
 
+# Create idmapping table
+logprint "\n\n\n#CREATING IDMAPPING TABLE";
+my $idJobId = submitIdMappingJob($S->getBuilder(), $enaJobId);
+
 # Create and import the data into the database
 logprint "\n\n\n#WRITING SQL SCRIPT FOR IMPORTING DATA INTO DATABASE\n";
 writeSqlCommands($dbName);
+
 
 logprint "\n\n\n#FINISHED AT " . scalar localtime() . "\n";
 
@@ -204,8 +210,8 @@ sub writeSqlCommands {
 
     my $batchFile = "";
     if (not defined $outFile) {
-        $outFile = "$BuildDir/5-createDbAndImportData.sql";
-        $batchFile = "$BuildDir/6-runDatabaseActions.sh";
+        $outFile = "$BuildDir/7-createDbAndImportData.sql";
+        $batchFile = "$BuildDir/8-runDatabaseActions.sh";
     }
 
     open OUT, "> $outFile" or die "Unable to open '$outFile' to save SQL commands: $!";
@@ -259,6 +265,12 @@ create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,
 create index ena_acnum_index on ena(AC, NUM);
 create index ena_ID_index on ena(id);
 
+select 'CREATING idmapping' as '';
+create table idmapping (uniprot_id varchar(15), foreign_id_type varchar(15), foreign_id varchar(20));
+create index uniprot_id_Index on idmapping (uniprot_id);
+create index foreign_id_Index on idmapping (foreign_id);
+
+
 
 select 'LOADING colors' as '';
 load data local infile '$DbSupport/colors.tab' into table colors;
@@ -286,6 +298,9 @@ load data local infile '$OutputDir/pfam_info.tab' into table pfam_info;
 
 select 'LOADING ena' as '';
 load data local infile '$OutputDir/ena.tab' into table ena;
+
+select 'LOADING idmapping' as '';
+load data local infile '$OutputDir/idmapping.tab' into table idmapping;
 
 SQL
     ;
@@ -372,6 +387,26 @@ CMDS
 
 
 
+sub submitIdMappingJob {
+    my ($B, $depId) = @_;
+
+    waitForInput();
+
+    my $file = "$BuildDir/6-idmapping.sh";
+    $B->dependency(0, $depId);
+    
+    $B->addAction("module load perl");
+    $B->addAction("module load $DbMod");
+    $B->addAction("perl $ScriptDir/import_id_mapping.pl -config $configFile -input $InputDir/idmapping.dat -output $OutputDir/idmapping.tab");
+    $B->addAction("date > $CompletedFlagFile.6-idmapping\n");
+   
+    $B->renderToFile($file);
+
+    return $DoSubmit and $S->submit($file);
+}
+
+
+
 
 sub submitEnaJob {
     my ($B, $depId) = @_;
@@ -382,7 +417,7 @@ sub submitEnaJob {
     $B->dependency(0, $depId);
     
     $B->addAction("module load perl");
-    $B->addAction("module load efidb");
+    $B->addAction("module load $DbMod");
    
     my $enaDir = "$BuildDir/ena"; 
     mkdir $enaDir unless(-d $enaDir);
