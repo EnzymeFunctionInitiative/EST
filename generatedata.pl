@@ -271,6 +271,12 @@ if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = "";
 }
 
+my $accessionFileZip = $accessionFile;
+if ($accessionFileZip =~ /\.zip$/i) {
+    $accessionFile =~ s/\.zip$/.txt/i;
+    $accessionFileOption =~ s/\.zip$/.txt/i;
+}
+
 
 #if (defined $fastaFile and -e $fastaFile) { # and -e $userHeaderFile) {
 ##} elsif (defined $userHeaderFile) {
@@ -293,6 +299,12 @@ if (defined $fastaFile and -e $fastaFile) {
     die "$fastaFile does not exist\n";
 } else {
     $fastaFile = "";
+}
+
+my $fastaFileZip = $fastaFile;
+if ($fastaFileZip =~ /\.zip$/i) {
+    $fastaFile =~ s/\.zip$/.fasta/i;
+    $fastaFileOption =~ s/\.zip$/.fasta/i;
 }
 
 
@@ -329,10 +341,12 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiestmod");
     $B->addAction("cd $ENV{PWD}/$tmpdir");
     $B->addAction("which perl");
+    $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
+    $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
     $B->addAction("dos2unix $fastaFile");
     $B->addAction("mac2unix $fastaFile");
     $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$configFile");
-    $B->addAction("$toolpath/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFile -config=$configFile");
+    $B->addAction("$toolpath/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
     # Submit and keep the job id for next dependancy

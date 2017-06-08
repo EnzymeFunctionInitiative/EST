@@ -227,14 +227,11 @@ foreach $element (@uniprotIds, @fastaUniprotIds) {
     $sth->execute;
     if ($row = $sth->fetch) {
         #print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$element} and $showNoMatches;
-        push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
         $inUserIds{$element} = 1;
     } elsif ($element !~ m/^z/) {
         # No PFAM found so we use the entire sequence
-        $accessionhash{$element} = [];
         $inUserIds{$element} = 1;
     } else {
-        print STDERR "$element\n";
         print NOMATCH "$element\tNOT_FOUND_DATABASE\n" if $showNoMatches;
     }
 }
@@ -334,7 +331,10 @@ close OUT;
 open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
 
 
-foreach my $acc (sort sortFn @origAccessions) {
+my @metaAcc = @origAccessions;
+push(@metaAcc, @fastaUniprotIds);
+push(@metaAcc, @uniprotIds);
+foreach my $acc (sort sortFn @metaAcc) {
     print META "$acc\n";
 
     # For user-supplied FASTA sequences that have headers with metadata and that appear in an input
@@ -409,6 +409,9 @@ sub parseFastaHeaders {
     open INFASTA, $fastaFileIn;
     open FASTAOUT, ">$fastaFileOut";
 
+    my %seq;        # actual sequence data
+    my %seqMeta;    # sequence metadata (ID, other ID, query IDs, descript, seq length, source)
+
     my $lastLineIsHeader = 0;
     my $lastId = "";
     my $id;
@@ -429,18 +432,23 @@ sub parseFastaHeaders {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
                     $id = makeSequenceId($seqCount);
-                    $seq{$id}->{description} = substr($result->{raw_headers}, 0, 200);
-                    $seq{$id}->{query_ids} = [];
-                    $seq{$id}->{other_ids} = $result->{other_ids};
+                    print "ZZ $id\n";
+                    $seqMeta{$id}->{description} = substr($result->{raw_headers}, 0, 200);
+                    $seqMeta{$id}->{other_ids} = $result->{other_ids};
+                    push(@{ $seq{$seqCount}->{ids} }, $id);
                 } else {
-                    # We discard the sequences for known Uniprot IDs since we will look them up at a later point.
-                    $id = "discard_me";
                     foreach my $res (@{ $result->{uniprot_ids} }) {
-                        push(@{ $seq{$res->{uniprot_id}}->{query_ids} }, $res->{other_id});
-                        foreach my $dupId (@{ $result->{duplicates}->{$res->{uniprot_id}} }) {
-                            push(@{ $seq{$res->{uniprot_id}}->{query_ids} }, $dupId);
+                        $id = $res->{uniprot_id};
+                        print "UPID $id\n";
+                        my $ss = $seqMeta{$id};
+                        push(@{ $ss->{query_ids} }, $res->{other_id});
+                        foreach my $dupId (@{ $result->{duplicates}->{$id} }) {
+                            push(@{ $ss->{query_ids} }, $dupId);
                         }
-                        push(@{ $seq{$res->{uniprot_id}}->{other_ids} }, @{ $result->{other_ids} });
+                        push(@{ $seq{$seqCount}->{ids} }, $id);
+                        push(@{ $ss->{other_ids} }, @{ $result->{other_ids} });
+                        $ss->{copy_seq_from} = $id;
+                        $seqMeta{$id} = $ss;
                     }
                 }
                 
@@ -461,14 +469,15 @@ sub parseFastaHeaders {
 
                 # $id is written to the file at the bottom of the while loop.
                 $id = makeSequenceId($seqCount);
-                my $ss = exists $seq{$id} ? $seq{$id} : {};
+                my $ss = exists $seqMeta{$id} ? $seqMeta{$id} : {};
+                push(@{ $seq{$seqCount}->{ids} }, $id);
                 
                 $ss->{description} = $line;
 
                 $seqCount++;
                 $headerLine = 1;
 
-                $seq{$id} = $ss;
+                $seqMeta{$id} = $ss;
                 $lastLineIsHeader = 1;
             } elsif ($line =~ /\S/ and $line !~ /^>/) {
                 $writeSeq = 1;
@@ -476,18 +485,13 @@ sub parseFastaHeaders {
             }
         }
 
-        if ($headerLine) {
-            if ($lastId and $lastId =~ /^z/) {
-                my $ss = $seq{$lastId};
-                $ss->{seq_length} = $seqLength;
-                $ss->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
-            }
+        if ($headerLine and $seqCount > 1) {
+            $seq{$seqCount - 2}->{seq_len} = $seqLength;
             $seqLength = 0;
-            $lastId = $id;
         }
 
         if ($writeSeq) {
-            my $ss = $seq{$id};
+            my $ss = $seq{$seqCount - 1};
             if (not exists $ss->{seq}) {
                 $ss->{seq} = $line . "\n";
             } else {
@@ -497,26 +501,32 @@ sub parseFastaHeaders {
         }
     }
 
-    if ($id =~ /^z/) {
-        $seq{$id}->{seq_length} = $seqLength;
-        $seq{$id}->{src} = Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
-    }
+    $seq{$seqCount - 1}->{seq_len} = $seqLength;
 
     my @seqToWrite;
-    foreach my $id (sort sortFn keys %seq) {
+    foreach my $seqIdx (sort sortFn keys %seq) {
         # Since multiple Uniprot IDs may map to the same sequence in the FASTA file, we need to write those
         # as sepearate sequences which is what "Expanding" means.
-        push(@seqToWrite, $id);
+        push(@seqToWrite, @{ $seq{$seqIdx}->{ids} });
 
-        # Only write out sequences that do not have a Uniprot ID, instead we retrieve them from the database rather
-        # than use them from the FASTA file.
-        if ($id =~ /^z/) {
-            print FASTAOUT ">" . $id . "\n";
-            print FASTAOUT $seq{$id}->{seq};
-            print FASTAOUT "\n";
+        # Since the same sequence may be pointed to by multiple uniprot IDs, we need to copy that sequence
+        # because it won't by default be saved for all sequences above.
+        my $sequence = "";
+        if ($seq{$seqIdx}->{seq}) {
+            $sequence = $seq{$seqIdx}->{seq};
         }
-        
-        delete $seq{$id}->{seq}; # Delete the sequence so we don't carry it around when the %seq structure is returned from the function.
+
+        foreach my $id (@{ $seq{$seqIdx}->{ids} }) {
+            print "ID: $id\n";
+            if ($sequence) { #$seqIdx =~ /^z/) {
+                print FASTAOUT ">$id\n";
+                print FASTAOUT $sequence;
+                print FASTAOUT "\n";
+            } else {
+                print "ERROR: Couldn't find the sequence for $seqIdx\n";
+            }
+            $seqMeta{$id}->{seq_len} = $seq{$seqIdx}->{seq_len} if $id =~ /^z/;
+        }
     }
 
     close FASTAOUT;
@@ -524,8 +534,9 @@ sub parseFastaHeaders {
 
     $parser->finish();
 
-    return (\%seq, sort sortFn grep !/^z/, @seqToWrite);
+    return (\%seqMeta, grep !/^z/, @seqToWrite);
 }
+
 
 
 sub sortFn {
@@ -540,14 +551,12 @@ sub sortFn {
 
 
 sub writeSeqData {
-    my ($id, $seq, $mfh) = @_;
+    my ($id, $seqMeta, $mfh) = @_;
 
-    #print $mfh $id . "\n";
-    print $mfh "\tDescription\t" . $seq->{description} . "\n"                               if $seq->{description};
-    print $mfh "\tSequence_Length\t" . $seq->{seq_length} . "\n"                            if exists $seq->{seq_length};
-    #print $mfh "\t" . Biocluster::Config::FIELD_SEQ_SRC_KEY . "\t" . $seq->{src} . "\n"     if exists $seq->{src};
-    print $mfh "\tOther_IDs\t" . join(",", @{ $seq->{other_ids} }) . "\n"                   if exists $seq->{other_ids};
-    print $mfh "\tQuery_IDs\t" . join(",", @{ $seq->{query_ids} }) . "\n";#                   if scalar @queryIds;
+    print $mfh "\tDescription\t" . $seqMeta->{description} . "\n"                               if $seqMeta->{description};
+    print $mfh "\tSequence_Length\t" . $seqMeta->{seq_len} . "\n"                               if exists $seqMeta->{seq_len};
+    print $mfh "\tOther_IDs\t" . join(",", @{ $seqMeta->{other_ids} }) . "\n"                   if exists $seqMeta->{other_ids};
+    print $mfh "\tQuery_IDs\t" . join(",", @{ $seqMeta->{query_ids} }) . "\n"                   if exists $seqMeta->{query_ids};
 }
 
 
