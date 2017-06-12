@@ -202,8 +202,10 @@ if ($#manualAccessions >= 0) {
     ($upIds, $noMatches, $uniprotRevMap) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::AUTO, @manualAccessions);
     @uniprotIds = @$upIds;
     print "There were ", scalar @uniprotIds, " matches and ", scalar @$noMatches, " no matches\n";
-    print "The uniprot ids that were found in the accession file:\n", "\t", join("\n\t", @uniprotIds), "\n";
+    print "The uniprot ids that were found in the accession file:\n", "\t", join(",", @uniprotIds), "\n";
 }
+
+print "Done with rev lookup\n";
 
 
 my $showNoMatches = $#manualAccessions >= 0 ? 1 : 0 and defined $noMatchFile;
@@ -220,21 +222,39 @@ if ($showNoMatches) {
 # VERIFY THAT THE ACCESSIONS ARE IN THE DATABASE AND RETRIEVE THE DOMAIN
 #
 my %inUserIds;
+
 # Lookup each manual accession ID to get the domain as well as verify that it exists.
-foreach $element (@uniprotIds, @fastaUniprotIds) {
+foreach $element (@uniprotIds) {
     $sql = "select accession,start,end from PFAM where accession = '$element'";
-    $sth = $dbh->prepare("select accession,start,end from PFAM where accession = '$element'");
+    $sth = $dbh->prepare($sql);
     $sth->execute;
-    if ($row = $sth->fetch) {
-        #print NOMATCH "$element\tDUPLICATE\n" if exists $inUserIds{$element} and $showNoMatches;
-        $inUserIds{$element} = 1;
-    } elsif ($element !~ m/^z/) {
-        # No PFAM found so we use the entire sequence
-        $inUserIds{$element} = 1;
+    my $foundIt = 0;
+    while ($row = $sth->fetch) {
+        push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
+        $foundIt = 1;
+    }
+    if (not $foundIt) {
+        $sql = "select accession from annotations where accession = '$element'";
+        $sth = $dbh->prepare($sql);
+        $sth->execute;
+        if ($sth->fetch) {
+            $inUserIds{$element} = 1;
+            $accessionhash{$element} = [];
+        } else {
+        }
     } else {
-        print NOMATCH "$element\tNOT_FOUND_DATABASE\n" if $showNoMatches;
+        $inUserIds{$element} = 1;
     }
 }
+
+# For the fasta sequences, we use the sequence so we don't look it up below.  They have been already
+# written to the output file in a prior step.  Here we are setting a flag for the metadata process
+# below.
+foreach $element (@fastaUniprotIds) {
+    $inUserIds{$element} = 1;
+}
+
+print "Done with pfam lookup\n";
 
 $sth->finish if $sth;
 $dbh->disconnect();
@@ -333,7 +353,7 @@ open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileO
 
 my @metaAcc = @origAccessions;
 push(@metaAcc, @fastaUniprotIds);
-push(@metaAcc, @uniprotIds);
+#push(@metaAcc, @uniprotIds);
 foreach my $acc (sort sortFn @metaAcc) {
     print META "$acc\n";
 
@@ -380,7 +400,7 @@ foreach my $err (@err) {
 
 close NOMATCH if $showNoMatches;
 
-
+print "Completed getsequences\n";
 
 
 
@@ -432,14 +452,12 @@ sub parseFastaHeaders {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
                     $id = makeSequenceId($seqCount);
-                    print "ZZ $id\n";
                     $seqMeta{$id}->{description} = substr($result->{raw_headers}, 0, 200);
                     $seqMeta{$id}->{other_ids} = $result->{other_ids};
                     push(@{ $seq{$seqCount}->{ids} }, $id);
                 } else {
                     foreach my $res (@{ $result->{uniprot_ids} }) {
                         $id = $res->{uniprot_id};
-                        print "UPID $id\n";
                         my $ss = $seqMeta{$id};
                         push(@{ $ss->{query_ids} }, $res->{other_id});
                         foreach my $dupId (@{ $result->{duplicates}->{$id} }) {

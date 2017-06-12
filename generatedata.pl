@@ -258,7 +258,7 @@ my $noMatchFile = "";
 if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $ENV{PWD} . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
     $userHeaderFile = dirname($accessionFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
-    $accessionFile = "-accession-file $accessionFile";
+    $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$tmpdir/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME;
     $noMatchFile = $ENV{PWD} . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
@@ -293,7 +293,7 @@ if (defined $fastaFile and -e $fastaFile) {
     $fastaFile = $ENV{PWD}."/$fastaFile" unless ($fastaFile=~/^\// or $fastaFile=~/^~/);
     $userHeaderFile = dirname($fastaFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
     $fastaFileOption = "-fasta-file $fastaFile";
-    $fastaFileOption .= " -use-fasta-headers" if defined $useFastaHeaders;
+    $fastaFileOption = "-use-fasta-headers " . $fastaFileOption if defined $useFastaHeaders;
     $userHeaderFileOption = "-meta-file $userHeaderFile";
 } elsif (defined $fastaFile) {
     die "$fastaFile does not exist\n";
@@ -343,9 +343,15 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("which perl");
     $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
     $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
-    $B->addAction("dos2unix $fastaFile");
-    $B->addAction("mac2unix $fastaFile");
-    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFile $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$configFile");
+    if ($fastaFile) {
+        $B->addAction("dos2unix $fastaFile");
+        $B->addAction("mac2unix $fastaFile");
+    }
+    if ($accessionFile) {
+        $B->addAction("dos2unix $accessionFile");
+        $B->addAction("mac2unix $accessionFile");
+    }
+    $B->addAction("$toolpath/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$configFile");
     $B->addAction("$toolpath/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
