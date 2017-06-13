@@ -225,25 +225,14 @@ my %inUserIds;
 
 # Lookup each manual accession ID to get the domain as well as verify that it exists.
 foreach $element (@uniprotIds) {
-    $sql = "select accession,start,end from PFAM where accession = '$element'";
+    $sql = "select accession from annotations where accession = '$element'";
     $sth = $dbh->prepare($sql);
     $sth->execute;
-    my $foundIt = 0;
-    while ($row = $sth->fetch) {
-        push @{$accessionhash{$row->[0]}}, {'start' => $row->[1], 'end' => $row->[2]};
-        $foundIt = 1;
-    }
-    if (not $foundIt) {
-        $sql = "select accession from annotations where accession = '$element'";
-        $sth = $dbh->prepare($sql);
-        $sth->execute;
-        if ($sth->fetch) {
-            $inUserIds{$element} = 1;
-            $accessionhash{$element} = [];
-        } else {
-        }
-    } else {
+    if ($sth->fetch) {
         $inUserIds{$element} = 1;
+        $accessionhash{$element} = [];
+    } else {
+        print NOMATCH "$element\tNOT_FOUND_DATABASE\n";
     }
 }
 

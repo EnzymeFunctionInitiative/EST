@@ -68,7 +68,6 @@ while (<BLAST>){
   if($evalue){
     #my $log=-(log(@line[3])/log(10))+@line[12]*log(2)/log(10);
     my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
-print "evalue: $log\n";
     if($log>=$minval and @line[5]>=$minlen and @line[6]>=$minlen and ((@line[5]<=$maxlen and @line[6]<=$maxlen) or $maxlen==0)){
       print OUT "$origline";
     }elsif($log<$minval){
