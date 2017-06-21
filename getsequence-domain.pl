@@ -205,6 +205,8 @@ if ($#manualAccessions >= 0) {
     print "The uniprot ids that were found in the accession file:\n", "\t", join(",", @uniprotIds), "\n";
 }
 
+$idMapper->finish();
+
 print "Done with rev lookup\n";
 
 

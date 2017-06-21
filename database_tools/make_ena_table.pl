@@ -15,8 +15,13 @@
 #           directory
 
 
+use FindBin;
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
+
+use lib "$FindBin::Bin/../lib";
+
+use Biocluster::IdMapping;
 
 # Uncommenting this line merely lists the files. The script doesn't read them.
 #$LIST_FILES_ONLY = 1;
@@ -30,10 +35,14 @@ sub process{
     my %accessions=%{shift @_};
     my %orgs=%{shift @_};
     my $out=shift @_;
-    my $dbh=shift @_;
+    my $idMapper=shift @_;
     my $count=1;
     #$AC='';
-    my @tmpaccession=();
+    
+    my @uniprotIds;
+    my @proteinIds;
+    my %processedAlready;
+
     open(OUT, ">>$out") or die "cannot write to output file $out"
         if not defined $LIST_FILES_ONLY;
     foreach $file (@files){
@@ -71,28 +80,50 @@ sub process{
                     $END=$2;
                 }
                 $count++;
-                unless(scalar(@tmpaccession) == 0){
+                unless(scalar(@uniprotIds) == 0){
                     if($verbose>0){
                         warn "possible missed accession $AC in ID $ID";
                     }
                 }
                 #$AC='';
-                @tmpaccession=();
+                @uniprotIds=();
+                %processedAlready=();
+                @proteinIds=();
                 #logprint "found a CDS";
+            }elsif($line=~/^FT\s+\/protein_id=\"([a-zA-Z0-9\.]+)\"/){
+                push @proteinIds, $1;
             }elsif($line=~/^FT\s+\/db_xref=\"UniProtKB\/[a-zA-Z0-9-]+:(\w+)\"/){
                 #logprint "\tfound uniprot accession $1";
                 #unless($AC eq ''){
                 #  die "multiple accessions in CDS of $ID\t$AC\t$1";
                 #}
                 #$AC=$1;
-                push @tmpaccession, $1;
+                push @uniprotIds, $1;
+                $processedAlready{$1} = 1;
             }elsif($line=~/^FT\s+\/translation=/){
                 #logprint "end of gene";
-                foreach $AC (@tmpaccession){
+                
+                my @revUniprotIdsToAdd;
+
+                # Only lookup a protein ID if there were no uniprot IDs found for this section
+                if ($#uniprotIds == -1) { 
+                    my ($revUniprotIds, $noMatch) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::GENBANK, @proteinIds);
+                    @revUniprotIdsToAdd = grep { not exists $processedAlready{$_} } @$revUniprotIds;
+                    logprint "REV\t" . (scalar @$revUniprotIds) . "\t" . (scalar @$noMatch) . "\t" . (scalar @revUniprotIdsToAdd);
+#                    logprint "Found " .
+#                        (scalar @$revUniprotIds) .
+#                        " protein IDs that mapped to uniprot IDs (" .
+#                        (scalar @$noMatch) . " were not found). Of those " . (scalar @revUniprotIdsToAdd) . " have not had uniprot IDs that were already found.\n";
+                }
+
+                foreach $AC (@uniprotIds, @revUniprotIdsToAdd) {
                     #logprint "AC is $AC, orgs is ".$orgs{$AC}."";
                     print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\t".$orgs{$AC}."\t".join(',',@{$accessions{$AC}})."\n";
                 }
-                @tmpaccession=();
+                @uniprotIds=();
+                %processedAlready=();
+                @proteinIds=();
+
                 #$AC='';
             }
         }
@@ -100,6 +131,7 @@ sub process{
     }
     close OUT
         if not defined $LIST_FILES_ONLY;
+
 }
 
 sub tabletohashary {
@@ -159,6 +191,7 @@ sub makechooser {
 }
 #end functions
 
+
 $result = GetOptions(
     "embl=s"    => \$embl,
     "pro=s"     => \$pro,
@@ -169,7 +202,17 @@ $result = GetOptions(
     "org=s"     => \$orgtable,
     "v"         => \$verbose,
     "log=s"     => \$log,
+    "config=s"  => \$configFile,
 );
+
+if (not $configFile or not -f $configFile) {
+    $configFile = $ENV{EFICONFIG};
+}
+die "This script requires that a config file be provided via the -config=file argument." if not -f $configFile; 
+
+my $idMapper = new Biocluster::IdMapping(config_file_path => $configFile);
+
+
 
 die "Invalid arguments specified" if not defined $embl or not defined $pro or not defined $env or not defined $fun or
                                      not defined $com or not defined $table or not defined $orgtable;
@@ -224,9 +267,11 @@ foreach $dir (@wgsdirs){
 
 logprint "processing tab files";
 logprint "\tbase files";
-process \@pro, \%accessions, \%organisms, $pro, $dbh;
-process \@fun, \%accessions, \%organisms, $fun, $dbh;
-process \@env, \%accessions, \%organisms, $env; $dbh;
+process \@pro, \%accessions, \%organisms, $pro, $idMapper;
+process \@fun, \%accessions, \%organisms, $fun, $idMapper;
+process \@env, \%accessions, \%organisms, $env; $idMapper;
+
+$idMapper->finish();
 
 logprint "make table chooser table";
 #makechooser $pro, $com, 'pro';

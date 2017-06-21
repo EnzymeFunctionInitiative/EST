@@ -24,7 +24,17 @@ sub new {
     # $self->{db} is defined by biocluster_configure
     $self->{db_obj} = new Biocluster::Database(%args);
 
+    $self->{dbh} = $self->{db_obj}->getHandle();
+
+    $self->{has_table} = $self->checkForTable();
+
     return $self;
+}
+
+
+sub checkForTable {
+    my ($self) = @_;
+
 }
 
 
@@ -48,8 +58,6 @@ sub reverseLookup {
         return (undef, undef);
     }
 
-    my $dbh = $self->{db_obj}->getHandle();
-
     my @uniprotIds;
     my @noMatch;
     my %uniprotRevMap;
@@ -65,7 +73,7 @@ sub reverseLookup {
         } else {
             my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where foreign_id = '$id' and foreign_id_type = '$type'";
             #print $querySql, "   ";
-            my $row = $dbh->selectrow_arrayref($querySql);
+            my $row = $self->{dbh}->selectrow_arrayref($querySql);
             if (defined $row) {
                 #print "found\n";
                 push(@uniprotIds, $row->[0]);
@@ -76,11 +84,17 @@ sub reverseLookup {
             }
         }
     }
-
-    $dbh->disconnect();
     
     return (\@uniprotIds, \@noMatch, \%uniprotRevMap);
 }
+
+
+sub finish {
+    my ($self) = @_;
+
+    $self->{dbh}->disconnect();
+}
+
 
 1;
 

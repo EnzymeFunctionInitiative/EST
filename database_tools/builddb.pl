@@ -37,6 +37,7 @@ my $sql;
 my $batchMode;
 my $noSubmit;
 my $dbName;
+my $buildEna;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "no-download"   => \$noDownload,
@@ -47,10 +48,12 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm
                         "queue=s"       => \$queue,
                         "config=s"      => \$configFile,
-                        "sql=s"         => \$sql,           # only output the SQL commands for importing data. no other args are required to use this option.
+                        "sql"           => \$sql,           # only output the SQL commands for importing data. no other args are required to use this option.
                         "no-prompt"     => \$batchMode,     # run without the GOLD version prompt
                         "no-submit"     => \$noSubmit,      # create the job scripts but don't submit them
                         "db-name=s"     => \$dbName,        # the name of the database
+                        "build-ena"     => \$buildEna,      # if this is present, build the ENA table only. the database must have
+                                                            # been already created, and the idmapping table must be present.
                        );
 
 die "Working directory must be specified" if not $WorkingDir;
@@ -66,6 +69,7 @@ my $CompletedFlagFile = "$BuildDir/progress/completed";
 my $LocalSupportDir = "$BuildDir/support";
 my $CombinedDir = "$BuildDir/combined";
 my $DbMod = $ENV{EFIDBMOD};
+my $EstMod = $ENV{EFIESTMOD};
 
 
 
@@ -73,7 +77,7 @@ my $DbMod = $ENV{EFIDBMOD};
 $logFile = "builddb.log" unless (defined $logFile and length $logFile);
 open LOG, ">$logFile" or die "Unable to open log file $logFile";
 open(STDERR, ">&STDOUT") or die "Unable to redirect STDERR: $!";
-sub logprint { print join("", @_); print LOG join("", @_); }
+sub logprint { print join("", @_), "\n"; print LOG join("", @_), "\n"; }
 #logprint "#OPTIONS: dir=$WorkingDir no-download=$noDownload step=$interactive log=$logFile dryrun=$dryRun exists=$skipIfExists queue=$queue scheduler=$scheduler\n";
 logprint "#STARTED builddb.pl AT " . scalar localtime() . "\n";
 
@@ -89,20 +93,26 @@ mkdir $LocalSupportDir if not -d $LocalSupportDir;
 mkdir $CombinedDir if not -d $CombinedDir;
 
 
+
+if (not $dbName) {
+    print "The -db-name parameter is required.\n";
+    exit(1);
+}
+
+my %dbArgs;
+$dbArgs{config_file_path} = $configFile if (defined $configFile and -f $configFile);
+my $DB = new Biocluster::Database(%dbArgs);
+
+
 # Output the sql commands necessary for creating the database and importing the data, then exit.
-if (defined $sql and length $sql) {
-    writeSqlCommands($sql);
+if (defined $sql) {
+    writeSqlCommands($dbName, $buildEna);
     exit(0);
 }
 
 
 if (not defined $queue or length $queue == 0) {
     print "The --queue parameter is required.\n";
-    exit(1);
-}
-
-if (not $dbName) {
-    print "The -db-name parameter is required.\n";
     exit(1);
 }
 
@@ -113,9 +123,6 @@ my $DoSubmit = not defined $noSubmit;
 
 # Get info from the configuration file.
 my $config = {};
-my %dbArgs;
-$dbArgs{config_file_path} = $configFile if (defined $configFile and -f $configFile);
-my $DB = new Biocluster::Database(%dbArgs);
 biocluster_configure($config, %dbArgs);
 my $UniprotLocation = $config->{build}->{uniprot_url};
 my $InterproLocation = $config->{build}->{interpro_url};
@@ -130,43 +137,46 @@ my $FH = new Biocluster::Util::FileHandle('dryrun' => $dryRun);
 unlink $CompletedFlagFile if -f $CompletedFlagFile;
 
 
-logprint "\n#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-logprint "# USING GOLD DATA THAT WAS LAST UPDATED LOCALLY ON ", scalar localtime((stat("$DbSupport/phylo.tab"))[9]), "\n";
-logprint "# TO DOWNLOAD THE LATEST DATA, GO TO https://gold.jgi.doe.gov/ AND REMOVE ALL COLUMNS EXCEPT\n";
-logprint "#    NCBI TAXON ID, DOMAIN, KINGDOM, PHYLUM, CLASS, ORDER, FAMILY, GENUS, SPECIES\n";
-logprint "# AND COPY THE RESULTING TAB-SEPARATED FILE TO $DbSupport/phylo.tab\n";
-logprint "#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
-print "To continue using these GOLD data, press enter or press Ctrl+C to abort..." and scalar <STDIN> unless $batchMode;
-logprint "\n";
+if (defined $buildEna and $buildEna) {
 
-
-logprint "#DOWNLOADING FILES\n";
-logprint "#UNZIPPING FILES + COPYING TREMBL FILES + #ADDING SPROT FILES\n";
-logprint "#CREATE TAB FILES\n";
-my $dlJobId = submitDownloadAndUnzipJob($S->getBuilder(), not $noDownload);
-
-
-logprint "\n\n\n#FORMAT BLAST DATABASE AND DO PDB BLAST\n";
-my $blastJobId = submitBlastJobs($S->getBuilder(), $dlJobId);
-
-
-# Chop up xml files so we can parse them easily
-logprint "\n\n\n#CHOP MATCH_COMPLETE AND .TAB FILES\n";
-my $ffJobId = submitFinalFileJob($S->getBuilder(), $dlJobId);
-
-
-# Create ENA table
-logprint "\n\n\n#CREATING ENA TABLE";
-my $enaJobId = submitEnaJob($S->getBuilder(), $ffJobId);
-
-
-# Create idmapping table
-logprint "\n\n\n#CREATING IDMAPPING TABLE";
-my $idJobId = submitIdMappingJob($S->getBuilder(), $enaJobId);
+    # Create ENA table
+    logprint "\n\n\n#CREATING ENA TABLE";
+    my $enaJobId = submitEnaJob($S->getBuilder());
+    
+} else {
+    
+    logprint "\n#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+    logprint "# USING GOLD DATA THAT WAS LAST UPDATED LOCALLY ON ", scalar localtime((stat("$DbSupport/phylo.tab"))[9]), "\n";
+    logprint "# TO DOWNLOAD THE LATEST DATA, GO TO https://gold.jgi.doe.gov/ AND REMOVE ALL COLUMNS EXCEPT\n";
+    logprint "#    NCBI TAXON ID, DOMAIN, KINGDOM, PHYLUM, CLASS, ORDER, FAMILY, GENUS, SPECIES\n";
+    logprint "# AND COPY THE RESULTING TAB-SEPARATED FILE TO $DbSupport/phylo.tab\n";
+    logprint "#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
+    print "To continue using these GOLD data, press enter or press Ctrl+C to abort..." and scalar <STDIN> unless $batchMode;
+    logprint "\n";
+    
+    
+    logprint "#DOWNLOADING FILES\n";
+    logprint "#UNZIPPING FILES + COPYING TREMBL FILES + #ADDING SPROT FILES\n";
+    logprint "#CREATE TAB FILES\n";
+    my $dlJobId = submitDownloadAndUnzipJob($S->getBuilder(), not $noDownload);
+    
+    
+    logprint "\n\n\n#FORMAT BLAST DATABASE AND DO PDB BLAST\n";
+    my $blastJobId = submitBlastJobs($S->getBuilder(), $dlJobId);
+    
+    
+    # Chop up xml files so we can parse them easily
+    logprint "\n\n\n#CHOP MATCH_COMPLETE AND .TAB FILES\n";
+    my $ffJobId = submitFinalFileJob($S->getBuilder(), $dlJobId);
+    
+    # Create idmapping table
+    logprint "\n\n\n#CREATING IDMAPPING TABLE";
+    my $idJobId = submitIdMappingJob($S->getBuilder());
+}
 
 # Create and import the data into the database
 logprint "\n\n\n#WRITING SQL SCRIPT FOR IMPORTING DATA INTO DATABASE\n";
-writeSqlCommands($dbName);
+writeSqlCommands($dbName, $buildEna);
 
 
 logprint "\n\n\n#FINISHED AT " . scalar localtime() . "\n";
@@ -205,186 +215,6 @@ close LOG;
 
 
 
-sub writeSqlCommands {
-    my ($outFile, $dbName) = @_;
-
-    my $batchFile = "";
-    if (not defined $outFile) {
-        $outFile = "$BuildDir/7-createDbAndImportData.sql";
-        $batchFile = "$BuildDir/8-runDatabaseActions.sh";
-    }
-
-    open OUT, "> $outFile" or die "Unable to open '$outFile' to save SQL commands: $!";
-
-    my (undef, undef, undef, $mday, $mon, $year) = localtime(time);
-    #my $dbName = "efi_" . sprintf("%d%02d%02d", $year + 1900, $mon + 1, $mday);
-
-    my $sql = <<SQL;
-create database if not exists $dbName;
-
-select 'CREATING ANNOTATIONS' as '';
-drop table if exists annotations;
-create table annotations(accession varchar(10) primary key, Uniprot_ID varchar(15), STATUS varchar(10), Squence_Length integer, Taxonomy_ID integer, GDNA varchar(5), Description varchar(255), SwissProt_Description varchar(255),Organism varchar(150), Domain varchar(25), GN varchar(40), PFAM varchar(300), pdb varchar(3000), IPRO varchar(700), GO varchar(1300), GI varchar(15), HMP_Body_Site varchar(75), HMP_Oxygen varchar(50), EFI_ID varchar(6), EC varchar(185), Phylum varchar(30), Class varchar(25), TaxOrder varchar(30), Family varchar(25), Genus varchar(40), Species varchar(50), Cazy varchar(30));
-create index TaxID_Index ON annotations (Taxonomy_ID);
-create index accession_Index ON annotations (accession);
-
-select 'CREATING GENE3D' as '';
-drop table if exists GENE3D;
-create table GENE3D(id varchar(24), accession varchar(10), start integer, end integer);
-create index GENE3D_ID_Index on GENE3D (id);
-
-select 'CREATING PFAM' as '';
-drop table if exists PFAM;
-create table PFAM(id varchar(24), accession varchar(10), start integer, end integer);
-create index PAM_ID_Index on PFAM (id);
-
-select 'CREATING SSF' as '';
-drop table if exists SSF;
-create table SSF(id varchar(24), accession varchar(10), start integer, end integer);
-create index SSF_ID_Index on SSF (id);
-
-select 'CREATING INTERPRO' as '';
-drop table if exists INTERPRO;
-create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer);
-create index INTERPRO_ID_Index on INTERPRO (id);
-
-select 'CREATING pdbhits' as '';
-drop table if exists pdbhits;
-create table pdbhits(ACC varchar(10) primary key, PDB varchar(4), e varchar(20));
-create index pdbhits_ACC_Index on pdbhits (ACC);
-
-select 'CREATING colors' as '';
-drop table if exists colors;
-create table colors(cluster int primary key,color varchar(7));
-drop table if exists pfam_info;
-create table pfam_info(pfam varchar(10) primary key, short_name varchar(50), long_name varchar(255));
-
-select 'CREATING ena' as '';
-drop table if exists ena;
-create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain varchar(2000),pfam varchar(1800));
-create index ena_acnum_index on ena(AC, NUM);
-create index ena_ID_index on ena(id);
-
-select 'CREATING idmapping' as '';
-create table idmapping (uniprot_id varchar(15), foreign_id_type varchar(15), foreign_id varchar(20));
-create index uniprot_id_Index on idmapping (uniprot_id);
-create index foreign_id_Index on idmapping (foreign_id);
-
-
-
-select 'LOADING colors' as '';
-load data local infile '$DbSupport/colors.tab' into table colors;
-
-select 'LOADING annotations' as '';
-load data local infile '$OutputDir/struct.tab' into table annotations;
-
-select 'LOADING GENE3D' as '';
-load data local infile '$OutputDir/GENE3D.tab' into table GENE3D;
-
-select 'LOADING PFAM' as '';
-load data local infile '$OutputDir/PFAM.tab' into table PFAM;
-
-select 'LOADING SSF' as '';
-load data local infile '$OutputDir/SSF.tab' into table SSF;
-
-select 'LOADING INTERPRO' as '';
-load data local infile '$OutputDir/INTERPRO.tab' into table INTERPRO;
-
-select 'LOADING pdbhits' as '';
-load data local infile '$OutputDir/pdb.tab' into table pdbhits;
-
-select 'LOADING pfam_info' as '';
-load data local infile '$OutputDir/pfam_info.tab' into table pfam_info;
-
-select 'LOADING ena' as '';
-load data local infile '$OutputDir/ena.tab' into table ena;
-
-select 'LOADING idmapping' as '';
-load data local infile '$OutputDir/idmapping.tab' into table idmapping;
-
-SQL
-    ;
-    print OUT $sql;
-
-    close OUT;
-
-    if (length $batchFile) {
-        open BATCH, "> $batchFile" or die "Unable to open '$batchFile' to save SQL shell script: $!";
-        my $mysqlCmd = $DB->getCommandLineConnString();
-        my $batch = <<CMDS;
-#!/bin/bash
-
-if [ ! -f $CompletedFlagFile.4-finalFiles ]; then
-    echo "The data file build has not completed yet. Please wait until all of the output has been generated."
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $CompletedFlagFile.5-ena ]; then
-    echo "The ENA data file build has not completed yet. Please wait until all of the output has been generated."
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/struct.tab ]; then
-    echo "$OutputDir/struct.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/GENE3D.tab ]; then
-    echo "$OutputDir/GENE3D.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/PFAM.tab ]; then
-    echo "$OutputDir/PFAM.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/SSF.tab ]; then
-    echo "$OutputDir/SSF.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/INTERPRO.tab ]; then
-    echo "$OutputDir/INTERPRO.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/pdb.tab  ]; then
-    echo "$OutputDir/pdb.tab  does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/pfam_info.tab ]; then
-    echo "$OutputDir/pfam_info.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $OutputDir/ena.tab ]; then
-    echo "$OutputDir/ena.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
-fi
-
-$mysqlCmd < $outFile > $BuildDir/mysqlOutput.txt
-
-date > $CompletedFlagFile.mysql_import
-
-CMDS
-        ;
-        print BATCH $batch;
-        close BATCH;
-    }
-}
-
 
 
 sub submitIdMappingJob {
@@ -392,11 +222,12 @@ sub submitIdMappingJob {
 
     waitForInput();
 
-    my $file = "$BuildDir/6-idmapping.sh";
+    my $file = "$BuildDir/5-idmapping.sh";
     $B->dependency(0, $depId);
     
     $B->addAction("module load perl");
     $B->addAction("module load $DbMod");
+    $B->addAction("module load $EstMod");
     $B->addAction("perl $ScriptDir/import_id_mapping.pl -config $configFile -input $InputDir/idmapping.dat -output $OutputDir/idmapping.tab");
     $B->addAction("date > $CompletedFlagFile.6-idmapping\n");
    
@@ -409,15 +240,15 @@ sub submitIdMappingJob {
 
 
 sub submitEnaJob {
-    my ($B, $depId) = @_;
+    my ($B) = @_;
 
     waitForInput();
 
-    my $file = "$BuildDir/5-ena.sh";
-    $B->dependency(0, $depId);
+    my $file = "$BuildDir/6-ena.sh";
     
     $B->addAction("module load perl");
     $B->addAction("module load $DbMod");
+    $B->addAction("module load $EstMod");
    
     my $enaDir = "$BuildDir/ena"; 
     mkdir $enaDir unless(-d $enaDir);
@@ -775,6 +606,214 @@ sub writeTabFileCommands {
 
 
 
+
+sub writeSqlCommands {
+    my ($dbName, $buildEna, $outFile) = @_;
+
+    my $batchFile = "";
+    if (not defined $outFile) {
+        $outFile = "$BuildDir/7-createDbAndImportData.sql";
+        $batchFile = "$BuildDir/8-runDatabaseActions.sh";
+    }
+
+    open OUT, "> $outFile" or die "Unable to open '$outFile' to save SQL commands: $!";
+
+    my (undef, undef, undef, $mday, $mon, $year) = localtime(time);
+    #my $dbName = "efi_" . sprintf("%d%02d%02d", $year + 1900, $mon + 1, $mday);
+
+    my $sql = "";
+
+    if (not $buildEna) {
+        $sql = <<SQL;
+
+select 'CREATING ANNOTATIONS' as '';
+drop table if exists annotations;
+create table annotations(accession varchar(10) primary key, Uniprot_ID varchar(15), STATUS varchar(10), Squence_Length integer, Taxonomy_ID integer, GDNA varchar(5), Description varchar(255), SwissProt_Description varchar(255),Organism varchar(150), Domain varchar(25), GN varchar(40), PFAM varchar(300), pdb varchar(3000), IPRO varchar(700), GO varchar(1300), GI varchar(15), HMP_Body_Site varchar(75), HMP_Oxygen varchar(50), EFI_ID varchar(6), EC varchar(185), Phylum varchar(30), Class varchar(25), TaxOrder varchar(30), Family varchar(25), Genus varchar(40), Species varchar(50), Cazy varchar(30));
+create index TaxID_Index ON annotations (Taxonomy_ID);
+create index accession_Index ON annotations (accession);
+
+select 'CREATING GENE3D' as '';
+drop table if exists GENE3D;
+create table GENE3D(id varchar(24), accession varchar(10), start integer, end integer);
+create index GENE3D_ID_Index on GENE3D (id);
+
+select 'CREATING PFAM' as '';
+drop table if exists PFAM;
+create table PFAM(id varchar(24), accession varchar(10), start integer, end integer);
+create index PAM_ID_Index on PFAM (id);
+
+select 'CREATING SSF' as '';
+drop table if exists SSF;
+create table SSF(id varchar(24), accession varchar(10), start integer, end integer);
+create index SSF_ID_Index on SSF (id);
+
+select 'CREATING INTERPRO' as '';
+drop table if exists INTERPRO;
+create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer);
+create index INTERPRO_ID_Index on INTERPRO (id);
+
+select 'CREATING pdbhits' as '';
+drop table if exists pdbhits;
+create table pdbhits(ACC varchar(10) primary key, PDB varchar(4), e varchar(20));
+create index pdbhits_ACC_Index on pdbhits (ACC);
+
+select 'CREATING colors' as '';
+drop table if exists colors;
+create table colors(cluster int primary key,color varchar(7));
+drop table if exists pfam_info;
+create table pfam_info(pfam varchar(10) primary key, short_name varchar(50), long_name varchar(255));
+
+select 'CREATING idmapping' as '';
+create table idmapping (uniprot_id varchar(15), foreign_id_type varchar(15), foreign_id varchar(20));
+create index uniprot_id_Index on idmapping (uniprot_id);
+create index foreign_id_Index on idmapping (foreign_id);
+
+
+
+select 'LOADING colors' as '';
+load data local infile '$DbSupport/colors.tab' into table colors;
+
+select 'LOADING annotations' as '';
+load data local infile '$OutputDir/struct.tab' into table annotations;
+
+select 'LOADING GENE3D' as '';
+load data local infile '$OutputDir/GENE3D.tab' into table GENE3D;
+
+select 'LOADING PFAM' as '';
+load data local infile '$OutputDir/PFAM.tab' into table PFAM;
+
+select 'LOADING SSF' as '';
+load data local infile '$OutputDir/SSF.tab' into table SSF;
+
+select 'LOADING INTERPRO' as '';
+load data local infile '$OutputDir/INTERPRO.tab' into table INTERPRO;
+
+select 'LOADING pdbhits' as '';
+load data local infile '$OutputDir/pdb.tab' into table pdbhits;
+
+select 'LOADING pfam_info' as '';
+load data local infile '$OutputDir/pfam_info.tab' into table pfam_info;
+
+select 'LOADING idmapping' as '';
+load data local infile '$OutputDir/idmapping.tab' into table idmapping;
+
+SQL
+        ;
+    } else {
+        $sql = <<SQL;
+
+select 'CREATING ena' as '';
+drop table if exists ena;
+create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain varchar(2000),pfam varchar(1800));
+create index ena_acnum_index on ena(AC, NUM);
+create index ena_ID_index on ena(id);
+
+select 'LOADING ena' as '';
+load data local infile '$OutputDir/ena.tab' into table ena;
+
+SQL
+        ;
+    }
+
+    print OUT $sql;
+
+    close OUT;
+
+    if (length $batchFile) {
+        open BATCH, "> $batchFile" or die "Unable to open '$batchFile' to save SQL shell script: $!";
+        my $mysqlCmd = $DB->getCommandLineConnString();
+
+        my $batch = "";
+        my $type = "";
+        if (not $buildEna) {
+            $type = ".default";
+            $batch = <<CMDS;
+
+if [ ! -f $CompletedFlagFile.4-finalFiles ]; then
+    echo "The data file build has not completed yet. Please wait until all of the output has been generated."
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $CompletedFlagFile.5-ena ]; then
+    echo "The ENA data file build has not completed yet. Please wait until all of the output has been generated."
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $OutputDir/struct.tab ]; then
+    echo "$OutputDir/struct.tab does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $OutputDir/GENE3D.tab ]; then
+    echo "$OutputDir/GENE3D.tab does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $OutputDir/PFAM.tab ]; then
+    echo "$OutputDir/PFAM.tab does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $OutputDir/SSF.tab ]; then
+    echo "$OutputDir/SSF.tab does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $OutputDir/INTERPRO.tab ]; then
+    echo "$OutputDir/INTERPRO.tab does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $OutputDir/pdb.tab  ]; then
+    echo "$OutputDir/pdb.tab  does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+if [ ! -f $OutputDir/pfam_info.tab ]; then
+    echo "$OutputDir/pfam_info.tab does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+CMDS
+            ;
+        } else {
+            $type = ".ena";
+            $batch = <<CMDS;
+
+if [ ! -f $OutputDir/ena.tab ]; then
+    echo "$OutputDir/ena.tab does not exist. Did the build complete?"
+    echo "Bye."
+    exit
+fi
+
+CMDS
+            ;
+        }
+
+        print BATCH <<CMDS;
+#!/bin/bash
+
+$batch
+
+$mysqlCmd $dbName < $outFile > $BuildDir/mysqlOutput$type.txt
+
+date > $CompletedFlagFile.mysql_import$type
+
+CMDS
+        ;
+
+        close BATCH;
+    }
+}
 
 
 
