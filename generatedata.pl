@@ -252,6 +252,7 @@ print "incfrac is $incfrac\n";
 
 
 my $userHeaderFile = "";
+my $userHeaderFileOption = "";
 
 # Error checking for user supplied dat and fa files
 my $noMatchFile = "";
@@ -288,7 +289,6 @@ if ($accessionFileZip =~ /\.zip$/i) {
 #}
 
 my $fastaFileOption = "";
-my $userHeaderFileOption = "";
 if (defined $fastaFile and -e $fastaFile) {
     $fastaFile = $ENV{PWD}."/$fastaFile" unless ($fastaFile=~/^\// or $fastaFile=~/^~/);
     $userHeaderFile = dirname($fastaFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
