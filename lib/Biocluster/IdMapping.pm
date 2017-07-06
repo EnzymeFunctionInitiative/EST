@@ -66,22 +66,20 @@ sub reverseLookup {
         my $type = $typeHint;
         $id =~ s/^\s*([^\|]*\|)?([^\s\|]+).*$/$2/;
         $type = check_id_type($id) if $typeHint eq Biocluster::IdMapping::Util::AUTO;
+        my $foreignIdCol = "foreign_id";
+        my $foreignIdCheck = " and foreign_id_type = '$type'";
         if ($type eq Biocluster::IdMapping::Util::UNIPROT) {
-            (my $upId = $id) =~ s/\.\d+$//;
-            push(@uniprotIds, $upId);
-            push(@{ $uniprotRevMap{$upId} }, $id);
+            $foreignIdCol = $self->{id_mapping}->{uniprot_id};
+            $foreignIdCheck = "";
+        }
+
+        my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where $foreignIdCol = '$id' $foreignIdCheck";
+        my $row = $self->{dbh}->selectrow_arrayref($querySql);
+        if (defined $row) {
+            push(@uniprotIds, $row->[0]);
+            push(@{ $uniprotRevMap{$row->[0]} }, $id);
         } else {
-            my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where foreign_id = '$id' and foreign_id_type = '$type'";
-            #print $querySql, "   ";
-            my $row = $self->{dbh}->selectrow_arrayref($querySql);
-            if (defined $row) {
-                #print "found\n";
-                push(@uniprotIds, $row->[0]);
-                push(@{ $uniprotRevMap{$row->[0]} }, $id);
-            } else {
-                #print "nomatch\n";
-                push(@noMatch, $id);
-            }
+            push(@noMatch, $id);
         }
     }
     

@@ -171,6 +171,9 @@ getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, @gene3ds);
 getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, @ssfs);
 
 
+# Header data for fasta and accession file inputs.
+my $headerData = {};
+
 # Save the accessions that are specified through a family.
 my %inFamilyIds = map { ($_, 1) } keys %accessionhash;
 
@@ -179,14 +182,18 @@ my %inFamilyIds = map { ($_, 1) } keys %accessionhash;
 # PARSE FASTA FILE FOR HEADER IDS (IF ANY)
 #
 my @fastaUniprotIds;
-my $headerData = {};
 if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     $useFastaHeaders = defined $useFastaHeaders ? 1 : 0;
     # Returns the Uniprot IDs that were found in the file.  If there were sequences found that didn't map
     # to a Uniprot ID, they are written to the output FASTA file directly.  The sequences that corresponded
     # to a Uniprot ID are not written, they are retrieved from the sequences below.
     # The '1' parameter tells the function not to apply any fraction computation.
-    ($headerData, @fastaUniprotIds) = parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $configFile, 1);
+    (@fastaUniprotIds) = parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $headerData, $configFile, 1);
+    
+    # Any ids from families are assigned a query_id value but only do it if we have specified
+    # an FASTA input file.
+    map { $headerData->{$_}->{query_ids} = [$_]; } keys %accessionhash;
+
     print "The uniprot ids that were found in the FASTA file:\n", "\t", join("\n\t", @fastaUniprotIds), "\n";
 }
 
@@ -201,6 +208,11 @@ if ($#manualAccessions >= 0) {
     my $upIds = [];
     ($upIds, $noMatches, $uniprotRevMap) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::AUTO, @manualAccessions);
     @uniprotIds = @$upIds;
+    
+    # Any ids from families are assigned a query_id value but only do it if we have specified
+    # an accession ID input file.
+    map { $headerData->{$_}->{query_ids} = [$_]; } keys %accessionhash;
+
     print "There were ", scalar @uniprotIds, " matches and ", scalar @$noMatches, " no matches\n";
     print "The uniprot ids that were found in the accession file:\n", "\t", join(",", @uniprotIds), "\n";
 }
@@ -233,6 +245,7 @@ foreach $element (@uniprotIds) {
     if ($sth->fetch) {
         $inUserIds{$element} = 1;
         $accessionhash{$element} = [];
+        $headerData->{$element}->{query_ids} = $uniprotRevMap->{$_};
     } else {
         print NOMATCH "$element\tNOT_FOUND_DATABASE\n";
     }
@@ -343,8 +356,8 @@ open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileO
 
 
 my @metaAcc = @origAccessions;
+# Add in the sequences that were in the fasta file (which we didn't retrieve from the fasta database).
 push(@metaAcc, @fastaUniprotIds);
-#push(@metaAcc, @uniprotIds);
 foreach my $acc (sort sortFn @metaAcc) {
     print META "$acc\n";
 
@@ -353,11 +366,10 @@ foreach my $acc (sort sortFn @metaAcc) {
     if (exists $headerData->{$acc}) {
         writeSeqData($acc, $headerData->{$acc}, \*META);
         delete $headerData->{$acc}; # delete this key so we don't write the same entry again below.
+    } else {
+        print "NOT FOUND $acc\n";
     }
 
-    if (exists $uniprotRevMap->{$acc}) {
-        print META "\tQuery_IDs\t", join(",", uniq @{ $uniprotRevMap->{$acc} }), "\n";
-    }
     print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
     if (exists $inUserIds{$acc} and exists $inFamilyIds{$acc}) {
         print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_BOTH;
@@ -373,6 +385,9 @@ foreach my $acc (sort sortFn @metaAcc) {
 foreach my $acc (sort sortFn keys %$headerData) {
     print META "$acc\n";
     writeSeqData($acc, $headerData->{$acc}, \*META);
+    print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
+    print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+    print META "\n";
 }
 
 close META;
@@ -413,7 +428,7 @@ print "Completed getsequences\n";
 
 
 sub parseFastaHeaders {
-    my ($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $configFile, $fraction) = @_;
+    my ($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $seqMeta, $configFile, $fraction) = @_;
 
     my $parser = new Biocluster::Fasta::Headers(config_file_path => $configFile);
 
@@ -421,7 +436,6 @@ sub parseFastaHeaders {
     open FASTAOUT, ">$fastaFileOut";
 
     my %seq;        # actual sequence data
-    my %seqMeta;    # sequence metadata (ID, other ID, query IDs, descript, seq length, source)
 
     my $lastLineIsHeader = 0;
     my $lastId = "";
@@ -443,13 +457,13 @@ sub parseFastaHeaders {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
                     $id = makeSequenceId($seqCount);
-                    $seqMeta{$id}->{description} = substr($result->{raw_headers}, 0, 200);
-                    $seqMeta{$id}->{other_ids} = $result->{other_ids};
+                    $seqMeta->{$id}->{description} = substr($result->{raw_headers}, 0, 200);
+                    $seqMeta->{$id}->{other_ids} = $result->{other_ids};
                     push(@{ $seq{$seqCount}->{ids} }, $id);
                 } else {
                     foreach my $res (@{ $result->{uniprot_ids} }) {
                         $id = $res->{uniprot_id};
-                        my $ss = $seqMeta{$id};
+                        my $ss = $seqMeta->{$id};
                         push(@{ $ss->{query_ids} }, $res->{other_id});
                         foreach my $dupId (@{ $result->{duplicates}->{$id} }) {
                             push(@{ $ss->{query_ids} }, $dupId);
@@ -457,7 +471,7 @@ sub parseFastaHeaders {
                         push(@{ $seq{$seqCount}->{ids} }, $id);
                         push(@{ $ss->{other_ids} }, @{ $result->{other_ids} });
                         $ss->{copy_seq_from} = $id;
-                        $seqMeta{$id} = $ss;
+                        $seqMeta->{$id} = $ss;
                     }
                 }
                 
@@ -478,7 +492,7 @@ sub parseFastaHeaders {
 
                 # $id is written to the file at the bottom of the while loop.
                 $id = makeSequenceId($seqCount);
-                my $ss = exists $seqMeta{$id} ? $seqMeta{$id} : {};
+                my $ss = exists $seqMeta->{$id} ? $seqMeta->{$id} : {};
                 push(@{ $seq{$seqCount}->{ids} }, $id);
                 
                 $ss->{description} = $line;
@@ -486,7 +500,7 @@ sub parseFastaHeaders {
                 $seqCount++;
                 $headerLine = 1;
 
-                $seqMeta{$id} = $ss;
+                $seqMeta->{$id} = $ss;
                 $lastLineIsHeader = 1;
             } elsif ($line =~ /\S/ and $line !~ /^>/) {
                 $writeSeq = 1;
@@ -534,7 +548,7 @@ sub parseFastaHeaders {
             } else {
                 print "ERROR: Couldn't find the sequence for $seqIdx\n";
             }
-            $seqMeta{$id}->{seq_len} = $seq{$seqIdx}->{seq_len} if $id =~ /^z/;
+            $seqMeta->{$id}->{seq_len} = $seq{$seqIdx}->{seq_len} if $id =~ /^z/;
         }
     }
 
@@ -543,7 +557,7 @@ sub parseFastaHeaders {
 
     $parser->finish();
 
-    return (\%seqMeta, grep !/^z/, @seqToWrite);
+    return (grep !/^z/, @seqToWrite);
 }
 
 

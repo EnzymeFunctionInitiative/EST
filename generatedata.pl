@@ -264,7 +264,7 @@ if (defined $accessionFile and -e $accessionFile) {
     $noMatchFile = $ENV{PWD} . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFile = "-no-match-file $noMatchFile";
 
-    $userHeaderFile = "-meta-file $userHeaderFile";
+    $userHeaderFileOption = "-meta-file $userHeaderFile";
 } elsif (defined $accessionFile) {
     die "accession file $accessionFile does not exist\n";
 } else {
