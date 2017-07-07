@@ -245,7 +245,7 @@ foreach $element (@uniprotIds) {
     if ($sth->fetch) {
         $inUserIds{$element} = 1;
         $accessionhash{$element} = [];
-        $headerData->{$element}->{query_ids} = $uniprotRevMap->{$_};
+        $headerData->{$element}->{query_ids} = $uniprotRevMap->{$element};
     } else {
         print NOMATCH "$element\tNOT_FOUND_DATABASE\n";
     }
