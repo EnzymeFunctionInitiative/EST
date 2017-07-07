@@ -35,6 +35,12 @@ my $efiDbMod = $ENV{EFIDBMOD};
 my $data_files = $ENV{EFIDBPATH};
 my $dbVer = $ENV{EFIDB};
 
+if (not $configFile or not -f $configFile) {
+    $configFile = $ENV{EFICONFIG};
+}
+
+die "-config file argument is required" if not -f $configFile;
+
 
 die "-tmpdir argument is required" if not $tmpdir;
 
@@ -189,6 +195,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $ENV{PWD}/$tmpdir");
 $B->addAction("which perl");
+$B->addAction("getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa -config=$configFile");
 $B->addAction("getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa");
 $B->renderToFile("$tmpdir/blasthits_getannotations.sh");
 
