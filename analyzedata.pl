@@ -33,12 +33,20 @@ $result = GetOptions(
     "config"      => \$config,        # config file path, if not given will look for EFICONFIG env var
 );
 
+die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
 
-$toolpath = $ENV{'EFIEST'};
-$efiestmod = $ENV{'EFIESTMOD'};
+my $toolpath = $ENV{EFIEST};
+my $efiEstMod = $ENV{EFIESTMOD};
+my $efiDbMod = $ENV{EFIDBMOD};
 
-$dbver = `head -1 $tmpdir/database_version`;
-chomp $dbver;
+my $dbver = "";
+if (-f "$tmpdir/database_version") {
+    $dbver = `head -1 $tmpdir/database_version`;
+    chomp $dbver;
+}
+if (not $dbver) {
+    ($dbver = $efiDbMod) =~ s/\D//g;
+}
 
 $minlen = 0             unless defined $minlen;
 $maxlen = 0             unless defined $maxlen;
@@ -119,7 +127,7 @@ $B = $S->getBuilder();
 $B->dependency(0, @filterjobline[0])
     if not $priorFilter;
 $B->addAction("module load oldapps") if $oldapps;
-$B->addAction("module load $efiestmod");
+$B->addAction("module load $efiEstMod");
 my $outFile = "$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}full_ssn.xgmml";
 $B->addAction("$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver");
 $B->addAction("zip -j $outFile.zip $outFile");
@@ -139,7 +147,7 @@ $B = $S->getBuilder();
 $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
 $B->dependency(0, @fulljobline[0]);
 $B->addAction("module load oldapps") if $oldapps;
-$B->addAction("module load $efiestmod");
+$B->addAction("module load $efiEstMod");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)");
 $B->addAction("cd-hit -i $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
@@ -160,7 +168,7 @@ print "Repnodes job is:\n $repnodejob";
 $B = $S->getBuilder();
 $B->dependency(1, @repnodejobline[0]);
 $B->addAction("module load oldapps") if $oldapps;
-$B->addAction("module load $efiestmod");
+$B->addAction("module load $efiEstMod");
 $B->addAction("sleep 5");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh");
 
@@ -177,7 +185,7 @@ $B->dependency(0, @fulljobline[0] . ":" . $fixjobline[0]);
 #$B->dependency(0, @fulljobline[0]); 
 $B->mailEnd();
 $B->addAction("module load oldapps") if $oldapps;
-$B->addAction("module load $efiestmod");
+$B->addAction("module load $efiEstMod");
 $B->addAction("$toolpath/stats.pl -tmp $ENV{PWD}/$tmpdir -run $filter-$minval-$minlen-$maxlen -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/stats.tab");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh");
 
