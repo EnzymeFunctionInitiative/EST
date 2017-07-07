@@ -196,7 +196,6 @@ $B->addAction("module load $efiDbMod");
 $B->addAction("cd $ENV{PWD}/$tmpdir");
 $B->addAction("which perl");
 $B->addAction("getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa -config=$configFile");
-$B->addAction("getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa");
 $B->renderToFile("$tmpdir/blasthits_getannotations.sh");
 
 $annotationjob= $S->submit("$tmpdir/blasthits_getannotations.sh");
