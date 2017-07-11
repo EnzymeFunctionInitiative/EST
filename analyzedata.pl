@@ -6,10 +6,10 @@
 #this program will analyze data from a folder created in the generatedata step, the most important parts being the 1.out and struct.out files
 
 #this program creates scripts and submits them on clusters with torque schedulers
-#filterblast.pl			Filters 1.out files to remove unwanted information, creates 2.out file
-#xgmml_100_create.pl		Creates a truely 100% xgmml (all nodes and edges) from stuct.out and 2.out files
-#xgmml_create_al.pl		Creates xgmml repnode networks from struct.out, 2.out, and cdit output
-#stats.pl			Displays number of edges and nodes in each xgmml
+#filterblast.pl            Filters 1.out files to remove unwanted information, creates 2.out file
+#xgmml_100_create.pl        Creates a truely 100% xgmml (all nodes and edges) from stuct.out and 2.out files
+#xgmml_create_al.pl        Creates xgmml repnode networks from struct.out, 2.out, and cdit output
+#stats.pl            Displays number of edges and nodes in each xgmml
 
 
 use FindBin;
@@ -19,18 +19,19 @@ use Biocluster::SchedulerApi;
 use Biocluster::Util qw(usesSlurm);
 
 $result = GetOptions(
-    "filter=s"    => \$filter,
-    "minval=s"	  => \$minval,
-    "queue=s"	  => \$queue,
-    "tmp=s"	      => \$tmpdir,
-    "maxlen:i"	  => \$maxlen,
-    "minlen:i"	  => \$minlen,
-    "title:s"	  => \$title,
-    "maxfull:i"	  => \$maxfull,
-    "scheduler=s" => \$scheduler,     # to set the scheduler to slurm 
-    "dryrun"      => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
-    "oldapps"     => \$oldapps,       # to module load oldapps for biocluster2 testing
-    "config"      => \$config,        # config file path, if not given will look for EFICONFIG env var
+    "filter=s"      => \$filter,
+    "minval=s"      => \$minval,
+    "queue=s"       => \$queue,
+    "tmp=s"         => \$tmpdir,
+    "maxlen:i"      => \$maxlen,
+    "minlen:i"      => \$minlen,
+    "title:s"       => \$title,
+    "maxfull:i"     => \$maxfull,
+    "job-id=i"      => \$jobId,
+    "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm 
+    "dryrun"        => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
+    "oldapps"       => \$oldapps,       # to module load oldapps for biocluster2 testing
+    "config"        => \$config,        # config file path, if not given will look for EFICONFIG env var
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -57,7 +58,10 @@ $queue = "efi"          unless defined $queue;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_";
-#my $safeTitle = "";
+
+if ($jobId) {
+    $safeTitle = $jobId . "_" . $safeTitle;
+}
 
 if (defined $maxfull and $maxfull !~ /^\d+$/) {
     die "maxfull must be an integer\n";
