@@ -70,9 +70,9 @@ $result = GetOptions(
     "blasthits=i"       => \$blasthits,
     "memqueue=s"        => \$memqueue,
     "maxsequence=s"     => \$maxsequence,
-#    "userdat=s"         => \$userHeaderFile,
     "userfasta=s"       => \$fastaFile,
     "use-fasta-headers" => \$useFastaHeaders,
+    "seq-count-file=s"  => \$seqCountFile,
     "lengthdif=f"       => \$lengthdif,
     "sim=f"             => \$sim,
     "multiplex=s"       => \$multiplexing,
@@ -198,6 +198,7 @@ if (not defined $configFile or not -f $configFile) {
     }
 }
 
+$seqCountFile = ""  unless defined $seqCountFile;
 
 $np = ceil($np / 24) if ($blast=~/diamond/);
 
@@ -249,6 +250,7 @@ print "maxlen is $maxlen\n";
 print "minlen is $minlen\n";
 print "maxsequence is $maxsequence\n";
 print "incfrac is $incfrac\n";
+print "seq-count-file is $seqCountFile\n";
 
 
 my $userHeaderFile = "";
@@ -276,6 +278,11 @@ my $accessionFileZip = $accessionFile;
 if ($accessionFileZip =~ /\.zip$/i) {
     $accessionFile =~ s/\.zip$/.txt/i;
     $accessionFileOption =~ s/\.zip$/.txt/i;
+}
+
+my $seqCountFileOption = "";
+if ($seqCountFile) {
+    $seqCountFileOption = "-seq-count-file $seqCountFile";
 }
 
 
@@ -352,7 +359,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $B->addAction("dos2unix $accessionFile");
         $B->addAction("mac2unix $accessionFile");
     }
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt -config=$configFile");
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out ".$ENV{PWD}."/$tmpdir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output ".$ENV{PWD}."/$tmpdir/accession.txt $seqCountFileOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 

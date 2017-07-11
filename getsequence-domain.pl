@@ -424,6 +424,8 @@ close NOMATCH if $showNoMatches;
 
 
 if ($seqCountFile) {
+    print "WRITING SEQUENCE COUNT TO $seqCountFile\n";
+
     open SEQCOUNT, "> $seqCountFile";
 
     print SEQCOUNT "File\t$fileSeqCount\n";
