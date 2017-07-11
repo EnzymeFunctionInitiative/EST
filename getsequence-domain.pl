@@ -27,24 +27,25 @@ use Biocluster::Database;
 #
 #print "Configfile is \n > $configfile\n";
 
-my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile, $configFile);
+my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile, $seqCountFile, $configFile);
 my $result = GetOptions(
-    "ipro=s"               => \$ipro,
-    "pfam=s"               => \$pfam,
-    "gene3d=s"             => \$gene3d,
-    "ssf=s"                => \$ssf,
-    "accession-output=s"   => \$access,
-    "maxsequence=s"        => \$maxsequence,
-    "accession-id=s"       => \$manualAccession,
-    "accession-file=s"     => \$accessionFile,
-    "out=s"                => \$fastaFileOut,
-    "fasta-file=s"         => \$fastaFileIn,
-    "meta-file=s"          => \$metaFileOut,
-    "use-fasta-headers"    => \$useFastaHeaders,
-    "domain=s"             => \$domain,
-    "fraction=i"           => \$fraction,
-    "no-match-file=s"      => \$noMatchFile,
-    "config=s"             => \$configFile,
+    "ipro=s"                => \$ipro,
+    "pfam=s"                => \$pfam,
+    "gene3d=s"              => \$gene3d,
+    "ssf=s"                 => \$ssf,
+    "accession-output=s"    => \$access,
+    "maxsequence=s"         => \$maxsequence,
+    "accession-id=s"        => \$manualAccession,
+    "accession-file=s"      => \$accessionFile,
+    "out=s"                 => \$fastaFileOut,
+    "fasta-file=s"          => \$fastaFileIn,
+    "meta-file=s"           => \$metaFileOut,
+    "use-fasta-headers"     => \$useFastaHeaders,
+    "domain=s"              => \$domain,
+    "fraction=i"            => \$fraction,
+    "no-match-file=s"       => \$noMatchFile,
+    "seq-count-file=s"      => \$seqCountFile,
+    "config=s"              => \$configFile,
 );
 
 die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
@@ -147,28 +148,33 @@ print "Getting Acession Numbers in specified Families\n";
 
 my $dbh = $db->getHandle();
 
+my $familySeqCount = 0;
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO FAMILY(S)
 #
-getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, @ipros);
+my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, @ipros);
+$familySeqCount += $famAcc;
 
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM PFAM FAMILY(S)
 #
-getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, @pfams);
+$famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, @pfams);
+$familySeqCount += $famAcc;
 
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM GENE3D FAMILY(S)
 #
-getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, @gene3ds);
+$famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, @gene3ds);
+$familySeqCount += $famAcc;
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM SSF FAMILY(S)
 #
-getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, @ssfs);
+$famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, @ssfs);
+$familySeqCount += $famAcc;
 
 
 # Header data for fasta and accession file inputs.
@@ -177,6 +183,9 @@ my $headerData = {};
 # Save the accessions that are specified through a family.
 my %inFamilyIds = map { ($_, 1) } keys %accessionhash;
 
+# This stores the number of sequences in FASTA files, or the number of matched sequences in an accession ID file.
+my $fileSeqCount = 0;
+
 
 #######################################################################################################################
 # PARSE FASTA FILE FOR HEADER IDS (IF ANY)
@@ -184,17 +193,19 @@ my %inFamilyIds = map { ($_, 1) } keys %accessionhash;
 my @fastaUniprotIds;
 if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     $useFastaHeaders = defined $useFastaHeaders ? 1 : 0;
-    # Returns the Uniprot IDs that were found in the file.  If there were sequences found that didn't map
-    # to a Uniprot ID, they are written to the output FASTA file directly.  The sequences that corresponded
-    # to a Uniprot ID are not written, they are retrieved from the sequences below.
+    # Returns the Uniprot IDs that were found in the file.  All sequences found in the file are written directly
+    # to the output FASTA file.
     # The '1' parameter tells the function not to apply any fraction computation.
-    (@fastaUniprotIds) = parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $headerData, $configFile, 1);
+    my $fastaNumSeq = 0;
+    ($fastaNumSeq, @fastaUniprotIds) = parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $headerData, $configFile, 1);
     
     # Any ids from families are assigned a query_id value but only do it if we have specified
     # an FASTA input file.
     map { $headerData->{$_}->{query_ids} = [$_]; } keys %accessionhash;
 
     print "The uniprot ids that were found in the FASTA file:\n", "\t", join("\n\t", @fastaUniprotIds), "\n";
+
+    $fileSeqCount += $fastaNumSeq;
 }
 
 #######################################################################################################################
@@ -215,6 +226,8 @@ if ($#manualAccessions >= 0) {
 
     print "There were ", scalar @uniprotIds, " matches and ", scalar @$noMatches, " no matches\n";
     print "The uniprot ids that were found in the accession file:\n", "\t", join(",", @uniprotIds), "\n";
+
+    $fileSeqCount += scalar @uniprotIds;
 }
 
 $idMapper->finish() if defined $idMapper;
@@ -273,6 +286,8 @@ print "Initial " . scalar @accessions . " sequences after manual accessions\n";
 print scalar @accessions . " total accessions\n";
 @accessions=uniq @accessions;
 print scalar @accessions . " after uniquing\n";
+
+my $totalSeqCount = scalar @accessions;
 
 
 if (scalar @accessions>$maxsequence and $maxsequence != 0) {
@@ -383,6 +398,7 @@ foreach my $acc (sort sortFn @metaAcc) {
 
 # Write out the remaining zzz headers
 foreach my $acc (sort sortFn keys %$headerData) {
+    $totalSeqCount++;
     print META "$acc\n";
     writeSeqData($acc, $headerData->{$acc}, \*META);
     print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
@@ -405,6 +421,18 @@ foreach my $err (@err) {
 }
 
 close NOMATCH if $showNoMatches;
+
+
+if ($seqCountFile) {
+    open SEQCOUNT, "> $seqCountFile";
+
+    print SEQCOUNT "File\t$fileSeqCount\n";
+    print SEQCOUNT "Family\t$familySeqCount\n";
+    print SEQCOUNT "Total\t$totalSeqCount\n";
+
+    close SEQCOUNT;
+}
+
 
 print "Completed getsequences\n";
 
@@ -557,7 +585,7 @@ sub parseFastaHeaders {
 
     $parser->finish();
 
-    return (grep !/^z/, @seqToWrite);
+    return ($seqCount, grep !/^z/, @seqToWrite);
 }
 
 
@@ -609,6 +637,7 @@ sub getDomainFromDb {
     }
     my @accessions = keys %$accessionHash;
     print "Initial " . scalar @accessions . " sequences after $table\n";
+    return $c;
 }
 
 
