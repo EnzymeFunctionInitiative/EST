@@ -74,6 +74,7 @@ $result = GetOptions(
     "use-fasta-headers" => \$useFastaHeaders,
     "seq-count-file=s"  => \$seqCountFile,
     "lengthdif=f"       => \$lengthdif,
+    "no-match-file=s"   => \$noMatchFile,
     "sim=f"             => \$sim,
     "multiplex=s"       => \$multiplexing,
     "domain=s"          => \$domain,
@@ -226,6 +227,8 @@ unless (defined $incfrac) {
     $incfrac=0.99;
 }
 
+$noMatchFile = ""   unless defined $noMatchFile;
+
 print "Blast is $blast\n";
 print "domain is $domain\n";
 print "fraction is $fraction\n";
@@ -240,6 +243,7 @@ print "ssf is $ssf\n";
 print "gene3d is $gene3d\n";
 print "accession-id is $accessionId\n";
 print "useraccession is $accessionFile\n";
+print "no-match-file is $noMatchFile\n";
 print "np is $np\n";
 print "queue is $queue\n";
 print "memqueue is $memqueue\n";
@@ -255,19 +259,18 @@ print "seq-count-file is $seqCountFile\n";
 
 my $userHeaderFile = "";
 my $userHeaderFileOption = "";
+$userHeaderFile = dirname($accessionFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
+$userHeaderFileOption = "-meta-file $userHeaderFile";
 
 # Error checking for user supplied dat and fa files
-my $noMatchFile = "";
 if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $ENV{PWD} . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
-    $userHeaderFile = dirname($accessionFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
     $accessionFileOption = "-accession-file $accessionFile";
 
-    $noMatchFile = "$tmpdir/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME;
+    $noMatchFile = "$tmpdir/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $ENV{PWD} . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFile = "-no-match-file $noMatchFile";
 
-    $userHeaderFileOption = "-meta-file $userHeaderFile";
 } elsif (defined $accessionFile) {
     die "accession file $accessionFile does not exist\n";
 } else {
@@ -298,10 +301,8 @@ if ($seqCountFile) {
 my $fastaFileOption = "";
 if (defined $fastaFile and -e $fastaFile) {
     $fastaFile = $ENV{PWD}."/$fastaFile" unless ($fastaFile=~/^\// or $fastaFile=~/^~/);
-    $userHeaderFile = dirname($fastaFile) . "/" . Biocluster::Config::FASTA_META_FILENAME;
     $fastaFileOption = "-fasta-file $fastaFile";
     $fastaFileOption = "-use-fasta-headers " . $fastaFileOption if defined $useFastaHeaders;
-    $userHeaderFileOption = "-meta-file $userHeaderFile";
 } elsif (defined $fastaFile) {
     die "$fastaFile does not exist\n";
 } else {
