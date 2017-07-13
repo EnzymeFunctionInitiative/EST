@@ -21,6 +21,7 @@ $result = GetOptions(
     "queue=s"           => \$queue,
     "memqueue=s"        => \$memqueue,
     "nresults=i"        => \$nresults,
+    "seq-count-file=s"  => \$seqCountFile,
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
@@ -117,6 +118,8 @@ unless(defined $memqueue){
     $memqueue="efi";
 }
 
+$seqCountFile = "$ENV{PWD}/$tmpdir/acc_counts.txt" if not $seqCountFile;
+
 
 # Set up the scheduler API so we can work with Torque or Slurm.
 my $schedType = "torque";
@@ -180,7 +183,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $ENV{PWD}/$tmpdir");
 $B->addAction("which perl");
-$B->addAction("blasthits-createfasta.pl -fasta allsequences.fa -accessions accessions.txt");
+$B->addAction("blasthits-createfasta.pl -fasta allsequences.fa -accessions accessions.txt -seq-count-file $seqCountFile");
 $B->renderToFile("$tmpdir/blasthits_createfasta.sh");
 
 $createfastajob= $S->submit("$tmpdir/blasthits_createfasta.sh");
