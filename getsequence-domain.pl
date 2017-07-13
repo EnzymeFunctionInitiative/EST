@@ -176,6 +176,9 @@ $familySeqCount += $famAcc;
 $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, @ssfs);
 $familySeqCount += $famAcc;
 
+# TODO test this
+$familySeqCount = scalar uniq keys %accessionhash;
+
 
 # Header data for fasta and accession file inputs.
 my $headerData = {};
@@ -366,6 +369,7 @@ while(scalar @accessions) {
 }
 close OUT;
 
+print "Starting to write to metadata file $metaFileOut\n";
 
 open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
 
@@ -408,6 +412,7 @@ foreach my $acc (sort sortFn keys %$headerData) {
 
 close META;
 
+print "Starting to write errors\n";
 
 foreach my $err (@err) {
     my @lines = split(m/[\r\n]+/, $err);
@@ -422,11 +427,12 @@ foreach my $err (@err) {
 
 close NOMATCH if $showNoMatches;
 
+print "Starting to write $seqCountFile\n";
 
 if ($seqCountFile) {
     print "WRITING SEQUENCE COUNT TO $seqCountFile\n";
 
-    open SEQCOUNT, "> $seqCountFile";
+    open SEQCOUNT, "> $seqCountFile" or die "Unable to write to sequence count file $seqCountFile: $!";
 
     print SEQCOUNT "File\t$fileSeqCount\n";
     print SEQCOUNT "Family\t$familySeqCount\n";
@@ -472,6 +478,7 @@ sub parseFastaHeaders {
     my $id;
     my $seqLength = 0;
     my $seqCount = 0;
+    my $headerCount = 0;
     while (my $line = <INFASTA>) {
         $line =~ s/[\r\n]+$//;
 
@@ -482,8 +489,11 @@ sub parseFastaHeaders {
         if ($useFastaHeaders) {
             my $result = $parser->parse_line_for_headers($line);
 
+            if ($result->{state} eq Biocluster::Fasta::Headers::HEADER) {
+                $headerCount += $result->{count};
+            }
             # When we get here we are at the end of the headers and have started reading a sequence.
-            if ($result->{state} eq Biocluster::Fasta::Headers::FLUSH) {
+            elsif ($result->{state} eq Biocluster::Fasta::Headers::FLUSH) {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
                     $id = makeSequenceId($seqCount);

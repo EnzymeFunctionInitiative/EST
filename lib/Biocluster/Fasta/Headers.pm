@@ -83,7 +83,7 @@ sub reset {
 sub parse_line_for_headers {
     my ($self, $line) = @_;
 
-    my $result = { state => HEADER, ids => [], primary_id => undef };
+    my $result = { state => HEADER, ids => [], primary_id => undef, count => 0 };
 
     # This flag treats the line as an option C style format where the ID format is unknown.
     my $saveAsUnknownHeader = 0;
@@ -98,6 +98,7 @@ sub parse_line_for_headers {
         $saveAsUnknownHeader = 1;
         # Iterate over each ID in the header line to check if we know anything about it.
         foreach my $id (get_fasta_header_ids($line)) {
+            $result->{count}++;
             # Check the ID type and if it's unknown, we add it to the ID list and move on.
             my $idType = check_id_type($id);
             if ($idType eq Biocluster::IdMapping::Util::UNKNOWN) {

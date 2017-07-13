@@ -516,7 +516,7 @@ sub writeDownloadCommands {
     }
 
     #Update ENA if needed
-    #rsync -auv rsync://ftp.ebi.ac.uk:/pub/databases/ena/sequence/release/ .
+    #rsync -auv rsync://bio-mirror.net/biomirror/embl/release/
 }
 
 

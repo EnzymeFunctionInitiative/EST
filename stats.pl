@@ -1,32 +1,32 @@
 #!/usr/bin/env perl
 
 use Getopt::Long;
+use strict;
 
-$result=GetOptions ("run=s"	=> \$run,
+my ($run, $tmpdir, $out);
+my $result = GetOptions(
+    "run=s"	=> \$run,
     "tmp=s"	=> \$tmpdir,
     "out=s"	=> \$out,
 );
 
 
 
-opendir(DIR, "$tmpdir/$run") or die "Cannot open directory $tmpdir/$run\n";
 open(OUT, ">$out") or die "cannot write to $out\n";
 print OUT "File\t\t\tNodes\tEdges\tSize\n";
-foreach $file (sort {$a cmp $b} readdir(DIR)){
-#print "$file\n";
-    if($file=~/.xgmml$/){
-        if(-s "$tmpdir/$run/$file"){
-            $size=-s "$tmpdir/$run/$file";
-            $nodes=`grep "^  <node" $tmpdir/$run/$file|wc -l`;
-            $edges=`grep "^  <edge" $tmpdir/$run/$file|wc -l`;
-            chomp $nodes;
-            chomp $edges;
-            if($file=~/full/){
-                $file.="\t";
+
+my $fullFile = glob("$tmpdir/$run/*full*");
+print OUT saveFile($fullFile, 1);
+
+foreach my $filePath (sort {$b cmp $a} glob("$tmpdir/$run/*")){
+    if ($filePath =~ /.xgmml$/) {
+        if (-s $filePath) {
+            if ($filePath !~ /full/) {
+                print OUT saveFile($filePath, 0);
             }
-            print OUT "$file\t$nodes\t$edges\t$size\n"
-        }else{
-            print OUT "$file\t0\t0\t0\n";
+        } else {
+            (my $filename = $filePath) =~ s%/([^/]+)$%$1%;
+            print OUT "$filename\t0\t0\t0\n";
         }
     }
 }
@@ -34,3 +34,25 @@ foreach $file (sort {$a cmp $b} readdir(DIR)){
 close DIR;
 
 system("touch $out.completed");
+
+
+
+sub saveFile {
+    my ($filePath, $isFull) = @_;
+
+#    my $filePath = "$tmpdir/$run/$filename";
+#    $filePath = $filename if $filename =~ /full/;
+
+    my $size = -s $filePath;
+    my $nodes = `grep "^  <node" $filePath | wc -l`;
+    my $edges = `grep "^  <edge" $filePath | wc -l`;
+    chomp $nodes;
+    chomp $edges;
+
+    (my $filename = $filePath) =~ s%/([^/]+)$%$1%;
+    $filename .= "\t" if $isFull;
+
+    return "$filename\t$nodes\t$edges\t$size\n"
+}
+
+

@@ -28,8 +28,8 @@ while(<ACC>){
     foreach $sequence (@sequences){
         $sequence=~s/^>\w\w\|(\w{6,10})\|.*/>$1/;
         print FASTA "$sequence\n";
-        $accCount++;
     }
+    $accCount++;
 }
 
 close ACC;
