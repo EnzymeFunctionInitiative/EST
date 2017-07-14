@@ -98,12 +98,13 @@ sub parse_line_for_headers {
         $saveAsUnknownHeader = 1;
         # Iterate over each ID in the header line to check if we know anything about it.
         foreach my $id (get_fasta_header_ids($line)) {
-            $result->{count}++;
             # Check the ID type and if it's unknown, we add it to the ID list and move on.
             my $idType = check_id_type($id);
             if ($idType eq Biocluster::IdMapping::Util::UNKNOWN) {
                 next;
             }
+
+            $result->{count}++;
 
             $saveAsUnknownHeader = 0; # We found a valid header so don't treat this line as an unknown format (Option C)
 

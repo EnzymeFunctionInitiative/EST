@@ -25,7 +25,7 @@ foreach my $filePath (sort {$b cmp $a} glob("$tmpdir/$run/*")){
                 print OUT saveFile($filePath, 0);
             }
         } else {
-            (my $filename = $filePath) =~ s%/([^/]+)$%$1%;
+            (my $filename = $filePath) =~ s%^.*/([^/]+)$%$1%;
             print OUT "$filename\t0\t0\t0\n";
         }
     }
@@ -49,7 +49,7 @@ sub saveFile {
     chomp $nodes;
     chomp $edges;
 
-    (my $filename = $filePath) =~ s%/([^/]+)$%$1%;
+    (my $filename = $filePath) =~ s%^.*/([^/]+)$%$1%;
     $filename .= "\t" if $isFull;
 
     return "$filename\t$nodes\t$edges\t$size\n"

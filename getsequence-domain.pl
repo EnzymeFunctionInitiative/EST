@@ -187,7 +187,10 @@ my $headerData = {};
 my %inFamilyIds = map { ($_, 1) } keys %accessionhash;
 
 # This stores the number of sequences in FASTA files, or the number of matched sequences in an accession ID file.
-my $fileSeqCount = 0;
+my $fileMatchedSeqCount = 0;
+my $fileUnmatchedSeqCount = 0;
+my $fileTotalSeqCount = 0;
+my $fastaNoHeaderTotal = 0;
 
 
 #######################################################################################################################
@@ -199,16 +202,23 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     # Returns the Uniprot IDs that were found in the file.  All sequences found in the file are written directly
     # to the output FASTA file.
     # The '1' parameter tells the function not to apply any fraction computation.
-    my $fastaNumSeq = 0;
-    ($fastaNumSeq, @fastaUniprotIds) = parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $headerData, $configFile, 1);
+    my ($fastaNumUniprotFormat, $fastaNumTotal, $fastaNumUnmatched) = (0, 0, 0);
+    ($fastaNumUniprotFormat, $fastaNumTotal, @fastaUniprotIds) = parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $headerData, $configFile, 1);
+
+    my $fastaNumInDb = scalar @fastaUniprotIds;
+    $fastaNumUnmatched = $fastaNumTotal - $fastaNumInDb;
     
     # Any ids from families are assigned a query_id value but only do it if we have specified
     # an FASTA input file.
     map { $headerData->{$_}->{query_ids} = [$_]; } keys %accessionhash;
 
-    print "The uniprot ids that were found in the FASTA file:\n", "\t", join("\n\t", @fastaUniprotIds), "\n";
+    print "There were $fastaNumTotal headers, $fastaNumInDb IDs with matching UniProt IDs, and $fastaNumUnmatched IDs that weren't found in idmapping in the FASTA file.\n";
+#    print "The uniprot ids that were found in the FASTA file:", "\t", join(",", @fastaUniprotIds), "\n";
 
-    $fileSeqCount += $fastaNumSeq;
+    $fileMatchedSeqCount += $fastaNumInDb;
+    $fileTotalSeqCount += $fastaNumTotal;
+    $fileUnmatchedSeqCount += $fastaNumUnmatched;
+    $fastaNoHeaderTotal += $fastaNumInDb if not $useFastaHeaders;
 }
 
 #######################################################################################################################
@@ -228,9 +238,11 @@ if ($#manualAccessions >= 0) {
     map { $headerData->{$_}->{query_ids} = [$_]; } keys %accessionhash;
 
     print "There were ", scalar @uniprotIds, " matches and ", scalar @$noMatches, " no matches\n";
-    print "The uniprot ids that were found in the accession file:\n", "\t", join(",", @uniprotIds), "\n";
+#    print "The uniprot ids that were found in the accession file:", "\t", join(",", @uniprotIds), "\n";
 
-    $fileSeqCount += scalar @uniprotIds;
+    $fileMatchedSeqCount += scalar @uniprotIds;
+    $fileUnmatchedSeqCount += scalar @$noMatches;
+    $fileTotalSeqCount += scalar @uniprotIds + scalar @$noMatches;
 }
 
 $idMapper->finish() if defined $idMapper;
@@ -337,11 +349,11 @@ while(scalar @accessions) {
         system("fastacmd", "-d", "${data_files}/combined.fasta", "-s", "$batchline");
     };
     push(@err, $fastaErr);
-    #print "fastacmd -d $data_files/combined.fasta -s $batchline\n"; #[[[$fastacmdOutput]]]\n";
+    print "fastacmd -d $data_files/combined.fasta -s $batchline\n";
     @sequences=split /\n>/, $fastacmdOutput;
     $sequences[0] = substr($sequences[0], 1) if $#sequences >= 0 and substr($sequences[0], 0, 1) eq ">";
     foreach $sequence (@sequences) { 
-        print "raw $sequence\n";
+        #print "raw $sequence\n";
         if ($sequence =~ s/^\w\w\|(\w{6,10})\|.*//) {
             $accession=$1;
         } else {
@@ -380,6 +392,18 @@ push(@metaAcc, @fastaUniprotIds);
 foreach my $acc (sort sortFn @metaAcc) {
     print META "$acc\n";
 
+    print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
+    if (exists $inUserIds{$acc} and exists $inFamilyIds{$acc}) {
+        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_BOTH;
+    } elsif (exists $inUserIds{$acc}) {
+        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+    } else {
+        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FAMILY;
+        # Don't write the query ID for ones that are family-only
+        delete $headerData->{$acc}->{query_ids};
+    }
+    print META "\n";
+
     # For user-supplied FASTA sequences that have headers with metadata and that appear in an input
     # PFAM family, write out the metadata.
     if (exists $headerData->{$acc}) {
@@ -388,16 +412,6 @@ foreach my $acc (sort sortFn @metaAcc) {
     } else {
         print "NOT FOUND $acc\n";
     }
-
-    print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
-    if (exists $inUserIds{$acc} and exists $inFamilyIds{$acc}) {
-        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_BOTH;
-    } elsif (exists $inUserIds{$acc}) {
-        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
-    } else {
-        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FAMILY;
-    }
-    print META "\n";
 }
 
 # Write out the remaining zzz headers
@@ -434,7 +448,9 @@ if ($seqCountFile) {
 
     open SEQCOUNT, "> $seqCountFile" or die "Unable to write to sequence count file $seqCountFile: $!";
 
-    print SEQCOUNT "File\t$fileSeqCount\n";
+    print SEQCOUNT "FileTotal\t$fileTotalSeqCount\n";
+    print SEQCOUNT "FileMatched\t$fileMatchedSeqCount\n";
+    print SEQCOUNT "FileUnmatched\t$fileUnmatchedSeqCount\n";
     print SEQCOUNT "Family\t$familySeqCount\n";
     print SEQCOUNT "Total\t$totalSeqCount\n";
 
@@ -496,6 +512,7 @@ sub parseFastaHeaders {
             elsif ($result->{state} eq Biocluster::Fasta::Headers::FLUSH) {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
+#                    print "ZZZ\n";
                     $id = makeSequenceId($seqCount);
                     $seqMeta->{$id}->{description} = substr($result->{raw_headers}, 0, 200);
                     $seqMeta->{$id}->{other_ids} = $result->{other_ids};
@@ -503,6 +520,7 @@ sub parseFastaHeaders {
                 } else {
                     foreach my $res (@{ $result->{uniprot_ids} }) {
                         $id = $res->{uniprot_id};
+#                        print "FASTA ID $id\n";
                         my $ss = $seqMeta->{$id};
                         push(@{ $ss->{query_ids} }, $res->{other_id});
                         foreach my $dupId (@{ $result->{duplicates}->{$id} }) {
@@ -514,6 +532,8 @@ sub parseFastaHeaders {
                         $seqMeta->{$id} = $ss;
                     }
                 }
+
+#                print "END FLUSH\n";
                 
                 # Ensure that the first line of the sequence is written to the file.
                 $writeSeq = 1;
@@ -539,6 +559,7 @@ sub parseFastaHeaders {
 
                 $seqCount++;
                 $headerLine = 1;
+                $headerCount++;
 
                 $seqMeta->{$id} = $ss;
                 $lastLineIsHeader = 1;
@@ -580,7 +601,6 @@ sub parseFastaHeaders {
         }
 
         foreach my $id (@{ $seq{$seqIdx}->{ids} }) {
-            print "ID: $id\n";
             if ($sequence) { #$seqIdx =~ /^z/) {
                 print FASTAOUT ">$id\n";
                 print FASTAOUT $sequence;
@@ -597,7 +617,7 @@ sub parseFastaHeaders {
 
     $parser->finish();
 
-    return ($seqCount, grep !/^z/, @seqToWrite);
+    return ($seqCount, $headerCount, grep !/^z/, @seqToWrite);
 }
 
 
@@ -649,6 +669,7 @@ sub getDomainFromDb {
     }
     my @accessions = keys %$accessionHash;
     print "Initial " . scalar @accessions . " sequences after $table\n";
+#    print "SEQ: ", join(",", @accessions), "\n";
     return $c;
 }
 
