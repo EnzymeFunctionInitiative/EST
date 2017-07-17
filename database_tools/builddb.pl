@@ -56,7 +56,39 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                                                             # been already created, and the idmapping table must be present.
                        );
 
-die "Working directory must be specified" if not $WorkingDir;
+my $usage = <<USAGE;
+Usage: $0 -dir=working_dir [-no-download -interactive -log=log_file-dryrun -exists -scheduler=scheduler
+    -queue=queue -config=config_file -sql -no-prompt -no-submit -db-name=database_name -build-ena]
+
+    -dir            directory to create build structure and download/build database tables in
+    -no-download    do not download the input files
+    -log            path to log file (defaults to build directory)
+    -dryrun         don't do anything, just display all commands to be executed to the console
+    -exists         skip any output or intermediate files that already exist
+    -scheduler      specify the scheduler to use (defaults to torque, can be slurm)
+    -queue          the cluster queue to use for computation
+    -config         path to configuration file (defaults to EFICONFIG env var, if present)
+    -sql            only output sql commands used for importing data into database, nothing else is done
+    -no-prompt      don't prompt the user to confirm the GOLD data version
+    -no-sumit       create all of the job files but don't submit them
+    -db-name        the name of the database to create/use
+    -build-ena      build the ENA database table only, db-name must already be created and idmapping table
+                    must have been imported into the database
+
+USAGE
+
+
+die "Working directory must be specified.\n$usage" if not $WorkingDir;
+
+if (not $dbName) {
+    print "The -db-name parameter is required.\n";
+    exit(1);
+}
+
+if (not defined $queue or length $queue == 0) {
+    print "The --queue parameter is required.\n";
+    exit(1);
+}
 
 # Various directories and files.
 my $DbSupport = $ENV{EFIDBHOME} . "/support";
@@ -94,11 +126,6 @@ mkdir $CombinedDir if not -d $CombinedDir;
 
 
 
-if (not $dbName) {
-    print "The -db-name parameter is required.\n";
-    exit(1);
-}
-
 my %dbArgs;
 $dbArgs{config_file_path} = $configFile if (defined $configFile and -f $configFile);
 my $DB = new Biocluster::Database(%dbArgs);
@@ -110,11 +137,6 @@ if (defined $sql) {
     exit(0);
 }
 
-
-if (not defined $queue or length $queue == 0) {
-    print "The --queue parameter is required.\n";
-    exit(1);
-}
 
 `rm $CompletedFlagFile.*`;
 
