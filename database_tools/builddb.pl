@@ -480,6 +480,10 @@ sub submitDownloadAndUnzipJob {
             if $interactive;
     }
 
+    $B->renderToFile($file);
+
+    $file = "$BuildDir/0-download-format.sh";
+    
     $B->addAction("module load perl");
 
     writeUnzipCommands($B);
