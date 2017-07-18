@@ -38,6 +38,7 @@ my $batchMode;
 my $noSubmit;
 my $dbName;
 my $buildEna;
+my $Legacy;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "no-download"   => \$noDownload,
@@ -45,6 +46,7 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "log=s"         => \$logFile,
                         "dryrun"        => \$dryRun,
                         "exists"        => \$skipIfExists,
+                        "oldapps"       => \$Legacy,        # adds the 'module load oldapps' line to each batch script so that they can work with biocluster2 oldapps module (which should go away at some point in the future)
                         "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm
                         "queue=s"       => \$queue,
                         "config=s"      => \$configFile,
@@ -102,6 +104,7 @@ my $LocalSupportDir = "$BuildDir/support";
 my $CombinedDir = "$BuildDir/combined";
 my $DbMod = $ENV{EFIDBMOD};
 my $EstMod = $ENV{EFIESTMOD};
+$Legacy = defined $Legacy ? 1 : 0;
 
 
 
@@ -148,6 +151,7 @@ my $config = {};
 biocluster_configure($config, %dbArgs);
 my $UniprotLocation = $config->{build}->{uniprot_url};
 my $InterproLocation = $config->{build}->{interpro_url};
+my $TaxonomyLocation = $config->{tax}->{remote_url};
 
 # Set up the scheduler API.
 my $schedType = getSchedulerType($scheduler);
@@ -246,7 +250,8 @@ sub submitIdMappingJob {
 
     my $file = "$BuildDir/5-idmapping.sh";
     $B->dependency(0, $depId);
-    
+   
+    $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
     $B->addAction("module load $DbMod");
     $B->addAction("module load $EstMod");
@@ -268,6 +273,7 @@ sub submitEnaJob {
 
     my $file = "$BuildDir/6-ena.sh";
     
+    $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
     $B->addAction("module load $DbMod");
     $B->addAction("module load $EstMod");
@@ -301,6 +307,7 @@ sub submitFinalFileJob {
     my $file = "$BuildDir/4-finalFiles.sh";
     $B->dependency(0, $depId);
     
+    $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
     
     mkdir "$BuildDir/match_complete" unless(-d "$BuildDir/match_complete");
@@ -392,6 +399,7 @@ sub writeCatBlastCommands {
     my $version = $dirs[-1];
     my $dbPath = $ENV{BLASTDB} . "/../" . $version;
 
+    $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
 
     if (not $skipIfExists or not -f "$pdbBuildDir/pdb.tab") {
@@ -412,6 +420,7 @@ sub writeBlastCommands {
     my $version = $dirs[-1];
     my $dbPath = $ENV{BLASTDB} . "/../" . $version;
 
+    $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load blast");
     $B->addAction("module load perl");
     if (not $skipIfExists or not -f "$pdbBuildDir/output/blastout-1.fa.tab") {
@@ -440,6 +449,7 @@ sub writeSplitFastaCommands {
 
     $B->workingDirectory($dbDir);
     
+    $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load blast");
     $B->addAction("module load efiest");
     $B->addAction("module load perl");
@@ -484,6 +494,7 @@ sub submitDownloadAndUnzipJob {
 
     $file = "$BuildDir/0-download-format.sh";
     
+    $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
 
     writeUnzipCommands($B);
@@ -532,6 +543,13 @@ sub writeDownloadCommands {
         logprint "#  Downloading $UniprotLocation/idmapping/idpmapping.dat.gz\n";
         $B->addAction("curl -sS $UniprotLocation/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
         $B->addAction("date > $CompletedFlagFile.idmapping.dat\n");
+    }
+    if (not $skipIfExists or not -f "$InputDir/taxonomy.xml.gz" and not -f "$InputDir/taxonomy.xml") {
+        if (defined $TaxonomyLocation) {
+            logprint "#  Downloading $TaxonomyLocation\n";
+            $B->addAction("curl -sS $TaxonomyLocation > $InputDir/taxonomy.xml.gz");
+            $B->addAction("date > $CompletedFlagFile.taxonomy.xml\n");
+        }
     }
 
     my $pfamInfoUrl = $config->{build}->{pfam_info_url};
