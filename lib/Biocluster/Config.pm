@@ -34,6 +34,9 @@ use constant {
     DBBUILD_INTERPRO_URL        => "interpro_url",
     DBBUILD_PFAM_INFO_URL       => "pfam_info_url",
 
+    TAX_SECTION                 => "taxonomy",
+    TAX_REMOTE_URL              => "remote_url",
+
     ENVIRONMENT_DB              => "EFIDB",
     ENVIRONMENT_CONFIG          => "EFICONFIG",
 };
@@ -134,6 +137,8 @@ sub parseConfig {
     croak getError(DBBUILD_UNIPROT_URL)             if not defined $object->{build}->{uniprot_url};
     croak getError(DBBUILD_INTERPRO_URL)            if not defined $object->{build}->{interpro_url};
     croak getError(DBBUILD_PFAM_INFO_URL)           if not defined $object->{build}->{pfam_info_url};
+
+    $object->{tax}->{remote_url} = $cfg->val(TAX_SECTION, TAX_REMOTE_URL);
 
     return 1;
 }

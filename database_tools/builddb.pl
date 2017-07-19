@@ -39,6 +39,7 @@ my $noSubmit;
 my $dbName;
 my $buildEna;
 my $Legacy;
+my $enaDir;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "no-download"   => \$noDownload,
@@ -56,6 +57,7 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "db-name=s"     => \$dbName,        # the name of the database
                         "build-ena"     => \$buildEna,      # if this is present, build the ENA table only. the database must have
                                                             # been already created, and the idmapping table must be present.
+                        "ena-dir=s"     => \$enaDir,
                        );
 
 my $usage = <<USAGE;
@@ -76,6 +78,7 @@ Usage: $0 -dir=working_dir [-no-download -interactive -log=log_file-dryrun -exis
     -db-name        the name of the database to create/use
     -build-ena      build the ENA database table only, db-name must already be created and idmapping table
                     must have been imported into the database
+    -ena-dir        the directory that contains the ENA mirror (should have folders pro, std, etc. in it)
 
 USAGE
 
@@ -165,9 +168,13 @@ unlink $CompletedFlagFile if -f $CompletedFlagFile;
 
 if (defined $buildEna and $buildEna) {
 
+    if (not defined $enaDir or not -d $enaDir or not -d "$enaDir/pro") {
+        die "Unable to create job for building ENA table: the ENA directory $enaDir is not valid.";
+    }
+
     # Create ENA table
     logprint "\n\n\n#CREATING ENA TABLE";
-    my $enaJobId = submitEnaJob($S->getBuilder());
+    my $enaJobId = submitEnaJob($S->getBuilder(), $enaDir);
     
 } else {
     
@@ -184,7 +191,7 @@ if (defined $buildEna and $buildEna) {
     logprint "#DOWNLOADING FILES\n";
     logprint "#UNZIPPING FILES + COPYING TREMBL FILES + #ADDING SPROT FILES\n";
     logprint "#CREATE TAB FILES\n";
-    my $dlJobId = submitDownloadAndUnzipJob($S->getBuilder(), not $noDownload);
+    my $dlJobId = submitDownloadAndUnzipJob($S, not $noDownload);
     
     
     logprint "\n\n\n#FORMAT BLAST DATABASE AND DO PDB BLAST\n";
@@ -197,7 +204,7 @@ if (defined $buildEna and $buildEna) {
     
     # Create idmapping table
     logprint "\n\n\n#CREATING IDMAPPING TABLE";
-    my $idJobId = submitIdMappingJob($S->getBuilder());
+    my $idJobId = submitIdMappingJob($S->getBuilder(), $dlJobId);
 }
 
 # Create and import the data into the database
@@ -267,7 +274,7 @@ sub submitIdMappingJob {
 
 
 sub submitEnaJob {
-    my ($B) = @_;
+    my ($B, $enaInputDir) = @_;
 
     waitForInput();
 
@@ -281,15 +288,17 @@ sub submitEnaJob {
     my $enaDir = "$BuildDir/ena"; 
     mkdir $enaDir unless(-d $enaDir);
     if (not $skipIfExists or not -f "$enaDir/pro.tab") {
-        my @emblDirs = sort map { $_ =~ s/^.*\/Release_(\d+).*?$/$1/; $_ } glob($ENV{EFIEMBL} . "/Release_*");
-        my $release = $emblDirs[-1];
-        $B->addAction("$ScriptDir/make_ena_table.pl -embl $ENV{EFIEMBL}/Release_$release -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -log $BuildDir/make_ena_table.log");
+        #my @emblDirs = sort map { $_ =~ s/^.*\/Release_(\d+).*?$/$1/; $_ } glob($ENV{EFIEMBL} . "/Release_*");
+        #my $release = $emblDirs[-1];
+        #my $enaInputDir = "$ENV{EFIEMBL}/Release_$release";
+        
+        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -log $BuildDir/make_ena_table.log");
         $B->addAction("date > $CompletedFlagFile.make_ena_table\n");
         $B->addAction("cat $enaDir/env.tab $enaDir/fun.tab $enaDir/pro.tab > $OutputDir/ena.tab");
         $B->addAction("date > $CompletedFlagFile.cat_ena\n");
     }
 
-    $B->addAction("date > $CompletedFlagFile.5-ena\n");
+    $B->addAction("date > $CompletedFlagFile.6-ena\n");
    
     $B->renderToFile($file);
 
@@ -458,7 +467,7 @@ sub writeSplitFastaCommands {
     #build fasta database
     if (not $skipIfExists or not -f "$dbDir/formatdb.log") {
         $B->addAction("cd $dbDir");
-        $B->addAction("formatdb -i $BuildDir/combined.fasta -p T -o T");
+        $B->addAction("formatdb -i $CombinedDir/combined.fasta -p T -o T");
         $B->addAction("date > $CompletedFlagFile.formatdb\n");
     }
     
@@ -466,7 +475,7 @@ sub writeSplitFastaCommands {
     mkdir $fracDir if not -d $fracDir;
 
     if (not $skipIfExists or not -f "$fracDir/fractfile-1.fa") {
-        $B->addAction("splitfasta.pl -parts $np -tmp $fracDir -source $BuildDir/combined.fasta");
+        $B->addAction("splitfasta.pl -parts $np -tmp $fracDir -source $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.splitfasta\n");
     }
 }
@@ -480,27 +489,28 @@ sub writeSplitFastaCommands {
 
 
 sub submitDownloadAndUnzipJob {
-    my ($B, $doDownload) = @_;
+    my ($S, $doDownload) = @_;
 
-    my $file = "$BuildDir/0-download.sh";
-    
     if ($doDownload) {
+        my $file = "$BuildDir/0-download.sh";
+
+        my $B = $S->getBuilder();
         writeDownloadCommands($B);
+
+        $B->renderToFile($file);
+
         logprint "#COMPLETED DOWNLOAD AT " . scalar localtime() . "\n"
             if $interactive;
     }
 
-    $B->renderToFile($file);
 
-    $file = "$BuildDir/0-download-format.sh";
-    
+    my $file = "$BuildDir/0-download-format.sh";
+    my $B = $S->getBuilder();
+
     $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
-
     writeUnzipCommands($B);
-
     writeTabFileCommands($B);
-
     $B->addAction("date > $CompletedFlagFile.0-download\n");
 
     $B->renderToFile($file);
@@ -569,6 +579,8 @@ sub writeUnzipCommands {
 
     waitForInput();
 
+    print "INPUT DIR: $InputDir\n";
+
     my @gzFiles = glob("$InputDir/*.gz");
     if (scalar @gzFiles) {
         $B->addAction("gunzip $InputDir/*.gz");
@@ -576,7 +588,7 @@ sub writeUnzipCommands {
     }
 
     #create new copies of trembl databases
-    if (not $skipIfExists or not -f "$InputDir/combined.fasta") {
+    if (not $skipIfExists or not -f "$CombinedDir/combined.fasta") {
         $B->addAction("cp $InputDir/uniprot_trembl.fasta $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.combined.fasta_cp\n");
     }
@@ -586,7 +598,7 @@ sub writeUnzipCommands {
     }
     
     #add swissprot database to trembl copy
-    if (not $skipIfExists or not -f "$InputDir/combined.fasta") {
+    if (not $skipIfExists or not -f "$CombinedDir/combined.fasta") {
         $B->addAction("cat $InputDir/uniprot_sprot.fasta >> $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.combined.fasta_cat\n");
     }

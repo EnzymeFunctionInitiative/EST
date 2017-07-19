@@ -143,7 +143,7 @@ sub dependency {
 
 sub workingDirectory {
     my ($self, $workingDir) = @_;
-    $self->{working_dir} = "-d $workingDir";
+    $self->{working_dir} = "-w $workingDir";
 }
 
 
