@@ -110,7 +110,10 @@ sub process{
                 if ($#uniprotIds == -1) { 
                     my ($revUniprotIds, $noMatch) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::GENBANK, @proteinIds);
                     @revUniprotIdsToAdd = grep { not exists $processedAlready{$_} } @$revUniprotIds;
-                    logprint "REV\t" . (scalar @$revUniprotIds) . "\t" . (scalar @$noMatch) . "\t" . (scalar @revUniprotIdsToAdd);
+                    if (scalar @revUniprotIdsToAdd) {
+                        logprint "Found a mapping of protein ID ", join(",", @proteinIds), " to UniProt ID ", join(",", @revUniprotIdsToAdd);
+                    }
+#                    logprint "REV\t" . (scalar @$revUniprotIds) . "\t" . (scalar @$noMatch) . "\t" . (scalar @revUniprotIdsToAdd);
 #                    logprint "Found " .
 #                        (scalar @$revUniprotIds) .
 #                        " protein IDs that mapped to uniprot IDs (" .
