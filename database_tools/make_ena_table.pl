@@ -20,8 +20,9 @@ use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 
 use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/lib";
 
-use Biocluster::IdMapping;
+use IdMappingFile;
 
 # Uncommenting this line merely lists the files. The script doesn't read them.
 #$LIST_FILES_ONLY = 1;
@@ -206,13 +207,15 @@ $result = GetOptions(
     "config=s"      => \$configFile,
 );
 
-if (not $configFile or not -f $configFile) {
-    $configFile = $ENV{EFICONFIG};
-}
-die "This script requires that a config file be provided via the -config=file argument." if not -f $configFile; 
+# We're not currently using the EFI database for reverse lookups, rather we're using the flat file so this
+# config file is now optional.
+#if (not $configFile or not -f $configFile) {
+#    $configFile = $ENV{EFICONFIG};
+#}
+#die "This script requires that a config file be provided via the -config=file argument." if not -f $configFile; 
+#my $idMapper = new EFI::IdMapping(config_file_path => $configFile);
 
-#my $idMapper = new Biocluster::IdMapping(config_file_path => $configFile);
-my $idMapper = new Mapper();
+my $idMapper = new IdMappingFile(); #Same signature as EFI::IdMapping
 $idMapper->parseTable($idMappingFile) if $idMappingFile and -f $idMappingFile;
 
 
@@ -290,58 +293,58 @@ close LOG;
 #system("sqlite3 $sqlite </home/groups/efi/gnn/creategnndatabase.sql");
 
 
-# We are abstracting the mapping code in case we want to start using the database again instead of
-# the table directly.
-package Mapper;
-
-sub new {
-    my $class = shift;
-    my %args = @_;
-
-    my $self = {};
-    bless($self, $class);
-
-    return $self;
-}
-
-
-sub parseTable {
-    my $self = shift;
-    my $tablePath = shift;
-
-    open TABLE, $tablePath or die "Unable to open idmapping table '$tablePath' for reading: $!";
-
-    while (my $line = <TABLE>) {
-        chomp $line;
-        my ($uniprotId, $type, $foreignId) = split /\t/, $line;
-        if (lc $type eq "embl-cds") {
-            $self->{map}->{$foriegnId} = $uniprotId;
-        }
-    }
-
-    close TABLE;
-}
-
-sub reverseLookup {
-    my $self = shift;
-    my $idType = shift; # not used; here for compatibility with the EFI::IdMapper module.
-    my @foreignIds = @_;
-
-    my @uniprotIds;
-    my @noMatches;
-    foreach my $id (@foreignIds) {
-        if (exists $self->{map}->{$id}) {
-            push @uniprotIds, $self->{map}->{$id};
-        } else {
-            push @noMatches, $id;
-        }
-    }
-
-    return \@uniprotIds, \@noMatches;
-}
-
-sub finish {
-}
-
-1;
+## We are abstracting the mapping code in case we want to start using the database again instead of
+## the table directly.
+#package Mapper;
+#
+#sub new {
+#    my $class = shift;
+#    my %args = @_;
+#
+#    my $self = {};
+#    bless($self, $class);
+#
+#    return $self;
+#}
+#
+#
+#sub parseTable {
+#    my $self = shift;
+#    my $tablePath = shift;
+#
+#    open TABLE, $tablePath or die "Unable to open idmapping table '$tablePath' for reading: $!";
+#
+#    while (my $line = <TABLE>) {
+#        chomp $line;
+#        my ($uniprotId, $type, $foreignId) = split /\t/, $line;
+#        if (lc $type eq "embl-cds") {
+#            $self->{map}->{$foriegnId} = $uniprotId;
+#        }
+#    }
+#
+#    close TABLE;
+#}
+#
+#sub reverseLookup {
+#    my $self = shift;
+#    my $idType = shift; # not used; here for compatibility with the EFI::IdMapper module.
+#    my @foreignIds = @_;
+#
+#    my @uniprotIds;
+#    my @noMatches;
+#    foreach my $id (@foreignIds) {
+#        if (exists $self->{map}->{$id}) {
+#            push @uniprotIds, $self->{map}->{$id};
+#        } else {
+#            push @noMatches, $id;
+#        }
+#    }
+#
+#    return \@uniprotIds, \@noMatches;
+#}
+#
+#sub finish {
+#}
+#
+#1;
 
