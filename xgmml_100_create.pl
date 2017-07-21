@@ -97,7 +97,8 @@ if(-e $struct){
             push(@metas, $lineary[1]) if not grep { $_ eq $lineary[1] } @metas;
             if (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and
                      @lineary[1] ne "PFAM" and @lineary[1] ne "GO" and @lineary[1] ne "HMP_Body_Site" and 
-                     @lineary[1] ne "CAZY" and @lineary[1] ne "Query_IDs" and @lineary[1] ne "Other_IDs") {
+                     @lineary[1] ne "CAZY" and @lineary[1] ne "Query_IDs" and @lineary[1] ne "Other_IDs" and
+                     @lineary[1] ne "Description") {
                 $uprot{$id}{@lineary[1]}=@lineary[2]; 
             }else{
                 my @tmpline = grep /\S/, split(",", @lineary[2]);
@@ -143,7 +144,9 @@ foreach my $element (@uprotnumbers){
     foreach my $key (@metas){
         #print "\t$key\t$uprot{$element}{$key}\n";
         if($key eq "IPRO" or $key eq "GI" or $key eq "PDB" or $key eq "PFAM" or $key eq "GO" or
-           $key eq "HMP_Body_Site" or $key eq "CAZY" or $key eq "Query_IDs" or $key eq "Other_IDs"){
+           $key eq "HMP_Body_Site" or $key eq "CAZY" or $key eq "Query_IDs" or $key eq "Other_IDs" or
+           $key eq "Description")
+        {
             $writer->startTag('att', 'type' => 'list', 'name' => $key);
             foreach my $piece (@{$uprot{$element}{$key}}){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;

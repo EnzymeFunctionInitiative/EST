@@ -543,7 +543,7 @@ sub parseFastaHeaders {
                 if (not scalar @{ $result->{uniprot_ids} }) {
 #                    print "ZZZ\n";
                     $id = makeSequenceId($seqCount);
-                    $seqMeta->{$id}->{description} = substr($result->{raw_headers}, 0, 200);
+                    $seqMeta->{$id}->{description} = $result->{raw_headers}; # substr($result->{raw_headers}, 0, 200);
                     $seqMeta->{$id}->{other_ids} = $result->{other_ids};
                     push(@{ $seq{$seqCount}->{ids} }, $id);
                 } else {
@@ -668,7 +668,13 @@ sub sortFn {
 sub writeSeqData {
     my ($id, $seqMeta, $mfh) = @_;
 
-    print $mfh "\tDescription\t" . $seqMeta->{description} . "\n"                               if $seqMeta->{description};
+    my $desc = "";
+    if ($seqMeta->{description}) {
+        # Get rid of commas, since they are used to transform the multiple headers into lists
+        ($desc = $seqMeta->{description}) =~ s/,//g;
+        $desc =~ s/>/,/g;
+    }
+    print $mfh "\tDescription\t" . $desc . "\n"                                                 if $desc;
     print $mfh "\tSequence_Length\t" . $seqMeta->{seq_len} . "\n"                               if exists $seqMeta->{seq_len};
     print $mfh "\tOther_IDs\t" . join(",", @{ $seqMeta->{other_ids} }) . "\n"                   if exists $seqMeta->{other_ids};
     print $mfh "\tQuery_IDs\t" . join(",", @{ $seqMeta->{query_ids} }) . "\n"                   if exists $seqMeta->{query_ids};
