@@ -105,9 +105,14 @@ my $OutputDir = "$WorkingDir/output";
 my $CompletedFlagFile = "$BuildDir/progress/completed";
 my $LocalSupportDir = "$BuildDir/support";
 my $CombinedDir = "$BuildDir/combined";
+my $PdbBuildDir = "$BuildDir/pdbblast";
 my $DbMod = $ENV{EFIDBMOD};
 my $EstMod = $ENV{EFIESTMOD};
 $Legacy = defined $Legacy ? 1 : 0;
+
+
+# Number of processors to use for the blast job.
+my $np = 200;
 
 
 
@@ -129,6 +134,8 @@ mkdir $OutputDir if not -d $OutputDir;
 mkdir "$BuildDir/progress" if not -d "$BuildDir/progress";
 mkdir $LocalSupportDir if not -d $LocalSupportDir;
 mkdir $CombinedDir if not -d $CombinedDir;
+mkdir $PdbBuildDir if not -d $PdbBuildDir;
+mkdir "$PdbBuildDir/output" if not -d "$PdbBuildDir/output";
 
 
 
@@ -139,7 +146,7 @@ my $DB = new Biocluster::Database(%dbArgs);
 
 # Output the sql commands necessary for creating the database and importing the data, then exit.
 if (defined $sql) {
-    writeSqlCommands($dbName, $buildEna);
+    writeSqlCommands($dbName, $buildEna, "sql");
     exit(0);
 }
 
@@ -166,6 +173,8 @@ my $FH = new Biocluster::Util::FileHandle('dryrun' => $dryRun);
 unlink $CompletedFlagFile if -f $CompletedFlagFile;
 
 
+my $fileNum = 0;
+    
 if (defined $buildEna and $buildEna) {
 
     if (not defined $enaDir or not -d $enaDir or not -d "$enaDir/pro") {
@@ -174,42 +183,52 @@ if (defined $buildEna and $buildEna) {
 
     # Create ENA table
     logprint "\n\n\n#CREATING ENA TABLE";
-    my $enaJobId = submitEnaJob($S->getBuilder(), $enaDir);
+    my $enaJobId = submitEnaJob($S->getBuilder(), $enaDir, 17);
     
 } else {
     
-    logprint "\n#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-    logprint "# USING GOLD DATA THAT WAS LAST UPDATED LOCALLY ON ", scalar localtime((stat("$DbSupport/phylo.tab"))[9]), "\n";
-    logprint "# TO DOWNLOAD THE LATEST DATA, GO TO https://gold.jgi.doe.gov/ AND REMOVE ALL COLUMNS EXCEPT\n";
-    logprint "#    NCBI TAXON ID, DOMAIN, KINGDOM, PHYLUM, CLASS, ORDER, FAMILY, GENUS, SPECIES\n";
-    logprint "# AND COPY THE RESULTING TAB-SEPARATED FILE TO $DbSupport/phylo.tab\n";
-    logprint "#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
-    print "To continue using these GOLD data, press enter or press Ctrl+C to abort..." and scalar <STDIN> unless $batchMode;
-    logprint "\n";
-    
+    #logprint "\n#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+    #logprint "# USING GOLD DATA THAT WAS LAST UPDATED LOCALLY ON ", scalar localtime((stat("$DbSupport/phylo.tab"))[9]), "\n";
+    #logprint "# TO DOWNLOAD THE LATEST DATA, GO TO https://gold.jgi.doe.gov/ AND REMOVE ALL COLUMNS EXCEPT\n";
+    #logprint "#    NCBI TAXON ID, DOMAIN, KINGDOM, PHYLUM, CLASS, ORDER, FAMILY, GENUS, SPECIES\n";
+    #logprint "# AND COPY THE RESULTING TAB-SEPARATED FILE TO $DbSupport/phylo.tab\n";
+    #logprint "#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
+    #print "To continue using these GOLD data, press enter or press Ctrl+C to abort..." and scalar <STDIN> unless $batchMode;
+    #logprint "\n";
     
     logprint "#DOWNLOADING FILES\n";
-    logprint "#UNZIPPING FILES + COPYING TREMBL FILES + #ADDING SPROT FILES\n";
-    logprint "#CREATE TAB FILES\n";
-    my $dlJobId = submitDownloadAndUnzipJob($S, not $noDownload);
+    my $dlJobId;
+    $dlJobId = submitDownloadJob($S->getBuilder(), $fileNum) if not $noDownload;
+    $fileNum++;
     
+    logprint "#UNZIPPING FILES + COPYING TREMBL FILES + ADDING SPROT FILES + CREATE TAB FILES\n";
+    my $unzipJobId = submitUnzipJob($S->getBuilder(), $dlJobId, $fileNum++);
     
-    logprint "\n\n\n#FORMAT BLAST DATABASE AND DO PDB BLAST\n";
-    my $blastJobId = submitBlastJobs($S->getBuilder(), $dlJobId);
+    logprint "#UNZIPPING FILES + COPYING TREMBL FILES + ADDING SPROT FILES + CREATE TAB FILES\n";
+    my $taxJobId = submitTaxonomyJob($S->getBuilder(), $unzipJobId, $fileNum++);
+    
+    logprint "\n\n\n#FORMAT BLAST DATABASE\n";
+    my $splitJobId = submitSplitFastaJob($S->getBuilder(), $unzipJobId, $np, $PdbBuildDir, $fileNum++);
+    
+    logprint "\n\n\n#DO PDB BLAST\n";
+    my $blastJobId = submitBlastJob($S->getBuilder(), $splitJobId, $np, $PdbBuildDir, $fileNum++);
+    
+    logprint "\n\n\n#CAT BLAST FILES\n";
+    my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
     
     
     # Chop up xml files so we can parse them easily
     logprint "\n\n\n#CHOP MATCH_COMPLETE AND .TAB FILES\n";
-    my $ffJobId = submitFinalFileJob($S->getBuilder(), $dlJobId);
+    my $ffJobId = submitFinalFileJob($S->getBuilder(), $unzipJobId, $fileNum++);
     
     # Create idmapping table
     logprint "\n\n\n#CREATING IDMAPPING TABLE";
-    my $idJobId = submitIdMappingJob($S->getBuilder(), $dlJobId);
+    my $idJobId = submitIdMappingJob($S->getBuilder(), $unzipJobId, $fileNum++);
 }
 
 # Create and import the data into the database
 logprint "\n\n\n#WRITING SQL SCRIPT FOR IMPORTING DATA INTO DATABASE\n";
-writeSqlCommands($dbName, $buildEna);
+writeSqlCommands($dbName, $buildEna, $fileNum);
 
 
 logprint "\n\n\n#FINISHED AT " . scalar localtime() . "\n";
@@ -251,11 +270,11 @@ close LOG;
 
 
 sub submitIdMappingJob {
-    my ($B, $depId) = @_;
+    my ($B, $depId, $fileNum) = @_;
 
     waitForInput();
 
-    my $file = "$BuildDir/5-idmapping.sh";
+    my $file = "$BuildDir/$fileNum-idmapping.sh";
     $B->dependency(0, $depId);
    
     $B->addAction("module load oldapps") if $Legacy;
@@ -263,7 +282,7 @@ sub submitIdMappingJob {
     $B->addAction("module load $DbMod");
     $B->addAction("module load $EstMod");
     $B->addAction("perl $ScriptDir/import_id_mapping.pl -config $configFile -input $InputDir/idmapping.dat -output $OutputDir/idmapping.tab");
-    $B->addAction("date > $CompletedFlagFile.6-idmapping\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-idmapping\n");
    
     $B->renderToFile($file);
 
@@ -274,11 +293,11 @@ sub submitIdMappingJob {
 
 
 sub submitEnaJob {
-    my ($B, $enaInputDir) = @_;
+    my ($B, $enaInputDir, $fileNum) = @_;
 
     waitForInput();
 
-    my $file = "$BuildDir/6-ena.sh";
+    my $file = "$BuildDir/$fileNum-ena.sh";
     
     $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
@@ -292,13 +311,15 @@ sub submitEnaJob {
         #my $release = $emblDirs[-1];
         #my $enaInputDir = "$ENV{EFIEMBL}/Release_$release";
         
+        $B->addAction("gunzip -r $enaInputDir");
+        $B->addAction("date > $CompletedFlagFile.unzip_ena\n");
         $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -log $BuildDir/make_ena_table.log");
         $B->addAction("date > $CompletedFlagFile.make_ena_table\n");
         $B->addAction("cat $enaDir/env.tab $enaDir/fun.tab $enaDir/pro.tab > $OutputDir/ena.tab");
         $B->addAction("date > $CompletedFlagFile.cat_ena\n");
     }
 
-    $B->addAction("date > $CompletedFlagFile.6-ena\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-ena\n");
    
     $B->renderToFile($file);
 
@@ -309,11 +330,11 @@ sub submitEnaJob {
 
 
 sub submitFinalFileJob {
-    my ($B, $depId) = @_;
+    my ($B, $depId, $fileNum) = @_;
 
     waitForInput();
 
-    my $file = "$BuildDir/4-finalFiles.sh";
+    my $file = "$BuildDir/$fileNum-finalFiles.sh";
     $B->dependency(0, $depId);
     
     $B->addAction("module load oldapps") if $Legacy;
@@ -334,7 +355,7 @@ sub submitFinalFileJob {
         $B->addAction("date > $CompletedFlagFile.formatdatfromxml\n");
     }
 
-    $B->addAction("date > $CompletedFlagFile.4-finalFiles\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-finalFiles\n");
 
     $B->renderToFile($file);
 
@@ -351,54 +372,103 @@ sub submitFinalFileJob {
 
 
 
-sub submitBlastJobs {
-    my ($B, $depId) = @_;
+sub submitSplitFastaJob {
+    my ($B, $depId, $np, $pdbBuildDir, $fileNum) = @_;
 
-    my $np = 200;
-    my $pdbBuildDir = "$BuildDir/pdbblast";
-    mkdir $pdbBuildDir if not -d $pdbBuildDir;
-    mkdir "$pdbBuildDir/output" if not -d "$pdbBuildDir/output";
-
-    my $file = "$BuildDir/1-splitfasta.sh";
+    my $file = "$BuildDir/$fileNum-splitfasta.sh";
     $B->dependency(0, $depId);
 
     writeSplitFastaCommands($B, $np, $pdbBuildDir);
-    $B->addAction("date > $CompletedFlagFile.1-splitfasta\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-splitfasta\n");
 
     $B->renderToFile($file);
-    $depId = $DoSubmit and $S->submit($file);
+    return $DoSubmit and $S->submit($file);
+}
 
-    $B = $S->getBuilder();
+
+sub submitBlastJob {
+    my ($B, $depId, $np, $pdbBuildDir, $fileNum) = @_;
 
     # Separate blast job since we are requesting a job array.
 
-    $file = "$BuildDir/2-blast-qsub.sh";
+    my $file = "$BuildDir/$fileNum-blast-qsub.sh";
     $B->workingDirectory($pdbBuildDir);
     $B->dependency(0, $depId);
     $B->jobArray("1-$np");
 
     writeBlastCommands($B, $pdbBuildDir);
-    $B->addAction("date > $CompletedFlagFile.2-blast-qsub\n");
-        
-    $B->renderToFile($file);
-
-    $depId = $DoSubmit and $S->submit($file);
-
-    $B = $S->getBuilder();
-
-    # Separate blast job since we are requesting a job array.
-
-    $file = "$BuildDir/3-cat-blast.sh";
-    $B->workingDirectory($pdbBuildDir);
-    $B->dependency(0, $depId);
-
-    writeCatBlastCommands($B, $pdbBuildDir);
-    $B->addAction("date > $CompletedFlagFile.3-cat-blast\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-blast-qsub\n");
         
     $B->renderToFile($file);
 
     return $DoSubmit and $S->submit($file);
 }
+
+
+sub submitCatBlastJob {
+    my ($B, $depId, $pdbBuildDir, $fileNum) = @_;
+
+    my $file = "$BuildDir/$fileNum-cat-blast.sh";
+    $B->workingDirectory($pdbBuildDir);
+    $B->dependency(0, $depId);
+
+    writeCatBlastCommands($B, $pdbBuildDir);
+    $B->addAction("date > $CompletedFlagFile.$fileNum-cat-blast\n");
+        
+    $B->renderToFile($file);
+
+    return $DoSubmit and $S->submit($file);
+}
+
+
+#sub submitBlastJobs {
+#    my ($B, $depId, $fileNum) = @_;
+#
+#    my $np = 200;
+#    my $pdbBuildDir = "$BuildDir/pdbblast";
+#    mkdir $pdbBuildDir if not -d $pdbBuildDir;
+#    mkdir "$pdbBuildDir/output" if not -d "$pdbBuildDir/output";
+#
+#    my $file = "$BuildDir/$fileNum-splitfasta.sh";
+#    $B->dependency(0, $depId);
+#
+#    writeSplitFastaCommands($B, $np, $pdbBuildDir);
+#    $B->addAction("date > $CompletedFlagFile.$fileNum-splitfasta\n");
+#
+#    $B->renderToFile($file);
+#    $depId = $DoSubmit and $S->submit($file);
+#
+#    $B = $S->getBuilder();
+#
+#    # Separate blast job since we are requesting a job array.
+#
+#    $file = "$BuildDir/2-blast-qsub.sh";
+#    $B->workingDirectory($pdbBuildDir);
+#    $B->dependency(0, $depId);
+#    $B->jobArray("1-$np");
+#
+#    writeBlastCommands($B, $pdbBuildDir);
+#    $B->addAction("date > $CompletedFlagFile.2-blast-qsub\n");
+#        
+#    $B->renderToFile($file);
+#
+#    $depId = $DoSubmit and $S->submit($file);
+#
+#    $B = $S->getBuilder();
+#
+#    # Separate blast job since we are requesting a job array.
+#
+#    $file = "$BuildDir/3-cat-blast.sh";
+#    $B->workingDirectory($pdbBuildDir);
+#    $B->dependency(0, $depId);
+#
+#    writeCatBlastCommands($B, $pdbBuildDir);
+#    $B->addAction("date > $CompletedFlagFile.3-cat-blast\n");
+#        
+#    $B->renderToFile($file);
+#
+#    return $DoSubmit and $S->submit($file);
+#}
 
 
 sub writeCatBlastCommands {
@@ -488,30 +558,47 @@ sub writeSplitFastaCommands {
 
 
 
-sub submitDownloadAndUnzipJob {
-    my ($S, $doDownload) = @_;
+sub submitTaxonomyJob {
+    my ($B, $depId, $fileNum) = @_;
 
-    if ($doDownload) {
-        my $file = "$BuildDir/0-download.sh";
+    my $file = "$BuildDir/$fileNum-taxonomy.sh";
 
-        my $B = $S->getBuilder();
-        writeDownloadCommands($B);
+    $B->dependency($depId);
+    $B->addAction("$ScriptDir/make_taxonomy_table.pl -input $InputDir/taxonomy.xml -output $OutputDir/taxonomy.tab -verbose");
 
-        $B->renderToFile($file);
+    $B->renderToFile($file);
 
-        logprint "#COMPLETED DOWNLOAD AT " . scalar localtime() . "\n"
-            if $interactive;
-    }
+    return $DoSubmit and $S->submit($file);
+}
 
 
-    my $file = "$BuildDir/0-download-format.sh";
-    my $B = $S->getBuilder();
+sub submitDownloadJob {
+    my ($B, $fileNum) = @_;
 
+    my $file = "$BuildDir/$fileNum-download.sh";
+
+    writeDownloadCommands($B);
+
+    $B->renderToFile($file);
+
+    logprint "#COMPLETED DOWNLOAD AT " . scalar localtime() . "\n"
+        if $interactive;
+
+    return $DoSubmit and $S->submit($file);
+}
+
+
+sub submitUnzipJob {
+    my ($B, $depId, $fileNum) = @_;
+
+    my $file = "$BuildDir/$fileNum-process.sh";
+
+    $B->dependency(0, $depId);
     $B->addAction("module load oldapps") if $Legacy;
     $B->addAction("module load perl");
     writeUnzipCommands($B);
     writeTabFileCommands($B);
-    $B->addAction("date > $CompletedFlagFile.0-download\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-process\n");
 
     $B->renderToFile($file);
 
@@ -624,11 +711,11 @@ sub writeTabFileCommands {
         $B->addAction("mac2unix $LocalSupportDir/gdna.tab");
         $B->addAction("dos2unix $LocalSupportDir/gdna.tab\n");
     }
-    if (not $skipIfExists or not -f "$LocalSupportDir/phylo.tab") {
-        $B->addAction("cp $DbSupport/phylo.tab $LocalSupportDir/phylo.tab");
-        $B->addAction("mac2unix $LocalSupportDir/phylo.tab");
-        $B->addAction("dos2unix $LocalSupportDir/phylo.tab\n");
-    }
+    #if (not $skipIfExists or not -f "$LocalSupportDir/phylo.tab") {
+    #    $B->addAction("cp $DbSupport/phylo.tab $LocalSupportDir/phylo.tab");
+    #    $B->addAction("mac2unix $LocalSupportDir/phylo.tab");
+    #    $B->addAction("dos2unix $LocalSupportDir/phylo.tab\n");
+    #}
     if (not $skipIfExists or not -f "$LocalSupportDir/efi-accession.tab") {
         $B->addAction("cp $DbSupport/efi-accession.tab $LocalSupportDir/efi-accession.tab");
         $B->addAction("mac2unix $LocalSupportDir/efi-accession.tab");
@@ -664,13 +751,10 @@ sub writeTabFileCommands {
 
 
 sub writeSqlCommands {
-    my ($dbName, $buildEna, $outFile) = @_;
+    my ($dbName, $buildEna, $fileNum) = @_;
 
-    my $batchFile = "";
-    if (not defined $outFile) {
-        $outFile = "$BuildDir/7-createDbAndImportData.sql";
-        $batchFile = "$BuildDir/8-runDatabaseActions.sh";
-    }
+    my $outFile = "$BuildDir/$fileNum-createDbAndImportData.sql";
+    my $batchFile = "$BuildDir/$fileNum-runDatabaseActions.sh";
 
     open OUT, "> $outFile" or die "Unable to open '$outFile' to save SQL commands: $!";
 
@@ -684,9 +768,14 @@ sub writeSqlCommands {
 
 select 'CREATING ANNOTATIONS' as '';
 drop table if exists annotations;
-create table annotations(accession varchar(10) primary key, Uniprot_ID varchar(15), STATUS varchar(10), Squence_Length integer, Taxonomy_ID integer, GDNA varchar(5), Description varchar(255), SwissProt_Description varchar(255),Organism varchar(150), Domain varchar(25), GN varchar(40), PFAM varchar(300), pdb varchar(3000), IPRO varchar(700), GO varchar(1300), GI varchar(15), HMP_Body_Site varchar(75), HMP_Oxygen varchar(50), EFI_ID varchar(6), EC varchar(185), Phylum varchar(30), Class varchar(25), TaxOrder varchar(30), Family varchar(25), Genus varchar(40), Species varchar(50), Cazy varchar(30));
+create table annotations(accession varchar(10) primary key, Uniprot_ID varchar(15), STATUS varchar(10), Sequence_Length integer, Taxonomy_ID integer, GDNA varchar(5), Description varchar(255), SwissProt_Description varchar(255),Organism varchar(150), Domain varchar(25), GN varchar(40), PFAM varchar(300), pdb varchar(3000), IPRO varchar(700), GO varchar(1300), GI varchar(15), HMP_Body_Site varchar(75), HMP_Oxygen varchar(50), EFI_ID varchar(6), EC varchar(185), Phylum varchar(30), Class varchar(25), TaxOrder varchar(30), Family varchar(25), Genus varchar(40), Species varchar(50), Cazy varchar(30));
 create index TaxID_Index ON annotations (Taxonomy_ID);
 create index accession_Index ON annotations (accession);
+
+select 'CREATING TAXONOMY' as '';
+drop table if exists taxonomy;
+create table taxonomy(Taxonomy_ID integer, Domain varchar(25), Kingdom varchar(25), Phylum varchar(30), Class varchar(25), TaxOrder varchar(30), Family varchar(25), Genus varchar(40), Species varchar(50));
+create index TaxID_Index ON taxonomy (Taxonomy_ID);
 
 select 'CREATING GENE3D' as '';
 drop table if exists GENE3D;
@@ -731,6 +820,9 @@ load data local infile '$DbSupport/colors.tab' into table colors;
 
 select 'LOADING annotations' as '';
 load data local infile '$OutputDir/struct.tab' into table annotations;
+
+select 'LOADING taxonomy' as '';
+load data local infile '$OutputDir/taxonomy.tab' into table taxonomy;
 
 select 'LOADING GENE3D' as '';
 load data local infile '$OutputDir/GENE3D.tab' into table GENE3D;
@@ -785,13 +877,13 @@ SQL
             $type = ".default";
             $batch = <<CMDS;
 
-if [ ! -f $CompletedFlagFile.4-finalFiles ]; then
+if [ ! -f $CompletedFlagFile.*-finalFiles ]; then
     echo "The data file build has not completed yet. Please wait until all of the output has been generated."
     echo "Bye."
     exit
 fi
 
-if [ ! -f $CompletedFlagFile.5-ena ]; then
+if [ ! -f $CompletedFlagFile.*-ena ]; then
     echo "The ENA data file build has not completed yet. Please wait until all of the output has been generated."
     echo "Bye."
     exit

@@ -340,5 +340,8 @@ sub reverseLookup {
     return \@uniprotIds, \@noMatches;
 }
 
+sub finish {
+}
+
 1;
 
