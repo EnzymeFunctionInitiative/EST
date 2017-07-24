@@ -80,6 +80,7 @@ $result = GetOptions(
     "domain=s"          => \$domain,
     "fraction=i"        => \$fraction,
     "blast=s"           => \$blast,
+    "job-id=i"          => \$jobId,
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
@@ -226,6 +227,9 @@ unless (defined $incfrac) {
     print "-incfrac not specified, using default of 0.99\n";
     $incfrac=0.99;
 }
+
+($jobId = $ENV{PWD}) =~ s%^.*/(\d+)/*$%$1% if not $jobId;
+$jobId = "" if $jobId =~ /\D/;
 
 $noMatchFile = ""   unless defined $noMatchFile;
 
@@ -624,10 +628,10 @@ $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
-$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length.png");
-$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity.png");
-$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r  $outputDir/rdata.hdf5  $outputDir/length_histogram.png");
-$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png");
+$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId");
+$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId");
+$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r  $outputDir/rdata.hdf5  $outputDir/length_histogram.png $jobId");
+$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId");
 $B->addAction("touch  $outputDir/1.out.completed");
 #$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->renderToFile("$tmpdir/graphs.sh");

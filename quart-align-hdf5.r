@@ -18,7 +18,13 @@ png(pngfile, width=2000, height=900)
 
 newdata=t(rep(NA,stop))
 
-boxplot(newdata,  main = "Alignment Length vs Alignment Score", ylab = "Alignment Length", xlab = "Alignment Score",ylim=range(0,maxy))
+
+jobnum = ""
+if (length(args) > 2) {
+    jobnum = paste(" for Job ID ", args[3])
+}
+
+boxplot(newdata,  main = paste("Alignment Length vs Alignment Score", jobnum), ylab = "Alignment Length", xlab = "Alignment Score",ylim=range(0,maxy))
 for (i in 1:(stop-start+1)){
   key=i+start-1
   print(paste0("/align/",key))

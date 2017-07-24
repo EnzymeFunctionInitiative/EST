@@ -16,7 +16,13 @@ png(pngfile, width=2000, height=900)
 
 newdata=t(rep(NA,stop))
 
-boxplot(newdata,  main = "Percent Identity vs Alignment Score", ylab = "Percent Identity", xlab = "Alignment Score",ylim=range(0,100))
+
+jobnum = ""
+if (length(args) > 2) {
+    jobnum = paste(" for Job ID ", args[3])
+}
+
+boxplot(newdata,  main = paste("Percent Identity vs Alignment Score", jobnum), ylab = "Percent Identity", xlab = "Alignment Score",ylim=range(0,100))
 for (i in 1:(stop-start+1)){
   key=i+start-1
   print(paste0("/perid/",key))

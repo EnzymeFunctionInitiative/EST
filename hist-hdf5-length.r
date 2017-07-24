@@ -16,5 +16,11 @@ maxy=maxy[1][1]
 colnames(newdata)=seq(start,stop-1)
 png(args[2], width=1800, height=900);
 par(mar=c(4,4,4,4))
-barplot(newdata, main = "Number of Sequences at Each Length", ylab = "Number of Sequences", xlab = "Length", col = "red", border = "blue")
+
+jobnum = ""
+if (length(args) > 2) {
+    jobnum = paste(" for Job ID ", args[3])
+}
+
+barplot(newdata, main = paste("Number of Sequences at Each Length", jobnum), ylab = "Number of Sequences", xlab = "Length", col = "red", border = "blue")
 dev.off()
