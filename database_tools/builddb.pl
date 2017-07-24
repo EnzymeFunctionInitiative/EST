@@ -753,7 +753,8 @@ sub writeTabFileCommands {
 sub writeSqlCommands {
     my ($dbName, $buildEna, $fileNum) = @_;
 
-    my $outFile = "$BuildDir/$fileNum-createDbAndImportData.sql";
+    my $suffix = $buildEna ? "-ena" : "";
+    my $outFile = "$BuildDir/$fileNum-createDbAndImportData$suffix.sql";
     my $batchFile = "$BuildDir/$fileNum-runDatabaseActions.sh";
 
     open OUT, "> $outFile" or die "Unable to open '$outFile' to save SQL commands: $!";
@@ -768,7 +769,30 @@ sub writeSqlCommands {
 
 select 'CREATING ANNOTATIONS' as '';
 drop table if exists annotations;
-create table annotations(accession varchar(10) primary key, Uniprot_ID varchar(15), STATUS varchar(10), Sequence_Length integer, Taxonomy_ID integer, GDNA varchar(5), Description varchar(255), SwissProt_Description varchar(255),Organism varchar(150), Domain varchar(25), GN varchar(40), PFAM varchar(300), pdb varchar(3000), IPRO varchar(700), GO varchar(1300), GI varchar(15), HMP_Body_Site varchar(75), HMP_Oxygen varchar(50), EFI_ID varchar(6), EC varchar(185), Phylum varchar(30), Class varchar(25), TaxOrder varchar(30), Family varchar(25), Genus varchar(40), Species varchar(50), Cazy varchar(30));
+create table annotations(accession varchar(10) primary key,
+                         Uniprot_ID varchar(15),
+                         STATUS varchar(10),
+                         Sequence_Length integer,
+                         Taxonomy_ID integer,
+                         GDNA varchar(5),
+                         Description varchar(255),
+                         SwissProt_Description varchar(255),
+                         Organism varchar(150),
+                         GN varchar(40),
+                         PFAM varchar(300),
+                         pdb varchar(3000),
+                         IPRO varchar(700),
+                         GO varchar(1300),
+                         KEGG varchar(100),
+                         STRING varchar(100),
+                         BRENDA varchar(100),
+                         PATRIC varchar(100),
+                         GI varchar(15),
+                         HMP_Body_Site varchar(75),
+                         HMP_Oxygen varchar(50),
+                         EFI_ID varchar(6),
+                         EC varchar(185),
+                         Cazy varchar(30));
 create index TaxID_Index ON annotations (Taxonomy_ID);
 create index accession_Index ON annotations (accession);
 
@@ -805,10 +829,13 @@ create index pdbhits_ACC_Index on pdbhits (ACC);
 select 'CREATING colors' as '';
 drop table if exists colors;
 create table colors(cluster int primary key,color varchar(7));
+
+select 'CREATING pfam_info' as '';
 drop table if exists pfam_info;
 create table pfam_info(pfam varchar(10) primary key, short_name varchar(50), long_name varchar(255));
 
 select 'CREATING idmapping' as '';
+drop table if exists idmapping;
 create table idmapping (uniprot_id varchar(15), foreign_id_type varchar(15), foreign_id varchar(20));
 create index uniprot_id_Index on idmapping (uniprot_id);
 create index foreign_id_Index on idmapping (foreign_id);

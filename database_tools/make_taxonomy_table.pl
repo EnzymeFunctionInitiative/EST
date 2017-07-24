@@ -66,10 +66,10 @@ foreach my $taxon ($doc->findnodes("/taxonSet/taxon")) {
     my $taxDiv = $taxon->getAttribute("taxonomicDivision");
     my $taxName = $taxon->getAttribute("scientificName");
 
-    next if ($taxDiv ne "PRO" and $taxDiv ne "FUN" and $taxDiv ne "ENV");
+#    next if ($taxDiv ne "PRO" and $taxDiv ne "FUN" and $taxDiv ne "ENV");
 
-    if ($rank) {
-        $nodes{$taxId}->{rank} = $rank;
+#    if ($rank) {
+#        $nodes{$taxId}->{rank} = $rank;
 
         my ($childrenNode) = grep { $_->nodeName eq "children" } $taxon->nonBlankChildNodes();
         my @children = $childrenNode ? $childrenNode->nonBlankChildNodes() : ();
@@ -85,13 +85,14 @@ foreach my $taxon ($doc->findnodes("/taxonSet/taxon")) {
             $nodes{$childId}->{name} = $child->getAttribute("scientificName");
             $nodes{$childId}->{division} = $taxDiv;
         }
-    }
+#    }
     
-    if (not exists $nodes{$taxId}) {
-        print "[WARNING] No rank or data found for tax id: $taxId ($taxName)\n" if $verbose;
-        next;
-    }
+#    if (not exists $nodes{$taxId}) {
+#        print "[WARNING] No rank or data found for tax id: $taxId ($taxName)\n" if $verbose;
+#        next;
+#    }
 
+    $nodes{$taxId}->{rank} = $rank if $rank;
     $nodes{$taxId}->{division} = $taxDiv if $taxDiv;
     $nodes{$taxId}->{name} = $taxName if $taxName;
 
@@ -124,7 +125,7 @@ open OUT, "> $outputTabFile";
 
 # Don't print header, since it's going into its own database table.
 #print out join("\t", getTabHeader()), "\n";
-foreach my $taxId (grep { exists $nodes{$_}->{rank} and $nodes{$_}->{rank} eq "species" } keys %nodes) {
+foreach my $taxId (keys %nodes) { #grep { exists $nodes{$_}->{rank} and $nodes{$_}->{rank} eq "species" } keys %nodes) {
     print OUT join("\t", $taxId, getTabLine($nodes{$taxId})), "\n";
 }
 

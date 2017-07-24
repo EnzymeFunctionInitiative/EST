@@ -2,6 +2,12 @@
 
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
+use FindBin;
+
+use lib "$FindBin::Bin/lib";
+
+use IdMappingFile;
+
 
 $result = GetOptions(
     "dat=s"         => \$dat,
@@ -11,11 +17,16 @@ $result = GetOptions(
     "efitid=s"      => \$efitid,
     "gdna=s"        => \$gdna,
     "hmp=s"         => \$hmp,
-    #"phylo=s"       => \$phylofile,
+    "phylo=s"       => \$phylofile,
+    "idmapping=s"   => \$idMappingFile,
+    "debug=i"       => \$debug,  #TODO: debug
 );
 
 #$uniprotgi='/large/gionly.dat';
 #$uniprotref='/large/RefSeqonly.dat';
+
+my $idMapper = new IdMappingFile(forward_lookup => 1); #Same signature as EFI::IdMapping
+$idMapper->parseTable($idMappingFile) if $idMappingFile and -f $idMappingFile;
 
 %efitid=%hmpdata=%gdnadata=%refseq=%GI=();
 @uprotnumbers=();
@@ -54,14 +65,6 @@ while(<GDNA>){
 }
 close GDNA;
 
-#print "get HMP taxids\n";
-#open HMP, $hmp or die "could not open gda file $hmp\n";
-#while(<HMP>){
-#  $line=$_;
-#  chomp $line;
-#  $hmpdata{$line}=1;
-#}
-#close HMP;
 
 #the key for %hmpdata is the taxid
 print "get HMP data\n";
@@ -104,145 +107,42 @@ while(<EFITID>){
 }
 close EFITID;
 
-#print "Get Phylogeny Information\n";
-#open PHYLO, $phylofile or die "could not open phylogeny information file $phylofile\n";
-#while(<PHYLO>){
-#  $line=$_;
-#  chomp $line;
-#  @line=split /\t/, $line;
-#  $phylo{@line[0]}{'phylum'}=@line[3];
-#  $phylo{@line[0]}{'class'}=@line[4];
-#  $phylo{@line[0]}{'order'}=@line[5];
-#  $phylo{@line[0]}{'family'}=@line[6];
-#  $phylo{@line[0]}{'genus'}=@line[7];
-#  $phylo{@line[0]}{'species'}=@line[8];
-#}
+if (-f $phylofile) {
+    print "Get Phylogeny Information\n";
+    open PHYLO, $phylofile or die "could not open phylogeny information file $phylofile\n";
+    while(<PHYLO>){
+        $line=$_;
+        chomp $line;
+        @line=split /\t/, $line;
+        $phylo{@line[0]}{'phylum'}=@line[3];
+        $phylo{@line[0]}{'class'}=@line[4];
+        $phylo{@line[0]}{'order'}=@line[5];
+        $phylo{@line[0]}{'family'}=@line[6];
+        $phylo{@line[0]}{'genus'}=@line[7];
+        $phylo{@line[0]}{'species'}=@line[8];
+    }
+    close PHYLO;
+}
+
+$debug = 2**50 if not defined $debug; #TODO: debug
 
 print "Parsing DAT Annotation Information\n";
 open DAT, $dat or die "could not open dat file $dat\n";
 open STRUCT, ">$struct" or die "could not write struct data to $struct\n";
-while (<DAT>){
+$c = 0; #TODO: debug
+while (<DAT>){  
+    last if $c++ > $debug; #TODO: debug
     $line=$_;
     $line=~s/\&/and/g;
     if($line=~/^ID\s+(\w+)\s+(\w+);\s+(\d+)/){
-        if(defined $element){
-            if(scalar @PFAMS){
-                $PFAM=join ',', @PFAMS
-            }else{
-                $PFAM="None";
-            }
-            if(scalar @PDBS){
-                $PDB=join ',', @PDBS
-            }else{
-                $PDB="None";
-            }
-            if(scalar @IPROS){
-                $IPRO=join ',', @IPROS
-            }else{
-                $IPRO="None";
-            }
-            if(scalar @GOS){
-                $GO=join ',', @GOS
-            }else{
-                $GO="None";
-            }
-            if(scalar @CAZYS){
-                $cazy=join ',', @CAZYS
-            }else{
-                $cazy="None";
-            }
-            if(scalar @{$refseq{$element}}){
-                $refseqline=join ',', @{$refseq{$element}};
-            }else{
-                $refseqline="None";
-            }
-            if(exists $GI{$element}){
-                #$giline=join ',', @{$GI{$element}};
-                $giline=$GI{$element}{'number'}.":".$GI{$element}{'count'};
-            }else{
-                $giline="None";
-            }
-            if($hmpdata{$OX}{'sites'}){
-                $hmpsite=$hmpdata{$OX}{'sites'};
-            }else{
-                $hmpsite='None';
-            }
-            if($hmpdata{$OX}{'oxygen'}){
-                $hmpoxygen=$hmpdata{$OX}{'oxygen'};
-            }else{
-                $hmpoxygen='None';
-            }
-            #if(exists $phylo{$OX}){
-            #    $phylum=$phylo{$OX}{'phylum'};
-            #    $class=$phylo{$OX}{'class'};
-            #    $order=$phylo{$OX}{'order'};
-            #    $family=$phylo{$OX}{'family'};
-            #    $genus=$phylo{$OX}{'genus'};
-            #    $species=$phylo{$OX}{'species'};
-            #}else{
-            #    $phylum='NA';
-            #    $class='NA';
-            #    $order='NA';
-            #    $family='NA';
-            #    $genus='NA';
-            #    $species='NA'
-            #}
-            @ocarray=split /;/, $OC;
-
-            $OC=shift @ocarray;
-            $DE=~s/\>//;
-            $DE=~s/\<//;
-            #$DE=~s/\=//;
-            #$DE=~s/AltName.*//;
-            #$DE=~s/^RecName: .*//;
-            #$DE=~s/^SubName: //;
-            $DE=~s/\s+/ /g;
-            $DE=~s/\&/and/g;
-            $DE=~s/^\s+//g;
-            #$DE=~s/{.*?}$//;
-            if($DE=~/^RecName: Full=(.*)/){
-                $DE=$1;
-                $DE=~s/\{.*\}//;
-                $DE=~s/Flags:.*$//;
-                $DE=~s/AltName:.*//;
-                $DE=~s/RecName:.*//;
-                $DE=~s/\=//g;
-                #print "first $DE\n";
-            }elsif($DE=~/^SubName: Full=(.*)/){
-                $DE=$1;
-                $DE=~s/\{.*\}//;
-                $DE=~s/Flags:.*$//;
-                $DE=~s/AltName:.*//;
-                $DE=~s/RecName:.*//;
-                $DE=~s/\=//g;
-                #print "second $DE\n";
-            }else{
-                print "unmatched $DE\n";
-            }
-            $DE=~s/{.*?}//g;
-            if($status eq "Reviewed"){
-                $RDE=$DE;
-            }else{
-                $RDE="NA";
-            }
-            if($OS=~/\(/){
-                $OS=~/(.*?)\(/;
-                my $OSname=$1;
-                if($OS=~/(\(strain.*?\))/){
-                    $OS="$OSname $1";
-                }else{
-                    $OS=$OSname;
-                }
-            }
-            print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$RDE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$giline\t$hmpsite\t$hmpoxygen\t$TID\t$EC\t$cazy\n";
-        }
+        write_line();
         $id=$1;
         $status=$2;
         $size=$3;
         $element=$DE=$OS=$OC="";
         $GDNA="None";
         $cazy=$EC=$OX=$GN=$HMP="None";
-        @CAZYS=@PFAMS=@PDBS=@IPROS=@GOS=();
+        @CAZYS=@PFAMS=@PDBS=@IPROS=@GOS=@KEGG=@STRING=@BRENDA=@PATRIC=();
     }elsif($line=~/^AC\s+(\w+);/){
         unless($lastline=~/^AC/){
             $element=$1;
@@ -278,6 +178,14 @@ while (<DAT>){
         push @CAZYS, $1;
     }elsif($line=~/^DR   InterPro; (\w+); (\w+)/){
         push @IPROS, "$1 $2";
+    }elsif($line=~/^DR   KEGG; (\S+); (\S+)/){
+        push @KEGG, $1;
+    }elsif($line=~/^DR   STRING; (\S+); (\S+)/){
+        push @STRING, $1;
+    }elsif($line=~/^DR   BRENDA; (\S+); (\S+)/){
+        push @BRENDA, "$1 $2";
+    }elsif($line=~/^DR   PATRIC; (\S+); (\S+)/){
+        push @PATRIC, $1;
     }elsif($line=~/^OC   (.*)/){
         $OC.=$1;
     }elsif($line=~/^GN   \w+=(\w+)/){
@@ -290,114 +198,146 @@ while (<DAT>){
     $lastline=$line;
 }
 
-if(defined $element){
-    if(scalar @PFAMS){
-        $PFAM=join ',', @PFAMS
-    }else{
-        $PFAM="None";
-    }
-    if(scalar @PDBS){
-        $PDB=join ',', @PDBS
-    }else{
-        $PDB="None";
-    }
-    if(scalar @IPROS){
-        $IPRO=join ',', @IPROS
-    }else{
-        $IPRO="None";
-    }
-    if(scalar @GOS){
-        $GO=join ',', @GOS
-    }else{
-        $GO="None";
-    }
-    if(scalar @CAZYS){
-        $cazy=join ',', @CAZYS
-    }else{
-        $cazy="None";
-    }
-    if(scalar @{$refseq{$element}}){
-        $refseqline=join ',', @{$refseq{$element}};
-    }else{
-        $refseqline="None";
-    }
-    if(exists $GI{$element}){
-        #$giline=join ',', @{$GI{$element}};
-        $giline=$GI{$element}{'number'}.":".$GI{$element}{'count'};
-    }else{
-        $giline="None";
-    }
-    if($hmpdata{$OX}{'sites'}){
-        $hmpsite=$hmpdata{$OX}{'sites'};
-    }else{
-        $hmpsite='None';
-    }
-    if($hmpdata{$OX}{'oxygen'}){
-        $hmpoxygen=$hmpdata{$OX}{'oxygen'};
-    }else{
-        $hmpoxygen='None';
-    } 
-    #if(exists $phylo{$OX}){
-    #    $phylum=$phylo{$OX}{'phylum'};
-    #    $class=$phylo{$OX}{'class'};
-    #    $order=$phylo{$OX}{'order'};
-    #    $family=$phylo{$OX}{'family'};
-    #    $genus=$phylo{$OX}{'genus'};
-    #    $species=$phylo{$OX}{'species'};
-    #}else{
-    #    $phylum='NA';
-    #    $class='NA';
-    #    $order='NA';
-    #    $family='NA';
-    #    $genus='NA';
-    #    $species='NA'
-    #}
-    @ocarray=split /;/, $OC;
-    $OC=shift @ocarray;
-    $DE=~s/\>//;
-    $DE=~s/\<//;
-    #$DE=~s/\=//;
-    #$DE=~s/AltName.*//;
-    #$DE=~s/^RecName: .*//;
-    #$DE=~s/^SubName: //;
-    $DE=~s/\s+/ /g;
-    $DE=~s/\&/and/g;
-    $DE=~s/^\s+//g;
-    #$DE=~s/{.*?}$//;
-    if($DE=~/^RecName: Full=(.*)/){
-        $DE=$1;
-        $DE=~s/\{.*\}//;
-        $DE=~s/Flags:.*$//;
-        $DE=~s/AltName:.*//;
-        $DE=~s/RecName:.*//;
-        $DE=~s/\=//g;
-        #print "first $DE\n";
-    }elsif($DE=~/^SubName: Full=(.*)/){
-        $DE=$1;
-        $DE=~s/\{.*\}//;
-        $DE=~s/Flags:.*$//;
-        $DE=~s/AltName:.*//;
-        $DE=~s/RecName:.*//;
-        $DE=~s/\=//g;
-        #print "second $DE\n";
-    }else{
-        print "unmatched $DE\n";
-    }
-    $DE=~s/{.*?}//g;
-    if($status eq "Reveiewed"){
-        $RDE=$DE;
-    }else{
-        $RDE="NA";
-    }
-    if($OS=~/\(/){
-        $OS=~/(.*?)\(/;
-        my $OSname=$1;
-        if($OS=~/(\(strain.*?\))/){
-            $OS="$OSname $1";
-        }else{
-            $OS=$OSname;
-        }
-    }
-    print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$RDE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$giline\t$hmpsite\t$hmpoxygen\t$TID\t$EC\t$cazy\n";
-}
+
+write_line();
+
+
 close DAT;
+close STRUCT;
+
+sub write_line {
+    if(defined $element){
+        if(scalar @PFAMS){
+            $PFAM=join ',', @PFAMS
+        }else{
+            $PFAM="None";
+        }
+        if(scalar @PDBS){
+            $PDB=join ',', @PDBS
+        }else{
+            $PDB="None";
+        }
+        if(scalar @IPROS){
+            $IPRO=join ',', @IPROS
+        }else{
+            $IPRO="None";
+        }
+        if(scalar @GOS){
+            $GO=join ',', @GOS
+        }else{
+            $GO="None";
+        }
+        if(scalar @CAZYS){
+            $cazy=join ',', @CAZYS
+        }else{
+            $cazy="None";
+        }
+        if(scalar @KEGG){
+            $kegg = join ',', @$KEGG;
+        } else {
+            $kegg = "None";
+        }
+        if (scalar @STRING) {
+            $string = join ',', @STRING;
+        } else {
+            $string = "None";
+        }
+        if (scalar @BRENDA) {
+            $brenda = join ',', @BRENDA;
+        } else {
+            $brenda = "None";
+        }
+        if (scalar @PATRIC) {
+            $patric = join ',', @PATRIC;
+        } else {
+            $patric = "None";
+        }
+        if(scalar @{$refseq{$element}}){
+            $refseqline=join ',', @{$refseq{$element}};
+        }else{
+            $refseqline="None";
+        }
+        if(exists $GI{$element}){
+            #$giline=join ',', @{$GI{$element}};
+            $giline=$GI{$element}{'number'}.":".$GI{$element}{'count'};
+        }else{
+            $giline="None";
+        }
+        if($hmpdata{$OX}{'sites'}){
+            $hmpsite=$hmpdata{$OX}{'sites'};
+        }else{
+            $hmpsite='None';
+        }
+        if($hmpdata{$OX}{'oxygen'}){
+            $hmpoxygen=$hmpdata{$OX}{'oxygen'};
+        }else{
+            $hmpoxygen='None';
+        } 
+        if(exists $phylo{$OX}){
+            $phylum=$phylo{$OX}{'phylum'};
+            $class=$phylo{$OX}{'class'};
+            $order=$phylo{$OX}{'order'};
+            $family=$phylo{$OX}{'family'};
+            $genus=$phylo{$OX}{'genus'};
+            $species=$phylo{$OX}{'species'};
+        }else{
+            $phylum='NA';
+            $class='NA';
+            $order='NA';
+            $family='NA';
+            $genus='NA';
+            $species='NA'
+        }
+        @ocarray=split /;/, $OC;
+        $OC=shift @ocarray;
+        $DE=~s/\>//;
+        $DE=~s/\<//;
+        #$DE=~s/\=//;
+        #$DE=~s/AltName.*//;
+        #$DE=~s/^RecName: .*//;
+        #$DE=~s/^SubName: //;
+        $DE=~s/\s+/ /g;
+        $DE=~s/\&/and/g;
+        $DE=~s/^\s+//g;
+        #$DE=~s/{.*?}$//;
+        if($DE=~/^RecName: Full=(.*)/){
+            $DE=$1;
+            $DE=~s/\{.*\}//;
+            $DE=~s/Flags:.*$//;
+            $DE=~s/AltName:.*//;
+            $DE=~s/RecName:.*//;
+            $DE=~s/\=//g;
+            #print "first $DE\n";
+        }elsif($DE=~/^SubName: Full=(.*)/){
+            $DE=$1;
+            $DE=~s/\{.*\}//;
+            $DE=~s/Flags:.*$//;
+            $DE=~s/AltName:.*//;
+            $DE=~s/RecName:.*//;
+            $DE=~s/\=//g;
+            #print "second $DE\n";
+        }else{
+            print "unmatched $DE\n";
+        }
+        $DE=~s/{.*?}//g;
+        if($status eq "Reviewed"){
+            $RDE=$DE;
+        }else{
+            $RDE="NA";
+        }
+        if($OS=~/\(/){
+            $OS=~/(.*?)\(/;
+            my $OSname=$1;
+            if($OS=~/(\(strain.*?\))/){
+                $OS="$OSname $1";
+            }else{
+                $OS=$OSname;
+            }
+        }
+        print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$RDE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$kegg\t$string\t$patrick\t$brenda\t$giline\t$hmpsite\t$hmpoxygen\t$TID\t$EC";
+        print STRUCT "\t$phylum\t$class\t$order\t$family\t$genus\t$species" if -f $phylofile;
+        print STRUCT "\t$cazy\n";
+    }
+}
+
+
