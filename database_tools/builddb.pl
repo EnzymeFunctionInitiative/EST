@@ -40,6 +40,7 @@ my $dbName;
 my $buildEna;
 my $Legacy;
 my $enaDir;
+my $buildCounts;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "download"      => \$doDownload,
@@ -58,6 +59,7 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "build-ena"     => \$buildEna,      # if this is present, build the ENA table only. the database must have
                                                             # been already created, and the idmapping table must be present.
                         "ena-dir=s"     => \$enaDir,
+                        "build-counts"  => \$buildCounts,   # build the family count table only
                        );
 
 my $usage = <<USAGE;
@@ -68,6 +70,8 @@ Usage: $0 -dir=working_dir [-no-download -interactive -log=log_file-dryrun -exis
     -build-ena      build the ENA database table only, db-name must already be created and idmapping table
                     must have been imported into the database
     -sql            only output sql commands used for importing data into database, nothing else is done
+    -build-counts   build the family count table that needs to be imported into the EFI web server database
+                    (not the database that the rest of the files here get imported into)
 
     -dir            directory to create build structure and download/build database tables in
     -ena-dir        the directory that contains the ENA mirror (should have folders pro, std, etc. in it)
@@ -93,12 +97,12 @@ if (not $WorkingDir) {
     exit(1);
 }
 
-if (not $dbName and not $buildEna and not $doDownload) {
+if (not $dbName and not $buildEna and not $doDownload and not $buildCounts) {
     print "The -db-name parameter is required.\n";
     exit(1);
 }
 
-if (not defined $queue or length $queue == 0) {
+if (not defined $sql and not defined $buildCounts and (not defined $queue or length $queue == 0)) {
     print "The -queue parameter is required.\n";
     exit(1);
 }
@@ -215,6 +219,12 @@ if (defined $buildEna and $buildEna) {
     my $dlJobId;
     $dlJobId = submitDownloadJob($S->getBuilder(), $doDownload, $fileNum++);
     $dlJobId = undef if not $doDownload;
+
+} elsif ($buildCounts) {
+
+    $fileNum = 27;
+
+    submitBuildCountsJob($S->getBuilder(), undef, $fileNum++);
 
 } else {
 
@@ -352,6 +362,34 @@ sub submitFinalFileJob {
     }
 
     $B->addAction("date > $CompletedFlagFile.$fileNum-finalFiles\n");
+
+    $B->outputBaseFilepath($file);
+    $B->renderToFile($file);
+
+    return $DoSubmit ? $S->submit($file) : undef;
+}
+
+
+sub submitBuildCountsJob {
+    my ($B, $depId, $fileNum) = @_;
+
+    waitForInput();
+
+    my $file = "$BuildDir/$fileNum-buildCounts.sh";
+    $B->dependency(0, $depId);
+    
+    addLibxmlIfNecessary($B);
+    $B->addAction("module load $PerlMod");
+    
+    if (not $skipIfExists or not -f "$OutputDir/family_counts.tab") {
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/PFAM.tab -output $OutputDir/family_counts.tab -type PFAM -merge-domain");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/INTERPRO.tab -output $OutputDir/family_counts.tab -type INTERPRO -merge-domain -append");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/GENE3D.tab -output $OutputDir/family_counts.tab -type GENE3D -merge-domain -append");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/SSF.tab -output $OutputDir/family_counts.tab -type SSF -merge-domain -append");
+        $B->addAction("date > $CompletedFlagFile.family_counts\n");
+    }
+
+    $B->addAction("date > $CompletedFlagFile.$fileNum-buildCounts\n");
 
     $B->outputBaseFilepath($file);
     $B->renderToFile($file);
@@ -653,7 +691,34 @@ sub writeSqlCommands {
 
     my $sql = "";
 
-    if (not $buildEna) {
+    if ($buildCounts) {
+        $sql = <<SQL;
+
+select 'CREATED family_counts' as '';
+drop table if exists family_counts;
+create table family_counts (family_type varchar(15), family varchar(100), num_members integer);
+create index family_Index on family_counts (family);
+create index family_type_Index on family_counts (family_type);
+
+select 'LOADING family_counts' as '';
+load data local infile '$OutputDir/family_counts.tab' into table family_counts;
+SQL
+        ;
+    } elsif ($buildEna) {
+        $sql = <<SQL;
+
+select 'CREATING ena' as '';
+drop table if exists ena;
+create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain varchar(2000),pfam varchar(1800));
+create index ena_acnum_index on ena(AC, NUM);
+create index ena_ID_index on ena(id);
+
+select 'LOADING ena' as '';
+load data local infile '$OutputDir/ena.tab' into table ena;
+
+SQL
+        ;
+    } else {
         $sql = <<SQL;
 
 select 'CREATING ANNOTATIONS' as '';
@@ -730,7 +795,6 @@ create index uniprot_id_Index on idmapping (uniprot_id);
 create index foreign_id_Index on idmapping (foreign_id);
 
 
-
 select 'LOADING colors' as '';
 load data local infile '$DbSupport/colors.tab' into table colors;
 
@@ -760,20 +824,6 @@ load data local infile '$OutputDir/pfam_info.tab' into table pfam_info;
 
 select 'LOADING idmapping' as '';
 load data local infile '$OutputDir/idmapping.tab' into table idmapping;
-
-SQL
-        ;
-    } else {
-        $sql = <<SQL;
-
-select 'CREATING ena' as '';
-drop table if exists ena;
-create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain varchar(2000),pfam varchar(1800));
-create index ena_acnum_index on ena(AC, NUM);
-create index ena_ID_index on ena(id);
-
-select 'LOADING ena' as '';
-load data local infile '$OutputDir/ena.tab' into table ena;
 
 SQL
         ;

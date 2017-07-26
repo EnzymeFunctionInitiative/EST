@@ -19,6 +19,10 @@ To create and submit scripts that will process the downloaded files:
     # builddb.pl -dir BUILD_DIR -queue efi -scheduler slurm -db-name YYYY-MM -config EFI_CONFIG_FILE
 
 
+To create a script and SQL file that will create the family_counts table that needs to be imported into the
+EFI webserver mysql database:
+
+    # builddb.pl  -dir BUILD_DIR -build-counts -config EFI_CONFIG_FILE
 
 All scripts are created in BUILD_DIR/build
 
