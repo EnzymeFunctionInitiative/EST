@@ -25,7 +25,7 @@ use Biocluster::Config qw(biocluster_configure);
 
 
 my $WorkingDir;
-my $noDownload = 0;
+my $doDownload = 0;
 my $interactive = 0;
 my $logFile = "";
 my $dryRun = 0;
@@ -42,12 +42,12 @@ my $Legacy;
 my $enaDir;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
-                        "no-download"   => \$noDownload,
+                        "download"      => \$doDownload,
                         "interactive"   => \$interactive,
                         "log=s"         => \$logFile,
                         "dryrun"        => \$dryRun,
                         "exists"        => \$skipIfExists,
-                        "oldapps"       => \$Legacy,        # adds the 'module load oldapps' line to each batch script so that they can work with biocluster2 oldapps module (which should go away at some point in the future)
+                        "bc1"           => \$Legacy,        # configures the scripts to work with biocluster 1 instead of biocluster 2
                         "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm
                         "queue=s"       => \$queue,
                         "config=s"      => \$configFile,
@@ -64,34 +64,42 @@ my $usage = <<USAGE;
 Usage: $0 -dir=working_dir [-no-download -interactive -log=log_file-dryrun -exists -scheduler=scheduler
     -queue=queue -config=config_file -sql -no-prompt -no-submit -db-name=database_name -build-ena]
 
+    -download       only create the script for downloading the input files
+    -build-ena      build the ENA database table only, db-name must already be created and idmapping table
+                    must have been imported into the database
+    -sql            only output sql commands used for importing data into database, nothing else is done
+
     -dir            directory to create build structure and download/build database tables in
-    -no-download    do not download the input files
+    -ena-dir        the directory that contains the ENA mirror (should have folders pro, std, etc. in it)
+    -db-name        the name of the database to create/use
+    
     -log            path to log file (defaults to build directory)
     -dryrun         don't do anything, just display all commands to be executed to the console
     -exists         skip any output or intermediate files that already exist
-    -scheduler      specify the scheduler to use (defaults to torque, can be slurm)
-    -queue          the cluster queue to use for computation
-    -config         path to configuration file (defaults to EFICONFIG env var, if present)
-    -sql            only output sql commands used for importing data into database, nothing else is done
     -no-prompt      don't prompt the user to confirm the GOLD data version
     -no-sumit       create all of the job files but don't submit them
-    -db-name        the name of the database to create/use
-    -build-ena      build the ENA database table only, db-name must already be created and idmapping table
-                    must have been imported into the database
-    -ena-dir        the directory that contains the ENA mirror (should have folders pro, std, etc. in it)
+
+    -bc1            configure the scripts to work with biocluster1 instead of biocluster 2
+    -scheduler      specify the scheduler to use (defaults to torque, can be slurm)
+    -queue          the cluster queue to use for computation
+
+    -config         path to configuration file (defaults to EFICONFIG env var, if present)
 
 USAGE
 
 
-die "Working directory must be specified.\n$usage" if not $WorkingDir;
+if (not $WorkingDir) {
+    print "The -dir (build directory) parameter must be specified.\n$usage\n";
+    exit(1);
+}
 
-if (not $dbName) {
+if (not $dbName and not $buildEna and not $doDownload) {
     print "The -db-name parameter is required.\n";
     exit(1);
 }
 
 if (not defined $queue or length $queue == 0) {
-    print "The --queue parameter is required.\n";
+    print "The -queue parameter is required.\n";
     exit(1);
 }
 
@@ -109,6 +117,8 @@ my $PdbBuildDir = "$BuildDir/pdbblast";
 my $DbMod = $ENV{EFIDBMOD};
 my $EstMod = $ENV{EFIESTMOD};
 $Legacy = defined $Legacy ? 1 : 0;
+my $PerlMod = $Legacy ? "perl" : "Perl";
+my $BlastMod = $Legacy ? "blast" : "BLAST";
 
 
 # Number of processors to use for the blast job.
@@ -121,11 +131,11 @@ $logFile = "builddb.log" unless (defined $logFile and length $logFile);
 open LOG, ">$logFile" or die "Unable to open log file $logFile";
 open(STDERR, ">&STDOUT") or die "Unable to redirect STDERR: $!";
 sub logprint { print join("", @_), "\n"; print LOG join("", @_), "\n"; }
-#logprint "#OPTIONS: dir=$WorkingDir no-download=$noDownload step=$interactive log=$logFile dryrun=$dryRun exists=$skipIfExists queue=$queue scheduler=$scheduler\n";
+#logprint "#OPTIONS: dir=$WorkingDir no-download=$doDownload step=$interactive log=$logFile dryrun=$dryRun exists=$skipIfExists queue=$queue scheduler=$scheduler\n";
 logprint "#STARTED builddb.pl AT " . scalar localtime() . "\n";
 
 
-logprint "# USING WORKING DIR OF $WorkingDir";
+logprint "# USING WORKING DIR OF $WorkingDir AND SCRIPTS IN $ScriptDir";
 
 mkdir $WorkingDir if not -d $WorkingDir;
 mkdir $BuildDir if not -d $BuildDir;
@@ -151,9 +161,10 @@ if (defined $sql) {
 }
 
 
-`rm $CompletedFlagFile.*`;
+`rm -f $CompletedFlagFile.*`;
 
 my $DoSubmit = not defined $noSubmit;
+
 
 
 # Get info from the configuration file.
@@ -165,7 +176,8 @@ my $TaxonomyLocation = $config->{tax}->{remote_url};
 
 # Set up the scheduler API.
 my $schedType = getSchedulerType($scheduler);
-my $S = new Biocluster::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1], 'dryrun' => $dryRun);
+my $S = new Biocluster::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1, '100gb'],
+    'default_working_dir' => $BuildDir, 'dryrun' => $dryRun);
 my $FH = new Biocluster::Util::FileHandle('dryrun' => $dryRun);
 
 
@@ -177,15 +189,17 @@ my $fileNum = 0;
     
 if (defined $buildEna and $buildEna) {
 
-    if (not defined $enaDir or not -d $enaDir or not -d "$enaDir/pro") {
+    $fileNum = 17;
+
+    if (not defined $enaDir or not -d $enaDir or not -d "$enaDir/std") {
         die "Unable to create job for building ENA table: the ENA directory $enaDir is not valid.";
     }
 
     # Create ENA table
-    logprint "\n\n\n#CREATING ENA TABLE";
-    my $enaJobId = submitEnaJob($S->getBuilder(), $enaDir, 17);
+    logprint "#CREATING ENA TABLE";
+    my $enaJobId = submitEnaJob($S->getBuilder(), $enaDir, $fileNum++);
     
-} else {
+} elsif ($doDownload) {
     
     #logprint "\n#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
     #logprint "# USING GOLD DATA THAT WAS LAST UPDATED LOCALLY ON ", scalar localtime((stat("$DbSupport/phylo.tab"))[9]), "\n";
@@ -195,43 +209,52 @@ if (defined $buildEna and $buildEna) {
     #logprint "#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
     #print "To continue using these GOLD data, press enter or press Ctrl+C to abort..." and scalar <STDIN> unless $batchMode;
     #logprint "\n";
-    
+   
+    # Write out the download script, even though it can't be run on the cluster. This way we can execute it ourselves.
     logprint "#DOWNLOADING FILES\n";
     my $dlJobId;
-    $dlJobId = submitDownloadJob($S->getBuilder(), $fileNum) if not $noDownload;
-    $fileNum++;
+    $dlJobId = submitDownloadJob($S->getBuilder(), $doDownload, $fileNum++);
+    $dlJobId = undef if not $doDownload;
+
+} else {
+
+    $fileNum = 1; # reserve 0 for download
     
     logprint "#UNZIPPING FILES + COPYING TREMBL FILES + ADDING SPROT FILES + CREATE TAB FILES\n";
-    my $unzipJobId = submitUnzipJob($S->getBuilder(), $dlJobId, $fileNum++);
+    my $unzipJobId = submitUnzipJob($S->getBuilder(), undef, $fileNum++);
     
-    logprint "#UNZIPPING FILES + COPYING TREMBL FILES + ADDING SPROT FILES + CREATE TAB FILES\n";
+    logprint "#PARSING TAXONOMY FILE\n";
     my $taxJobId = submitTaxonomyJob($S->getBuilder(), $unzipJobId, $fileNum++);
     
-    logprint "\n\n\n#FORMAT BLAST DATABASE\n";
+    logprint "#FORMAT BLAST DATABASE\n";
     my $splitJobId = submitSplitFastaJob($S->getBuilder(), $unzipJobId, $np, $PdbBuildDir, $fileNum++);
     
-    logprint "\n\n\n#DO PDB BLAST\n";
+    logprint "#DO PDB BLAST\n";
     my $blastJobId = submitBlastJob($S->getBuilder(), $splitJobId, $np, $PdbBuildDir, $fileNum++);
     
-    logprint "\n\n\n#CAT BLAST FILES\n";
+    logprint "#CAT BLAST FILES\n";
     my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
     
     
     # Chop up xml files so we can parse them easily
-    logprint "\n\n\n#CHOP MATCH_COMPLETE AND .TAB FILES\n";
+    logprint "#CHOP MATCH_COMPLETE AND .TAB FILES\n";
     my $ffJobId = submitFinalFileJob($S->getBuilder(), $unzipJobId, $fileNum++);
     
     # Create idmapping table
-    logprint "\n\n\n#CREATING IDMAPPING TABLE";
+    logprint "#CREATING IDMAPPING TABLE\n";
     my $idJobId = submitIdMappingJob($S->getBuilder(), $unzipJobId, $fileNum++);
 }
 
-# Create and import the data into the database
-logprint "\n\n\n#WRITING SQL SCRIPT FOR IMPORTING DATA INTO DATABASE\n";
-writeSqlCommands($dbName, $buildEna, $fileNum);
 
 
-logprint "\n\n\n#FINISHED AT " . scalar localtime() . "\n";
+if (not $doDownload) {
+    # Create and import the data into the database
+    logprint "#WRITING SQL SCRIPT FOR IMPORTING DATA INTO DATABASE\n";
+    writeSqlCommands($dbName, $buildEna, $fileNum);
+}
+
+
+logprint "\n#FINISHED AT " . scalar localtime() . "\n";
 
 close LOG;
 
@@ -247,28 +270,6 @@ close LOG;
 
 
 
-#sub submitDatabaseJob {
-#    my ($B, $depId) = @_;
-#
-#    my $file = "$WorkingDir/database.sh";
-#    $B->dependency(0, $depId);
-#
-#    my $sqlFile = "$WorkingDir/createDbAndImportData.sql";
-#
-#    writeSqlCommands($sqlFile);
-#
-#    $B->addAction($DB->getCommandLineConnString() . " < " . $sqlFile . " > $WorkingDir/sqloutput.txt";
-#
-#    $B->renderToFile($file);
-#
-#    return $DoSubmit and $S->submit($file);
-#}
-
-
-
-
-
-
 sub submitIdMappingJob {
     my ($B, $depId, $fileNum) = @_;
 
@@ -277,19 +278,17 @@ sub submitIdMappingJob {
     my $file = "$BuildDir/$fileNum-idmapping.sh";
     $B->dependency(0, $depId);
    
-    $B->addAction("module load oldapps") if $Legacy;
-    $B->addAction("module load perl");
+    $B->addAction("module load $PerlMod");
     $B->addAction("module load $DbMod");
     $B->addAction("module load $EstMod");
     $B->addAction("perl $ScriptDir/import_id_mapping.pl -config $configFile -input $InputDir/idmapping.dat -output $OutputDir/idmapping.tab");
     $B->addAction("date > $CompletedFlagFile.$fileNum-idmapping\n");
    
+    $B->outputBaseFilepath($file);
     $B->renderToFile($file);
 
-    return $DoSubmit and $S->submit($file);
+    return $DoSubmit ? $S->submit($file) : undef;
 }
-
-
 
 
 sub submitEnaJob {
@@ -299,10 +298,8 @@ sub submitEnaJob {
 
     my $file = "$BuildDir/$fileNum-ena.sh";
     
-    $B->addAction("module load oldapps") if $Legacy;
-    $B->addAction("module load perl");
+    $B->addAction("module load $PerlMod");
     $B->addAction("module load $DbMod");
-    $B->addAction("module load $EstMod");
    
     my $enaDir = "$BuildDir/ena"; 
     mkdir $enaDir unless(-d $enaDir);
@@ -321,12 +318,11 @@ sub submitEnaJob {
 
     $B->addAction("date > $CompletedFlagFile.$fileNum-ena\n");
    
+    $B->outputBaseFilepath($file);
     $B->renderToFile($file);
 
-    return $DoSubmit and $S->submit($file);
+    return $DoSubmit ? $S->submit($file) : undef;
 }
-
-
 
 
 sub submitFinalFileJob {
@@ -337,8 +333,8 @@ sub submitFinalFileJob {
     my $file = "$BuildDir/$fileNum-finalFiles.sh";
     $B->dependency(0, $depId);
     
-    $B->addAction("module load oldapps") if $Legacy;
-    $B->addAction("module load perl");
+    addLibxmlIfNecessary($B);
+    $B->addAction("module load $PerlMod");
     
     mkdir "$BuildDir/match_complete" unless(-d "$BuildDir/match_complete");
     
@@ -357,19 +353,11 @@ sub submitFinalFileJob {
 
     $B->addAction("date > $CompletedFlagFile.$fileNum-finalFiles\n");
 
+    $B->outputBaseFilepath($file);
     $B->renderToFile($file);
 
-    return $DoSubmit and $S->submit($file);
+    return $DoSubmit ? $S->submit($file) : undef;
 }
-
-
-
-
-
-
-
-
-
 
 
 sub submitSplitFastaJob {
@@ -378,11 +366,40 @@ sub submitSplitFastaJob {
     my $file = "$BuildDir/$fileNum-splitfasta.sh";
     $B->dependency(0, $depId);
 
-    writeSplitFastaCommands($B, $np, $pdbBuildDir);
+    waitForInput();
+
+    my $dbDir = "$WorkingDir/blastdb";
+    mkdir $dbDir if not -d $dbDir;
+
+    $B->workingDirectory($dbDir);
+    
+    $B->addAction("module load $BlastMod");
+    $B->addAction("module load $EstMod");
+    $B->addAction("module load $PerlMod");
+    
+    #build fasta database
+    if (not $skipIfExists or not -f "$dbDir/formatdb.log") {
+        $B->addAction("cd $dbDir");
+        $B->addAction("mv $CombinedDir/combined.fasta $dbDir/");
+        $B->addAction("formatdb -i $CombinedDir/combined.fasta -p T -o T");
+        $B->addAction("mv $dbDir/combined.fasta $CombinedDir/");
+        $B->addAction("date > $CompletedFlagFile.formatdb\n");
+    }
+    
+    my $fracDir = "$pdbBuildDir/fractions";
+    mkdir $fracDir if not -d $fracDir;
+
+    if (not $skipIfExists or not -f "$fracDir/fractfile-1.fa") {
+        $B->addAction("$ScriptDir/splitfasta.pl -parts $np -tmp $fracDir -source $CombinedDir/combined.fasta");
+        $B->addAction("date > $CompletedFlagFile.splitfasta\n");
+    }
+
     $B->addAction("date > $CompletedFlagFile.$fileNum-splitfasta\n");
 
+    $B->outputBaseFilepath($file);
     $B->renderToFile($file);
-    return $DoSubmit and $S->submit($file);
+
+    return $DoSubmit ? $S->submit($file) : undef;
 }
 
 
@@ -396,12 +413,23 @@ sub submitBlastJob {
     $B->dependency(0, $depId);
     $B->jobArray("1-$np");
 
-    writeBlastCommands($B, $pdbBuildDir);
+    my @dirs = sort grep(m%^\d+$%, map { s%^.*\/(\d+)\/?%$1%; $_ } glob($ENV{BLASTDB} . "/../*"));
+    my $version = $dirs[-1];
+    my $dbPath = $ENV{BLASTDB} . "/../" . $version;
+
+    $B->addAction("module load $BlastMod");
+    $B->addAction("module load $PerlMod");
+    if (not $skipIfExists or not -f "$pdbBuildDir/output/blastout-1.fa.tab") {
+        $B->addAction("blastall -p blastp -i $pdbBuildDir/fractions/fracfile-\${JOB_ARRAYID}.fa -d $dbPath/pdbaa -m 8 -e 1e-20 -b 1 -o $pdbBuildDir/output/blastout-\${JOB_ARRAYID}.fa.tab");
+        $B->addAction("date > $CompletedFlagFile.blastall\n");
+    }
+
     $B->addAction("date > $CompletedFlagFile.$fileNum-blast-qsub\n");
         
+    $B->outputBaseFilepath($file);
     $B->renderToFile($file);
 
-    return $DoSubmit and $S->submit($file);
+    return $DoSubmit ? $S->submit($file) : undef;
 }
 
 
@@ -412,74 +440,11 @@ sub submitCatBlastJob {
     $B->workingDirectory($pdbBuildDir);
     $B->dependency(0, $depId);
 
-    writeCatBlastCommands($B, $pdbBuildDir);
-    $B->addAction("date > $CompletedFlagFile.$fileNum-cat-blast\n");
-        
-    $B->renderToFile($file);
-
-    return $DoSubmit and $S->submit($file);
-}
-
-
-#sub submitBlastJobs {
-#    my ($B, $depId, $fileNum) = @_;
-#
-#    my $np = 200;
-#    my $pdbBuildDir = "$BuildDir/pdbblast";
-#    mkdir $pdbBuildDir if not -d $pdbBuildDir;
-#    mkdir "$pdbBuildDir/output" if not -d "$pdbBuildDir/output";
-#
-#    my $file = "$BuildDir/$fileNum-splitfasta.sh";
-#    $B->dependency(0, $depId);
-#
-#    writeSplitFastaCommands($B, $np, $pdbBuildDir);
-#    $B->addAction("date > $CompletedFlagFile.$fileNum-splitfasta\n");
-#
-#    $B->renderToFile($file);
-#    $depId = $DoSubmit and $S->submit($file);
-#
-#    $B = $S->getBuilder();
-#
-#    # Separate blast job since we are requesting a job array.
-#
-#    $file = "$BuildDir/2-blast-qsub.sh";
-#    $B->workingDirectory($pdbBuildDir);
-#    $B->dependency(0, $depId);
-#    $B->jobArray("1-$np");
-#
-#    writeBlastCommands($B, $pdbBuildDir);
-#    $B->addAction("date > $CompletedFlagFile.2-blast-qsub\n");
-#        
-#    $B->renderToFile($file);
-#
-#    $depId = $DoSubmit and $S->submit($file);
-#
-#    $B = $S->getBuilder();
-#
-#    # Separate blast job since we are requesting a job array.
-#
-#    $file = "$BuildDir/3-cat-blast.sh";
-#    $B->workingDirectory($pdbBuildDir);
-#    $B->dependency(0, $depId);
-#
-#    writeCatBlastCommands($B, $pdbBuildDir);
-#    $B->addAction("date > $CompletedFlagFile.3-cat-blast\n");
-#        
-#    $B->renderToFile($file);
-#
-#    return $DoSubmit and $S->submit($file);
-#}
-
-
-sub writeCatBlastCommands {
-    my ($B, $pdbBuildDir) = @_;
-    
     my @dirs = sort grep(m%^\d+$%, map { s%^.*\/(\d+)\/?%$1%; $_ } glob($ENV{BLASTDB} . "/../*"));
     my $version = $dirs[-1];
     my $dbPath = $ENV{BLASTDB} . "/../" . $version;
 
-    $B->addAction("module load oldapps") if $Legacy;
-    $B->addAction("module load perl");
+    $B->addAction("module load $PerlMod");
 
     if (not $skipIfExists or not -f "$pdbBuildDir/pdb.tab") {
         $B->addAction("cat $pdbBuildDir/output/*.tab > $OutputDir/pdb.tab");
@@ -489,73 +454,14 @@ sub writeCatBlastCommands {
         $B->addAction($ScriptDir . "/pdbblasttotab.pl -in $OutputDir/pdb.tab -out $OutputDir/simplified.pdb.tab");
         $B->addAction("date > $CompletedFlagFile.pdbblasttotab\n");
     }
-} 
+        
+    $B->addAction("date > $CompletedFlagFile.$fileNum-cat-blast\n");
 
+    $B->outputBaseFilepath($file);
+    $B->renderToFile($file);
 
-sub writeBlastCommands {
-    my ($B, $pdbBuildDir) = @_;
-    
-    my @dirs = sort grep(m%^\d+$%, map { s%^.*\/(\d+)\/?%$1%; $_ } glob($ENV{BLASTDB} . "/../*"));
-    my $version = $dirs[-1];
-    my $dbPath = $ENV{BLASTDB} . "/../" . $version;
-
-    $B->addAction("module load oldapps") if $Legacy;
-    $B->addAction("module load blast");
-    $B->addAction("module load perl");
-    if (not $skipIfExists or not -f "$pdbBuildDir/output/blastout-1.fa.tab") {
-        $B->addAction("blastall -p blastp -i $pdbBuildDir/fractions/fracfile-\${PBS_ARRAYID}.fa -d $dbPath/pdbaa -m 8 -e 1e-20 -b 1 -o $pdbBuildDir/output/blastout-\${PBS_ARRAYID}.fa.tab");
-        $B->addAction("date > $CompletedFlagFile.blastall\n");
-    }
-
-    #if (not $skipIfExists or not -f "$pdbBuildDir/pdb.tab") {
-    #    $B->addAction("cat $pdbBuildDir/output/*.tab > $OutputDir/pdb.tab");
-    #    $B->addAction("date > $CompletedFlagFile.blast_cat\n");
-    #}
-    #if (not $skipIfExists or not -f "$OutputDir/simplified.pdb.tab") {
-    #    $B->addAction($ScriptDir . "/pdbblasttotab.pl -in $OutputDir/pdb.tab -out $OutputDir/simplified.pdb.tab");
-    #    $B->addAction("date > $CompletedFlagFile.pdbblasttotab\n");
-    #}
-} 
-
-
-sub writeSplitFastaCommands {
-    my ($B, $np, $pdbBuildDir) = @_;
-
-    waitForInput();
-
-    my $dbDir = "$WorkingDir/blastdb";
-    mkdir $dbDir if not -d $dbDir;
-
-    $B->workingDirectory($dbDir);
-    
-    $B->addAction("module load oldapps") if $Legacy;
-    $B->addAction("module load blast");
-    $B->addAction("module load efiest");
-    $B->addAction("module load perl");
-
-    
-    #build fasta database
-    if (not $skipIfExists or not -f "$dbDir/formatdb.log") {
-        $B->addAction("cd $dbDir");
-        $B->addAction("formatdb -i $CombinedDir/combined.fasta -p T -o T");
-        $B->addAction("date > $CompletedFlagFile.formatdb\n");
-    }
-    
-    my $fracDir = "$pdbBuildDir/fractions";
-    mkdir $fracDir if not -d $fracDir;
-
-    if (not $skipIfExists or not -f "$fracDir/fractfile-1.fa") {
-        $B->addAction("splitfasta.pl -parts $np -tmp $fracDir -source $CombinedDir/combined.fasta");
-        $B->addAction("date > $CompletedFlagFile.splitfasta\n");
-    }
+    return $DoSubmit ? $S->submit($file) : undef;
 }
-
-
-
-
-
-
-
 
 
 sub submitTaxonomyJob {
@@ -564,50 +470,22 @@ sub submitTaxonomyJob {
     my $file = "$BuildDir/$fileNum-taxonomy.sh";
 
     $B->dependency($depId);
+
+    addLibxmlIfNecessary($B);
+    $B->addAction("module load $PerlMod");
     $B->addAction("$ScriptDir/make_taxonomy_table.pl -input $InputDir/taxonomy.xml -output $OutputDir/taxonomy.tab -verbose");
 
+    $B->outputBaseFilepath($file);
     $B->renderToFile($file);
 
-    return $DoSubmit and $S->submit($file);
+    return $DoSubmit ? $S->submit($file) : undef;
 }
 
 
 sub submitDownloadJob {
-    my ($B, $fileNum) = @_;
+    my ($B, $doDownload, $fileNum) = @_;
 
     my $file = "$BuildDir/$fileNum-download.sh";
-
-    writeDownloadCommands($B);
-
-    $B->renderToFile($file);
-
-    logprint "#COMPLETED DOWNLOAD AT " . scalar localtime() . "\n"
-        if $interactive;
-
-    return $DoSubmit and $S->submit($file);
-}
-
-
-sub submitUnzipJob {
-    my ($B, $depId, $fileNum) = @_;
-
-    my $file = "$BuildDir/$fileNum-process.sh";
-
-    $B->dependency(0, $depId);
-    $B->addAction("module load oldapps") if $Legacy;
-    $B->addAction("module load perl");
-    writeUnzipCommands($B);
-    writeTabFileCommands($B);
-    $B->addAction("date > $CompletedFlagFile.$fileNum-process\n");
-
-    $B->renderToFile($file);
-
-    return $DoSubmit and $S->submit($file);
-}
-
-
-sub writeDownloadCommands {
-    my ($B) = @_;
 
     waitForInput();
 
@@ -656,17 +534,29 @@ sub writeDownloadCommands {
         $B->addAction("date > $CompletedFlagFile.Pfam-A.clans.tsv\n");
     }
 
-    #Update ENA if needed
+    $B->addAction("echo To download the ENA files, run");
+    $B->addAction("echo rsync -auv rsync://bio-mirror.net/biomirror/embl/release/ TARGET_DIR");
     #rsync -auv rsync://bio-mirror.net/biomirror/embl/release/
+
+    $B->outputBaseFilepath($file);
+    $B->renderToFile($file);
+
+    logprint "#COMPLETED DOWNLOAD AT " . scalar localtime() . "\n"
+        if $interactive;
+
+    return $doDownload and $DoSubmit ? $S->submit($file) : undef;
 }
 
 
-sub writeUnzipCommands {
-    my ($B) = @_;
+sub submitUnzipJob {
+    my ($B, $depId, $fileNum) = @_;
+
+    my $file = "$BuildDir/$fileNum-process-downloads.sh";
+
+    $B->dependency(0, $depId);
+    $B->addAction("module load $PerlMod");
 
     waitForInput();
-
-    print "INPUT DIR: $InputDir\n";
 
     my @gzFiles = glob("$InputDir/*.gz");
     if (scalar @gzFiles) {
@@ -698,11 +588,6 @@ sub writeUnzipCommands {
         $B->addAction("grep -P \"\tGI\t\" $InputDir/idmapping.dat > $LocalSupportDir/gionly.dat");
         $B->addAction("date > $CompletedFlagFile.gionly\n");
     }
-}
-
-
-sub writeTabFileCommands {
-    my ($B) = @_;
 
     waitForInput();
 
@@ -744,10 +629,14 @@ sub writeTabFileCommands {
         $B->addAction("cut -f 1,9 $OutputDir/struct.tab > $OutputDir/organism.tab");
         $B->addAction("date > $CompletedFlagFile.organism.tab\n");
     }
+
+    $B->addAction("date > $CompletedFlagFile.$fileNum-process-downloads\n");
+
+    $B->outputBaseFilepath($file);
+    $B->renderToFile($file);
+
+    return $DoSubmit ? $S->submit($file) : undef;
 }
-
-
-
 
 
 sub writeSqlCommands {
@@ -995,6 +884,13 @@ CMDS
 # This function allows the user to step through the script.
 sub waitForInput {
     $interactive and scalar <STDIN>;
+}
+
+
+sub addLibxmlIfNecessary {
+    my $B = shift;
+
+    $B->addAction("module load libxml2") if not $Legacy;
 }
 
 

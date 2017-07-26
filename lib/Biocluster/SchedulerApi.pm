@@ -19,6 +19,11 @@ sub new {
     $self->{sched_prefix} = "";
     $self->{actions} = [];
     $self->{working_dir} = "";
+    $self->{output_file_stderr} = "";
+    $self->{output_file_stdout} = "";
+    $self->{output_file_seq_num} = "";
+    $self->{output_file_seq_num_array} = "";
+    $self->{arrayid_var_name} = "";
     $self->{dryrun} = exists $args{dryrun} ? $args{dryrun} : 0;
 
     return $self;
@@ -48,8 +53,14 @@ sub workingDirectory {
     my ($self, $workingDir) = @_;
 }
 
+sub outputBaseFilepath {
+    my ($self, $filepath) = @_;
+}
+
 sub addAction {
     my ($self, $actionLine) = @_;
+
+    $actionLine =~ s/JOB_ARRAYID/$self->{arrayid_var_name}/g;
 
     push(@{$self->{actions}}, $actionLine);
 }
@@ -60,7 +71,7 @@ sub render {
     print $fh ("#!/bin/bash\n");
     my $pfx = $self->{sched_prefix};
     print $fh ("$pfx " . $self->{array} . "\n") if length($self->{array});
-    print $fh ("$pfx " . $self->{output} . "\n") if length($self->{output});
+    #print $fh ("$pfx " . $self->{output} . "\n") if length($self->{output});
     print $fh ("$pfx " . $self->{shell} . "\n") if length($self->{shell});
     print $fh ("$pfx " . $self->{queue} . "\n") if length($self->{queue});
     foreach my $res (@{ $self->{res} }) {
@@ -69,6 +80,23 @@ sub render {
     print $fh ("$pfx " . $self->{deps} . "\n") if length($self->{deps});
     print $fh ("$pfx " . $self->{mail} . "\n") if length($self->{mail});
     print $fh ("$pfx " . $self->{working_dir} . "\n") if length($self->{working_dir});
+    
+    if (length $self->{output_file_stdout}) {
+        if (length $self->{array}) {
+            print $fh ("$pfx " . $self->{output_file_stdout} . ".stdout." . $self->{output_file_seq_num_array} . "\n");
+        } else {
+            print $fh ("$pfx " . $self->{output_file_stdout} . ".stdout." . $self->{output_file_seq_num} . "\n");
+        }
+    }
+
+    if (length $self->{output_file_stderr}) {
+        if (length $self->{array}) {
+            print $fh ("$pfx " . $self->{output_file_stderr} . ".stderr." . $self->{output_file_seq_num_array} . "\n");
+        } else {
+            print $fh ("$pfx " . $self->{output_file_stderr} . ".stderr." . $self->{output_file_seq_num} . "\n");
+        }
+    }
+
     foreach my $action (@{$self->{actions}}) {
         print $fh "$action\n";
     }
@@ -95,9 +123,12 @@ sub new {
     my ($class, %args) = @_;
 
     my $self = Biocluster::SchedulerApi::Builder->new(%args);
-    $self->{output} = "-j oe";
+    #$self->{output} = "-j oe";
     $self->{shell} = "-S /bin/bash";
     $self->{sched_prefix} = "#PBS";
+    $self->{output_file_seq_num} = "\$PBS_JOBID";
+    $self->{output_file_seq_num_array} = "\$PBS_JOBID";
+    $self->{arrayid_var_name} = "PBS_ARRAYID";
 
     return bless($self, $class);
 }
@@ -129,7 +160,7 @@ sub queue {
 }
 
 sub resource {
-    my ($self, $numNodes, $procPerNode) = @_;
+    my ($self, $numNodes, $procPerNode, $ram) = @_;
 
     $self->{res} = ["-l nodes=$numNodes:ppn=$procPerNode"];
 }
@@ -137,13 +168,25 @@ sub resource {
 sub dependency {
     my ($self, $isArray, $jobId) = @_;
 
-    my $okStr = $isArray ? "afterokarray" : "afterok";
-    $self->{deps} = "-W depend=$okStr:$jobId";
+    if (defined $jobId) {
+        my $okStr = $isArray ? "afterokarray" : "afterok";
+        $self->{deps} = "-W depend=$okStr:$jobId";
+    }
 }
 
 sub workingDirectory {
     my ($self, $workingDir) = @_;
     $self->{working_dir} = "-w $workingDir";
+}
+
+sub outputBaseFilepath {
+    my ($self, $filepath) = @_;
+    if ($filepath) {
+        $self->{output_file_stderr} = "-e $filepath";
+        $self->{output_file_stdout} = "-o $filepath";
+    } else {
+        $self->{output_file_stderr} = $self->{output_file_stdout} = "";
+    }
 }
 
 
@@ -161,6 +204,9 @@ sub new {
 
     my $self = Biocluster::SchedulerApi::Builder->new(%args);
     $self->{sched_prefix} = "#SBATCH";
+    $self->{output_file_seq_num} = "%j";
+    $self->{output_file_seq_num_array} = "%A-%a";
+    $self->{arrayid_var_name} = "SLURM_ARRAY_TASK_ID";
 
     return bless($self, $class);
 }
@@ -192,16 +238,20 @@ sub queue {
 }
 
 sub resource {
-    my ($self, $numNodes, $procPerNode) = @_;
+    my ($self, $numNodes, $procPerNode, $ram) = @_;
 
-    $self->{res} = ["--nodes=$numNodes", "--tasks-per-node=$procPerNode"];
+    my $mem = defined $ram ? "--mem=$ram" : "";
+
+    $self->{res} = ["--nodes=$numNodes", "--tasks-per-node=$procPerNode", $mem];
 }
 
 sub dependency {
     my ($self, $isArray, $jobId) = @_;
 
-    my $okStr = "afterok";
-    $self->{deps} = "--dependency=$okStr:$jobId";
+    if (defined $jobId) {
+        my $okStr = "afterok";
+        $self->{deps} = "--dependency=$okStr:$jobId";
+    }
 }
 
 sub workingDirectory {
@@ -209,6 +259,15 @@ sub workingDirectory {
     $self->{working_dir} = "-D $workingDir";
 }
 
+sub outputBaseFilepath {
+    my ($self, $filepath) = @_;
+    if ($filepath) {
+        $self->{output_file_stderr} = "-e $filepath";
+        $self->{output_file_stdout} = "-o $filepath";
+    } else {
+        $self->{output_file_stderr} = $self->{output_file_stdout} = "";
+    }
+}
 
 
 
@@ -244,13 +303,25 @@ sub new {
     if (exists $args{resource}) {
         $self->{resource} = $args{resource};
     } else {
-        $self->{resource} = [1, 1];
+        $self->{resource} = [];
     }
+    
+    push(@{ $self->{resource} }, 1) if scalar @{ $self->{resource} } < 1;
+    push(@{ $self->{resource} }, 1) if scalar @{ $self->{resource} } < 2;
+    push(@{ $self->{resource} }, "20gb") if scalar @{ $self->{resource} } < 3;
 
     if (exists $args{dryrun}) {
         $self->{dryrun} = $args{dryrun};
     } else {
         $self->{dryrun} = 0;
+    }
+
+    if (exists $args{default_working_dir}) {
+        $self->{default_working_dir} = $args{default_working_dir};
+    }
+
+    if (exists $args{output_base_filepath}) {
+        $self->{output_base_filepath} = $args{output_base_filepath};
     }
 
     return $self;
@@ -269,7 +340,9 @@ sub getBuilder {
     }
 
     $b->queue($self->{queue}) if defined $self->{queue};
-    $b->resource($self->{resource}[0], $self->{resource}[1]) if defined $self->{resource};
+    $b->resource($self->{resource}[0], $self->{resource}[1], $self->{resource}[2]) if defined $self->{resource};
+    $b->workingDirectory($self->{default_working_dir}) if exists $self->{default_working_dir} and -d $self->{default_working_dir};
+    $b->outputBaseFilepath($self->{output_base_filepath}) if exists $self->{output_base_filepath} and length $self->{output_base_filepath};
 
     return $b;
 }
@@ -281,6 +354,8 @@ sub submit {
     if (not $self->{dryrun}) {
         my $submit = $self->{type} == SLURM ? "sbatch" : "qsub";
         $result = `$submit $script`;
+
+        $result =~ s/\D//g if $self->{type} == SLURM;
     }
 
     return $result;

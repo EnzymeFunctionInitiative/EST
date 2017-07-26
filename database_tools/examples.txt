@@ -1,0 +1,24 @@
+
+To start a job that processes the ENA files and builds a tab file that can be imported into the database, the
+following command can be used:
+
+    # builddb.pl -dir BUILD_DIR -ena-dir ENA_DIR -build-ena -queue efi -scheduler slurm -config EFI_CONFIG_FILE
+
+This could be triggered at the end of the script that downloads (rsync) the ENA files from biomirror.
+
+
+
+To create a script that can be used for downloading the requisite files:
+
+    # builddb.pl -dir BUILD_DIR -download -queue efi -scheduler slurm -config EFI_CONFIG_FILE
+
+
+
+To create and submit scripts that will process the downloaded files:
+
+    # builddb.pl -dir BUILD_DIR -queue efi -scheduler slurm -db-name YYYY-MM -config EFI_CONFIG_FILE
+
+
+
+All scripts are created in BUILD_DIR/build
+
