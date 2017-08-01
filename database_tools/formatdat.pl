@@ -233,7 +233,7 @@ sub write_line {
             $cazy="None";
         }
         if(scalar @KEGG){
-            $kegg = join ',', @$KEGG;
+            $kegg = join ',', @KEGG;
         } else {
             $kegg = "None";
         }
@@ -334,8 +334,10 @@ sub write_line {
                 $OS=$OSname;
             }
         }
-        print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$RDE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$kegg\t$string\t$patrick\t$brenda\t$giline\t$hmpsite\t$hmpoxygen\t$TID\t$EC";
-        print STRUCT "\t$phylum\t$class\t$order\t$family\t$genus\t$species" if -f $phylofile;
+        print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$RDE\t$OS";
+        print STRUCT "\t$OC" if -f $phylofile; # If we're using the new taxonomy source don't include the domain
+        print STRUCT "\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$kegg\t$string\t$patrick\t$brenda\t$giline\t$hmpsite\t$hmpoxygen\t$TID\t$EC";
+        print STRUCT "\t$phylum\t$class\t$order\t$family\t$genus\t$species" if -f $phylofile; # New format for taxonomy
         print STRUCT "\t$cazy\n";
     }
 }
