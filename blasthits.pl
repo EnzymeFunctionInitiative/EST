@@ -4,15 +4,19 @@ use Getopt::Long;
 use DBD::SQLite;
 use DBD::mysql;
 use File::Slurp;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use Annotations;
+
 
 $configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
 eval $configfile;
 
 $result=GetOptions (	"seq=s"	=> \$seq,
-			"nresults=i"	=> \$nresults,
-			"tmpdir=s"	=> \$tmpdir,
-			"evalue=s"	=> \$evalue
-		    );
+    "nresults=i"	=> \$nresults,
+    "tmpdir=s"	=> \$tmpdir,
+    "evalue=s"	=> \$evalue
+);
 
 mkdir $tmpdir or die "Could not make directory $tmpdir\n";
 
@@ -45,19 +49,19 @@ open(INITBLAST, "$ENV{PWD}/$tmpdir/sortedinitblast.out") or die "Cannot open sor
 $count=0;
 @accessions=();
 while (<INITBLAST>){
-  $line=$_;
-  @lineary=split /\s+/, $line;
-  @lineary[1]=~/\|(\w+)\|/;
-  $accession=$1;
-  if($count==0){
-    print "Top hit is $accession\n";
-  }
-  print ACCESSIONS "$accession\n";
-  push @accessions, $accession; 
-  $count++;
-  if($count>=$nresults){
-    last;
-  }
+    $line=$_;
+    @lineary=split /\s+/, $line;
+    @lineary[1]=~/\|(\w+)\|/;
+    $accession=$1;
+    if($count==0){
+        print "Top hit is $accession\n";
+    }
+    print ACCESSIONS "$accession\n";
+    push @accessions, $accession; 
+    $count++;
+    if($count>=$nresults){
+        last;
+    }
 }
 close INITBLAST;
 close ACCESSIONS;
@@ -68,15 +72,15 @@ print "Grab Sequences\n";
 print "there are ".scalar @accessions." accessions\n";
 open OUT, ">$ENV{PWD}/$tmpdir/allsequences.fa" or die "Cannot write fasta\n";
 while(scalar @accessions){
-  @batch=splice(@accessions, 0, $perpass);
-  $batchline=join ',', @batch;
-  #print "fastacmd -d $combined -s $batchline\n";
-  @sequences=split /\n/, `fastacmd -d $db -s $batchline`;
-  foreach $sequence (@sequences){ 
-    $sequence=~s/^>\w\w\|(\w{6,12}).*/>$1/;
-    print OUT "$sequence\n";
-  }
-  
+    @batch=splice(@accessions, 0, $perpass);
+    $batchline=join ',', @batch;
+    #print "fastacmd -d $combined -s $batchline\n";
+    @sequences=split /\n/, `fastacmd -d $db -s $batchline`;
+    foreach $sequence (@sequences){ 
+        $sequence=~s/^>\w\w\|(\w{6,12}).*/>$1/;
+        print OUT "$sequence\n";
+    }
+
 }
 close OUT;
 
@@ -84,60 +88,13 @@ print "Grab Annotations\n";
 open OUT, ">$ENV{PWD}/$tmpdir/struct.out" or die "cannot write to struct.out\n";
 #my $dbh = DBI->connect("dbi:SQLite:$sqlite","","");
 foreach $accession (@annoaccessions){
-  $sth= $dbh->prepare("select * from annotations where accession = '$accession'");
-  $sth->execute;
-  $row = $sth->fetchrow_hashref;
-  #print OUT 
-  #  $row->{"accession"} . 
-  #  "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} . 
-  #  "\n\tSTATUS\t" . $row->{"STATUS"} . 
-  #  "\n\tSequence_Length\t" . $row->{"Sequence_Length"} . 
-  #  "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
-  #  "\n\tGDNA\t" . $row->{"GDNA"} . 
-  #  "\n\tDescription\t" . $row->{"Description"} . 
-  #  "\n\tOrganism\t" . $row->{"Organism"} . 
-  #  "\n\tDomain\t" . $row->{"Domain"} . 
-  #  "\n\tGN\t" . $row->{"GN"} . 
-  #  "\n\tPFAM\t" . $row->{"PFAM"} . 
-  #  "\n\tPDB\t" . $row->{"pdb"} . 
-  #  "\n\tIPRO\t" . $row->{"IPRO"} . 
-  #  "\n\tGO\t" . $row->{"GO"} . 
-  #  "\n\tGI\t" . $row->{"GI"} . 
-  #  "\n\tHMP_Body_Site\t" . $row->{"HMP_Body_Site"} . 
-  #  "\n\tHMP_Oxygen\t" . $row->{"HMP_Oxygen"} . 
-  #  "\n\tEFI_ID\t" . $row->{"EFI_ID"} . 
-  #  "\n\tSEQ\t" . $row->{"SEQ"} . 
-  #  "\n";
-  #print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$OS\t$OC\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$giline\t$TID\t$sequence\n";
-  print OUT
-    $row->{"accession"} . 
-    "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} . 
-    "\n\tSTATUS\t" . $row->{"STATUS"} . 
-    "\n\tSequence_Length\t" . $row->{"Sequence_Length"} . 
-    "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
-    "\n\tGDNA\t" . $row->{"GDNA"} . 
-    "\n\tDescription\t" . $row->{"Description"} . 
-    "\n\tSwissprot_Description\t" . $row->{"SwissProt_Description"} . 
-    "\n\tOrganism\t" . $row->{"Organism"} . 
-    "\n\tDomain\t" . $row->{"Domain"} . 
-    "\n\tGN\t" . $row->{"GN"} . 
-    "\n\tPFAM\t" . $row->{"PFAM"} . 
-    "\n\tPDB\t" . $row->{"pdb"} . 
-    "\n\tIPRO\t" . $row->{"IPRO"} . 
-    "\n\tGO\t" . $row->{"GO"} . 
-    "\n\tGI\t" . $row->{"GI"} . 
-    "\n\tHMP_Body_Site\t" . $row->{"HMP_Body_Site"} . 
-    "\n\tHMP_Oxygen\t" . $row->{"HMP_Oxygen"} . 
-    "\n\tEFI_ID\t" . $row->{"EFI_ID"} . 
-    "\n\tEC\t" . $row->{"EC"} . 
-    "\n\tPHYLUM\t" . $row->{"Phylum"} . 
-    "\n\tCLASS\t" . $row->{"Class"} . 
-    "\n\tORDER\t" . $row->{"TaxOrder"} . 
-    "\n\tFAMILY\t" . $row->{"Family"} . 
-    "\n\tGENUS\t" . $row->{"Genus"} . 
-    "\n\tSPECIES\t" . $row->{"Species"} . 
-    "\n\tCAZY\t" . $row->{"Cazy"} . 
-    "\n";
+    my $sql = Annotations::build_query_string($accession);
+    #$sql = "select * from annotations where accession = '$accession'";
+    $sth= $dbh->prepare($sql);
+    $sth->execute;
+    $row = $sth->fetchrow_hashref;
+
+    print OUT Annotations::build_annotations($row);
 }
 close OUT;
 
@@ -171,9 +128,9 @@ $removedups=`$toolpath/removedups.pl -in $ENV{PWD}/$tmpdir/1.out.dupes -out $ENV
 print $removedups;
 
 if ( -z "$ENV{PWD}/$tmpdir/1.out" ) {
-	$fail_file="$ENV{PWD}/$tmpdir/1.out.failed";
-        system("touch $fail_file");
-        die "Empty 1.out file\n";
+    $fail_file="$ENV{PWD}/$tmpdir/1.out.failed";
+    system("touch $fail_file");
+    die "Empty 1.out file\n";
 }
 # 
 mkdir "$ENV{PWD}/$tmpdir/rdata" or die "could not make direcotry $ENV{PWD}/$tmpdir/rdata\n";
