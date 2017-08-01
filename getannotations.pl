@@ -48,7 +48,7 @@ foreach $accession (@accessions){
         print OUT $row->{"accession"} . 
         "\n\tUniprot_ID\t" . $row->{"Uniprot_ID"} . 
         "\n\tSTATUS\t" . $row->{"STATUS"} . 
-        "\n\tSequence_Length\t" . $row->{"Squence_Length"} . 
+        "\n\tSequence_Length\t" . $row->{"Sequence_Length"} . 
         "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
         "\n\tGDNA\t" . $row->{"GDNA"} . 
         "\n\tDescription\t" . $row->{"Description"} . 
