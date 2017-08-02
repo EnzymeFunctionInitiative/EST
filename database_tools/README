@@ -1,0 +1,81 @@
+
+# Building a Database
+
+Building a complete EFI-EST/GNT database requires a few steps as well as a bit
+of manual intervention.  The first step involves downloading the files which
+as of August 2017 is a process that must be user-initiated and run on the EFI
+machine since the clusters don't allow access from nodes to the outside world.
+Eventually that process will be moved to the datamover account/process, but at
+least for now it is a manual step.
+
+The builddb.pl script is used to create the database build directory
+structure.  The structure is created for any of the following build steps.
+
+All scripts are created in BUILD_DIR/build
+
+
+## Step 1: Downloading UniProt and Interpro files
+
+builddb.pl can be used to create a script that downloads the requisite files
+and is used as follows:
+
+    # builddb.pl -dir BUILD_DIR -download -queue efi -scheduler slurm -config EFI_CONFIG_FILE
+
+
+## Step 2: Downloading ENA files
+
+Currently this is a process that is not automatically included in the download
+script build by builddb.pl.  However, there is a line at the end of the file
+that gives guidance on how this might be done.  The reason that it is not
+included is that the rsync takes a long time, and occasionally fails and must
+be restarted.  This will be moved into the datamover process eventually.  The
+download script shouldn't take more than a day to run, but the rsync of ENA
+data will take several days.  The release cycle is different than UniProt and
+Interpro as well, so the user will not always download ENA files.  The rsync
+can be run independent of the UniProt and Interpro download and processing
+jobs.
+
+
+## Step 3: Process the UniProt and Interpro files
+
+The UniProt and Interpro files need to be processed and blast'ed after being
+downloaded.  To create and automatically submit scripts that will process the
+downloaded files, the following command can be run:
+
+    # builddb.pl -dir BUILD_DIR -queue efi -scheduler slurm -db-name YYYY-MM -config EFI_CONFIG_FILE
+
+
+## Step 4: Process ENA files
+
+The job that processes the ENA files is dependent on the first part of Step 3,
+namely the process-downloads job file.  Once that job is completed, builddb.pl
+can be used to create and start a job that processes the ENA files and builds
+a tab file that can be imported into the database.  It can be run as follows:
+
+    # builddb.pl -dir BUILD_DIR -ena-dir ENA_DIR -build-ena -queue efi -scheduler slurm -config EFI_CONFIG_FILE
+
+This could be triggered at the end of the script that downloads (rsync) the
+ENA files from biomirror and made a dependency of the process-downloads job.
+If the -ena-dir option is not provided, it is assumed that the ENA files have
+been downloaded to BUILD_DIR/input/ena/release.
+
+
+## Step 5: Create database and import data
+
+The final steps in building a database involve using builddb.pl to create SQL
+scripts used for creating and importing the data into tables.  In order to
+mitigate the risk of overwriting a database, the scripts require that the
+user have created a database manually (e.g. "create database YYYY-MM" from
+within MySQL).  
+
+
+
+
+## Appendix A
+
+To ONLY create a script and SQL file that will create the family_counts table
+that needs to be imported into the EFI webserver mysql database:
+
+    # builddb.pl  -dir BUILD_DIR -build-counts -config EFI_CONFIG_FILE
+
+

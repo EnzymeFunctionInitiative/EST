@@ -23,6 +23,9 @@ use Biocluster::Util::FileHandle;
 use Biocluster::Database;
 use Biocluster::Config qw(biocluster_configure);
 
+use constant BUILD_ENA => 2;
+use constant BUILD_COUNTS => 4;
+
 
 my $WorkingDir;
 my $doDownload = 0;
@@ -40,7 +43,7 @@ my $dbName;
 my $buildEna;
 my $Legacy;
 my $enaDir;
-my $buildCounts;
+my $buildCountsOnly;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "download"      => \$doDownload,
@@ -59,7 +62,7 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "build-ena"     => \$buildEna,      # if this is present, build the ENA table only. the database must have
                                                             # been already created, and the idmapping table must be present.
                         "ena-dir=s"     => \$enaDir,
-                        "build-counts"  => \$buildCounts,   # build the family count table only
+                        "build-counts"  => \$buildCountsOnly,   # build the family count table only
                        );
 
 my $usage = <<USAGE;
@@ -97,12 +100,12 @@ if (not $WorkingDir) {
     exit(1);
 }
 
-if (not $dbName and not $buildEna and not $doDownload and not $buildCounts) {
+if (not $dbName and not $buildEna and not $doDownload and not $buildCountsOnly) {
     print "The -db-name parameter is required.\n";
     exit(1);
 }
 
-if (not defined $sql and not defined $buildCounts and (not defined $queue or length $queue == 0)) {
+if (not defined $sql and not defined $buildCountsOnly and (not defined $queue or length $queue == 0)) {
     print "The -queue parameter is required.\n";
     exit(1);
 }
@@ -128,19 +131,6 @@ my $BlastMod = $Legacy ? "blast" : "BLAST";
 # Number of processors to use for the blast job.
 my $np = 200;
 
-
-
-# Setup logging. Also redirect stderr to console stdout.
-$logFile = "builddb.log" unless (defined $logFile and length $logFile);
-open LOG, ">$logFile" or die "Unable to open log file $logFile";
-open(STDERR, ">&STDOUT") or die "Unable to redirect STDERR: $!";
-sub logprint { print join("", @_), "\n"; print LOG join("", @_), "\n"; }
-#logprint "#OPTIONS: dir=$WorkingDir no-download=$doDownload step=$interactive log=$logFile dryrun=$dryRun exists=$skipIfExists queue=$queue scheduler=$scheduler\n";
-logprint "#STARTED builddb.pl AT " . scalar localtime() . "\n";
-
-
-logprint "# USING WORKING DIR OF $WorkingDir AND SCRIPTS IN $ScriptDir";
-
 mkdir $WorkingDir if not -d $WorkingDir;
 mkdir $BuildDir if not -d $BuildDir;
 mkdir $InputDir if not -d $InputDir;
@@ -152,6 +142,21 @@ mkdir $PdbBuildDir if not -d $PdbBuildDir;
 mkdir "$PdbBuildDir/output" if not -d "$PdbBuildDir/output";
 
 
+# Setup logging. Also redirect stderr to console stdout.
+$logFile = "$BuildDir/builddb.log" unless (defined $logFile and length $logFile);
+open LOG, ">$logFile" or die "Unable to open log file $logFile";
+open(STDERR, ">&STDOUT") or die "Unable to redirect STDERR: $!";
+sub logprint { print join("", @_), "\n"; print LOG join("", @_), "\n"; }
+#logprint "#OPTIONS: dir=$WorkingDir no-download=$doDownload step=$interactive log=$logFile dryrun=$dryRun exists=$skipIfExists queue=$queue scheduler=$scheduler\n";
+
+logprint "#STARTED builddb.pl AT " . scalar localtime() . "\n";
+logprint "# USING WORKING DIR OF $WorkingDir AND SCRIPTS IN $ScriptDir";
+
+
+my $buildOptions = 0;
+$buildOptions = $buildOptions | BUILD_ENA if $buildEna;
+$buildOptions = $buildOptions | BUILD_COUNTS if $buildCountsOnly;
+
 
 my %dbArgs;
 $dbArgs{config_file_path} = $configFile if (defined $configFile and -f $configFile);
@@ -160,7 +165,7 @@ my $DB = new Biocluster::Database(%dbArgs);
 
 # Output the sql commands necessary for creating the database and importing the data, then exit.
 if (defined $sql) {
-    writeSqlCommands($dbName, $buildEna, "sql");
+    writeSqlCommands($dbName, $buildOptions, "sql");
     exit(0);
 }
 
@@ -195,7 +200,8 @@ if (defined $buildEna and $buildEna) {
 
     $fileNum = 17;
 
-    if (not defined $enaDir or not -d $enaDir or not -d "$enaDir/std") {
+    $enaDir = "$InputDir/ena/release" if not defined $enaDir;
+    if (not -d $enaDir or not -d "$enaDir/std") {
         die "Unable to create job for building ENA table: the ENA directory $enaDir is not valid.";
     }
 
@@ -220,7 +226,7 @@ if (defined $buildEna and $buildEna) {
     $dlJobId = submitDownloadJob($S->getBuilder(), $doDownload, $fileNum++);
     $dlJobId = undef if not $doDownload;
 
-} elsif ($buildCounts) {
+} elsif ($buildOptions & BUILD_COUNTS) { # Build the counts table only
 
     $fileNum = 27;
 
@@ -245,7 +251,6 @@ if (defined $buildEna and $buildEna) {
     logprint "#CAT BLAST FILES\n";
     my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
     
-    
     # Chop up xml files so we can parse them easily
     logprint "#CHOP MATCH_COMPLETE AND .TAB FILES\n";
     my $ffJobId = submitFinalFileJob($S->getBuilder(), $unzipJobId, $fileNum++);
@@ -253,6 +258,10 @@ if (defined $buildEna and $buildEna) {
     # Create idmapping table
     logprint "#CREATING IDMAPPING TABLE\n";
     my $idJobId = submitIdMappingJob($S->getBuilder(), $unzipJobId, $fileNum++);
+    
+    # Create family_counts table
+    logprint "#CREATING FAMILY COUNTS TABLE\n";
+    my $countJobId = submitBuildCountsJob($S->getBuilder(), $unzipJobId, $fileNum++);
 }
 
 
@@ -260,7 +269,7 @@ if (defined $buildEna and $buildEna) {
 if (not $doDownload) {
     # Create and import the data into the database
     logprint "#WRITING SQL SCRIPT FOR IMPORTING DATA INTO DATABASE\n";
-    writeSqlCommands($dbName, $buildEna, $fileNum);
+    writeSqlCommands($dbName, $buildOptions | BUILD_COUNTS, $fileNum); # Output the build counts job as well, by default
 }
 
 
@@ -573,7 +582,7 @@ sub submitDownloadJob {
     }
 
     $B->addAction("echo To download the ENA files, run");
-    $B->addAction("echo rsync -auv rsync://bio-mirror.net/biomirror/embl/release/ TARGET_DIR");
+    $B->addAction("echo rsync -auv rsync://bio-mirror.net/biomirror/embl/release/ $InputDir/ena");
     #rsync -auv rsync://bio-mirror.net/biomirror/embl/release/
 
     $B->outputBaseFilepath($file);
@@ -678,21 +687,14 @@ sub submitUnzipJob {
 
 
 sub writeSqlCommands {
-    my ($dbName, $buildEna, $fileNum) = @_;
-
-    my $suffix = $buildEna ? "-ena" : "";
-    my $outFile = "$BuildDir/$fileNum-createDbAndImportData$suffix.sql";
-    my $batchFile = "$BuildDir/$fileNum-runDatabaseActions.sh";
-
-    open OUT, "> $outFile" or die "Unable to open '$outFile' to save SQL commands: $!";
-
-    my (undef, undef, undef, $mday, $mon, $year) = localtime(time);
-    #my $dbName = "efi_" . sprintf("%d%02d%02d", $year + 1900, $mon + 1, $mday);
+    my ($dbName, $buildOptions, $fileNum) = @_;
 
     my $sql = "";
+    my $countSql = "";
+    my $enaSql = "";
 
-    if ($buildCounts) {
-        $sql = <<SQL;
+    if ($buildOptions & BUILD_COUNTS) {
+        $countSql = <<SQL;
 
 select 'CREATED family_counts' as '';
 drop table if exists family_counts;
@@ -704,8 +706,10 @@ select 'LOADING family_counts' as '';
 load data local infile '$OutputDir/family_counts.tab' into table family_counts;
 SQL
         ;
-    } elsif ($buildEna) {
-        $sql = <<SQL;
+    }
+    
+    if ($buildOptions & BUILD_ENA) {
+        $enaSql = <<SQL;
 
 select 'CREATING ena' as '';
 drop table if exists ena;
@@ -718,7 +722,9 @@ load data local infile '$OutputDir/ena.tab' into table ena;
 
 SQL
         ;
-    } else {
+    }
+    
+    {
         $sql = <<SQL;
 
 select 'CREATING ANNOTATIONS' as '';
@@ -829,28 +835,51 @@ SQL
         ;
     }
 
-    print OUT $sql;
 
-    close OUT;
+    my $writeSqlSub = sub {
+        my ($filePath, $sqlString) = @_;
+        open OUT, "> $filePath" or die "Unable to open '$filePath' to save SQL commands: $!";
+        print OUT $sqlString;
+        close OUT;
+    };
 
-    if (length $batchFile) {
+    my $outFile = "$BuildDir/$fileNum-createDbAndImportData";
+    my $countSqlFile = $outFile . "-counts.sql";
+    my $enaSqlFile = $outFile . "-ena.sql";
+    my $sqlFile = $outFile . ".sql";
+
+    $writeSqlSub->($countSqlFile, $countSql) if $buildOptions & BUILD_COUNTS;
+    $writeSqlSub->($enaSqlFile, $enaSql) if $buildOptions & BUILD_ENA;
+    $writeSqlSub->($sqlFile, $sql) if not ($buildOptions & BUILD_COUNTS);
+
+
+    my $mysqlCmd = $DB->getCommandLineConnString();
+    my $batchFile = "$BuildDir/$fileNum-runDatabaseActions.sh";
+
+    if (not ($buildOptions & BUILD_COUNTS)) {
         open BATCH, "> $batchFile" or die "Unable to open '$batchFile' to save SQL shell script: $!";
-        my $mysqlCmd = $DB->getCommandLineConnString();
+        print BATCH "#!/bin/bash\n\n";
+    
+        if ($buildOptions & BUILD_ENA) {
+            print BATCH <<CMDS;
 
-        my $batch = "";
-        my $type = "";
-        if (not $buildEna) {
-            $type = ".default";
-            $batch = <<CMDS;
+if [ -f $CompletedFlagFile.mysql_import-ena ]; then
+    echo "The ENA database has already been imported. You will need to manually import the data to"
+    echo "override this check."
+elif [ -f $CompletedFlagFile.*-ena ]; then
+    $mysqlCmd $dbName < $enaSqlFile > $BuildDir/mysqlOutput-ena.txt
+    date > $CompletedFlagFile.mysql_import-ena
+else
+    echo "The ENA data file build has not completed yet. Skipping that import."
+fi
+
+CMDS
+        }
+
+        print BATCH <<CMDS;
 
 if [ ! -f $CompletedFlagFile.*-finalFiles ]; then
     echo "The data file build has not completed yet. Please wait until all of the output has been generated."
-    echo "Bye."
-    exit
-fi
-
-if [ ! -f $CompletedFlagFile.*-ena ]; then
-    echo "The ENA data file build has not completed yet. Please wait until all of the output has been generated."
     echo "Bye."
     exit
 fi
@@ -897,36 +926,37 @@ if [ ! -f $OutputDir/pfam_info.tab ]; then
     exit
 fi
 
-CMDS
-            ;
-        } else {
-            $type = ".ena";
-            $batch = <<CMDS;
-
-if [ ! -f $OutputDir/ena.tab ]; then
-    echo "$OutputDir/ena.tab does not exist. Did the build complete?"
-    echo "Bye."
-    exit
+if [ -f $CompletedFlagFile.mysql_import-base ]; then
+    echo "It looks like the data has already been imported. You'll have to manually import if you want"
+    echo "to override this check.";
+else
+    $mysqlCmd $dbName < $sqlFile > $BuildDir/mysqlOutput-base.txt
+    date > $CompletedFlagFile.mysql_import-base
 fi
 
 CMDS
-            ;
-        }
-
-        print BATCH <<CMDS;
-#!/bin/bash
-
-$batch
-
-$mysqlCmd $dbName < $outFile > $BuildDir/mysqlOutput$type.txt
-
-date > $CompletedFlagFile.mysql_import$type
-
-CMDS
-        ;
 
         close BATCH;
     }
+    
+    if ($buildOptions & BUILD_COUNTS) {
+        (my $countsBatchFile = $batchFile) =~ s/\.sh$/.counts.sh/;
+        open COUNTSBATCH, "> $countsBatchFile" or die "Unable to open counts batch file '$countsBatchFile': $!";
+        print COUNTSBATCH <<CMDS;
+
+if [ -f $CompletedFlagFile.mysql_import-counts ]; then
+    echo "The family counts table has already been imported. You will need to manually import the data"
+    echo "to override this check."
+elif [ -f $CompletedFlagFile.*-counts ]; then
+    echo "Do something like mysql -p WEB_EFI_DB_NAME < $countSqlFile > $BuildDir/mysqlOutput-counts.txt"
+else
+    echo "The family counts file has not yet been created.  Skipping that import."
+fi
+
+CMDS
+        close COUNTSBATCH;
+    }
+
 }
 
 
