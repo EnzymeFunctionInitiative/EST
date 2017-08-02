@@ -631,10 +631,11 @@ sub submitUnzipJob {
         $B->addAction("date > $CompletedFlagFile.combined.dat_cat\n");
     }
 
-    if (not $skipIfExists or not -f "$InputDir/gionly.dat") {
-        $B->addAction("grep -P \"\tGI\t\" $InputDir/idmapping.dat > $LocalSupportDir/gionly.dat");
-        $B->addAction("date > $CompletedFlagFile.gionly\n");
-    }
+    # July 2017 - Don't include GI anymore
+    #if (not $skipIfExists or not -f "$InputDir/gionly.dat") {
+    #    $B->addAction("grep -P \"\tGI\t\" $InputDir/idmapping.dat > $LocalSupportDir/gionly.dat");
+    #    $B->addAction("date > $CompletedFlagFile.gionly\n");
+    #}
 
     waitForInput();
 
@@ -669,7 +670,9 @@ sub submitUnzipJob {
     
 
     if (not $skipIfExists or not -f "$OutputDir/struct.tab") {
-        $B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
+        # Exclude GI
+        #$B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
+        $B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -uniprotgi -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
         $B->addAction("date > $CompletedFlagFile.formatdat\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/organism.tab") {
@@ -747,7 +750,7 @@ create table annotations(accession varchar(10) primary key,
                          STRING varchar(100),
                          BRENDA varchar(100),
                          PATRIC varchar(100),
-                         GI varchar(15),
+                         /*GI varchar(15),*/
                          HMP_Body_Site varchar(75),
                          HMP_Oxygen varchar(50),
                          EFI_ID varchar(6),

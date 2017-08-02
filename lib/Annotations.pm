@@ -37,12 +37,10 @@ sub build_query_string_base {
 sub build_annotations {
     my $row = shift;
 
-    my $tabPrefix = $Version == 1 ? "" : "A.";
-
     my $tab = $row->{"accession"} . 
         "\n\tSTATUS\t" . $row->{"STATUS"} . 
         "\n\tSequence_Length\t" . $row->{"Sequence_Length"} . 
-        "\n\tTaxonomy_ID\t" . $row->{"${tabPrefix}Taxonomy_ID"} . 
+        "\n\tTaxonomy_ID\t" . $row->{"Taxonomy_ID"} . 
         "\n\tP01_gDNA\t" . $row->{"GDNA"} . 
         "\n\tDescription\t" . $row->{"Description"} . 
         "\n\tSwissprot_Description\t" . $row->{"SwissProt_Description"} . 

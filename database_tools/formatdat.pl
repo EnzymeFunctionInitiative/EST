@@ -40,20 +40,25 @@ $idMapper->parseTable($idMappingFile) if $idMappingFile and -f $idMappingFile;
 #close REFSEQ;
 #print "RefSeq Finished\n";
 
-print "Read in GI Table\n";
-open GI, $uniprotgi or die "could not open $uniprotgi for GI\n";
-while (<GI>){
-    @line=split /\s/, $_;
-    $GI{@line[0]}{'number'}=@line[2];
-    if(exists $GI{@line[0]}{'count'}){
-        $GI{@line[0]}{'count'}++;
-    }else{
-        $GI{@line[0]}{'count'}=0;
+
+my %GI;
+if ($uniprotgi) {
+    print "Read in GI Table\n";
+    open GI, $uniprotgi or die "could not open $uniprotgi for GI\n";
+    while (<GI>){
+        @line=split /\s/, $_;
+        $GI{@line[0]}{'number'}=@line[2];
+        if(exists $GI{@line[0]}{'count'}){
+            $GI{@line[0]}{'count'}++;
+        }else{
+            $GI{@line[0]}{'count'}=0;
+        }
+        #print "GI\t@line[0]\t".$GI{@line[0]}{'number'}."\t".$GI{@line[0]}{'count'}."\n";
     }
-    #print "GI\t@line[0]\t".$GI{@line[0]}{'number'}."\t".$GI{@line[0]}{'count'}."\n";
+    close GI;
+    print "GI Finished\n";
 }
-close GI;
-print "GI Finished\n";
+
 
 print "get GDNA taxids\n";
 open GDNA, $gdna or die "could not open gda file $gdna\n";
@@ -126,6 +131,8 @@ if (-f $phylofile) {
 
 $debug = 2**50 if not defined $debug; #TODO: debug
 
+my ($element, $id, $status, $size, $OX, $GDNA, $DE, $RDE, $OS, $OC, $GN, $PFAM, $PDB, $IPRO, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $TID, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy);
+
 print "Parsing DAT Annotation Information\n";
 open DAT, $dat or die "could not open dat file $dat\n";
 open STRUCT, ">$struct" or die "could not write struct data to $struct\n";
@@ -175,6 +182,7 @@ while (<DAT>){
     }elsif($line=~/^DR   PDB; (\w+);/){
         push @PDBS, $1;
     }elsif($line=~/DR\s+CAZy; (\w+);/){
+        print "FOUND ONE$id\n";
         push @CAZYS, $1;
     }elsif($line=~/^DR   InterPro; (\w+); (\w+)/){
         push @IPROS, "$1 $2";
@@ -334,11 +342,27 @@ sub write_line {
                 $OS=$OSname;
             }
         }
-        print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$RDE\t$OS";
-        print STRUCT "\t$OC" if -f $phylofile; # If we're using the new taxonomy source don't include the domain
-        print STRUCT "\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$kegg\t$string\t$patrick\t$brenda\t$giline\t$hmpsite\t$hmpoxygen\t$TID\t$EC";
-        print STRUCT "\t$phylum\t$class\t$order\t$family\t$genus\t$species" if -f $phylofile; # New format for taxonomy
-        print STRUCT "\t$cazy\n";
+
+        my @line = ($element, $id, $status, $size, $OX, $GDNA, $DE, $RDE, $OS); 
+        push @line, $OC     if $useOldPhylo;
+        push @line, $GN, $PFAM, $PDB, $IPRO, $GO, $kegg, $string, $brenda, $patric;
+        push @line, $giline if $useGiNums;
+        push @line, $hmpsite, $hmpoxygen, $TID, $EC;
+        push @line, $phylum, $class, $order, $family, $genus, $species if $useOldPhylo;
+        push @line, $cazy;
+
+        print STRUCT join("\t", @line), "\n";
+        
+        #print STRUCT "$element\t$id\t$status\t$size\t$OX\t$GDNA\t$DE\t$RDE\t$OS";
+        ## If we're using the new taxonomy source don't include the domain
+        #print STRUCT "\t$OC" if -f $phylofile; 
+        #print STRUCT "\t$GN\t$PFAM\t$PDB\t$IPRO\t$GO\t$kegg\t$string\t$brenda\t$patric";
+        ## As of July 2017 we are not including GI numbers anymore.
+        #print STRUCT "\t$giline" if -f $uniprotgi;
+        #print STRUCT "\t$hmpsite\t$hmpoxygen\t$TID\t$EC";
+        ## If we're using the new taxonomy source don't include it here, it's in a separate table
+        #print STRUCT "\t$phylum\t$class\t$order\t$family\t$genus\t$species" if -f $phylofile; 
+        #print STRUCT "\t$cazy\n";
     }
 }
 
