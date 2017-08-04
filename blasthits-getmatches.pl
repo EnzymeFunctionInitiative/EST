@@ -1,27 +1,28 @@
 #!/usr/bin/env perl
 
+use strict;
 use Getopt::Long;
-use DBD::SQLite;
-use DBD::mysql;
-use File::Slurp;
 
-$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
-eval $configfile;
+my ($blastfile, $accessions, $max);
+my $result=GetOptions(
+    "blastfile=s"   => \$blastfile,
+    "accessions=s"  => \$accessions,
+    "max=i"         => \$max,
+);
 
-$result=GetOptions (	"blastfile=s"	=> \$blastfile,
-			"accessions=s"	=> \$accessions,
-			"max=i"		=> \$max
-		    );
+die "Missing required command line arguments" if not $blastfile or not $accessions or not $max;
 
-open(ACCESSIONS, ">$accessions") or die "Couldn not write accession list $accessions\n";
+open(ACCESSIONS, ">$accessions") or die "Could not write accession list $accessions\n";
 open(INITBLAST, $blastfile) or die "Cannot open sorted initial blast query $blastfile\n";
-$count=0;
-@accessions=();
+
+my $count=0;
+my @accessions=();
+
 while (<INITBLAST>){
-  $line=$_;
-  @lineary=split /\s+/, $line;
-  @lineary[1]=~/\|(\w+)\|/;
-  $accession=$1;
+  my $line=$_;
+  my @parts = split /\s+/, $line;
+  $parts[1]=~/\|(\w+)\|/;
+  my $accession=$1;
   if($count==0){
     print "Top hit is $accession\n";
   }
@@ -34,3 +35,5 @@ while (<INITBLAST>){
 }
 close INITBLAST;
 close ACCESSIONS;
+
+

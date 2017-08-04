@@ -9,9 +9,6 @@
 
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
-use DBD::SQLite;
-use DBD::mysql;
-use File::Slurp;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 use Biocluster::IdMapping;
@@ -21,11 +18,6 @@ use Biocluster::Fasta::Headers;
 use Biocluster::Database;
 
 
-#print "config file is located at: ".$ENV{'EFICFG'}."\n";
-#$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
-#eval $configfile;
-#
-#print "Configfile is \n > $configfile\n";
 
 my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile, $seqCountFile, $configFile);
 my $result = GetOptions(
@@ -191,6 +183,10 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
 
     print "Parsing the FASTA file.\n";
 
+    ## Any ids from families are assigned a query_id value but only do it if we have specified
+    ## an FASTA input file.
+    #map { $headerData->{$_}->{query_ids} = [$_]; } keys %accessionhash;
+
     $useFastaHeaders = defined $useFastaHeaders ? 1 : 0;
     # Returns the Uniprot IDs that were found in the file.  All sequences found in the file are written directly
     # to the output FASTA file.
@@ -202,10 +198,6 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
     my $fastaNumUniprotIdsInDb = scalar @fastaUniprotIds;
     $fastaNumUnmatched = $fastaNumHeaders - $fastaNumUniprotIdsInDb;
     
-    # Any ids from families are assigned a query_id value but only do it if we have specified
-    # an FASTA input file.
-    map { $headerData->{$_}->{query_ids} = [$_]; } keys %accessionhash;
-
     print "There were $fastaNumHeaders headers, $fastaNumUniprotIdsInDb IDs with matching UniProt IDs, ";
     print "$fastaNumUnmatched IDs that weren't found in idmapping, and $fileSequenceCount sequences in the FASTA file.\n";
     print "There were $numMultUniprotIdSeq sequences that were replicated because they had multiple Uniprot IDs in the headers.\n";

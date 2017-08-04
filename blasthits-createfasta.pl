@@ -1,20 +1,24 @@
 #!/usr/bin/env perl
 
+use strict;
 use Getopt::Long;
-use DBD::SQLite;
-use DBD::mysql;
-use File::Slurp;
 
-$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
-eval $configfile;
+die "EFIDBPATH environment variable must be present; did you forget to module load efiest?" if not exists $ENV{EFIDBPATH};
 
-$result = GetOptions(
+
+my ($fasta, $accessions, $countFile);
+my $result = GetOptions(
     "fasta=s"           => \$fasta,
     "accessions=s"      => \$accessions,
     "seq-count-file=s"  => \$countFile,
 );
 
-print "$data_files/combined.fasta";
+
+die "Missing command line arguments" if not $fasta or not $accessions or not $countFile;
+
+my $data_files = $ENV{EFIDBPATH};
+
+print "using $data_files/combined.fasta as the Blast database\n";
 
 open(FASTA, ">$fasta") or die "could not write to fasta file $fasta\n";
 open(ACC, $accessions) or die "could not read accession file $accessions\n";
@@ -22,10 +26,10 @@ open(ACC, $accessions) or die "could not read accession file $accessions\n";
 my $accCount = 0;
 
 while(<ACC>){
-    $line=$_;
+    my $line=$_;
     chomp $line;
-    @sequences=split "\n", `fastacmd -d $data_files/combined.fasta -s $line`;
-    foreach $sequence (@sequences){
+    my @sequences=split "\n", `fastacmd -d $data_files/combined.fasta -s $line`;
+    foreach my $sequence (@sequences){
         $sequence=~s/^>\w\w\|(\w{6,10})\|.*/>$1/;
         print FASTA "$sequence\n";
     }

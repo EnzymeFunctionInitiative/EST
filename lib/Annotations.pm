@@ -33,9 +33,16 @@ sub build_query_string_base {
 }
 
 
+sub build_id_mapping_query_string {
+    my $accession = shift;
+    my $sql = "select foreign_id_type, foreign_id from idmapping where uniprot_id = '$accession'";
+    return $sql;
+}
+
 
 sub build_annotations {
     my $row = shift;
+    my $ncbiIds = shift;
 
     my $tab = $row->{"accession"} . 
         "\n\tSTATUS\t" . $row->{"STATUS"} . 
@@ -66,8 +73,9 @@ sub build_annotations {
         "\n\tFamily\t" . $row->{"Family"} . 
         "\n\tGenus\t" . $row->{"Genus"} . 
         "\n\tSpeices\t" . $row->{"Species"} . 
-        "\n\tCAZY\t" . $row->{"Cazy"} .
-        "\n";
+        "\n\tCAZY\t" . $row->{"Cazy"};
+    $tab .= "\n\tNCBI_IDs\t" . join(",", @$ncbiIds) if ($ncbiIds);
+    $tab .= "\n";
 
     return $tab;
 }
