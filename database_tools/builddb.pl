@@ -431,7 +431,7 @@ sub submitSplitFastaJob {
     if (not $skipIfExists or not -f "$dbDir/formatdb.log") {
         $B->addAction("cd $dbDir");
         $B->addAction("mv $CombinedDir/combined.fasta $dbDir/");
-        $B->addAction("formatdb -i $CombinedDir/combined.fasta -p T -o T");
+        $B->addAction("formatdb -i $dbDir/combined.fasta -p T -o T");
         $B->addAction("mv $dbDir/combined.fasta $CombinedDir/");
         $B->addAction("date > $CompletedFlagFile.formatdb\n");
     }
@@ -440,6 +440,7 @@ sub submitSplitFastaJob {
     mkdir $fracDir if not -d $fracDir;
 
     if (not $skipIfExists or not -f "$fracDir/fractfile-1.fa") {
+        $B->addAction("rm -rf $fracDir");
         $B->addAction("$ScriptDir/splitfasta.pl -parts $np -tmp $fracDir -source $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.splitfasta\n");
     }

@@ -11,11 +11,7 @@ $result=GetOptions ("source=s" => \$source,
 		    "parts=i"  => \$parts,
 		    "tmp=s"    => \$tmpdir);
 
-if(-e $tmpdir){
-  die "directory $tmpdir already exists\n";
-}else{
-  mkdir $tmpdir;
-}
+mkdir $tmpdir;
 
 #open all the filehandles and store them in an arry of $parts elements
 @filehandles;
