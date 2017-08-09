@@ -204,7 +204,7 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
 #    print "The uniprot ids that were found in the FASTA file:", "\t", join(",", @fastaUniprotIds), "\n";
 
     $fileMatchedIdCount += $fastaNumUniprotIdsInDb;
-    $fileTotalIdCount += $fastaNumHeaders;
+    $fileTotalIdCount = $fileSequenceCount;
     $fileUnmatchedIdCount += $fastaNumUnmatched;
 }
 
