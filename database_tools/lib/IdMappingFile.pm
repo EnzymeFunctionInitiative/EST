@@ -34,7 +34,7 @@ sub parseTable {
                 $self->{map}->{$foreignId} = $uniprotId;
             }
         } else {
-            push(@{ $self->{forward_map}->{$type}->{$uniprotId} }, $foreignId);
+            push(@{ $self->{forward_map}->{$uniprotId}->{$type} }, $foreignId);
         }
     }
 
@@ -67,8 +67,8 @@ sub forwardLookup {
     my $idType = shift; # Which foreign ID type we want to return
     my $uniprotId = shift;
 
-    if (exists $self->{forward_map}->{$uniprotId}) {
-        return @{ $self->{forward_map}->{$idType}->{$uniprotId} };
+    if (exists $self->{forward_map}->{$uniprotId}->{$idType}) {
+        return @{ $self->{forward_map}->{$uniprotId}->{$idType} };
     } else {
         return ();
     }

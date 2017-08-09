@@ -44,7 +44,7 @@ sub process{
     my @proteinIds;
     my %processedAlready;
 
-    open(OUT, ">>$out") or die "cannot write to output file $out"
+    open(OUT, ">$out") or die "cannot write to output file $out"
         if not defined $LIST_FILES_ONLY;
     foreach $file (@files){
         logprint "Processing $file";

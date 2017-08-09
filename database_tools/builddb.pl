@@ -236,7 +236,7 @@ if (defined $buildEna and $buildEna) {
 
     $fileNum = 1; # reserve 0 for download
     
-    logprint "#UNZIPPING FILES + COPYING TREMBL FILES + ADDING SPROT FILES + CREATE TAB FILES\n";
+    logprint "#UNZIPPING FILES + COPYING TREMBL FILES + ADDING SPROT FILES\n";
     my $unzipJobId = submitUnzipJob($S->getBuilder(), undef, $fileNum++);
     
     logprint "#PARSING TAXONOMY FILE\n";
@@ -257,7 +257,10 @@ if (defined $buildEna and $buildEna) {
     
     # Create idmapping table
     logprint "#CREATING IDMAPPING TABLE\n";
-    my $idJobId = submitIdMappingJob($S->getBuilder(), $unzipJobId, $fileNum++);
+    my $idmappingJobId = submitIdMappingJob($S->getBuilder(), $unzipJobId, $fileNum++);
+    
+    logprint "#CREATE ANNOTATIONS (STRUCT) TAB FILES\n";
+    my $structJobId = submitAnnotationsJob($S->getBuilder(), $idmappingJobId, $fileNum++);
     
     # Create family_counts table
     logprint "#CREATING FAMILY COUNTS TABLE\n";
@@ -649,11 +652,11 @@ sub submitUnzipJob {
     #    $B->addAction("mac2unix $LocalSupportDir/phylo.tab");
     #    $B->addAction("dos2unix $LocalSupportDir/phylo.tab\n");
     #}
-    if (not $skipIfExists or not -f "$LocalSupportDir/efi-accession.tab") {
-        $B->addAction("cp $DbSupport/efi-accession.tab $LocalSupportDir/efi-accession.tab");
-        $B->addAction("mac2unix $LocalSupportDir/efi-accession.tab");
-        $B->addAction("dos2unix $LocalSupportDir/efi-accession.tab\n");
-    }
+    #if (not $skipIfExists or not -f "$LocalSupportDir/efi-accession.tab") {
+    #    $B->addAction("cp $DbSupport/efi-accession.tab $LocalSupportDir/efi-accession.tab");
+    #    $B->addAction("mac2unix $LocalSupportDir/efi-accession.tab");
+    #    $B->addAction("dos2unix $LocalSupportDir/efi-accession.tab\n");
+    #}
     if (not $skipIfExists or not -f "$LocalSupportDir/hmp.tab") {
         $B->addAction("cp $DbSupport/hmp.tab $LocalSupportDir/hmp.tab\n");
     }
@@ -668,11 +671,29 @@ sub submitUnzipJob {
     }
     $B->addAction("date > $CompletedFlagFile.support_files\n");
     
+    $B->addAction("date > $CompletedFlagFile.$fileNum-process-downloads\n");
+
+    $B->outputBaseFilepath($file);
+    $B->renderToFile($file);
+
+    return $DoSubmit ? $S->submit($file) : undef;
+}
+
+
+sub submitAnnotationsJob {
+    my ($B, $depId, $fileNum) = @_;
+
+    my $file = "$BuildDir/$fileNum-annotations.sh";
+
+    $B->dependency(0, $depId);
+    $B->addAction("module load $PerlMod");
+
+    waitForInput();
 
     if (not $skipIfExists or not -f "$OutputDir/struct.tab") {
         # Exclude GI
         #$B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
-        $B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -uniprotgi -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
+        $B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
         $B->addAction("date > $CompletedFlagFile.formatdat\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/organism.tab") {
@@ -680,7 +701,7 @@ sub submitUnzipJob {
         $B->addAction("date > $CompletedFlagFile.organism.tab\n");
     }
 
-    $B->addAction("date > $CompletedFlagFile.$fileNum-process-downloads\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-annotations\n");
 
     $B->outputBaseFilepath($file);
     $B->renderToFile($file);
@@ -750,7 +771,6 @@ create table annotations(accession varchar(10) primary key,
                          STRING varchar(100),
                          BRENDA varchar(100),
                          PATRIC varchar(100),
-                         /*GI varchar(15),*/
                          HMP_Body_Site varchar(75),
                          HMP_Oxygen varchar(50),
                          EFI_ID varchar(6),
