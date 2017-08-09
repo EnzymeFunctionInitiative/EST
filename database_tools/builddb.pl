@@ -497,11 +497,11 @@ sub submitCatBlastJob {
     $B->addAction("module load $PerlMod");
 
     if (not $skipIfExists or not -f "$pdbBuildDir/pdb.tab") {
-        $B->addAction("cat $pdbBuildDir/output/*.tab > $OutputDir/pdb.tab");
+        $B->addAction("cat $pdbBuildDir/output/*.tab > $pdbBuildDir/pdb.full.tab");
         $B->addAction("date > $CompletedFlagFile.blast_cat\n");
     }
-    if (not $skipIfExists or not -f "$OutputDir/simplified.pdb.tab") {
-        $B->addAction($ScriptDir . "/pdbblasttotab.pl -in $OutputDir/pdb.tab -out $OutputDir/simplified.pdb.tab");
+    if (not $skipIfExists or not -f "$OutputDir/pdb.tab") {
+        $B->addAction($ScriptDir . "/pdbblasttotab.pl -in $pdbBuildDir/pdb.full.tab -out $OutputDir/pdb.tab");
         $B->addAction("date > $CompletedFlagFile.pdbblasttotab\n");
     }
         
