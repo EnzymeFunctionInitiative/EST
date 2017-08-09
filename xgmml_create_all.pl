@@ -19,6 +19,7 @@ use XML::LibXML;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 use Biocluster::Config;
+use Annotations;
 
 $result = GetOptions(
     "blast=s"	=> \$blast,
@@ -92,7 +93,13 @@ if ($#metas < 0) {
     }
 }
 
+my $SizeKey = "Cluster Size";
 unshift @metas, "ACC";
+unshift @metas, $SizeKey;
+
+my $annoData = Annotations::get_annotation_data();
+@metas = Annotations::sort_annotations($annoData, @metas);
+
 $metaline=join ',', @metas;
 
 print "Metadata keys are $metaline\n";
@@ -123,23 +130,27 @@ while (<CDHIT>){
         $nodecount++;
         $writer->startTag('node', 'id' => $head, 'label' => $head);
         foreach my $key (@metas){
-            @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
-            $writer->startTag('att', 'type' => 'list', 'name' => $key);
-            foreach my $piece (@{$clusterdata{$key}}){
-                #remove illegal xml characters from annotation data
-                $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
-                if($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/){
-                    $piece=$2-$1+1;
+            my $displayName = $annoData->{$key}->{display};
+            if ($key eq $SizeKey) {
+                $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $count);
+            } else {
+                @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
+                $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
+                foreach my $piece (@{$clusterdata{$key}}){
+                    #remove illegal xml characters from annotation data
+                    $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+                    if($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/){
+                        $piece=$2-$1+1;
+                    }
+                    unless($key eq "Sequence_Length"){
+                        $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
+                    }else{
+                        $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $piece);
+                    }
                 }
-                unless($key eq "Sequence_Length"){
-                    $writer->emptyTag('att', 'type' => 'string', 'name' => $key, 'value' => $piece);
-                }else{
-                    $writer->emptyTag('att', 'type' => 'integer', 'name' => $key, 'value' => $piece);
-                }
+                $writer->endTag();
             }
-            $writer->endTag();
         }
-        $writer->emptyTag('att', 'type' => 'integer', 'name' => 'Cluster Size', 'value' => $count);
         $writer->endTag();
         %clusterdata=();
         $count=0;
@@ -175,14 +186,18 @@ print "Last Node\n";
 $nodecount++;
 $writer->startTag('node', 'id' => $head, 'label' => $head);
 foreach my $key (@metas){
-    @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
-    $writer->startTag('att', 'type' => 'list', 'name' => $key);
-    foreach my $piece (@{$clusterdata{$key}}){
-        $writer->emptyTag('att', 'type' => 'string', 'name' => $key, 'value' => $piece);
+    my $displayName = $annoData->{$key}->{display};
+    if ($key eq $SizeKey) {
+        $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $count);
+    } else {
+        @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
+        $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
+        foreach my $piece (@{$clusterdata{$key}}){
+            $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
+        }
+        $writer->endTag;
     }
-    $writer->endTag;
 }
-$writer->emptyTag('att', 'type' => 'integer', 'name' => 'Cluster Size', 'value' => $count);
 
 $writer->endTag();
 $clusterdata=();

@@ -18,6 +18,7 @@ use Getopt::Long;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 use Biocluster::Config;
+use Annotations;
 
 $result=GetOptions ("blast=s"	=> \$blast,
     "fasta=s"	=> \$fasta,
@@ -78,7 +79,7 @@ foreach $line (<FASTA>){
 close FASTA;
 print time . " Finished reading in uniprot numbers\n";
 
-
+# Column headers and order in output file.
 my @metas;
 print time . " Read in annotation data\n";
 #if struct file (annotation information) exists, use that to generate annotation information
@@ -127,6 +128,9 @@ if ($#metas < 0) {
     }
 }
 
+my $annoData = Annotations::get_annotation_data();
+@metas = Annotations::sort_annotations($annoData, @metas);
+
 $metaline=join ',', @metas;
 
 print time ." Metadata keys are $metaline\n";
@@ -143,14 +147,15 @@ foreach my $element (@uprotnumbers){
     }
     foreach my $key (@metas){
         #print "\t$key\t$uprot{$element}{$key}\n";
+        my $displayName = $annoData->{$key}->{display};
         if($key eq "IPRO" or $key eq "GI" or $key eq "PDB" or $key eq "PFAM" or $key eq "GO" or
            $key eq "HMP_Body_Site" or $key eq "CAZY" or $key eq "Query_IDs" or $key eq "Other_IDs" or
            $key eq "Description" or $key eq "NCBI_IDs")
         {
-            $writer->startTag('att', 'type' => 'list', 'name' => $key);
+            $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
             foreach my $piece (@{$uprot{$element}{$key}}){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
-                $writer->emptyTag('att', 'type' => 'string', 'name' => $key, 'value' => $piece);
+                $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
             }
             $writer->endTag();
         }else{
@@ -158,12 +163,12 @@ foreach my $element (@uprotnumbers){
             if($key eq "Sequence_Length" and $origelement=~/\w{6,10}:(\d+):(\d+)/){
                 my $piece=$2-$1+1;
                 print "start:$1\tend$2\ttotal:$piece\n";
-                $writer->emptyTag('att', 'name' => $key, 'type' => 'integer', 'value' => $piece);
+                $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $piece);
             }else{
                 if($key eq "Sequence_Length"){
-                    $writer->emptyTag('att', 'name' => $key, 'type' => 'integer', 'value' => $uprot{$element}{$key});
+                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $uprot{$element}{$key});
                 }else{
-                    $writer->emptyTag('att', 'name' => $key, 'type' => 'string', 'value' => $uprot{$element}{$key});
+                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'string', 'value' => $uprot{$element}{$key});
                 }
             }
         }
