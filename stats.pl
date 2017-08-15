@@ -15,11 +15,11 @@ my $result = GetOptions(
 open(OUT, ">$out") or die "cannot write to $out\n";
 print OUT "File\t\t\tNodes\tEdges\tSize\n";
 
-my $fullFile = glob("$tmpdir/$run/*full*");
+my $fullFile = glob("$tmpdir/$run/*full_ssn*");
 print OUT saveFile($fullFile, 1);
 
 foreach my $filePath (sort {$b cmp $a} glob("$tmpdir/$run/*")){
-    if ($filePath =~ /.xgmml$/) {
+    if ($filePath =~ /\.xgmml$/) {
         if (-s $filePath) {
             if ($filePath !~ /full/) {
                 print OUT saveFile($filePath, 0);
