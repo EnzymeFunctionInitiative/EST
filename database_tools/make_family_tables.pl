@@ -1,49 +1,75 @@
 #!/usr/bin/env perl
 
-#use XML::Simple;
 use XML::LibXML;
-use XML::Parser;
-use Data::Dumper;
-use IO::Handle;
 use Getopt::Long;
+use strict;
 
-$result = GetOptions(
-    "outdir=s", \$outputDir,
+my ($outputDir, $inputDir, $uniref50File, $uniref90File, $gene3dFile, $pfamFile, $ssfFile, $interproFile);
+
+my $result = GetOptions(
+    "outdir=s"      => \$outputDir,
+    "indir=s"       => \$inputDir,
+    "uniref50=s"    => \$uniref50File,  # tab file that maps clustered UniProt IDs to representative UniRef ID
+    "uniref90=s"    => \$uniref90File,  # tab file that maps clustered UniProt IDs to representative UniRef ID
+    "gene3d=s"      => \$gene3dFile,    # GENE3D output file
+    "pfam=s"        => \$pfamFile,      # PFAM output file
+    "ssf=s"         => \$ssfFile,       # SSF output file
+    "interpro=s"    => \$interproFile,  # INTERPRO output file
 );
 
-die "No output directory provided" if not $outputDir;
+die "No output directory provided" if not $outputDir and not -d $outputDir;
+die "No input directory provided" if not $inputDir and not -d $inputDir;
 
-$verbose=0;
+my %files;
+$files{GENE3D} = $gene3dFile if ($gene3dFile and -f $gene3dFile);
+$files{PFAM} = $pfamFile if ($pfamFile and -f $pfamFile);
+$files{SSF} = $ssfFile if ($ssfFile and -f $ssfFile);
+$files{INTERPRO} = $interproFile if ($interproFile and -f $interproFile);
 
-%databases=(GENE3D => 	1,
-    PFAM =>	1,
-    SSF =>	1,
-    INTERPRO =>	1);
-%filehandles=();
+my $uniref50 = {};
+$uniref50 = loadUniRefFile($uniref50File) if ($uniref50File and -f $uniref50File);
+my $uniref90 = {};
+$uniref90 = loadUniRefFile($uniref90File) if ($uniref90File and -f $uniref90File);
 
-foreach $database (keys %databases){
+
+my $verbose=0;
+
+my %databases = (
+    GENE3D      => 1,
+    PFAM        => 1,
+    SSF         => 1,
+    INTERPRO    => 1);
+my %filehandles = ();
+
+foreach my $database (keys %databases){
     local *FILE;
-    open(FILE, ">$outputDir/$database.tab") or die "could not write to $outputDir/$database.tab\n";
-    $filehandles{$database}=*FILE;
+    my $file = "$outputDir/$database.tab";
+    $file = $files{$database} if exists $files{$database};
+    open(FILE, ">$file") or die "could not write to $file\n";
+    $filehandles{$database} = *FILE;
 }
 
-foreach $xmlfile (@ARGV){
-    print "$xmlfile\n";
-    $parser=XML::LibXML->new();
+foreach my $xmlfile (glob("$inputDir/*.xml")){
+    print "Parsing $xmlfile\n";
+    my $parser = XML::LibXML->new();
 
-    $doc=$parser->parse_file($xmlfile);
+    my $doc = $parser->parse_file($xmlfile);
     $doc->indexElements();
 
-    foreach $protein ($doc->findnodes('/interpromatch/protein')){
-        if($verbose>0){
+    foreach my $protein ($doc->findnodes('/interpromatch/protein')){
+        if ($verbose > 0) {
             print $protein->getAttribute('id').",".$protein->getAttribute('name').",".$protein->getAttribute('length')."\n";
         }
-        $accession=$protein->getAttribute('id');
+        my $accession=$protein->getAttribute('id');
         if($protein->hasChildNodes){
-            @iprmatches=();
-            foreach $match ($protein->findnodes('./match')){
+            my @iprmatches=();
+            foreach my $match ($protein->findnodes('./match')){
+                my $matchdb;
+                my $matchid;
+                my $interpro = 0;
+                my ($start, $end);
                 if($match->hasChildNodes){
-                    foreach $child ($match->nonBlankChildNodes()){
+                    foreach my $child ($match->nonBlankChildNodes()){
                         $interpro=0;
                         $matchdb=$match->getAttribute('dbname');
                         $matchid=$match->getAttribute('id');
@@ -78,7 +104,15 @@ foreach $xmlfile (@ARGV){
                 }
                 if(defined $databases{$match->getAttribute('dbname')}){
 
-                    print {$filehandles{$matchdb}} "$matchid\t$accession\t$start\t$end\n";
+                    my $ur50 = exists $uniref50->{$accession} ? 1 : 0;
+                    my $ur90 = exists $uniref90->{$accession} ? 1 : 0;
+                    my @parts = ($matchid, $accession, $start, $end);
+                    if ($uniref50File or $uniref90File) {
+                        push(@parts, $ur50);
+                        push(@parts, $ur90);
+                    }
+
+                    print {$filehandles{$matchdb}} join("\t", @parts), "\n";
 
                     if($verbose>0){
                         print "\t$accession\t$matchdb,$matchid start $start end $end\n";
@@ -102,6 +136,29 @@ foreach $xmlfile (@ARGV){
 
 foreach my $key (keys %filehandles) {
     close $filehandles{$key};
+}
+
+
+
+
+
+
+sub loadUniRefFile {
+    my $filePath = shift;
+
+    open URF, $filePath;
+
+    my %data;
+
+    while (<URF>) {
+        chomp;
+        my ($refId, $upId) = split(m/\t/);
+        $data{$refId} = 1;
+    }
+
+    close URF;
+
+    return \%data;
 }
 
 

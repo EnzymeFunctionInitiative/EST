@@ -368,9 +368,10 @@ sub submitFinalFileJob {
         $B->addAction("$ScriptDir/chopxml.pl -in $InputDir/match_complete.xml -outdir $BuildDir/match_complete");
         $B->addAction("date > $CompletedFlagFile.chopxml\n");
     }
+    # Build PFAM, SSF, INTERPRO, and GENE3D .tab files
     if (not $skipIfExists or not -f "$OutputDir/GENE3D.tab") {
-        $B->addAction("$ScriptDir/formatdatfromxml.pl -outdir $OutputDir -- $BuildDir/match_complete/*.xml");
-        $B->addAction("date > $CompletedFlagFile.formatdatfromxml\n");
+        $B->addAction("$ScriptDir/make_family_tables.pl -outdir $OutputDir -indir $BuildDir/match_complete");
+        $B->addAction("date > $CompletedFlagFile.make_family_tables\n");
     }
 
     $B->addAction("date > $CompletedFlagFile.$fileNum-finalFiles\n");
@@ -691,14 +692,14 @@ sub submitAnnotationsJob {
 
     waitForInput();
 
-    if (not $skipIfExists or not -f "$OutputDir/struct.tab") {
+    if (not $skipIfExists or not -f "$OutputDir/annotations.tab") {
         # Exclude GI
-        #$B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
-        $B->addAction($ScriptDir . "/formatdat.pl -dat $CombinedDir/combined.dat -struct $OutputDir/struct.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
-        $B->addAction("date > $CompletedFlagFile.formatdat\n");
+        #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -struct $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
+        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -struct $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
+        $B->addAction("date > $CompletedFlagFile.make_annotations_table\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/organism.tab") {
-        $B->addAction("cut -f 1,9 $OutputDir/struct.tab > $OutputDir/organism.tab");
+        $B->addAction("cut -f 1,9 $OutputDir/annotations.tab > $OutputDir/organism.tab");
         $B->addAction("date > $CompletedFlagFile.organism.tab\n");
     }
 
@@ -829,7 +830,7 @@ select 'LOADING colors' as '';
 load data local infile '$DbSupport/colors.tab' into table colors;
 
 select 'LOADING annotations' as '';
-load data local infile '$OutputDir/struct.tab' into table annotations;
+load data local infile '$OutputDir/annotations.tab' into table annotations;
 
 select 'LOADING taxonomy' as '';
 load data local infile '$OutputDir/taxonomy.tab' into table taxonomy;
@@ -908,8 +909,8 @@ if [ ! -f $CompletedFlagFile.*-finalFiles ]; then
     exit
 fi
 
-if [ ! -f $OutputDir/struct.tab ]; then
-    echo "$OutputDir/struct.tab does not exist. Did the build complete?"
+if [ ! -f $OutputDir/annotations.tab ]; then
+    echo "$OutputDir/annotations.tab does not exist. Did the build complete?"
     echo "Bye."
     exit
 fi
