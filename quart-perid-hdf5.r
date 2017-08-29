@@ -52,7 +52,7 @@ boxplot(newdata,
         frame = F)
 
 for (i in bars_to_use) {
-    key=i+start-1
+    key=i #i+start-1
     print(paste0("/perid/",key))
     newdata=t(h5read(hdffile,paste0("/perid/",key)))
     boxplot(newdata,
