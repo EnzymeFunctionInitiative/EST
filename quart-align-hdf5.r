@@ -55,7 +55,7 @@ boxplot(newdata,
         frame = F)
 
 for (i in bars_to_use){
-    key=i+start-1
+    key=i #i+start-1
     print(paste0("/align/",key))
     #so this is an array,has to be rotated
     newdata=t(h5read(hdffile,paste0("/align/",key)))
