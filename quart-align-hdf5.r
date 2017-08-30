@@ -40,9 +40,13 @@ if (im_width < 1000) {
 }
 
 num_boxes <- stop - start + 1
+print(num_boxes)
 step_size <- ceiling(10 / (im_width / num_boxes))
+print(step_size)
 box_range <- seq(start, num_boxes + step_size, step_size)
+print(box_range)
 bars_to_use <- seq(start, num_boxes, bar_step_size)
+print(bars_to_use)
 
 boxplot(newdata,
         main = paste("Alignment Length vs Alignment Score", jobnum),
@@ -59,6 +63,7 @@ for (i in bars_to_use){
     print(paste0("/align/",key))
     #so this is an array,has to be rotated
     newdata=t(h5read(hdffile,paste0("/align/",key)))
+    if (length(newdata) == 0) next
     boxplot(newdata,
             col = "red", 
             border = "blue",  

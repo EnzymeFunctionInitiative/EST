@@ -89,7 +89,7 @@ for key in range(start, end):
   except:
     print("evalue %s was missing" % key)
     dataSetHash['align'][key]=[]
-    dataSetHash['align'][key]=[]
+    dataSetHash['perid'][key]=[]
 
 #write out the data structure to the hdf5 file
 print("write out start, stop, and max alignment length")
