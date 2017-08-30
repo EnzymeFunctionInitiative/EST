@@ -55,6 +55,7 @@ for (i in bars_to_use) {
     key=i #i+start-1
     print(paste0("/perid/",key))
     newdata=t(h5read(hdffile,paste0("/perid/",key)))
+    if (length(newdata) == 0) next
     boxplot(newdata,
             col = "red", 
             border = "blue", 
