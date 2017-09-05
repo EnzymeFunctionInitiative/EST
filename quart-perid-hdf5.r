@@ -32,7 +32,7 @@ newdata=t(rep(NA,stop))
 bar_step_size <- 1
 whisk_color <- "gray40"
 if (im_width < 1000) {
-    bar_step_size = 5
+    bar_step_size = 3
     whisk_color <- "gray60"
 }
 

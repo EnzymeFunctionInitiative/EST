@@ -27,6 +27,9 @@ sub new {
     $self->{dbh} = $self->{db_obj}->getHandle();
 
     $self->{has_table} = $self->checkForTable();
+    # By default we check uniprot IDs for existence in idmapping table. This can be
+    # turned off by providing argument uniprot_check = 0
+    $self->{uniprot_check} = exists $args{uniprot_check} ? $args{uniprot_check} : 0;
 
     return $self;
 }
@@ -66,9 +69,17 @@ sub reverseLookup {
         my $type = $typeHint;
         $id =~ s/^\s*([^\|]*\|)?([^\s\|]+).*$/$2/;
         $type = check_id_type($id) if $typeHint eq Biocluster::IdMapping::Util::AUTO;
+        next if $type eq Biocluster::IdMapping::Util::UNKNOWN;
+
         my $foreignIdCol = "foreign_id";
         my $foreignIdCheck = " and foreign_id_type = '$type'";
         if ($type eq Biocluster::IdMapping::Util::UNIPROT) {
+            if (not $self->{uniprot_check}) {
+                (my $upId = $id) =~ s/\.\d+$//;
+                push(@uniprotIds, $upId);
+                push(@{ $uniprotRevMap{$upId} }, $id);
+                next;
+            }
             $foreignIdCol = $self->{id_mapping}->{uniprot_id};
             $foreignIdCheck = "";
         }
