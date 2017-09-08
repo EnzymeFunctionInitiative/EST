@@ -13,9 +13,10 @@ use Biocluster::IdMapping::Util;
 
 
 my ($inputFile, $outputFile, $giFile, $uniprotref, $efiTidFile, $gdnaFile, $hmpFile, $oldPhyloFile, $debug, $idMappingFile);
+my ($uniref50File, $uniref90File);
 my $result = GetOptions(
     "dat=s"         => \$inputFile,
-    "struct=s"      => \$outputFile,
+    "annotations=s" => \$outputFile,
     "uniprotgi=s"   => \$giFile,
     #"uniprotref=s"  => \$uniprotref,
     "efitid=s"      => \$efiTidFile,
@@ -23,13 +24,16 @@ my $result = GetOptions(
     "hmp=s"         => \$hmpFile,
     "phylo=s"       => \$oldPhyloFile,
     "idmapping=s"   => \$idMappingFile,
+    "uniref50=s"    => \$uniref50File,
+    "uniref90=s"    => \$uniref90File,
     "debug=i"       => \$debug,  #TODO: debug
 );
 
 my $usage = <<USAGE;
-Usage: $0 -dat combined_dat_input_file -struct output_struct_tab_file
+Usage: $0 -dat combined_dat_input_file -annotations output_annotations_tab_file
             [-uniprotgi gi_file_path -efitid efi_tid_file_path -gdna gdna_file_path -hmp hmp_file_path
-             -phylo old_phylogeny_file_path -debug num_iterations_to_run -idmapping idmapping_tab_file_path]
+             -phylo old_phylogeny_file_path -debug num_iterations_to_run -idmapping idmapping_tab_file_path
+             -uniref50 uniref50_tab_file -uniref90 uniref90_tab_file]
 
     Anything in [] is optional.
 
@@ -37,6 +41,8 @@ Usage: $0 -dat combined_dat_input_file -struct output_struct_tab_file
         -uniprotgi  will include GI numbers, otherwise they are left out
         -idmapping  use the idmapping.tab file output by the import_id_mapping.pl script to obtain the
                     refseq, embl-cds, and gi numbers 
+        -uniref50   use the given tab file to add the UniRef50 cluster ID field
+        -uniref90   use the given tab file to add the UniRef90 cluster ID field
 
 USAGE
 
@@ -74,96 +80,62 @@ my $useGiNums = 0;
 if ($giFile) {
     $useGiNums = 1;
     print "Read in GI Table\n";
-    open GI, $giFile or die "could not open $giFile for GI\n";
-    while (<GI>){
-        my @line=split /\s/, $_;
-        $GI{@line[0]}{'number'}=@line[2];
-        if(exists $GI{@line[0]}{'count'}){
-            $GI{@line[0]}{'count'}++;
-        }else{
-            $GI{@line[0]}{'count'}=0;
-        }
-        #print "GI\t@line[0]\t".$GI{@line[0]}{'number'}."\t".$GI{@line[0]}{'count'}."\n";
-    }
-    close GI;
-    print "GI Finished\n";
+    getGiNums();
+    print "Done\n";
 }
-
 
 if ($gdnaFile) {
-    print "get GDNA taxids\n";
-    open GDNA, $gdnaFile or die "could not open gdna file $gdnaFile\n";
-    while(<GDNA>){
-        my $line=$_;
-        chomp $line;
-        $gdnaData{$line}=1;
-        #print ":$line:\n";
-    }
-    close GDNA;
+    print "Get GDNA taxids\n";
+    getGdnaData();
+    print "Done\n";
 }
-
 
 if ($hmpFile) {
     #the key for %hmpData is the taxid
-    print "get HMP data\n";
-    open HMP, $hmpFile or die "could not open gda file $hmpFile\n";
-    while(<HMP>){
-        my $line=$_;
-        chomp $line;
-        my @line=split /\t/, $line;
-        if($line[16] eq ""){
-            $line[16]='Not Specified';
-        }
-        if($line[47] eq ""){
-            $line[47]='Not Specified';
-        }
-        if($line[5] eq ""){
-            die "key is an empty value\n";
-        }
-        $line[16]=~s/,\s+/,/g;
-        $line[47]=~s/,\s+/,/g;
-        push @{$hmpData{$line[5]}{'sites'}}, $line[16];
-        push @{$hmpData{$line[5]}{'oxygen'}}, $line[47];
-    }
-    close HMP;
-    
-    #remove hmp doubles and set up final hash
-    foreach my $key (keys %hmpData){
-        $hmpData{$key}{'sites'}=join(",", uniq split(",",join(",", @{$hmpData{$key}{'sites'}})));
-        $hmpData{$key}{'oxygen'}=join(",", uniq split(",",join(",", @{$hmpData{$key}{'oxygen'}})));
-    }
+    print "Get HMP data\n";
+    getHmpData();
+    print "Done\n";
 }
 
 if ($efiTidFile) {
-    print "get EFI TIDs\n";
-    open EFITID, $efiTidFile or die "could not open efi target id file $efiTidFile\n";
-    while(<EFITID>){
-        my $line=$_;
-        chomp $line;
-        my @parts = split /\t/, $line;
-        $efiTidData{@parts[2]}=@parts[0];
-    }
-    close EFITID;
+    print "Get EFI TIDs\n";
+    getEfiTids();
+    print "Done\n";
 }
 
 my $useOldPhylo = 0;
 if ($oldPhyloFile) {
     $useOldPhylo = 1;
     print "Get Phylogeny Information\n";
-    open PHYLO, $oldPhyloFile or die "could not open phylogeny information file $oldPhyloFile\n";
-    while(<PHYLO>){
-        my $line=$_;
-        chomp $line;
-        my @line=split /\t/, $line;
-        $phylo{$line[0]}{'phylum'}=$line[3];
-        $phylo{$line[0]}{'class'}=$line[4];
-        $phylo{$line[0]}{'order'}=$line[5];
-        $phylo{$line[0]}{'family'}=$line[6];
-        $phylo{$line[0]}{'genus'}=$line[7];
-        $phylo{$line[0]}{'species'}=$line[8];
-    }
-    close PHYLO;
+    getOldPhylo();
+    print "Done\n";
 }
+
+my $uniref50 = {};
+if ($uniref50File) {
+    print "Reading UniRef50 file\n";
+    $uniref50 = getUnirefData($uniref50File);
+    print "Done\n";
+}
+
+my $uniref90 = {};
+if ($uniref90File) {
+    print "Reading UniRef90 file\n";
+    $uniref90 = getUnirefData($uniref90File);
+    print "Done\n";
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 $debug = 2**50 if not defined $debug; #TODO: debug
 
@@ -251,6 +223,19 @@ write_line();
 
 close DAT;
 close STRUCT;
+
+
+print "Wrote the following columns to the annotations table:\n    ";
+print join("\n    ", "element", "id", "status", "size", "OX_tax_id", "GDNA", "DE_desc",
+                 "RDE_reviewed_desc", "OS_organism", "GN_gene", "PFAM", "PDB", "IPRO",
+                 "GO", "kegg", "string", "brenda", "patric", "hmpsite", "hmpoxygen",
+                 "efiTid", "EC", "cazy", "ncbiStr", "uniref50", "uniref90");
+print "\n";
+
+
+
+
+
 
 sub write_line {
     if(defined $element){
@@ -385,16 +370,120 @@ sub write_line {
         }
 
         my @line = ($element, $id, $status, $size, $OX_tax_id, $GDNA, $DE_desc, $RDE_reviewed_desc, $OS_organism); 
-        push @line, $OC_domain     if $useOldPhylo;
         push @line, $GN_gene, $PFAM, $PDB, $IPRO, $GO, $kegg, $string, $brenda, $patric;
-        push @line, $giline if $useGiNums;
         push @line, $hmpsite, $hmpoxygen, $efiTid, $EC;
-        push @line, $phylum, $class, $order, $family, $genus, $species if $useOldPhylo;
         push @line, $cazy;
-        push @line, $ncbiStr if $includeNcbi;
+        push @line, $ncbiStr;
+        push @line, (exists $uniref50->{$element} ? $uniref50->{$element} : "");
+        push @line, (exists $uniref90->{$element} ? $uniref90->{$element} : "");
 
         print STRUCT join("\t", @line), "\n";
     }
+}
+
+
+
+sub getEfiTids {
+    open EFITID, $efiTidFile or die "could not open efi target id file $efiTidFile\n";
+    while(<EFITID>){
+        my $line=$_;
+        chomp $line;
+        my @parts = split /\t/, $line;
+        $efiTidData{@parts[2]}=@parts[0];
+    }
+    close EFITID;
+}
+
+
+sub getOldPhylo {
+    open PHYLO, $oldPhyloFile or die "could not open phylogeny information file $oldPhyloFile\n";
+    while(<PHYLO>){
+        my $line=$_;
+        chomp $line;
+        my @line=split /\t/, $line;
+        $phylo{$line[0]}{'phylum'}=$line[3];
+        $phylo{$line[0]}{'class'}=$line[4];
+        $phylo{$line[0]}{'order'}=$line[5];
+        $phylo{$line[0]}{'family'}=$line[6];
+        $phylo{$line[0]}{'genus'}=$line[7];
+        $phylo{$line[0]}{'species'}=$line[8];
+    }
+    close PHYLO;
+}
+
+
+sub getHmpData {
+    open HMP, $hmpFile or die "could not open gda file $hmpFile\n";
+    while(<HMP>){
+        my $line=$_;
+        chomp $line;
+        my @line=split /\t/, $line;
+        if($line[16] eq ""){
+            $line[16]='Not Specified';
+        }
+        if($line[47] eq ""){
+            $line[47]='Not Specified';
+        }
+        if($line[5] eq ""){
+            die "key is an empty value\n";
+        }
+        $line[16]=~s/,\s+/,/g;
+        $line[47]=~s/,\s+/,/g;
+        push @{$hmpData{$line[5]}{'sites'}}, $line[16];
+        push @{$hmpData{$line[5]}{'oxygen'}}, $line[47];
+    }
+    close HMP;
+    
+    #remove hmp doubles and set up final hash
+    foreach my $key (keys %hmpData){
+        $hmpData{$key}{'sites'}=join(",", uniq split(",",join(",", @{$hmpData{$key}{'sites'}})));
+        $hmpData{$key}{'oxygen'}=join(",", uniq split(",",join(",", @{$hmpData{$key}{'oxygen'}})));
+    }
+}
+
+
+sub getGdnaData {
+    open GDNA, $gdnaFile or die "could not open gdna file $gdnaFile\n";
+    while(<GDNA>){
+        my $line=$_;
+        chomp $line;
+        $gdnaData{$line}=1;
+        #print ":$line:\n";
+    }
+    close GDNA;
+}
+
+
+sub getGiNums {
+    open GI, $giFile or die "could not open $giFile for GI\n";
+    while (<GI>){
+        my @line=split /\s/, $_;
+        $GI{@line[0]}{'number'}=@line[2];
+        if(exists $GI{@line[0]}{'count'}){
+            $GI{@line[0]}{'count'}++;
+        }else{
+            $GI{@line[0]}{'count'}=0;
+        }
+        #print "GI\t@line[0]\t".$GI{@line[0]}{'number'}."\t".$GI{@line[0]}{'count'}."\n";
+    }
+    close GI;
+}
+
+
+sub getUnirefData {
+    my $file = shift;
+
+    my $data = {};
+
+    open UR, $file or die "Could not open UniRef file $file for reading: $!";
+    while (<UR>) {
+        chomp;
+        my ($seed, $member) = split /\t/;
+        $data->{$member} = $seed;
+    }
+    close UR;
+
+    return $data;
 }
 
 

@@ -694,8 +694,8 @@ sub submitAnnotationsJob {
 
     if (not $skipIfExists or not -f "$OutputDir/annotations.tab") {
         # Exclude GI
-        #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -struct $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
-        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -struct $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
+        #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
+        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
         $B->addAction("date > $CompletedFlagFile.make_annotations_table\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/organism.tab") {
@@ -777,7 +777,9 @@ create table annotations(accession varchar(10) primary key,
                          HMP_Oxygen varchar(50),
                          EFI_ID varchar(6),
                          EC varchar(185),
-                         Cazy varchar(30));
+                         Cazy varchar(30),
+                         UniRef50_Cluster varchar(10),
+                         UniRef90_Cluster varchar(10));
 create index TaxID_Index ON annotations (Taxonomy_ID);
 create index accession_Index ON annotations (accession);
 
@@ -788,22 +790,22 @@ create index TaxID_Index ON taxonomy (Taxonomy_ID);
 
 select 'CREATING GENE3D' as '';
 drop table if exists GENE3D;
-create table GENE3D(id varchar(24), accession varchar(10), start integer, end integer);
+create table GENE3D(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
 create index GENE3D_ID_Index on GENE3D (id);
 
 select 'CREATING PFAM' as '';
 drop table if exists PFAM;
-create table PFAM(id varchar(24), accession varchar(10), start integer, end integer);
+create table PFAM(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
 create index PAM_ID_Index on PFAM (id);
 
 select 'CREATING SSF' as '';
 drop table if exists SSF;
-create table SSF(id varchar(24), accession varchar(10), start integer, end integer);
+create table SSF(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
 create index SSF_ID_Index on SSF (id);
 
 select 'CREATING INTERPRO' as '';
 drop table if exists INTERPRO;
-create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer);
+create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
 create index INTERPRO_ID_Index on INTERPRO (id);
 
 select 'CREATING pdbhits' as '';
