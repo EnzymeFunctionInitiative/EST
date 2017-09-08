@@ -28,6 +28,7 @@ $result = GetOptions(
     "title:s"       => \$title,
     "maxfull:i"     => \$maxfull,
     "job-id=i"      => \$jobId,
+    "lengthdif=i"   => \$lengthOverlap,
     "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"        => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"       => \$oldapps,       # to module load oldapps for biocluster2 testing
@@ -55,6 +56,7 @@ $filter = "bit"         unless defined $filter;
 $minval = 0             unless defined $minval;
 $title = "Untitled"     unless defined $title;
 $queue = "efi"          unless defined $queue;
+$lengthOverlap = 1         unless (defined $lengthOverlap and $lengthOverlap);
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_";
@@ -97,6 +99,11 @@ if (defined($oldapps)) {
 } else {
     $oldapps = 0;
 }
+
+my $wordOption = $lengthOverlap < 1 ? "-n 2" : "";
+
+
+
 
 my $S = new Biocluster::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 my $B = $S->getBuilder();
@@ -154,7 +161,7 @@ $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)");
-$B->addAction("cd-hit -i $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
+$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
 $outFile = "$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
 $B->addAction("$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $outFile -title=\"$title\" -dbver $dbver");
 $B->addAction("zip -j $outFile.zip $outFile");

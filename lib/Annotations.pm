@@ -78,6 +78,8 @@ sub build_annotations {
         "\n\tSpecies\t" . $row->{"Species"} . 
         "\n\tCAZY\t" . $row->{"Cazy"};
     $tab .= "\n\tNCBI_IDs\t" . join(",", @$ncbiIds) if ($ncbiIds);
+#    $tab .= "\n\tUniRef50\t" . $row->{"UniRef50_Cluster"} if $row->{"UniRef50_Cluster"};
+#    $tab .= "\n\tUniRef90\t" . $row->{"UniRef90_Cluster"} if $row->{"UniRef90_Cluster"};
     $tab .= "\n";
 
     return $tab;
@@ -123,6 +125,14 @@ sub get_annotation_data {
     $annoData{"HMP_Body_Site"}          = {order => $idx++, display => "HMP Body Site"};
     $annoData{"HMP_Oxygen"}             = {order => $idx++, display => "HMP Oxygen"};
     $annoData{"P01_gDNA"}               = {order => $idx++, display => "P01 gDNA"};
+    $annoData{"UniRef50_IDs"}           = {order => $idx++, display => "UniRef50 Cluster IDs"};
+    $annoData{"UniRef50_Cluster_Size"}  = {order => $idx++, display => "UniRef50 Cluster Size"};
+    $annoData{"UniRef90_IDs"}           = {order => $idx++, display => "UniRef90 Cluster IDs"};
+    $annoData{"UniRef90_Cluster_Size"}  = {order => $idx++, display => "UniRef90 Cluster Size"};
+    $annoData{"UniRef100_IDs"}          = {order => $idx++, display => "UniRef100 Cluster IDs"};
+    $annoData{"UniRef100_Cluster_Size"} = {order => $idx++, display => "UniRef100 Cluster Size"};
+    $annoData{"ACC_CDHIT"}              = {order => $idx++, display => "CD-HIT IDs"};
+    $annoData{"ACC_CDHIT_COUNT"}        = {order => $idx++, display => "CD-HIT Cluster Size"};
 
     return \%annoData;
 }
@@ -146,6 +156,29 @@ sub sort_annotations {
     } @metas;
 
     return @metas;
+}
+
+# Returns true if the attribute should be a list in the xgmml.
+sub is_list_attribute {
+    my $attr = shift;
+    return (
+        $attr eq "IPRO" or $attr eq "GI" or $attr eq "PDB" or
+        $attr eq "PFAM" or $attr eq "GO" or $attr eq "HMP_Body_Site" or
+        $attr eq "CAZY" or $attr eq "Query_IDs" or $attr eq "Other_IDs" or
+        $attr eq "Description" or $attr eq "NCBI_IDs" or $attr eq "UniRef50_IDs" or
+        $attr eq "UniRef90_IDs" or $attr eq "ACC_CDHIT");
+}
+
+sub get_attribute_type {
+    my $attr = shift;
+
+    if ($attr eq "Sequence_Length" or $attr eq "UniRef50_Cluster_Size" or $attr eq "UniRef90_Cluster_Size" or
+        $attr eq "UniRef100_Cluster_Size" or $attr eq "ACC_CDHIT_COUNT" or $attr eq "Cluster Size")
+    {
+        return "integer";
+    } else {
+        return "string";
+    }
 }
 
 1;

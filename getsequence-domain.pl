@@ -7,6 +7,8 @@
 #version 0.9.3 modified to use cfg file to load location of variables for database
 #version 0.9.4 change way cfg file used to load database location
 
+use strict;
+
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use FindBin;
@@ -19,13 +21,16 @@ use Biocluster::Database;
 
 
 
-my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile, $seqCountFile, $configFile);
+my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile,
+    $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile,
+    $seqCountFile, $unirefVersion, $configFile, $errorFile);
 my $result = GetOptions(
     "ipro=s"                => \$ipro,
     "pfam=s"                => \$pfam,
     "gene3d=s"              => \$gene3d,
     "ssf=s"                 => \$ssf,
     "accession-output=s"    => \$access,
+    "error-file=s"          => \$errorFile,
     "maxsequence=s"         => \$maxsequence,
     "accession-id=s"        => \$manualAccession,
     "accession-file=s"      => \$accessionFile,
@@ -37,6 +42,7 @@ my $result = GetOptions(
     "fraction=i"            => \$fraction,
     "no-match-file=s"       => \$noMatchFile,
     "seq-count-file=s"      => \$seqCountFile,
+    "uniref-version=s"      => \$unirefVersion,
     "config=s"              => \$configFile,
 );
 
@@ -65,40 +71,37 @@ if (defined $fraction) {
     $fraction=1;
 }
 
+my @ipros = ();
 if (defined $ipro and $ipro ne 0) {
     print ":$ipro:\n";
     @ipros=split /,/, $ipro;
-} else {
-    @ipros = ();
 }
 
+my @pfams = ();
 if (defined $pfam and $pfam ne 0) {
     print ":$pfam:\n";
     @pfams=split /,/, $pfam;
-} else {
-    @pfams = ();
 }
 
+my @gene3ds = ();
 if (defined $gene3d and $gene3d ne 0) {
     print ":$gene3d:\n";
     @gene3ds=split /,/, $gene3d;
-} else {
-    @gene3ds = ();
 }
 
+my @ssfs = ();
 if (defined $ssf and $ssf ne 0) {
     print ":$ssf:\n";
     @ssfs=split /,/, $ssf;
-} else {
-    @ssfs = ();
 }
 
+my @manualAccessions = ();
 if (defined $manualAccession and $manualAccession ne 0) {
     print ":manual $manualAccession:\n";
     @manualAccessions = split m/,/, $manualAccession;
-} else {
-    @manualAccessions = ();
 }
+
+$errorFile = "$access.failed" if not $errorFile;
 
 if (defined $accessionFile and -f $accessionFile) {
     print ":accessionFile $accessionFile:\n";
@@ -150,15 +153,22 @@ my $fileSequenceCount = 0; # The number of actual sequences in the FASTA file, n
 
 
 #######################################################################################################################
+# DATA FOR MAPPING UNIREF50 AND UNIREF90 CLUSTER IDS TO ACCESSION IDS
+#
+my $unirefData = {};
+# If $unirefVersion is set, %accessionhash will contain the UniRef cluster IDs that are in the family.
+
+
+#######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S)
 #
-my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, @ipros);
+my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, $unirefData, $unirefVersion, @ipros);
 
-$famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, @pfams);
+$famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, $unirefData, $unirefVersion, @pfams);
 
-$famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, @gene3ds);
+$famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, $unirefData, $unirefVersion, @gene3ds);
 
-$famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, @ssfs);
+$famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, $unirefData, $unirefVersion, @ssfs);
 
 my @accessions = uniq keys %accessionhash;
 $familyIdCount = scalar @accessions;
@@ -260,6 +270,7 @@ my %inUserIds;
 my $overlapCount = 0;  # Number of IDs in the input file(s) that overlap with IDs from any family(s) specified.
 my $addedFromFile = 0; # Number of IDs that were added to the list of accession IDs to retrieve FASTA sequences for.
 
+my $sth;
 if (scalar @accUniprotIds) {
 
     my @uniqAccUniprotIds = uniq @accUniprotIds;
@@ -268,8 +279,8 @@ if (scalar @accUniprotIds) {
     my $numDuplicate = (scalar @accUniprotIds) - (scalar @uniqAccUniprotIds);
     
     # Lookup each manual accession ID to get the domain as well as verify that it exists.
-    foreach $element (@uniqAccUniprotIds) {
-        $sql = "select accession from annotations where accession = '$element'";
+    foreach my $element (@uniqAccUniprotIds) {
+        my $sql = "select accession from annotations where accession = '$element'";
         $sth = $dbh->prepare($sql);
         $sth->execute;
         if ($sth->fetch) {
@@ -282,7 +293,7 @@ if (scalar @accUniprotIds) {
                 push(@accessions, $element);
             }
     
-            $accessionhash{$element} = [];
+            $accessionhash{$element} = [{}];
             $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
         } else {
             $noMatchCount++;
@@ -301,7 +312,7 @@ if (scalar @accUniprotIds) {
 # For the fasta sequences, we use the sequence so we don't look it up below.  They have been already
 # written to the output file in a prior step.  Here we are setting a flag for the metadata process
 # below.
-foreach $element (@fastaUniprotIds) {
+foreach my $element (@fastaUniprotIds) {
     if (exists $accessionhash{$element}) {
         $overlapCount++;
     } else {
@@ -320,7 +331,7 @@ print "There are a total of $numIdsToRetrieve IDs whose sequences will be retrie
 
 
 if ($numIdsToRetrieve > $maxsequence and $maxsequence != 0) {
-    open ERROR, ">$access.failed" or die "cannot write error output file $access.failed\n";
+    open ERROR, ">$errorFile" or die "cannot write error output file $errorFile\n";
     print ERROR "Number of sequences $numIdsToRetrieve exceeds maximum specified $maxsequence\n";
     close ERROR;
     die "Number of sequences $numIdsToRetrieve exceeds maximum specified $maxsequence";
@@ -328,9 +339,9 @@ if ($numIdsToRetrieve > $maxsequence and $maxsequence != 0) {
 
 print "Print out accessions\n";
 open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
-foreach $accession (keys %accessionhash) {
+foreach my $accession (keys %accessionhash) {
     my @domains = @{$accessionhash{$accession}};
-    foreach $piece (@domains) {
+    foreach my $piece (@domains) {
         if ($domain eq "off") {
             print GREP "$accession\n";
         } elsif ($domain eq "on") {
@@ -357,16 +368,17 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
 
 my @origAccessions = @accessions;
 while(scalar @accessions) {
-    @batch=splice(@accessions, 0, $perpass);
-    $batchline=join ',', @batch;
+    my @batch=splice(@accessions, 0, $perpass);
+    my $batchline=join ',', @batch;
     my ($fastacmdOutput, $fastaErr) = capture {
         system("fastacmd", "-d", "${data_files}/combined.fasta", "-s", "$batchline");
     };
     push(@err, $fastaErr);
     #print "fastacmd -d $data_files/combined.fasta -s $batchline\n";
-    @sequences=split /\n>/, $fastacmdOutput;
+    my @sequences=split /\n>/, $fastacmdOutput;
     $sequences[0] = substr($sequences[0], 1) if $#sequences >= 0 and substr($sequences[0], 0, 1) eq ">";
-    foreach $sequence (@sequences) { 
+    my $accession = "";
+    foreach my $sequence (@sequences) { 
         #print "raw $sequence\n";
         if ($sequence =~ s/^\w\w\|(\w{6,10})\|.*//) {
             $accession=$1;
@@ -418,6 +430,11 @@ foreach my $acc (sort sortFn @metaAcc) {
         delete $headerData->{$acc}->{query_ids};
     }
     print META "\n";
+    if (exists $unirefData->{$acc} and $unirefVersion) {
+        my @urIds = uniq @{ $unirefData->{$acc} };
+        print META "\tUniRef${unirefVersion}_IDs\t", join(",", @urIds), "\n";
+        print META "\tUniRef${unirefVersion}_Cluster_Size\t", scalar(@urIds), "\n";
+    }
 
     # For user-supplied FASTA sequences that have headers with metadata and that appear in an input
     # PFAM family, write out the metadata.
@@ -682,18 +699,40 @@ sub makeSequenceId {
 
 
 sub getDomainFromDb {
-    my ($dbh, $table, $accessionHash, $fraction, @elements) = @_;
+    my ($dbh, $table, $accessionHash, $fraction, $unirefData, $unirefVersion, @elements) = @_;
     my $c = 1;
+    my %unirefFamSizeHelper;
     print "Accessions found in $table:\n";
     foreach my $element (@elements) {
-        my $sth = $dbh->prepare("select accession,start,end from $table where id = '$element'");
+        #my $sth = $dbh->prepare("select accession,start,end,uniref50_cluster_id,uniref90_cluster_id from $table where id = '$element'");
+        my $sth = $dbh->prepare("select * from $table where id = '$element'");
         $sth->execute;
-        while (my $row = $sth->fetch) {
-            (my $uniprotId = $row->[0]) =~ s/\-\d+$//;
-            if ($fraction == 1 or $c % $fraction == 0) {
-                push @{$accessionHash->{$uniprotId}}, {'start' => $row->[1], 'end' => $row->[2]};
+        while (my $row = $sth->fetchrow_hashref) {
+            (my $uniprotId = $row->{accession}) =~ s/\-\d+$//;
+
+            if ($unirefVersion) {
+                my $idx = $unirefVersion eq "90" ? "uniref90_cluster_id" : "uniref50_cluster_id";
+                my $unirefId = $row->{$idx};
+                if ($fraction == 1 or $c % $fraction == 0) {
+                    push @{$unirefData->{$unirefId}}, $uniprotId;
+                    # The accessionHash element will be overwritten multiple times, once for each accession ID 
+                    # in the UniRef cluster that corresponds to the UniRef cluster ID.
+                    $accessionHash->{$unirefId} = [{}]; 
+                }
+                # Only increment the family size if the uniref cluster ID hasn't yet been encountered.  This
+                # is because the select query above retrieves all accessions in the family based on UniProt
+                # not based on UniRef.
+                if (not exists $unirefFamSizeHelper{$unirefId}) {
+                    $unirefFamSizeHelper{$unirefId} = 1;
+                    $c++;
+                }
+            } else {
+                if ($fraction == 1 or $c % $fraction == 0) {
+                    push @{$accessionHash->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
+                }
+                $c++;
             }
-            $c++;
+
         }
         $sth->finish;
     }

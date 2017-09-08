@@ -81,6 +81,8 @@ $result = GetOptions(
     "fraction=i"        => \$fraction,
     "blast=s"           => \$blast,
     "job-id=i"          => \$jobId,
+    "uniref-version=s"  => \$unirefVersion,
+    "no-demux"          => \$noDemuxArg,
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
@@ -118,35 +120,35 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
 
 # Defaults and error checking for multiplexing
 if ($multiplexing eq "on") {
-    if (defined $lengthdif and $lengthdif !~ /\d*\.\d+/) {
-        die "lengthdif must be in a format like 0.9\n";
+    if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
+        die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
     } elsif (not defined $lengthdif) {
         $lengthdif=1;
     }
-    if (defined $sim and $sim !~ /\d*\.\d+/) {
+    if (defined $sim and $sim !~ /\d(\.\d+)?/) {
         die "sim must be in a format like 0.9\n";
     } elsif (not defined $sim) {
         $sim=1;
     }
 } elsif ($multiplexing eq "off") {
-    if (defined $lengthdif and $lengthdif !~ /\d*\.\d+/) {
-        die "lengthdif must be in a format like 0.9\n";
+    if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
+        die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
     } elsif (not defined $lengthdif) {
         $lengthdif=1;
     }
-    if (defined $sim and $sim !~ /\d*\.\d+/) {
+    if (defined $sim and $sim !~ /\d(\.\d+)?/) {
         die "sim must be in a format like 0.9\n";
     } elsif (not defined $sim) {
         $sim=1;
     } 
 } elsif (!(defined $multiplexing)) {
     $multiplexing = "on";
-    if (defined $lengthdif and $lengthdif !~ /\d*\.\d+/) {
-        die "lengthdif must be in a format like 0.9\n";
+    if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
+        die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
     } elsif (not defined $lengthdif) {
         $lengthdif=1;
     }
-    if (defined $sim and $sim !~ /\d*\.\d+/) {
+    if (defined $sim and $sim !~ /\d(\.\d+)?/) {
         die "sim must be in a format like 0.9\n";
     } elsif (not defined $sim) {
         $sim=1;
@@ -200,6 +202,9 @@ if (not defined $configFile or not -f $configFile) {
     }
 }
 
+my $manualCdHit = 0;
+$manualCdHit = 1 if (($lengthdif < 1 or $sim < 1) and defined $noDemuxArg);
+
 $seqCountFile = ""  unless defined $seqCountFile;
 
 $np = ceil($np / 24) if ($blast=~/diamond/);
@@ -218,6 +223,7 @@ $accessionId = 0    unless (defined $accessionId);
 # Default values for bandpass filter, 0,0 disables it, which is the default
 $maxlen = 0         unless (defined $maxlen);
 $minlen = 0         unless (defined $minlen);
+$unirefVersion = "" unless (defined $unirefVersion);
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    unless (defined $maxsequence);
@@ -264,6 +270,12 @@ print "incfrac is $incfrac\n";
 print "seq-count-file is $seqCountFile\n";
 print "base output directory is $baseOutputDir\n";
 print "output directory is $outputDir\n";
+print "uniref-version is $unirefVersion\n";
+print "manualcdhit is $manualCdHit\n";
+
+
+my $accOutFile = "$outputDir/accession.txt";
+my $errorFile = "$accOutFile.failed";
 
 
 my $userHeaderFile = "";
@@ -353,6 +365,7 @@ my $S = new Biocluster::SchedulerApi(type => $schedType, queue => $queue, resour
 my $B = $S->getBuilder();
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
+    my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
@@ -369,7 +382,10 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $B->addAction("dos2unix $accessionFile");
         $B->addAction("mac2unix $accessionFile");
     }
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa -maxsequence $maxsequence -fraction $fraction -accession-output $outputDir/accession.txt $seqCountFileOption -config=$configFile");
+    # Don't enforce the limit here if we are using manual cd-hit parameters below (the limit
+    # is checked below after cd-hit).
+    my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
@@ -420,7 +436,26 @@ $B->addAction("module load $efiEstMod");
 #$B->addAction("module load blast");
 $B->addAction("cd $outputDir");
 if ($multiplexing eq "on") {
-    $B->addAction("cd-hit -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa");
+    my $nParm = ($sim < 1 and $lengthdif < 1) ? "-n 2" : "";
+    $B->addAction("cd-hit $nParm -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa");
+
+    if ($manualCdHit) {
+        $B->addAction(<<CMDS
+if $efiEstTools/check_seq_count.pl -max-seq $maxsequence -error-file $errorFile -cluster $outputDir/sequences.fa.clstr
+then
+    echo "Sequence count OK"
+else
+    echo "Sequence count not OK"
+    exit 1
+fi
+CMDS
+            );
+        $B->addAction("mv $outputDir/struct.out $outputDir/struct.demux.out");
+        $B->addAction("$efiEstTools/remove_demuxed_nodes.pl -in $outputDir/struct.demux.out -out $outputDir/struct.out -cluster $outputDir/sequences.fa.clstr");
+        $B->addAction("mv $outputDir/allsequences.fa $outputDir/allsequences.fa.before_demux");
+        $B->addAction("cp $outputDir/sequences.fa $outputDir/allsequences.fa");
+    }
+    $B->addAction("$efiEstTools/get_demux_ids.pl -struct $outputDir/struct.out -cluster $outputDir/sequences.fa.clstr -domain $domain");
 } else {
     $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
 }
@@ -556,13 +591,14 @@ $B->dependency(0, @blastreducejobline[0]);
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
-if ($multiplexing eq "on") {
+if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
 } else {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/removedups.pl -in $outputDir/mux.out -out $outputDir/1.out");
 }
+
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
 $B->renderToFile("$tmpdir/demux.sh");

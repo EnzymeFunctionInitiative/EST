@@ -10,6 +10,8 @@
 
 #this program is used to create repnode networks using information from cd-hit
 
+use strict;
+
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
@@ -21,7 +23,8 @@ use lib "$FindBin::Bin/lib";
 use Biocluster::Config;
 use Annotations;
 
-$result = GetOptions(
+my ($blast, $cdhit, $fasta, $struct, $output, $title, $dbver);
+my $result = GetOptions(
     "blast=s"	=> \$blast,
     "cdhit=s"	=> \$cdhit,
     "fasta=s"	=> \$fasta,
@@ -33,44 +36,42 @@ $result = GetOptions(
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver or not $cdhit;
 
-$uniprotgi='/home/groups/efi/devel/idmapping/gionly.dat';
-$uniprotref='/home/groups/efi/devel/idmapping/RefSeqonly.dat';
+my $uniprotgi='/home/groups/efi/devel/idmapping/gionly.dat';
+my $uniprotref='/home/groups/efi/devel/idmapping/RefSeqonly.dat';
 
-%clusters=();
-%sequence=();
-%uprot=();
-%headuprot=();
+my %clusters=();
+my %sequence=();
+my %uprot=();
+my %headuprot=();
 
-$edgecount=$nodecount=0;
+my ($edgecount, $nodecount) = (0, 0);
 
-$parser=XML::LibXML->new();
-$output=new IO::File(">$output");
-$writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
+my $parser=XML::LibXML->new();
+my $output=new IO::File(">$output");
+my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
 
 #if struct file (annotation information) exists, use that to generate annotation information
 my @metas;
 if(-e $struct){
     print "populating annotation structure from file\n";
     open STRUCT, $struct or die "could not open $struct\n";
-    foreach $line (<STRUCT>){
+    my $id;
+    foreach my $line (<STRUCT>){
         chomp $line;
         if($line=~/^([A-Za-z0-9:]+)/){
             $id=$1;
         }else{
-            @lineary=split "\t",$line;
-            unless(@lineary[2]){
-                @lineary[2]='None';
+            my ($junk, $key, $value) = split "\t",$line;
+            unless($value){
+                $value='None';
             }
-            push(@metas, $lineary[1]) if not grep { $_ eq $lineary[1] } @metas;
-            if (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and
-                     @lineary[1] ne "PFAM" and @lineary[1] ne "GO" and @lineary[1] ne "HMP_Body_Site" and
-                     @lineary[1] ne "CAZY" and @lineary[1] ne "Query_IDs" and @lineary[1] ne "Other_IDs" and
-                     @lineary[1] ne "Description" and @lineary[1] ne "NCBI_IDs")
-            {
-                $uprot{$id}{@lineary[1]}=@lineary[2];
-            }else{
-                my @tmpline = grep /\S/, split(",", @lineary[2]);
-                $uprot{$id}{@lineary[1]} = \@tmpline;
+            next if not $key;
+            push(@metas, $key) if not grep { $_ eq $key } @metas;
+            if (Annotations::is_list_attribute($key)) {
+                my @tmpline = grep /\S/, split(",", $value);
+                $uprot{$id}{$key} = \@tmpline;
+            } else {
+                $uprot{$id}{$key} = $value;
             }
         }
     }
@@ -84,10 +85,10 @@ if ($#metas < 0) {
     @metas=();
     while (<STRUCT>){
         last if /^\w/;
-        $line=$_;
+        my $line=$_;
         chomp $line;
         if($line=~/^\s/){
-            @lineary=split /\t/, $line;
+            my @lineary=split /\t/, $line;
             push @metas, @lineary[1];
         }
     }
@@ -100,12 +101,13 @@ unshift @metas, $SizeKey;
 my $annoData = Annotations::get_annotation_data();
 @metas = Annotations::sort_annotations($annoData, @metas);
 
-$metaline=join ',', @metas;
+my $metaline=join ',', @metas;
 
 print "Metadata keys are $metaline\n";
 
 
 
+my $similarity;
 if($cdhit=~/cdhit\.*([\d\.]+)\.clstr$/){
     $similarity=$1;
     $similarity=~s/\.//g;
@@ -118,8 +120,11 @@ $writer->comment("Database: $dbver");
 #write the top container
 $writer->startTag('graph', 'label' => "$title", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
 
-%clusterdata=();
-$count=0;
+my %clusterdata=();
+my $count=0;
+my $head;
+my $element;
+
 open CDHIT, $cdhit or die "could not open cdhit file $cdhit\n";
 print "parsing cdhit file, this creates the nodes\n";
 <CDHIT>;
@@ -142,11 +147,13 @@ while (<CDHIT>){
                     if($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/){
                         $piece=$2-$1+1;
                     }
-                    unless($key eq "Sequence_Length"){
-                        $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
-                    }else{
-                        $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $piece);
-                    }
+                    my $type = Annotations::get_attribute_type($key);
+                    $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
+#                    unless($key eq "Sequence_Length"){
+#                        $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
+#                    }else{
+#                        $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $piece);
+#                    }
                 }
                 $writer->endTag();
             }
@@ -200,7 +207,7 @@ foreach my $key (@metas){
 }
 
 $writer->endTag();
-$clusterdata=();
+%clusterdata=();
 
 print "Writing Edges\n";
 

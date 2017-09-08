@@ -9,6 +9,8 @@
 
 #this program creates an xgmml with all nodes and edges
 
+use strict;
+
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
 use IO;
@@ -20,7 +22,8 @@ use lib "$FindBin::Bin/lib";
 use Biocluster::Config;
 use Annotations;
 
-$result=GetOptions ("blast=s"	=> \$blast,
+my ($blast, $fasta, $struct, $output, $title, $maxfull, $dbver);
+my $result=GetOptions ("blast=s"	=> \$blast,
     "fasta=s"	=> \$fasta,
     "struct=s"	=> \$struct,
     "output=s"	=> \$output,
@@ -40,15 +43,15 @@ if(defined $maxfull){
 }
 
 
-$edge=$node=0;
+my ($edge, $node) = (0, 0);
 
-%sequence=();
-%uprot=();
+my %sequence=();
+my %uprot=();
 
-@uprotnumbers=();
+my @uprotnumbers=();
 
-$blastlength=`wc -l $blast`;
-@blastlength=split( "\s+" , $blastlength);
+my $blastlength=`wc -l $blast`;
+my @blastlength=split( "\s+" , $blastlength);
 if(int(@blastlength[0])>$maxfull){
     open(OUTPUT, ">$output") or die "cannot write to $output\n";
     chomp @blastlength[0];
@@ -58,9 +61,9 @@ if(int(@blastlength[0])>$maxfull){
 }
 
 
-$parser=XML::LibXML->new();
-$output=new IO::File(">$output");
-$writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
+my $parser=XML::LibXML->new();
+my $output=new IO::File(">$output");
+my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
 
 print time . " check length of 2.out file\n";
 
@@ -71,7 +74,7 @@ print time . " check length of 2.out file\n";
 print time . " Reading in uniprot numbers from fasta file\n";
 
 open(FASTA, $fasta) or die "could not open $fasta\n";
-foreach $line (<FASTA>){
+foreach my $line (<FASTA>){
     if($line=~/>([A-Za-z0-9:]+)/){
         push @uprotnumbers, $1;
     }
@@ -86,24 +89,23 @@ print time . " Read in annotation data\n";
 if(-e $struct){
     print "populating annotation structure from file\n";
     open STRUCT, $struct or die "could not open $struct\n";
-    foreach $line (<STRUCT>){
+    my $id;
+    foreach my $line (<STRUCT>){
         chomp $line;
         if($line=~/^([A-Za-z0-9\:]+)/){
             $id=$1;
         }else{
-            @lineary=split "\t",$line;
-            unless(@lineary[2]){
-                @lineary[2]='None';
+            my ($junk, $key, $value) = split "\t",$line;
+            unless($value){
+                $value='None';
             }
-            push(@metas, $lineary[1]) if not grep { $_ eq $lineary[1] } @metas;
-            if (@lineary[1] ne "IPRO" and @lineary[1] ne "GI" and @lineary[1] ne "PDB" and
-                     @lineary[1] ne "PFAM" and @lineary[1] ne "GO" and @lineary[1] ne "HMP_Body_Site" and 
-                     @lineary[1] ne "CAZY" and @lineary[1] ne "Query_IDs" and @lineary[1] ne "Other_IDs" and
-                     @lineary[1] ne "Description" and @lineary[1] ne "NCBI_IDs") {
-                $uprot{$id}{@lineary[1]}=@lineary[2]; 
+            next if not $key;
+            push(@metas, $key) if not grep { $_ eq $key } @metas;
+            if (Annotations::is_list_attribute($key)) {
+                my @tmpline = grep /\S/, split(",", $value);
+                $uprot{$id}{$key} = \@tmpline;
             }else{
-                my @tmpline = grep /\S/, split(",", @lineary[2]);
-                $uprot{$id}{@lineary[1]} = \@tmpline;
+                $uprot{$id}{$key} = $value; 
             }
         }
     }
@@ -119,11 +121,11 @@ if ($#metas < 0) {
     @metas=();
     while (<STRUCT>){
         last if /^\w/;
-        $line=$_;
+        my $line=$_;
         chomp $line;
         if($line=~/^\s/){
-            @lineary=split /\t/, $line;
-            push @metas, @lineary[1];
+            my @parts = split /\t/, $line;
+            push @metas, $parts[1];
         }
     }
 }
@@ -131,7 +133,7 @@ if ($#metas < 0) {
 my $annoData = Annotations::get_annotation_data();
 @metas = Annotations::sort_annotations($annoData, @metas);
 
-$metaline=join ',', @metas;
+my $metaline=join ',', @metas;
 
 print time ." Metadata keys are $metaline\n";
 print time ." Start nodes\n";
@@ -139,7 +141,7 @@ $writer->comment("Database: $dbver");
 $writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
 foreach my $element (@uprotnumbers){
     #print "$element\n";;
-    $origelement=$element;
+    my $origelement=$element;
     $node++;
     $writer->startTag('node', 'id' => $element, 'label' => $element);
     if($element=~/(\w{6,10}):/){
@@ -148,10 +150,7 @@ foreach my $element (@uprotnumbers){
     foreach my $key (@metas){
         #print "\t$key\t$uprot{$element}{$key}\n";
         my $displayName = $annoData->{$key}->{display};
-        if($key eq "IPRO" or $key eq "GI" or $key eq "PDB" or $key eq "PFAM" or $key eq "GO" or
-           $key eq "HMP_Body_Site" or $key eq "CAZY" or $key eq "Query_IDs" or $key eq "Other_IDs" or
-           $key eq "Description" or $key eq "NCBI_IDs")
-        {
+         if (Annotations::is_list_attribute($key)) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
             foreach my $piece (@{$uprot{$element}{$key}}){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
@@ -160,17 +159,20 @@ foreach my $element (@uprotnumbers){
             $writer->endTag();
         }else{
             $uprot{$element}{$key}=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+            my $piece = $uprot{$element}{$key};
             if($key eq "Sequence_Length" and $origelement=~/\w{6,10}:(\d+):(\d+)/){
-                my $piece=$2-$1+1;
+                $piece=$2-$1+1;
                 print "start:$1\tend$2\ttotal:$piece\n";
-                $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $piece);
-            }else{
-                if($key eq "Sequence_Length"){
-                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $uprot{$element}{$key});
-                }else{
-                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'string', 'value' => $uprot{$element}{$key});
-                }
             }
+            my $type = Annotations::get_attribute_type($key);
+            $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
+#            }else{
+#                if($key eq "Sequence_Length"){
+#                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $uprot{$element}{$key});
+#                }else{
+#                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'string', 'value' => $uprot{$element}{$key});
+#                }
+#            }
         }
     }
     $writer->endTag();
