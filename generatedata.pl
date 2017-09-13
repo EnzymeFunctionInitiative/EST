@@ -54,6 +54,7 @@ use Biocluster::SchedulerApi;
 use Biocluster::Util qw(usesSlurm);
 use Biocluster::Config;
 
+
 $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -73,9 +74,9 @@ $result = GetOptions(
     "userfasta=s"       => \$fastaFile,
     "use-fasta-headers" => \$useFastaHeaders,
     "seq-count-file=s"  => \$seqCountFile,
-    "lengthdif=f"       => \$lengthdif,
+    "lengthdif=s"       => \$lengthdif,
     "no-match-file=s"   => \$noMatchFile,
-    "sim=f"             => \$sim,
+    "sim=s"             => \$sim,
     "multiplex=s"       => \$multiplexing,
     "domain=s"          => \$domain,
     "fraction=i"        => \$fraction,
@@ -83,10 +84,12 @@ $result = GetOptions(
     "job-id=i"          => \$jobId,
     "uniref-version=s"  => \$unirefVersion,
     "no-demux"          => \$noDemuxArg,
+    "conv-ratio-file=s" => \$convRatioFile,
+    "cd-hit=s"          => \$cdHitOnly,     # specify this flag in order to run cd-hit only after getsequence-domain.pl then exit.
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
-    "config=s"          => \$configFile,        # new-style config file
+    "config=s"          => \$configFile,    # new-style config file
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -117,44 +120,45 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
     $fraction=1;
 }
 
-
-# Defaults and error checking for multiplexing
-if ($multiplexing eq "on") {
-    if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
-        die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
-    } elsif (not defined $lengthdif) {
-        $lengthdif=1;
+if (not $cdHitOnly or not $lengthdif or not $sim) {
+    # Defaults and error checking for multiplexing
+    if ($multiplexing eq "on") {
+        if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
+            die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
+        } elsif (not defined $lengthdif) {
+            $lengthdif=1;
+        }
+        if (defined $sim and $sim !~ /\d(\.\d+)?/) {
+            die "sim must be in a format like 0.9\n";
+        } elsif (not defined $sim) {
+            $sim=1;
+        }
+    } elsif ($multiplexing eq "off") {
+        if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
+            die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
+        } elsif (not defined $lengthdif) {
+            $lengthdif=1;
+        }
+        if (defined $sim and $sim !~ /\d(\.\d+)?/) {
+            die "sim must be in a format like 0.9\n";
+        } elsif (not defined $sim) {
+            $sim=1;
+        } 
+    } elsif (!(defined $multiplexing)) {
+        $multiplexing = "on";
+        if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
+            die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
+        } elsif (not defined $lengthdif) {
+            $lengthdif=1;
+        }
+        if (defined $sim and $sim !~ /\d(\.\d+)?/) {
+            die "sim must be in a format like 0.9\n";
+        } elsif (not defined $sim) {
+            $sim=1;
+        }
+    } else {
+        die "valid variables for multiplexing are either on or off\n";
     }
-    if (defined $sim and $sim !~ /\d(\.\d+)?/) {
-        die "sim must be in a format like 0.9\n";
-    } elsif (not defined $sim) {
-        $sim=1;
-    }
-} elsif ($multiplexing eq "off") {
-    if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
-        die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
-    } elsif (not defined $lengthdif) {
-        $lengthdif=1;
-    }
-    if (defined $sim and $sim !~ /\d(\.\d+)?/) {
-        die "sim must be in a format like 0.9\n";
-    } elsif (not defined $sim) {
-        $sim=1;
-    } 
-} elsif (!(defined $multiplexing)) {
-    $multiplexing = "on";
-    if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
-        die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
-    } elsif (not defined $lengthdif) {
-        $lengthdif=1;
-    }
-    if (defined $sim and $sim !~ /\d(\.\d+)?/) {
-        die "sim must be in a format like 0.9\n";
-    } elsif (not defined $sim) {
-        $sim=1;
-    }
-} else {
-    die "valid variables for multiplexing are either on or off\n";
 }
 
 
@@ -203,7 +207,7 @@ if (not defined $configFile or not -f $configFile) {
 }
 
 my $manualCdHit = 0;
-$manualCdHit = 1 if (($lengthdif < 1 or $sim < 1) and defined $noDemuxArg);
+$manualCdHit = 1 if (not $cdHitOnly and ($lengthdif < 1 or $sim < 1) and defined $noDemuxArg);
 
 $seqCountFile = ""  unless defined $seqCountFile;
 
@@ -430,11 +434,34 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 #
 $B = $S->getBuilder();
 $B->dependency(0, @importjobline[0]);
+$B->mailEnd() if defined $cdHitOnly;
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load blast");
 $B->addAction("cd $outputDir");
+
+# If we only want to do CD-HIT jobs then do that here.
+if ($cdHitOnly) {
+
+    my @seqId = split /,/, $sim;
+    my @seqLength = split /,/, $lengthdif;
+
+    for (my $i = 0; $i <= $#seqId; $i++) {
+        my $sLen = $#seqId == $#seqLength ? $seqLength[$i] : $seqLength[0];
+        my $sId = $seqId[$i];
+        my $nParm = ($sId < 1 and $sLen < 1) ? "-n 2" : "";
+        $B->addAction("cd-hit $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa");
+        $B->addAction("$efiEstTools/get_cluster_count.pl -id $sId -len $sLen -cluster $outputDir/sequences-$sId-$sLen.fa.clstr >> $cdHitOnly");
+    }
+    $B->addAction("touch  $outputDir/1.out.completed");
+
+    $B->renderToFile("$tmpdir/cdhit.sh");
+    $cdhitjob = $S->submit("$outputDir/cdhit.sh");
+    print "CD-HIT job is:\n $cdhitjob";
+    exit;
+}
+
 if ($multiplexing eq "on") {
     my $nParm = ($sim < 1 and $lengthdif < 1) ? "-n 2" : "";
     $B->addAction("cd-hit $nParm -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa");
@@ -607,6 +634,22 @@ $demuxjob = $S->submit("$tmpdir/demux.sh");
 print "Demux job is:\n $demuxjob";
 @demuxjobline=split /\./, $demuxjob;
 
+my $depJob = @demuxjobline[0];
+
+########################################################################################################################
+# Compute convergence ratio
+#
+if ($convRatioFile) {
+    $B = $S->getBuilder();
+    $B->dependency(0, $depJob); 
+    $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/sequences.fa > $outputDir/$convRatioFile");
+    $B->renderToFile("$tmpdir/conv_ratio.sh");
+    my $convRatioJob = $S->submit("$tmpdir/conv_ratio.sh");
+    print "Convergence ratio job is:\n $convRatioJob";
+    my @convRatioJobLine=split /\./, $convRatioJob;
+    $depJob = @convRatioJobLine[0];
+}
+
 
 ########################################################################################################################
 # Removed in favor of R, comments kept in case someone ever wants to use the pure perl solution
@@ -659,7 +702,7 @@ $B = $S->getBuilder();
 
 my ($smallWidth, $fullWidth, $smallHeight, $fullHeight) = (700, 2000, 315, 900);
 $B->queue($memqueue);
-$B->dependency(0, @demuxjobline[0]);
+$B->dependency(0, $depJob);
 $B->mailEnd();
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");

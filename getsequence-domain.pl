@@ -162,13 +162,20 @@ my $unirefData = {};
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S)
 #
-my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, $unirefData, $unirefVersion, @ipros);
 
-$famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, $unirefData, $unirefVersion, @pfams);
+my @clans = grep {m/^cl/i} @pfams;
+@pfams = grep {m/^pf/i} @pfams;
+push @pfams, retrieveFamiliesForClans(@clans);
 
-$famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, $unirefData, $unirefVersion, @gene3ds);
+my $isDomainOn = lc($domain) eq "on";
 
-$famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, $unirefData, $unirefVersion, @ssfs);
+my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @ipros);
+
+$famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @pfams);
+
+$famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @gene3ds);
+
+$famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @ssfs);
 
 my @accessions = uniq keys %accessionhash;
 $familyIdCount = scalar @accessions;
@@ -699,16 +706,20 @@ sub makeSequenceId {
 
 
 sub getDomainFromDb {
-    my ($dbh, $table, $accessionHash, $fraction, $unirefData, $unirefVersion, @elements) = @_;
+    my ($dbh, $table, $accessionHash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @elements) = @_;
     my $c = 1;
     my %unirefFamSizeHelper;
     print "Accessions found in $table:\n";
+    my %idsProcessed;
     foreach my $element (@elements) {
         #my $sth = $dbh->prepare("select accession,start,end,uniref50_cluster_id,uniref90_cluster_id from $table where id = '$element'");
         my $sth = $dbh->prepare("select * from $table where id = '$element'");
         $sth->execute;
+        my $ac = 1;
         while (my $row = $sth->fetchrow_hashref) {
             (my $uniprotId = $row->{accession}) =~ s/\-\d+$//;
+            next if (not $isDomainOn and exists $idsProcessed{$uniprotId});
+            $idsProcessed{$uniprotId} = 1;
 
             if ($unirefVersion) {
                 my $idx = $unirefVersion eq "90" ? "uniref90_cluster_id" : "uniref50_cluster_id";
@@ -728,17 +739,36 @@ sub getDomainFromDb {
                 }
             } else {
                 if ($fraction == 1 or $c % $fraction == 0) {
+                    $ac++;
                     push @{$accessionHash->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
                 }
                 $c++;
             }
-
         }
+        print "Family $element had $ac elements that were added\n";
         $sth->finish;
     }
     my @accessions = keys %$accessionHash;
     print "Initial " . scalar @accessions . " sequences after $table\n";
     return $c;
+}
+
+
+sub retrieveFamiliesForClans {
+    my (@clans) = @_;
+
+    my @fams;
+    foreach my $clan (@clans) {
+        my $sql = "select pfam_id from PFAM_clans where clan_id = '$clan'";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute;
+    
+        while (my $row = $sth->fetchrow_arrayref) {
+            push @fams, $row->[0];
+        }
+    }
+
+    return @fams;
 }
 
 
