@@ -165,7 +165,9 @@ foreach my $element (@uprotnumbers){
                 print "start:$1\tend$2\ttotal:$piece\n";
             }
             my $type = Annotations::get_attribute_type($key);
-            $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
+            if ($piece or $type ne "integer") {
+                $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
+            }
 #            }else{
 #                if($key eq "Sequence_Length"){
 #                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $uprot{$element}{$key});

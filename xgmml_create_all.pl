@@ -148,7 +148,9 @@ while (<CDHIT>){
                         $piece=$2-$1+1;
                     }
                     my $type = Annotations::get_attribute_type($key);
-                    $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
+                    if ($piece or $type ne "integer") {
+                        $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
+                    }
 #                    unless($key eq "Sequence_Length"){
 #                        $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
 #                    }else{

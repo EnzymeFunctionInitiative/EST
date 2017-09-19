@@ -86,6 +86,7 @@ $result = GetOptions(
     "no-demux"          => \$noDemuxArg,
     "conv-ratio-file=s" => \$convRatioFile,
     "cd-hit=s"          => \$cdHitOnly,     # specify this flag in order to run cd-hit only after getsequence-domain.pl then exit.
+    "uniref-expand"     => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
@@ -228,6 +229,8 @@ $accessionId = 0    unless (defined $accessionId);
 $maxlen = 0         unless (defined $maxlen);
 $minlen = 0         unless (defined $minlen);
 $unirefVersion = "" unless (defined $unirefVersion);
+$unirefExpand = 0   unless (defined $unirefExpand);
+$domain = "off"     if $unirefVersion;
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    unless (defined $maxsequence);
@@ -276,6 +279,7 @@ print "base output directory is $baseOutputDir\n";
 print "output directory is $outputDir\n";
 print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
+print "uniref-expand is $unirefExpand\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -370,6 +374,7 @@ my $B = $S->getBuilder();
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
     my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
+    my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
@@ -389,7 +394,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     # Don't enforce the limit here if we are using manual cd-hit parameters below (the limit
     # is checked below after cd-hit).
     my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption -config=$configFile");
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
@@ -435,14 +440,15 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 $B = $S->getBuilder();
 $B->dependency(0, @importjobline[0]);
 $B->mailEnd() if defined $cdHitOnly;
-$B->addAction("module load oldapps") if $oldapps;
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
-#$B->addAction("module load blast");
-$B->addAction("cd $outputDir");
 
 # If we only want to do CD-HIT jobs then do that here.
 if ($cdHitOnly) {
+    $B->resource(1, 24, 20);
+    $B->addAction("module load oldapps") if $oldapps;
+    $B->addAction("module load $efiDbMod");
+    $B->addAction("module load $efiEstMod");
+    #$B->addAction("module load blast");
+    $B->addAction("cd $outputDir");
 
     my @seqId = split /,/, $sim;
     my @seqLength = split /,/, $lengthdif;
@@ -451,7 +457,8 @@ if ($cdHitOnly) {
         my $sLen = $#seqId == $#seqLength ? $seqLength[$i] : $seqLength[0];
         my $sId = $seqId[$i];
         my $nParm = ($sId < 1 and $sLen < 1) ? "-n 2" : "";
-        $B->addAction("cd-hit $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa");
+        ##$B->addAction("/home/n-z/noberg/dev/cd-hit-v4.6.8-2017-0621/cd-hit $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2 -T 24");
+        $B->addAction("cd-hit $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2");
         $B->addAction("$efiEstTools/get_cluster_count.pl -id $sId -len $sLen -cluster $outputDir/sequences-$sId-$sLen.fa.clstr >> $cdHitOnly");
     }
     $B->addAction("touch  $outputDir/1.out.completed");
@@ -462,9 +469,15 @@ if ($cdHitOnly) {
     exit;
 }
 
+$B->addAction("module load oldapps") if $oldapps;
+$B->addAction("module load $efiDbMod");
+$B->addAction("module load $efiEstMod");
+#$B->addAction("module load blast");
+$B->addAction("cd $outputDir");
+
 if ($multiplexing eq "on") {
     my $nParm = ($sim < 1 and $lengthdif < 1) ? "-n 2" : "";
-    $B->addAction("cd-hit $nParm -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa");
+    $B->addAction("cd-hit $nParm -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa -M 10000");
 
     if ($manualCdHit) {
         $B->addAction(<<CMDS
@@ -607,6 +620,22 @@ $blastreducejob = $S->submit("$tmpdir/blastreduce.sh");
 print "Blastreduce job is:\n $blastreducejob";
 
 @blastreducejobline=split /\./, $blastreducejob;
+my $depJob = @blastreducejobline[0];
+
+
+########################################################################################################################
+# Compute convergence ratio, before demultiplex
+#
+if ($convRatioFile) {
+    $B = $S->getBuilder();
+    $B->dependency(0, $depJob); 
+    $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
+    $B->renderToFile("$tmpdir/conv_ratio.sh");
+    my $convRatioJob = $S->submit("$tmpdir/conv_ratio.sh");
+    print "Convergence ratio job is:\n $convRatioJob";
+    my @convRatioJobLine=split /\./, $convRatioJob;
+    $depJob = @convRatioJobLine[0];
+}
 
 
 ########################################################################################################################
@@ -634,21 +663,7 @@ $demuxjob = $S->submit("$tmpdir/demux.sh");
 print "Demux job is:\n $demuxjob";
 @demuxjobline=split /\./, $demuxjob;
 
-my $depJob = @demuxjobline[0];
-
-########################################################################################################################
-# Compute convergence ratio
-#
-if ($convRatioFile) {
-    $B = $S->getBuilder();
-    $B->dependency(0, $depJob); 
-    $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/sequences.fa > $outputDir/$convRatioFile");
-    $B->renderToFile("$tmpdir/conv_ratio.sh");
-    my $convRatioJob = $S->submit("$tmpdir/conv_ratio.sh");
-    print "Convergence ratio job is:\n $convRatioJob";
-    my @convRatioJobLine=split /\./, $convRatioJob;
-    $depJob = @convRatioJobLine[0];
-}
+$depJob = @demuxjobline[0];
 
 
 ########################################################################################################################
