@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #version 0.9.2 no changes
 #version 0.9.7 added options and code for working with Slurm scheduler
 
@@ -13,10 +18,9 @@
 
 
 use FindBin;
-use lib "$FindBin::Bin/lib";
 use Getopt::Long;
-use Biocluster::SchedulerApi;
-use Biocluster::Util qw(usesSlurm);
+use EFI::SchedulerApi;
+use EFI::Util qw(usesSlurm);
 
 $result = GetOptions(
     "filter=s"      => \$filter,
@@ -105,7 +109,7 @@ my $wordOption = $lengthOverlap < 1 ? "-n 2" : "";
 
 
 
-my $S = new Biocluster::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my $S = new EFI::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 my $B = $S->getBuilder();
 
 print "Data from runs will be saved to $tmpdir/$filter-$minval-$minlen-$maxlen/\n";

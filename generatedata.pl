@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 # This program creates bash scripts and submits them on clusters with torque schedulers, overview of steps below
 #   Step 1 fetch sequences and get annotations
 #       initial_import.sh       generates initial_import script that contains getsequence.pl and getannotation.pl or just getseqtaxid.pl if input was from taxid
@@ -47,12 +52,11 @@
 use FindBin;
 use Cwd qw(abs_path);
 use File::Basename;
-use lib "$FindBin::Bin/lib";
 use Getopt::Long;
 use POSIX qw(ceil);
-use Biocluster::SchedulerApi;
-use Biocluster::Util qw(usesSlurm);
-use Biocluster::Config;
+use EFI::SchedulerApi;
+use EFI::Util qw(usesSlurm);
+use EFI::Config;
 
 
 $result = GetOptions(
@@ -288,7 +292,7 @@ my $errorFile = "$accOutFile.failed";
 
 my $userHeaderFile = "";
 my $userHeaderFileOption = "";
-$userHeaderFile = "$outputDir/" . Biocluster::Config::FASTA_META_FILENAME;
+$userHeaderFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 $userHeaderFileOption = "-meta-file $userHeaderFile";
 
 # Error checking for user supplied dat and fa files
@@ -296,7 +300,7 @@ if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $baseOutputDir . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
     $accessionFileOption = "-accession-file $accessionFile";
 
-    $noMatchFile = "$tmpdir/" . Biocluster::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
+    $noMatchFile = "$tmpdir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $baseOutputDir . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFile = "-no-match-file $noMatchFile";
 
@@ -364,7 +368,7 @@ if (defined($oldapps)) {
 }
 
 
-my $S = new Biocluster::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my $S = new EFI::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 
 
 ########################################################################################################################
@@ -624,21 +628,6 @@ my $depJob = @blastreducejobline[0];
 
 
 ########################################################################################################################
-# Compute convergence ratio, before demultiplex
-#
-if ($convRatioFile) {
-    $B = $S->getBuilder();
-    $B->dependency(0, $depJob); 
-    $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
-    $B->renderToFile("$tmpdir/conv_ratio.sh");
-    my $convRatioJob = $S->submit("$tmpdir/conv_ratio.sh");
-    print "Convergence ratio job is:\n $convRatioJob";
-    my @convRatioJobLine=split /\./, $convRatioJob;
-    $depJob = @convRatioJobLine[0];
-}
-
-
-########################################################################################################################
 # If multiplexing is on, demultiplex sequences back so all are present
 #
 $B = $S->getBuilder();
@@ -664,6 +653,21 @@ print "Demux job is:\n $demuxjob";
 @demuxjobline=split /\./, $demuxjob;
 
 $depJob = @demuxjobline[0];
+
+
+########################################################################################################################
+# Compute convergence ratio, before demultiplex
+#
+if ($convRatioFile) {
+    $B = $S->getBuilder();
+    $B->dependency(0, $depJob); 
+    $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
+    $B->renderToFile("$tmpdir/conv_ratio.sh");
+    my $convRatioJob = $S->submit("$tmpdir/conv_ratio.sh");
+    print "Convergence ratio job is:\n $convRatioJob";
+    my @convRatioJobLine=split /\./, $convRatioJob;
+    $depJob = @convRatioJobLine[0];
+}
 
 
 ########################################################################################################################

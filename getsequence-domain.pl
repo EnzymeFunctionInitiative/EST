@@ -1,5 +1,9 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
 
 #version 0.9.0 moved from getting accesions by grepping files to using sqlite database
 #version 0.9.0 options of specifing ssf and gene3d numbers added
@@ -14,12 +18,11 @@ use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use FindBin;
 use Capture::Tiny ':all';
-use lib "$FindBin::Bin/lib";
-use Biocluster::IdMapping;
-use Biocluster::Config;
-use Biocluster::IdMapping::Util;
-use Biocluster::Fasta::Headers;
-use Biocluster::Database;
+use EFI::IdMapping;
+use EFI::Config;
+use EFI::IdMapping::Util;
+use EFI::Fasta::Headers;
+use EFI::Database;
 
 
 
@@ -68,7 +71,7 @@ verifyArgs();
 
 parseFamilyArgs();
 
-my $db = new Biocluster::Database(config_file_path => $configFile);
+my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
 
 
@@ -82,7 +85,7 @@ if (defined $accessionFile and -f $accessionFile) {
 # Do reverse-id database lookup if we've been given manual accessions.
 my $idMapper;
 if ($#manualAccessions >= 0) {
-    $idMapper = new Biocluster::IdMapping(config_file_path => $configFile);
+    $idMapper = new EFI::IdMapping(config_file_path => $configFile);
 }
 
 
@@ -221,7 +224,7 @@ print "Completed getsequences\n";
 sub parseFastaHeaders {
     my ($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $seqMeta, $configFile, $fraction) = @_;
 
-    my $parser = new Biocluster::Fasta::Headers(config_file_path => $configFile);
+    my $parser = new EFI::Fasta::Headers(config_file_path => $configFile);
 
     open INFASTA, $fastaFileIn;
     open FASTAOUT, ">$fastaFileOut";
@@ -244,11 +247,11 @@ sub parseFastaHeaders {
         if ($useFastaHeaders) {
             my $result = $parser->parse_line_for_headers($line);
 
-            if ($result->{state} eq Biocluster::Fasta::Headers::HEADER) {
+            if ($result->{state} eq EFI::Fasta::Headers::HEADER) {
                 $headerCount += $result->{count};
             }
             # When we get here we are at the end of the headers and have started reading a sequence.
-            elsif ($result->{state} eq Biocluster::Fasta::Headers::FLUSH) {
+            elsif ($result->{state} eq EFI::Fasta::Headers::FLUSH) {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
 #                    print "ZZZ\n";
@@ -280,7 +283,7 @@ sub parseFastaHeaders {
                 $headerLine = 1;
 
             # Here we have encountered a sequence line.
-            } elsif ($result->{state} eq Biocluster::Fasta::Headers::SEQUENCE) {
+            } elsif ($result->{state} eq EFI::Fasta::Headers::SEQUENCE) {
                 $writeSeq = 1;
             }
         # Option C
@@ -524,7 +527,7 @@ sub reverseLookupManualAccessions {
     print "Parsing the accession ID file.\n";
 
     my $upIds = [];
-    ($upIds, $noMatches, $accUniprotIdRevMap) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::AUTO, @manualAccessions);
+    ($upIds, $noMatches, $accUniprotIdRevMap) = $idMapper->reverseLookup(EFI::IdMapping::Util::AUTO, @manualAccessions);
     @accUniprotIds = @$upIds;
     
     # Any ids from families are assigned a query_id value but only do it if we have specified
@@ -725,13 +728,13 @@ sub writeMetadata {
     foreach my $acc (sort sortFn @metaAcc) {
         print META "$acc\n";
     
-        print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
+        print META "\t", EFI::Config::FIELD_SEQ_SRC_KEY, "\t";
         if (exists $inUserIds{$acc} and exists $inFamilyIds{$acc}) {
-            print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_BOTH;
+            print META EFI::Config::FIELD_SEQ_SRC_VALUE_BOTH;
         } elsif (exists $inUserIds{$acc}) {
-            print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+            print META EFI::Config::FIELD_SEQ_SRC_VALUE_FASTA;
         } else {
-            print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FAMILY;
+            print META EFI::Config::FIELD_SEQ_SRC_VALUE_FAMILY;
             # Don't write the query ID for ones that are family-only
             delete $headerData->{$acc}->{query_ids};
         }
@@ -759,8 +762,8 @@ sub writeMetadata {
         $totalIdCount++;
         print META "$acc\n";
         writeSeqData($acc, $headerData->{$acc}, \*META);
-        print META "\t", Biocluster::Config::FIELD_SEQ_SRC_KEY, "\t";
-        print META Biocluster::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+        print META "\t", EFI::Config::FIELD_SEQ_SRC_KEY, "\t";
+        print META EFI::Config::FIELD_SEQ_SRC_VALUE_FASTA;
         print META "\n";
     }
     

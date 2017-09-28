@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #version 0.9.1 Changed to using xml creation packages (xml::writer) instead of writing out xml myself
 #version 0.9.1 Removed dat file parser (not used anymore)
 #version 0.9.1 Remove a bunch of commented out stuff
@@ -18,9 +23,8 @@ use XML::Writer;
 use XML::LibXML;
 use Getopt::Long;
 use FindBin;
-use lib "$FindBin::Bin/lib";
-use Biocluster::Config;
-use Annotations;
+use EFI::Config;
+use EFI::Annotations;
 
 my ($blast, $fasta, $struct, $output, $title, $maxfull, $dbver);
 my $result=GetOptions ("blast=s"	=> \$blast,
@@ -65,6 +69,8 @@ my $parser=XML::LibXML->new();
 my $output=new IO::File(">$output");
 my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
 
+my $anno = new EFI::Annotations;
+
 print time . " check length of 2.out file\n";
 
 
@@ -101,7 +107,7 @@ if(-e $struct){
             }
             next if not $key;
             push(@metas, $key) if not grep { $_ eq $key } @metas;
-            if (Annotations::is_list_attribute($key)) {
+            if ($anno->is_list_attribute($key)) {
                 my @tmpline = grep /\S/, split(",", $value);
                 $uprot{$id}{$key} = \@tmpline;
             }else{
@@ -130,8 +136,8 @@ if ($#metas < 0) {
     }
 }
 
-my $annoData = Annotations::get_annotation_data();
-@metas = Annotations::sort_annotations($annoData, @metas);
+my $annoData = EFI::Annotations::get_annotation_data();
+@metas = EFI::Annotations::sort_annotations($annoData, @metas);
 
 my $metaline=join ',', @metas;
 
@@ -150,7 +156,7 @@ foreach my $element (@uprotnumbers){
     foreach my $key (@metas){
         #print "\t$key\t$uprot{$element}{$key}\n";
         my $displayName = $annoData->{$key}->{display};
-         if (Annotations::is_list_attribute($key)) {
+         if ($anno->is_list_attribute($key)) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
             foreach my $piece (@{$uprot{$element}{$key}}){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
@@ -164,7 +170,7 @@ foreach my $element (@uprotnumbers){
                 $piece=$2-$1+1;
                 print "start:$1\tend$2\ttotal:$piece\n";
             }
-            my $type = Annotations::get_attribute_type($key);
+            my $type = EFI::Annotations::get_attribute_type($key);
             if ($piece or $type ne "integer") {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
             }

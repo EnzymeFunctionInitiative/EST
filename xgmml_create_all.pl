@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #version 0.9.1 Now using xml::writer to create xgmml instead of just writing out the data
 #version 0.9.1 Removed .dat parser (not used anymore)
 #version 0.9.1 Remove a lot of unused commented out lines
@@ -19,9 +24,8 @@ use IO;
 use XML::Writer;
 use XML::LibXML;
 use FindBin;
-use lib "$FindBin::Bin/lib";
-use Biocluster::Config;
-use Annotations;
+use EFI::Config;
+use EFI::Annotations;
 
 my ($blast, $cdhit, $fasta, $struct, $output, $title, $dbver);
 my $result = GetOptions(
@@ -35,6 +39,8 @@ my $result = GetOptions(
 );
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver or not $cdhit;
+
+my $anno = new EFI::Annotations;
 
 my $uniprotgi='/home/groups/efi/devel/idmapping/gionly.dat';
 my $uniprotref='/home/groups/efi/devel/idmapping/RefSeqonly.dat';
@@ -67,7 +73,7 @@ if(-e $struct){
             }
             next if not $key;
             push(@metas, $key) if not grep { $_ eq $key } @metas;
-            if (Annotations::is_list_attribute($key)) {
+            if ($anno->is_list_attribute($key)) {
                 my @tmpline = grep /\S/, split(",", $value);
                 $uprot{$id}{$key} = \@tmpline;
             } else {
@@ -98,8 +104,8 @@ my $SizeKey = "Cluster Size";
 unshift @metas, "ACC";
 unshift @metas, $SizeKey;
 
-my $annoData = Annotations::get_annotation_data();
-@metas = Annotations::sort_annotations($annoData, @metas);
+my $annoData = EFI::Annotations::get_annotation_data();
+@metas = EFI::Annotations::sort_annotations($annoData, @metas);
 
 my $metaline=join ',', @metas;
 
@@ -147,7 +153,7 @@ while (<CDHIT>){
                     if($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/){
                         $piece=$2-$1+1;
                     }
-                    my $type = Annotations::get_attribute_type($key);
+                    my $type = EFI::Annotations::get_attribute_type($key);
                     if ($piece or $type ne "integer") {
                         $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
                     }
