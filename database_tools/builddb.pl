@@ -66,7 +66,8 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                        );
 
 my $usage = <<USAGE;
-Usage: $0 -dir=working_dir [-no-download -interactive -log=log_file-dryrun -exists -scheduler=scheduler
+Usage: $0
+    -dir=working_dir [-download -interactive -log=log_file-dryrun -exists -scheduler=scheduler
     -queue=queue -config=config_file -sql -no-prompt -no-submit -db-name=database_name -build-ena]
 
     -download       only create the script for downloading the input files
@@ -265,6 +266,10 @@ if (defined $buildEna and $buildEna) {
     # Create family_counts table
     logprint "#CREATING FAMILY COUNTS TABLE\n";
     my $countJobId = submitBuildCountsJob($S->getBuilder(), $unzipJobId, $fileNum++);
+    
+    # Create uniref table
+    logprint "#CREATING UNIREF TABLE\n";
+    my $unirefJobId = submitBuildUnirefJob($S->getBuilder(), $unzipJobId, $fileNum++);
 }
 
 
@@ -411,6 +416,41 @@ sub submitBuildCountsJob {
 }
 
 
+sub submitBuildUnirefJob {
+    my ($B, $depId, $fileNum) = @_;
+
+    waitForInput();
+
+    my $file = "$BuildDir/$fileNum-buildUniref.sh";
+    $B->dependency(0, $depId);
+    
+    addLibxmlIfNecessary($B);
+    $B->addAction("module load $PerlMod");
+    
+    if (not $skipIfExists or not -f "$OutputDir/uniref.tab") {
+        my $urDir = "$BuildDir/uniref";
+        mkdir $urDir if not -d $urDir;
+
+        foreach my $ver ("50", "90") {
+            my $outDir = "$BuildDir/uniref/uniref$ver";
+            mkdir $outDir if not -d $outDir;
+            $B->addAction("rm -rf $outDir/*");
+            $B->addAction("$ScriptDir/chopxml.pl -in $InputDir/uniref$ver.xml -outdir $outDir");
+            $B->addAction("$ScriptDir/make_uniref_table.pl -in-dir $outDir -out-list $BuildDir/uniref/uniref$ver.list -out-map $BuildDir/uniref/uniref$ver.tab");
+        }
+        $B->addAction("$ScriptDir/merge_uniref_tables.pl $BuildDir/uniref/uniref50.tab $BuildDir/uniref/uniref90.tab $OutputDir/uniref.tab");
+        $B->addAction("date > $CompletedFlagFile.make-merge_uniref\n");
+    }
+
+    $B->addAction("date > $CompletedFlagFile.$fileNum-buildUniref\n");
+
+    $B->outputBaseFilepath($file);
+    $B->renderToFile($file);
+
+    return $DoSubmit ? $S->submit($file) : undef;
+}
+
+
 sub submitSplitFastaJob {
     my ($B, $depId, $np, $pdbBuildDir, $fileNum) = @_;
 
@@ -542,23 +582,23 @@ sub submitDownloadJob {
     waitForInput();
 
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.dat.gz" and not -f "$InputDir/uniprot_sprot.dat") {
-        logprint "#  Downloading $UniprotLocation/uniprot_sprot.dat.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.dat.gz\n";
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.dat.gz" and not -f "$InputDir/uniprot_trembl.dat") {
-        logprint "#  Downloading $UniprotLocation/uniprot_trembl.dat.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.dat.gz\n";
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.fasta.gz" and not -f "$InputDir/uniprot_sprot.fasta") {
-        logprint "#  Downloading $UniprotLocation/uniprot_sprot.fasta.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.fasta.gz\n";
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.fasta.gz" and not -f "$InputDir/uniprot_trembl.fasta") {
-        logprint "#  Downloading $UniprotLocation/uniprot_trembl.fasta.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.fasta.gz\n";
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/match_complete.xml.gz" and not -f "$InputDir/match_complete.xml") {
@@ -567,8 +607,8 @@ sub submitDownloadJob {
         $B->addAction("date > $CompletedFlagFile.match_complete.xml\n");
     }
     if (not $skipIfExists or not -f "$InputDir/idmapping.dat.gz" and not -f "$InputDir/idmapping.dat") {
-        logprint "#  Downloading $UniprotLocation/idmapping/idpmapping.dat.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/idmapping/idpmapping.dat.gz\n";
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
         $B->addAction("date > $CompletedFlagFile.idmapping.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/taxonomy.xml.gz" and not -f "$InputDir/taxonomy.xml") {
@@ -578,7 +618,16 @@ sub submitDownloadJob {
             $B->addAction("date > $CompletedFlagFile.taxonomy.xml\n");
         }
     }
-
+    if (not $skipIfExists or not -f "$InputDir/uniref50.xml.gz" and not -f "$InputDir/uniref50.xml") {
+        logprint "#  Downloading $UniprotLocation/uniref/uniref50/uniref50.xml.gz\n";
+        $B->addAction("curl -sS $UniprotLocation/uniref/uniref50/uniref50.xml.gz > $InputDir/uniref50.xml.gz");
+        $B->addAction("date > $CompletedFlagFile.uniref50.xml\n");
+    }
+    if (not $skipIfExists or not -f "$InputDir/uniref90.xml.gz" and not -f "$InputDir/uniref90.xml") {
+        logprint "#  Downloading $UniprotLocation/uniref/uniref90/uniref90.xml.gz\n";
+        $B->addAction("curl -sS $UniprotLocation/uniref/uniref90/uniref90.xml.gz > $InputDir/uniref90.xml.gz");
+        $B->addAction("date > $CompletedFlagFile.uniref90.xml\n");
+    }
     my $pfamInfoUrl = $config->{build}->{pfam_info_url};
     if (not $skipIfExists or not -f "$InputDir/Pfam-A.clans.tsv.gz" and not -f "$InputDir/Pfam-A.clans.tsv") {
         logprint "#  Downloading $pfamInfoUrl\n";
@@ -790,22 +839,29 @@ create index TaxID_Index ON taxonomy (Taxonomy_ID);
 
 select 'CREATING GENE3D' as '';
 drop table if exists GENE3D;
-create table GENE3D(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
+create table GENE3D(id varchar(24), accession varchar(10), start integer, end integer);
 create index GENE3D_ID_Index on GENE3D (id);
 
 select 'CREATING PFAM' as '';
 drop table if exists PFAM;
-create table PFAM(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
+create table PFAM(id varchar(24), accession varchar(10), start integer, end integer);
 create index PAM_ID_Index on PFAM (id);
+
+select 'CREATING UNIREF' as '';
+drop table if exists uniref;
+create table uniref(accession varchar(10), uniref50_seed varchar(10), uniref90_seed varchar(10));
+create index uniref_accession_index on uniref (accession);
+create index uniref50_seed_index on uniref (uniref50_seed);
+create index uniref90_seed_index on uniref (uniref90_seed);
 
 select 'CREATING SSF' as '';
 drop table if exists SSF;
-create table SSF(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
+create table SSF(id varchar(24), accession varchar(10), start integer, end integer);
 create index SSF_ID_Index on SSF (id);
 
 select 'CREATING INTERPRO' as '';
 drop table if exists INTERPRO;
-create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer, uniref50_cluster_id varchar(10), uniref90_cluster_id varchar(10));
+create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer);
 create index INTERPRO_ID_Index on INTERPRO (id);
 
 select 'CREATING pdbhits' as '';
@@ -839,6 +895,9 @@ load data local infile '$OutputDir/taxonomy.tab' into table taxonomy;
 
 select 'LOADING GENE3D' as '';
 load data local infile '$OutputDir/GENE3D.tab' into table GENE3D;
+
+select 'LOADING UNIREF' as '';
+load data local infile '$OutputDir/uniref.tab' into table uniref;
 
 select 'LOADING PFAM' as '';
 load data local infile '$OutputDir/PFAM.tab' into table PFAM;

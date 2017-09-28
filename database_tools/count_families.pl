@@ -2,12 +2,14 @@
 
 use strict;
 
+use List::MoreUtils qw(uniq);
 use IO::Handle;
 use Getopt::Long;
 
 my $inputFile = "";
 my $outputFile = "";
 my $tableType = "";
+my $clanFile = "";
 my $append = undef;
 my $mergeDomain = undef;
 my $showProgress = undef;
@@ -19,6 +21,7 @@ my $result = GetOptions(
     "append"        => \$append,
     "merge-domain"  => \$mergeDomain,
     "progress"      => \$showProgress,
+    "clans=s"       => \$clanFile,
 );
 
 
@@ -32,6 +35,7 @@ Count the number of elements in the families in the input file.
     -type           the family type (e.g. INTERPRO, PFAM)
     -append         if present, the file is appended to instead of overwritten
     -merge-domain   if present, multiple occurences of the same accession ID in the same family are counted as one
+    -clans          if present and family type is PFAM, the clan sizes are also output
 USAGE
 ;
 
@@ -52,6 +56,15 @@ $showProgress = defined $showProgress ? 1 : 0;
 my %counts;
 my %merges;
 
+
+
+my %clanData;
+my %famToClan;
+if (-f $clanFile) {
+    getClanData($clanFile, \%clanData, \%famToClan);
+}
+
+
 open INPUT, $inputFile or die "Unable to open the input file '$inputFile': $!";
 
 my $size = -s $inputFile;
@@ -67,6 +80,11 @@ while (<INPUT>) {
         }
     } else {
         $counts{$family} = 1;
+    }
+
+    if (exists $famToClan{$family}) {
+        my $clan = $famToClan{$family};
+        push @{ $clanData{$clan}->{ids} }, $accId;
     }
 
     if ($showProgress) {
@@ -103,8 +121,50 @@ foreach my $family (@families) {
     }
 }
 
+print "\nWriting clan data\n";
+foreach my $clan (sort keys %clanData) {
+    my @allIds = @{ $clanData{$clan}->{ids} };
+    my @ids = uniq @allIds;
+    #my @fams = @{ $clanData{$clan}->{fams} };
+    print OUTPUT join("\t", "CLAN", $clan, scalar(@ids)), "\n";
+}
+
+
+
 print "\n" if $showProgress;
 
+
+
 close OUTPUT;
+
+
+
+
+
+
+
+
+
+sub getClanData {
+    my $clanFile = shift;
+    my $clanData = shift;
+    my $famToClan = shift;
+
+    open CLANS, $clanFile or die "Unable to open $clanFile: $!";
+
+    while (<CLANS>) {
+        chomp;
+        my ($fam, $clan, @stuff) = split /\t/;
+        next if not $clan;
+   
+        $clanData->{$clan} = {fams => [], ids => [], ur50 => [], ur90 => []} if not exists $clanData->{$clan};
+        push @{$clanData->{$clan}->{fams}}, $fam;
+        $famToClan->{$fam} = $clan;
+    }
+
+    close CLANS;
+}
+
+
 
 
