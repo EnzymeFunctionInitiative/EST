@@ -1,4 +1,10 @@
 #!/usr/bin/env perl
+
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 use strict;
 
 
@@ -16,12 +22,11 @@ use Getopt::Long;
 use FindBin;
 use Cwd qw(abs_path);
 
-use lib "$FindBin::Bin/../lib";
-use Biocluster::SchedulerApi;
-use Biocluster::Util qw(getSchedulerType);
-use Biocluster::Util::FileHandle;
-use Biocluster::Database;
-use Biocluster::Config qw(biocluster_configure);
+use EFI::SchedulerApi;
+use EFI::Util qw(getSchedulerType);
+use EFI::Util::FileHandle;
+use EFI::Database;
+use EFI::Config qw(biocluster_configure);
 
 use constant BUILD_ENA => 2;
 use constant BUILD_COUNTS => 4;
@@ -161,7 +166,7 @@ $buildOptions = $buildOptions | BUILD_COUNTS if $buildCountsOnly;
 
 my %dbArgs;
 $dbArgs{config_file_path} = $configFile if (defined $configFile and -f $configFile);
-my $DB = new Biocluster::Database(%dbArgs);
+my $DB = new EFI::Database(%dbArgs);
 
 
 # Output the sql commands necessary for creating the database and importing the data, then exit.
@@ -186,9 +191,9 @@ my $TaxonomyLocation = $config->{tax}->{remote_url};
 
 # Set up the scheduler API.
 my $schedType = getSchedulerType($scheduler);
-my $S = new Biocluster::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1, '100gb'],
+my $S = new EFI::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1, '100gb'],
     'default_working_dir' => $BuildDir, 'dryrun' => $dryRun);
-my $FH = new Biocluster::Util::FileHandle('dryrun' => $dryRun);
+my $FH = new EFI::Util::FileHandle('dryrun' => $dryRun);
 
 
 # Remove the file that indicates the build process (outside of database import) has completed.
@@ -561,7 +566,7 @@ sub submitTaxonomyJob {
 
     my $file = "$BuildDir/$fileNum-taxonomy.sh";
 
-    $B->dependency($depId);
+    $B->dependency(0, $depId);
 
     addLibxmlIfNecessary($B);
     $B->addAction("module load $PerlMod");
@@ -583,54 +588,64 @@ sub submitDownloadJob {
 
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.dat.gz" and not -f "$InputDir/uniprot_sprot.dat") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.dat.gz\n";
+        $B->addAction("echo Downloading uniprot_sprot.dat.gz");
         $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.dat.gz" and not -f "$InputDir/uniprot_trembl.dat") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.dat.gz\n";
+        $B->addAction("echo Downloading uniprot_trembl.dat.gz");
         $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.fasta.gz" and not -f "$InputDir/uniprot_sprot.fasta") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.fasta.gz\n";
+        $B->addAction("echo Downloading uniprot_sprot.fasta.gz");
         $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.fasta.gz" and not -f "$InputDir/uniprot_trembl.fasta") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.fasta.gz\n";
+        $B->addAction("echo Downloading uniprot_trembl.fasta.gz");
         $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/match_complete.xml.gz" and not -f "$InputDir/match_complete.xml") {
         logprint "#  Downloading $InterproLocation/match_complete.xml.gz\n";
+        $B->addAction("echo Downloading match_complete.xml.gz");
         $B->addAction("curl -sS $InterproLocation/match_complete.xml.gz > $InputDir/match_complete.xml.gz");
         $B->addAction("date > $CompletedFlagFile.match_complete.xml\n");
     }
     if (not $skipIfExists or not -f "$InputDir/idmapping.dat.gz" and not -f "$InputDir/idmapping.dat") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/idmapping/idpmapping.dat.gz\n";
+        $B->addAction("echo Downloading idmapping.dat.gz");
         $B->addAction("curl -sS $UniprotLocation/knowledgebase/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
         $B->addAction("date > $CompletedFlagFile.idmapping.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/taxonomy.xml.gz" and not -f "$InputDir/taxonomy.xml") {
         if (defined $TaxonomyLocation) {
             logprint "#  Downloading $TaxonomyLocation\n";
+            $B->addAction("echo Downloading taxonomy.xml.gz");
             $B->addAction("curl -sS $TaxonomyLocation > $InputDir/taxonomy.xml.gz");
             $B->addAction("date > $CompletedFlagFile.taxonomy.xml\n");
         }
     }
     if (not $skipIfExists or not -f "$InputDir/uniref50.xml.gz" and not -f "$InputDir/uniref50.xml") {
         logprint "#  Downloading $UniprotLocation/uniref/uniref50/uniref50.xml.gz\n";
+        $B->addAction("echo Downloading uniref50.xml.gz");
         $B->addAction("curl -sS $UniprotLocation/uniref/uniref50/uniref50.xml.gz > $InputDir/uniref50.xml.gz");
         $B->addAction("date > $CompletedFlagFile.uniref50.xml\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniref90.xml.gz" and not -f "$InputDir/uniref90.xml") {
         logprint "#  Downloading $UniprotLocation/uniref/uniref90/uniref90.xml.gz\n";
+        $B->addAction("echo Downloading uniref90.xml.gz");
         $B->addAction("curl -sS $UniprotLocation/uniref/uniref90/uniref90.xml.gz > $InputDir/uniref90.xml.gz");
         $B->addAction("date > $CompletedFlagFile.uniref90.xml\n");
     }
     my $pfamInfoUrl = $config->{build}->{pfam_info_url};
     if (not $skipIfExists or not -f "$InputDir/Pfam-A.clans.tsv.gz" and not -f "$InputDir/Pfam-A.clans.tsv") {
         logprint "#  Downloading $pfamInfoUrl\n";
+        $B->addAction("echo Downloading Pfam-A.clans.tsv.gz");
         $B->addAction("curl -sS $pfamInfoUrl > $InputDir/Pfam-A.clans.tsv.gz");
         $B->addAction("date > $CompletedFlagFile.Pfam-A.clans.tsv\n");
     }
@@ -663,6 +678,14 @@ sub submitUnzipJob {
     if (scalar @gzFiles) {
         $B->addAction("gunzip $InputDir/*.gz");
         $B->addAction("date > $CompletedFlagFile.gunzip\n");
+        # If there was an error (e.g. bad gz) then there will be one or more .gz files in the dir.
+        # If that is the case we exit with an error code of 1 which will cause all of the dependent
+        # jobs to abort.
+        $B->addAction("NUM_GZ=`ls -l $InputDir/*.gz | wc -l`");
+        $B->addAction("if (( \$NUM_GZ > 0 ));");
+        $B->addAction("then");
+        $B->addAction("    exit 1");
+        $B->addAction("fi");
     }
 
     #create new copies of trembl databases

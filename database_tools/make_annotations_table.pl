@@ -1,15 +1,19 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 use strict;
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use FindBin;
 
 use lib "$FindBin::Bin/lib";
-use lib "$FindBin::Bin/../lib";
 
 use IdMappingFile;
-use Biocluster::IdMapping::Util;
+use EFI::IdMapping::Util;
 
 
 my ($inputFile, $outputFile, $giFile, $uniprotref, $efiTidFile, $gdnaFile, $hmpFile, $oldPhyloFile, $debug, $idMappingFile);
@@ -167,9 +171,9 @@ while (<DAT>){
             }else{
                 $efiTid="NA";
             }
-            @NCBI = map { "GI:$_" } $idMapper->forwardLookup(Biocluster::IdMapping::Util::GI, $element);
-            push @NCBI, map { "RefSeq:$_" } $idMapper->forwardLookup(Biocluster::IdMapping::Util::NCBI, $element);
-            push @NCBI, map { "EMBL-CDS:$_" } $idMapper->forwardLookup(Biocluster::IdMapping::Util::GENBANK, $element);
+            @NCBI = map { "GI:$_" } $idMapper->forwardLookup(EFI::IdMapping::Util::GI, $element);
+            push @NCBI, map { "RefSeq:$_" } $idMapper->forwardLookup(EFI::IdMapping::Util::NCBI, $element);
+            push @NCBI, map { "EMBL-CDS:$_" } $idMapper->forwardLookup(EFI::IdMapping::Util::GENBANK, $element);
         }
     }elsif($line=~/^OX   NCBI_TaxID=(\d+)/){
         $OX_tax_id=$1;
