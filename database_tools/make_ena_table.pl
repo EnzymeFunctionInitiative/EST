@@ -111,7 +111,7 @@ sub process{
                 my @revUniprotIdsToAdd;
 
                 # Only lookup a protein ID if there were no uniprot IDs found for this section
-                if ($#uniprotIds == -1) { 
+                if ($#uniprotIds == -1) {
                     my ($revUniprotIds, $noMatch) = $idMapper->reverseLookup(EFI::IdMapping::Util::GENBANK, @proteinIds);
                     @revUniprotIdsToAdd = grep { not exists $processedAlready{$_} } @$revUniprotIds;
                     if (scalar @revUniprotIdsToAdd) {
@@ -282,7 +282,7 @@ logprint "processing tab files";
 logprint "\tbase files";
 process \@pro, \%accessions, \%organisms, $pro, $idMapper;
 process \@fun, \%accessions, \%organisms, $fun, $idMapper;
-process \@env, \%accessions, \%organisms, $env; $idMapper;
+process \@env, \%accessions, \%organisms, $env, $idMapper;
 
 $idMapper->finish();
 
