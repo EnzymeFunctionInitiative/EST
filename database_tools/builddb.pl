@@ -670,6 +670,7 @@ sub submitUnzipJob {
     my $file = "$BuildDir/$fileNum-process-downloads.sh";
 
     $B->dependency(0, $depId);
+    $B->mailError();
     $B->addAction("module load $PerlMod");
 
     waitForInput();

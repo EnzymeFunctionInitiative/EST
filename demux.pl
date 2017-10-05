@@ -34,7 +34,7 @@ my $cp = new CdHitParser(verbose => 1);
 print "Read in clusters\n";
 my $line = "";
 while (<CLUSTER>) {
-    print "$line";
+#    print "$line";
     $line=$_;
     chomp $line;
     $cp->parse_line($line);
@@ -60,6 +60,8 @@ while (<CLUSTER>) {
 #@{$tree{$head}}=@children;
 $cp->finish;
 
+use Data::Dumper;
+#print Dumper($cp);
 
 print "Demultiplex blast\n";
 #read BLASTIN and expand with clusters from cluster file to create demultiplexed file
@@ -69,17 +71,26 @@ while (my $line = <BLASTIN>) {
     my $linesource=shift @lineary;
     my $linetarget=shift @lineary;
     #print "$linesource\t$linetarget\n";
+    if (not $cp->child_exists($linesource)) {
+        print "SOURCE $linesource does not exist in the cluster file\n";
+        next;
+    }
     my @srcChildren = $cp->get_children($linesource);
     if ($linesource eq $linetarget) {
         for (my $i=0; $i < scalar @srcChildren; $i++) {
             for (my $j = $i+1; $j < scalar @srcChildren; $j++) {
                 print BLASTOUT join("\t", $srcChildren[$i], $srcChildren[$j], @lineary), "\n";
-                print "likewise demux\t", $srcChildren[$i], $srcChildren[$j], "\n";
+#                print "likewise demux\t", $srcChildren[$i], $srcChildren[$j], "\n";
             }
         }
     } else {
         foreach my $source (@srcChildren) {
-            foreach my $target ($cp->get_children($linetarget)) {
+            if (not $cp->child_exists($linetarget)) {
+                print "TARGET $linetarget does not exist in the cluster file\n";
+                next;
+            }
+            my @targetChildren = $cp->get_children($linetarget);
+            foreach my $target (@targetChildren) {
                 print BLASTOUT join("\t", $source, $target, @lineary), "\n";
             }
         }

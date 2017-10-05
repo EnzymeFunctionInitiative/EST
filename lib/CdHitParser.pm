@@ -28,14 +28,22 @@ sub parse_line {
         $self->{children} = [];
     }elsif($line=~/ >(\w{6,10})\.\.\. \*$/ or $line=~/ >(\w{6,10}:\d+:\d+)\.\.\. \*$/ ){
         #print "head\t$1\n";
-        push @{$self->{children}}, $1;
+        my $name = trim_name($1);
+        push @{$self->{children}}, $name;
         $self->{head} = $1;
     }elsif($line=~/^\d+.*>(\w{6,10})\.\.\. at/ or $line=~/^\d+.*>(\w{6,10}:\d+:\d+)\.\.\. at/){
-        print $self->{head}, "\tchild\t$1\n" if $self->{verbose};
-        push @{$self->{children}}, $1;
+        #print "child\t$1\n";
+        #print $self->{head}, "\tchild\t$1\n" if $self->{verbose};
+        my $name = trim_name($1);
+        push @{$self->{children}}, $name;
     }else{
         warn "no match in $line\n";
     }
+}
+
+sub trim_name {
+    my $name = shift;
+    return substr($name, 0, 19);
 }
 
 sub finish {
@@ -44,9 +52,20 @@ sub finish {
     $self->{tree}->{$self->{head}} = $self->{children};
 }
 
+sub child_exists {
+    my $self = shift;
+    my $key = shift;
+
+    $key = trim_name($key);
+
+    exists $self->{tree}->{$key} ? return 1 : 0;
+}
+
 sub get_children {
     my $self = shift;
     my $key = shift;
+
+    $key = trim_name($key);
 
     return @{ $self->{tree}->{$key} };
 }
