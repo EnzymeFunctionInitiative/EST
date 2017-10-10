@@ -9,7 +9,7 @@ use strict;
 
 
 if (not exists $ENV{BLASTDB}) {
-    print "The BLASTDB environment variable must be present. Did you forget to \"module load blast\" before running this program?\n";
+    print "The BLASTDB environment variable must be present. Did you forget to \"module load BLAST\" before running this program?\n";
     exit(1);
 }
 if (not exists $ENV{EFIDBHOME}) {
@@ -442,7 +442,7 @@ sub submitBuildUnirefJob {
             my $outDir = "$BuildDir/uniref/uniref$ver";
             mkdir $outDir if not -d $outDir;
             $B->addAction("rm -rf $outDir/*");
-            $B->addAction("$ScriptDir/chopxml.pl -in $InputDir/uniref$ver.xml -outdir $outDir");
+            $B->addAction("$ScriptDir/chop_uniref_xml.pl.pl -in $InputDir/uniref$ver.xml -outdir $outDir");
             $B->addAction("$ScriptDir/make_uniref_table.pl -in-dir $outDir -out-list $BuildDir/uniref/uniref$ver.list -out-map $BuildDir/uniref/uniref$ver.tab");
         }
         $B->addAction("$ScriptDir/merge_uniref_tables.pl $BuildDir/uniref/uniref50.tab $BuildDir/uniref/uniref90.tab $OutputDir/uniref.tab");
