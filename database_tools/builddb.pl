@@ -429,6 +429,7 @@ sub submitBuildUnirefJob {
 
     my $file = "$BuildDir/$fileNum-buildUniref.sh";
     $B->dependency(0, $depId);
+    $B->resource(1, 1, "350gb");
     
     addLibxmlIfNecessary($B);
     $B->addAction("module load $PerlMod");
