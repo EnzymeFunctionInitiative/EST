@@ -163,8 +163,6 @@ $famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, $isDomainO
 
 $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, $isDomainOn, @ssfs);
 
-exit; #TODO: debug
-
 my @accessions = uniq keys %accessionhash;
 $familyIdCount = scalar @accessions;
 
