@@ -34,34 +34,12 @@ my $cp = new CdHitParser(verbose => 1);
 print "Read in clusters\n";
 my $line = "";
 while (<CLUSTER>) {
-#    print "$line";
     $line=$_;
     chomp $line;
     $cp->parse_line($line);
-#    if($line=~/^>/){
-#        #print "New Cluster\n";
-#        if(defined $head){
-#            @{$tree{$head}}=@children;
-#        }
-#        @children=();
-#    }elsif($line=~/ >(\w{6,10})\.\.\. \*$/ or $line=~/ >(\w{6,10}:\d+:\d+)\.\.\. \*$/ ){
-#        #print "head\t$1\n";
-#        push @children, $1;
-#        $head=$1;
-#        #print "$1\n";
-#    }elsif($line=~/^\d+.*>(\w{6,10})\.\.\. at/ or $line=~/^\d+.*>(\w{6,10}:\d+:\d+)\.\.\. at/){
-#        print "$head\tchild\t$1\n";
-#        push @children, $1;
-#    }else{
-#        warn "no match in $line\n";
-#    }
 }
 
-#@{$tree{$head}}=@children;
 $cp->finish;
-
-use Data::Dumper;
-#print Dumper($cp);
 
 print "Demultiplex blast\n";
 #read BLASTIN and expand with clusters from cluster file to create demultiplexed file
@@ -80,7 +58,6 @@ while (my $line = <BLASTIN>) {
         for (my $i=0; $i < scalar @srcChildren; $i++) {
             for (my $j = $i+1; $j < scalar @srcChildren; $j++) {
                 print BLASTOUT join("\t", $srcChildren[$i], $srcChildren[$j], @lineary), "\n";
-#                print "likewise demux\t", $srcChildren[$i], $srcChildren[$j], "\n";
             }
         }
     } else {
