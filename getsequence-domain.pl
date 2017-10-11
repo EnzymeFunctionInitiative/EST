@@ -152,13 +152,18 @@ my $fileSequenceCount = 0; # The number of actual sequences in the FASTA file, n
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S)
 #
-my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, @ipros);
 
-$famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, @pfams);
+my $isDomainOn = lc($domain) eq "on";
 
-$famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, @gene3ds);
+my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, $isDomainOn, @ipros);
 
-$famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, @ssfs);
+$famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, $isDomainOn, @pfams);
+
+$famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, $isDomainOn, @gene3ds);
+
+$famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, $isDomainOn, @ssfs);
+
+exit; #TODO: debug
 
 my @accessions = uniq keys %accessionhash;
 $familyIdCount = scalar @accessions;
@@ -682,19 +687,26 @@ sub makeSequenceId {
 
 
 sub getDomainFromDb {
-    my ($dbh, $table, $accessionHash, $fraction, @elements) = @_;
+    my ($dbh, $table, $accessionHash, $fraction, $isDomainOn, @elements) = @_;
     my $c = 1;
     print "Accessions found in $table:\n";
+    my %idsProcessed;
     foreach my $element (@elements) {
         my $sth = $dbh->prepare("select accession,start,end from $table where id = '$element'");
         $sth->execute;
+        my $ac = 1;
         while (my $row = $sth->fetch) {
             (my $uniprotId = $row->[0]) =~ s/\-\d+$//;
+            next if (not $isDomainOn and exists $idsProcessed{$uniprotId});
+            $idsProcessed{$uniprotId} = 1;
+
             if ($fraction == 1 or $c % $fraction == 0) {
+                $ac++;
                 push @{$accessionHash->{$uniprotId}}, {'start' => $row->[1], 'end' => $row->[2]};
             }
             $c++;
         }
+        print "Family $element had $ac elements that were added\n";
         $sth->finish;
     }
     my @accessions = keys %$accessionHash;
