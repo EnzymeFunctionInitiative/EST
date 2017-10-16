@@ -343,7 +343,7 @@ sub submitEnaJob {
         
         $B->addAction("gunzip -r $enaInputDir");
         $B->addAction("date > $CompletedFlagFile.unzip_ena\n");
-        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -log $BuildDir/make_ena_table.log");
+        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -idmapping $OutputDir/idmapping.tab -log $BuildDir/make_ena_table.log");
         $B->addAction("date > $CompletedFlagFile.make_ena_table\n");
         $B->addAction("cat $enaDir/env.tab $enaDir/fun.tab $enaDir/pro.tab > $OutputDir/ena.tab");
         $B->addAction("date > $CompletedFlagFile.cat_ena\n");
@@ -406,7 +406,7 @@ sub submitBuildCountsJob {
     $B->addAction("module load $PerlMod");
     
     if (not $skipIfExists or not -f "$OutputDir/family_counts.tab") {
-        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/PFAM.tab -output $OutputDir/family_counts.tab -type PFAM -merge-domain");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/PFAM.tab -output $OutputDir/family_counts.tab -type PFAM -merge-domain -clans $InputDir/Pfam-A.clans.tsv");
         $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/INTERPRO.tab -output $OutputDir/family_counts.tab -type INTERPRO -merge-domain -append");
         $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/GENE3D.tab -output $OutputDir/family_counts.tab -type GENE3D -merge-domain -append");
         $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/SSF.tab -output $OutputDir/family_counts.tab -type SSF -merge-domain -append");
