@@ -28,7 +28,7 @@ use EFI::Database;
 
 my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile,
     $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile,
-    $seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile);
+    $seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile, $randomFraction);
 my $result = GetOptions(
     "ipro=s"                => \$ipro,
     "pfam=s"                => \$pfam,
@@ -45,6 +45,7 @@ my $result = GetOptions(
     "use-fasta-headers"     => \$useFastaHeaders,
     "domain=s"              => \$domain,
     "fraction=i"            => \$fraction,
+    "random-fraction"       => \$randomFraction,
     "no-match-file=s"       => \$noMatchFile,
     "seq-count-file=s"      => \$seqCountFile,
     "uniref-version=s"      => \$unirefVersion,
@@ -110,6 +111,8 @@ my $unirefData = {};
 #
 
 my @accessions;
+my $FracCount = 0;
+my $FracFlag = 0;
 retrieveFamilyAccessions();
 
 # Header data for fasta and accession file inputs.
@@ -366,7 +369,6 @@ sub parseFastaHeaders {
 }
 
 
-
 sub sortFn {
     if ($a =~ /^z/ and $b =~ /^z/) {
         (my $aa = $a) =~ s/\D//g;
@@ -403,7 +405,7 @@ sub makeSequenceId {
 
 
 sub getDomainFromDb {
-    my ($dbh, $table, $accessionHash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @elements) = @_;
+    my ($dbh, $table, $accessionHash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @elements) = @_;
     my $c = 1;
     my %unirefFamSizeHelper;
     print "Accessions found in $table:\n";
@@ -421,7 +423,7 @@ sub getDomainFromDb {
             if ($unirefVersion) {
                 my $idx = $unirefVersion eq "90" ? "uniref90_cluster_id" : "uniref50_cluster_id";
                 my $unirefId = $row->{$idx};
-                if ($fraction == 1 or $c % $fraction == 0) {
+                if (&$fractionFunc($c)) {
                     push @{$unirefData->{$unirefId}}, $uniprotId;
                     # The accessionHash element will be overwritten multiple times, once for each accession ID 
                     # in the UniRef cluster that corresponds to the UniRef cluster ID.
@@ -435,7 +437,7 @@ sub getDomainFromDb {
                     $c++;
                 }
             } else {
-                if ($fraction == 1 or $c % $fraction == 0) {
+                if (&$fractionFunc($c)) {
                     $ac++;
                     push @{$accessionHash->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
                 }
@@ -831,11 +833,45 @@ sub retrieveFamilyAccessions {
     @pfams = grep {m/^pf/i} @pfams;
     push @pfams, retrieveFamiliesForClans(@clans);
     
+    my $fractionFunc;
+    if (not defined $fraction or $fraction == 1) {
+        $fractionFunc = sub {
+            return 1;
+        };
+    } elsif (not defined $randomFraction) {
+        $fractionFunc = sub {
+            my $count = shift;
+            return $count % $fraction == 0;
+        };
+    } else {
+        my $halfFrac = int($fraction / 2);
+        $halfFrac = $halfFrac < 2 ? 1 : $halfFrac;
+        $fractionFunc = sub {
+            #my $count = shift;
+            if (++$FracCount >= $fraction) {
+                if (not $FracFlag) {
+                    $FracCount = 0;
+                    $FracFlag = 0;
+                    return 1;
+                } else {
+                    $FracCount = 0;
+                    $FracFlag = 0;
+                    return 0;
+                }
+            } elsif (int(rand($fraction)) == $halfFrac and not $FracFlag) {
+                $FracFlag = 1;
+                return 1;
+            } else {
+                return 0;
+            }
+        };
+    }
+
     print "Getting Acession Numbers in specified Families\n";
-    my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @ipros);
-    $famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @pfams);
-    $famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @gene3ds);
-    $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fraction, $unirefData, $unirefVersion, $isDomainOn, @ssfs);
+    my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ipros);
+    $famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @pfams);
+    $famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @gene3ds);
+    $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ssfs);
     
     @accessions = uniq keys %accessionhash;
     $familyIdCount = scalar @accessions;

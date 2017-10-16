@@ -84,6 +84,7 @@ $result = GetOptions(
     "multiplex=s"       => \$multiplexing,
     "domain=s"          => \$domain,
     "fraction=i"        => \$fraction,
+    "random-fraction"   => \$randomFraction,
     "blast=s"           => \$blast,
     "job-id=i"          => \$jobId,
     "uniref-version=s"  => \$unirefVersion,
@@ -228,6 +229,7 @@ $taxid = 0          unless (defined $taxid);
 $gene3d = 0         unless (defined $gene3d);
 $ssf = 0            unless (defined $ssf);
 $accessionId = 0    unless (defined $accessionId);
+$randomFraction = 0 unless (defined $randomFraction);
 
 # Default values for bandpass filter, 0,0 disables it, which is the default
 $maxlen = 0         unless (defined $maxlen);
@@ -256,6 +258,7 @@ my $outputDir = "$baseOutputDir/$tmpdir";
 print "Blast is $blast\n";
 print "domain is $domain\n";
 print "fraction is $fraction\n";
+print "random fraction is $randomFraction\n";
 print "multiplexing is $multiplexing\n";
 print "lengthdif is $lengthdif\n";
 print "sim is $sim\n";
@@ -398,7 +401,8 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     # Don't enforce the limit here if we are using manual cd-hit parameters below (the limit
     # is checked below after cd-hit).
     my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
+    my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->renderToFile("$tmpdir/initial_import.sh");
 
