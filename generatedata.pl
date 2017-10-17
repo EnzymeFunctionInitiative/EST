@@ -293,6 +293,9 @@ my $accOutFile = "$outputDir/accession.txt";
 my $errorFile = "$accOutFile.failed";
 
 
+my $fracOutputDir = "$outputDir/fractions";
+my $blastOutputDir = "$outputDir/blastout";
+
 my $userHeaderFile = "";
 my $userHeaderFileOption = "";
 $userHeaderFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
@@ -520,7 +523,8 @@ print "mux job is:\n $muxjob";
 $B = $S->getBuilder();
 
 $B->dependency(0, @muxjobline[0]);
-$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $outputDir -source $outputDir/sequences.fa");
+$B->addAction("mkdir $fracOutputDir");
+$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source $outputDir/sequences.fa");
 $B->renderToFile("$tmpdir/fracfile.sh");
 
 $fracfilejob = $S->submit("$tmpdir/fracfile.sh");
@@ -564,27 +568,28 @@ if ($blast =~ /diamond/){
 $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load oldapps") if $oldapps;
 #$B->addAction("module load blast+");
-#$B->addAction("blastp -query  $outputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $outputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
+#$B->addAction("blastp -query  $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
+$B->addAction("mkdir $blastOutputDir");
 if ($blast eq "blast") {
     $B->addAction("module load oldapps") if $oldapps;
     #$B->addAction("module load blast");
-    $B->addAction("blastall -p blastp -i $outputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $outputDir/blastout-\${PBS_ARRAYID}.fa.tab");
+    $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab");
 } elsif ($blast eq "blast+") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load blast+");
-    $B->addAction("blastp -query  $outputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $outputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
+    $B->addAction("blastp -query  $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
 } elsif ($blast eq "diamond") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load diamond");
-    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $outputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -a $outputDir/blastout-\${PBS_ARRAYID}.fa.daa");
-    $B->addAction("diamond view -o $outputDir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $outputDir/blastout-\${PBS_ARRAYID}.fa.daa");
+    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
+    $B->addAction("diamond view -o $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
 } elsif ($blast eq "diamondsensitive") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load diamond");
-    $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $outputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -a $outputDir/blastout-\${PBS_ARRAYID}.fa.daa");
-    $B->addAction("diamond view -o $outputDir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $outputDir/blastout-\${PBS_ARRAYID}.fa.daa");
+    $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
+    $B->addAction("diamond view -o $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
 } else {
     die "Blast control not set properly.  Can only be blast, blast+, or diamond.\n";
 }
@@ -602,9 +607,9 @@ print "blast job is:\n $blastjob";
 $B = $S->getBuilder();
 
 $B->dependency(1, @blastjobline[0]); 
-$B->addAction("cat $outputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
-#$B->addAction("rm  $outputDir/blastout-*.tab");
-#$B->addAction("rm  $outputDir/fracfile-*.fa");
+$B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
+#$B->addAction("rm  $blastOutputDir/blastout-*.tab");
+#$B->addAction("rm  $fracOutputDir/fracfile-*.fa");
 $B->renderToFile("$tmpdir/catjob.sh");
 $catjob = $S->submit("$tmpdir/catjob.sh");
 print "Cat job is:\n $catjob";
