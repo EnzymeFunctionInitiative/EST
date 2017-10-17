@@ -621,24 +621,44 @@ print "Simplegraphs job is:\n $simplegraphjob";
 #
 $B = $S->getBuilder();
 
-my ($smallWidth, $fullWidth, $smallHeight, $fullHeight) = (700, 2000, 315, 900);
+#my ($smallWidth, $fullWidth, $smallHeight, $fullHeight) = (700, 2000, 315, 900);
+#$B->queue($memqueue);
+#$B->dependency(0, $depJob);
+#$B->mailEnd();
+#$B->addAction("module load oldapps") if $oldapps;
+#$B->addAction("module load $efiEstMod");
+#$B->addAction("module load $efiDbMod");
+#$B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
+#$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
+#$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId $fullWidth $fullHeight");
+#$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity_sm.png $jobId $smallWidth $smallHeight");
+#$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId $fullWidth $fullHeight");
+#$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
+#$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram.png $jobId $fullWidth $fullHeight");
+#$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+#$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId $fullWidth $fullHeight");
+#$B->addAction("touch  $outputDir/1.out.completed");
+#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+
+#create information for R to make graphs and then have R make them
 $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]);
 $B->mailEnd();
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
-$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
-$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId $fullWidth $fullHeight");
-$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity_sm.png $jobId $smallWidth $smallHeight");
-$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId $fullWidth $fullHeight");
-$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
-$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram.png $jobId $fullWidth $fullHeight");
-$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId $fullWidth $fullHeight");
+$B->addAction("mkdir $outputDir/rdata");
+$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
+$B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
+$B->addAction("FIRST=`head -1 \$FIRST`");
+$B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
+$B->addAction("LAST=`head -1 \$LAST`");
+$B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
+$B->addAction("Rscript $efiEstTools/quart-align.r $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN");
+$B->addAction("Rscript $efiEstTools/quart-perid.r $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST");
+$B->addAction("Rscript $efiEstTools/hist-length.r  $outputDir/length.tab  $outputDir/length_histogram.png");
+$B->addAction("Rscript $efiEstTools/hist-edges.r $outputDir/edge.tab $outputDir/number_of_edges.png");
 $B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->renderToFile("$tmpdir/graphs.sh");
 
 $graphjob = $S->submit("$tmpdir/graphs.sh");
