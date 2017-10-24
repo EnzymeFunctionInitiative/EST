@@ -16,17 +16,13 @@ if ($ARGV[0] =~ /NT/) {
 my $completed = 0;
 my $tries = 1;
 while (not $completed and $tries <= $maxNumTries) {
-    my ($stdout, $stderr) = capture {
+    my $stderr;
+    (undef, $stderr) = tee {
         system("rsync", @ARGV);
-        system("perl -e 'die;'");
     };
 
     if (not $stderr) {
         $completed = 1;
-        print $stdout;
-    } else {
-        print $stdout;
-        print $stderr;
     }
 
     $tries++;
