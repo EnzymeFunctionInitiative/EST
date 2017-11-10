@@ -410,9 +410,12 @@ sub getDomainFromDb {
     my %unirefFamSizeHelper;
     print "Accessions found in $table:\n";
     my %idsProcessed;
+
+    my $joinClause = $unirefVersion ? "left join uniref on $table.accession = uniref.accession" : "";
+
     foreach my $element (@elements) {
         #my $sth = $dbh->prepare("select accession,start,end,uniref50_cluster_id,uniref90_cluster_id from $table where id = '$element'");
-        my $sth = $dbh->prepare("select * from $table where id = '$element'");
+        my $sth = $dbh->prepare("select * from $table $joinClause where $table.id = '$element'");
         $sth->execute;
         my $ac = 1;
         while (my $row = $sth->fetchrow_hashref) {
@@ -421,7 +424,8 @@ sub getDomainFromDb {
             $idsProcessed{$uniprotId} = 1;
 
             if ($unirefVersion) {
-                my $idx = $unirefVersion eq "90" ? "uniref90_cluster_id" : "uniref50_cluster_id";
+                my $idx = $unirefVersion eq "90" ? "uniref90_seed" : "uniref50_seed";
+                #my $idx = $unirefVersion eq "90" ? "uniref90_cluster_id" : "uniref50_cluster_id";
                 my $unirefId = $row->{$idx};
                 if (&$fractionFunc($c)) {
                     push @{$unirefData->{$unirefId}}, $uniprotId;
