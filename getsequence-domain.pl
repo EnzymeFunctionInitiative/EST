@@ -678,7 +678,7 @@ sub writeSeqData {
 
 sub makeSequenceId {
     my ($seqCount) = @_;
-    my $id = sprintf("%6d", $seqCount);
+    my $id = sprintf("%7d", $seqCount);
     $id =~ tr/ /z/;
     return $id;
 }
