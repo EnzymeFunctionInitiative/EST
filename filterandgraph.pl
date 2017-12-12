@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #version 0.9.2 no changes
 #version 0.9.7 added options and code for working with Slurm scheduler
 
@@ -12,10 +17,9 @@
 #sipmlegraphs.pl        generates sequence length and alignment score distributions
 
 use FindBin;
-use lib "$FindBin::Bin/lib";
 use Getopt::Long;
-use Biocluster::SchedulerApi;
-use Biocluster::Util qw(usesSlurm);
+use EFI::SchedulerApi;
+use EFI::Util qw(usesSlurm);
 
 $result = GetOptions(
     "filter=s"       => \$filter,
@@ -68,7 +72,7 @@ if (defined $oldapps) {
 } else {
     $oldapps = 0;
 }
-my $S = new Biocluster::SchedulerApi(type  => $schedType, dryrun  => $dryrun, $queue  => $queue, resource  => [1, 1]);
+my $S = new EFI::SchedulerApi(type  => $schedType, dryrun  => $dryrun, $queue  => $queue, resource  => [1, 1]);
 my $B = $S->getBuilder();
 
 # Don't refilter if it has already been done

@@ -1,14 +1,18 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #version 0.9.7 added options and code for working with Slurm scheduler
 
 #this is just a qsub wrapper for regen-network.pl
 
 use FindBin;
-use lib "$FindBin::Bin/lib";
 use Getopt::Long;
-use Biocluster::SchedulerApi;
-use Biocluster::Util qw(usesSlurm);
+use EFI::SchedulerApi;
+use EFI::Util qw(usesSlurm);
 
 $result = GetOptions(
     "xgmml=s"       => \$xgmml,
@@ -42,7 +46,7 @@ if (defined($oldapps)) {
     $oldapps = 0;
 }
 
-my $S = new Biocluster::SchedulerApi(type => $schedType, dryrun => $dryrun);
+my $S = new EFI::SchedulerApi(type => $schedType, dryrun => $dryrun);
 my $B = $S->getBuilder();
 
 $B->queue($queue);

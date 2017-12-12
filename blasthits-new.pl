@@ -1,12 +1,16 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 use FindBin;
 use File::Basename;
-use lib "$FindBin::Bin/lib";
 use Getopt::Long;
-use Biocluster::SchedulerApi;
-use Biocluster::Util qw(usesSlurm);
-use Biocluster::Config;
+use EFI::SchedulerApi;
+use EFI::Util qw(usesSlurm);
+use EFI::Config;
 
 
 $result = GetOptions(
@@ -132,7 +136,7 @@ if (defined($oldapps)) {
 }
 
 
-my $S = new Biocluster::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my $S = new EFI::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 
 
 

@@ -75,12 +75,12 @@ foreach my $xmlFile (glob("$inputDir/*.xml")) {
         print "Skipping entry $entryId since the representative member didn't have UniProtKB accession\n" and next if not $ok;
 
         if ($accId =~ s/\-\d+$//) {
-            if (exists $isoformWritten{$accId}) {
-                print "Skipping entry $entryId since the representative member is an isoform of $accId and we already wrote the first one\n";
-                next;
-            } else {
-                $isoformWritten{$accId} = 1;
-            }
+#            if (exists $isoformWritten{$accId}) {
+#                print "Skipping entry $entryId since the representative member is an isoform of $accId and we already wrote the first one\n";
+#                next;
+#            } else {
+#                $isoformWritten{$accId} = 1;
+#            }
         }
 
         $ok = saveMembers($entry, $accId);

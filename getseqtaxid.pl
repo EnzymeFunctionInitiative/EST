@@ -1,5 +1,10 @@
 #!/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #version 0.9.2 no changes to this file
 #version 0.9.5 fixed a bug in creating struct.out file where not all annotation information was being written
 
@@ -9,9 +14,8 @@ use DBD::SQLite;
 use DBD::mysql;
 use File::Slurp;
 use FindBin;
-use lib "$FindBin::Bin/lib";
-use Biocluster::Database;
-use Annotations;
+use EFI::Database;
+use EFI::Annotations;
 
 #removed in favor of cfg file
 #$db=$ENV{'EFIEST'}."/data_files/uniprot_combined.db";
@@ -31,7 +35,7 @@ my $result = GetOptions(
 die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
-my $db = new Biocluster::Database(config_file_path => $configFile);
+my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
 
 
@@ -46,13 +50,13 @@ foreach my $taxid (@taxids){
     print "getting resuts for $taxid\n";
     my $count = 0;
 
-    my $sql = Annotations::build_taxid_query_string($taxid);
+    my $sql = EFI::Annotations::build_taxid_query_string($taxid);
     #$sql = "select * from annotations where Taxonomy_ID = '$taxid'";
     my $sth = $dbh->prepare($sql);
 
     $sth->execute;
     while ($row = $sth->fetchrow_hashref) {
-        print STRUCT Annotations::build_annotations($row);
+        print STRUCT EFI::Annotations::build_annotations($row);
         push @accessions,$row->{"accessions"};
         $count++;
     }

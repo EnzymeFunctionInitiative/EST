@@ -1,9 +1,14 @@
 #!/usr/bin/perl -w
+
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 use strict;
 use FindBin;
-use lib "$FindBin::Bin/../lib/";
-use Biocluster::IdMapping::Builder;
-use Biocluster::Database;
+use EFI::IdMapping::Builder;
+use EFI::Database;
 use Getopt::Long;
 
 my ($configFile, $buildDir, $idMappingFile, $outputFile, $loadDb);
@@ -28,12 +33,12 @@ die "--idmapping=id_mapping.dat input file must be provided" unless (defined $id
 die "--output=output_tab_file must be provided" unless defined $outputFile;
 
 $buildDir = "" if not defined $buildDir;
-my $mapBuilder = new Biocluster::IdMapping::Builder(config_file_path => $configFile, build_dir => $buildDir);
+my $mapBuilder = new EFI::IdMapping::Builder(config_file_path => $configFile, build_dir => $buildDir);
 
 my $resCode = $mapBuilder->parse($outputFile, undef, $idMappingFile, 1);
 
 if (defined $loadDb) {
-    my $db = new Biocluster::Database(config_file_path => $configFile);
+    my $db = new EFI::Database(config_file_path => $configFile);
     my $mapTable = $db->{id_mapping}->{table};
     $db->dropTable($mapTable) if ($db->tableExists($mapTable));
     $db->createTable($mapBuilder->getTableSchema());

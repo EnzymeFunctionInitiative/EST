@@ -1,12 +1,17 @@
 #!/usr/bin/perl -w
+
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 use strict;
 
 use Cwd;
 use FindBin;
 use Getopt::Long;
-use lib "$FindBin::Bin/../lib";
-use Biocluster::IdMapping::Builder;
-use Biocluster::Database;
+use EFI::IdMapping::Builder;
+use EFI::Database;
 
 my $outputFile = "idmapping.tab";
 my ($configFile, $doDownload, $buildDir, $dryRun, $batchMode, $doParse);
@@ -54,7 +59,7 @@ $args{build_dir} = $buildDir;
 $args{dryrun} = $dryRun;
 #$args{batch_mode} = $batchMode;
 
-my $mapper = new Biocluster::IdMapping::Builder(%args);
+my $mapper = new EFI::IdMapping::Builder(%args);
 
 
 

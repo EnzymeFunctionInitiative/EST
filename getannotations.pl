@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #version 0.9.2 no changes to this file
 #version 0.9.4 modifications due to removing sequence and classi fields and addition of uniprot_description field
 
@@ -9,11 +14,10 @@ use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use FindBin;
 
-use lib "$FindBin::Bin/lib";
-use Biocluster::Database;
-use Biocluster::Config;
-use Annotations;
-use Biocluster::IdMapping::Util;
+use EFI::Database;
+use EFI::Config;
+use EFI::Annotations;
+use EFI::IdMapping::Util;
 
 
 
@@ -31,13 +35,13 @@ die "Environment variables not set properly: missing EFIDB variable" if not exis
 print "Using $fasta as the input FASTA file\n";
 
 my %idTypes;
-$idTypes{Biocluster::IdMapping::Util::GENBANK} = uc Biocluster::IdMapping::Util::GENBANK;
-$idTypes{Biocluster::IdMapping::Util::GI} = uc Biocluster::IdMapping::Util::GI;
-$idTypes{Biocluster::IdMapping::Util::NCBI} = uc Biocluster::IdMapping::Util::NCBI;
+$idTypes{EFI::IdMapping::Util::GENBANK} = uc EFI::IdMapping::Util::GENBANK;
+$idTypes{EFI::IdMapping::Util::GI} = uc EFI::IdMapping::Util::GI;
+$idTypes{EFI::IdMapping::Util::NCBI} = uc EFI::IdMapping::Util::NCBI;
 
 my @accessions = apply {chomp $_} apply {$_=~s/:\d+:\d+//} apply {$_=~s/^>//} `grep "\>" $fasta`;
 
-my $db = new Biocluster::Database(config_file_path => $configFile);
+my $db = new EFI::Database(config_file_path => $configFile);
 
 open OUT, ">$annoOut" or die "cannot write struct.out file $annoOut\n";
 
@@ -45,7 +49,7 @@ my $dbh = $db->getHandle();
 
 foreach my $accession (@accessions){
     unless($accession=~/^z/){
-        my $sql = Annotations::build_query_string($accession);
+        my $sql = EFI::Annotations::build_query_string($accession);
         #$sql = "select * from annotations as A join taxonomy as T on A.Taxonomy_ID = T.Taxonomy_ID where accession = '$accession'";
         my $sth = $dbh->prepare($sql);
         $sth->execute;
@@ -53,7 +57,7 @@ foreach my $accession (@accessions){
         $sth->finish;
 
         # Now get a list of NCBI IDs
-        $sql = Annotations::build_id_mapping_query_string($accession);
+        $sql = EFI::Annotations::build_id_mapping_query_string($accession);
         $sth = $dbh->prepare($sql);
         $sth->execute;
         my @ncbiIds;
@@ -63,7 +67,7 @@ foreach my $accession (@accessions){
             }
         }
         
-        print OUT Annotations::build_annotations($row, \@ncbiIds);
+        print OUT EFI::Annotations::build_annotations($row, \@ncbiIds);
         $sth->finish();
     }
 }

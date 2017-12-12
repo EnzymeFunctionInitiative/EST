@@ -1,12 +1,16 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 use Getopt::Long;
 use DBD::SQLite;
 use DBD::mysql;
 use File::Slurp;
 use FindBin;
-use lib "$FindBin::Bin/lib";
-use Annotations;
+use EFI::Annotations;
 
 
 $configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
@@ -84,17 +88,17 @@ while(scalar @accessions){
 }
 close OUT;
 
-print "Grab Annotations\n";
+print "Grab EFI::Annotations\n";
 open OUT, ">$ENV{PWD}/$tmpdir/struct.out" or die "cannot write to struct.out\n";
 #my $dbh = DBI->connect("dbi:SQLite:$sqlite","","");
 foreach $accession (@annoaccessions){
-    my $sql = Annotations::build_query_string($accession);
+    my $sql = EFI::Annotations::build_query_string($accession);
     #$sql = "select * from annotations where accession = '$accession'";
     $sth= $dbh->prepare($sql);
     $sth->execute;
     $row = $sth->fetchrow_hashref;
 
-    print OUT Annotations::build_annotations($row);
+    print OUT EFI::Annotations::build_annotations($row);
 }
 close OUT;
 

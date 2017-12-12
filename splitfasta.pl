@@ -6,43 +6,48 @@
 
 use Getopt::Long;
 
+use strict;
 
-$result=GetOptions ("source=s" => \$source,
-		    "parts=i"  => \$parts,
-		    "tmp=s"    => \$tmpdir);
+my ($source, $parts, $outputDir);
+my $result = GetOptions (
+    "source=s" => \$source,
+    "parts=i"  => \$parts,
+    "tmp=s"    => \$outputDir);
 
-if(-e $tmpdir){
-  warn "directory $tmpdir already exists\n";
-  sleep 5;
-}else{
-  mkdir $tmpdir;
-}
+die "Input sequence file to split up not valid or not provided" if not -f $source;
+die "Number of parts to split paramter not provided" if not $parts;
+die "Output directory not provided" if not -d $outputDir;
+
 
 #open all the filehandles and store them in an arry of $parts elements
-@filehandles;
-for($i=0;$i<$parts;$i++){
-  $filenumber=$i+1;
-  local *FILE;
-  open(FILE, ">$tmpdir/fracfile-$filenumber.fa") or die "could not create fractional blast file $tmpdir/fracfile-$filenumber.fa\n";
-  push(@filehandles, *FILE);
+my @filehandles;
+for(my $i = 0; $i < $parts; $i++){
+    my $filenumber = $i + 1;
+    local *FILE;
+    open(FILE, ">$outputDir/fracfile-$filenumber.fa") or die "could not create fractional blast file $outputDir/fracfile-$filenumber.fa\n";
+    push(@filehandles, *FILE);
 }
 
 #ready through sequences.fa and write each sequence to different filehandle in @filehandles in roundrobin fashion
 open(SEQUENCES, $source) or die "could not open sequence file $source\n";
-$sequence="";
-$arrayid=0;
+my $sequence = "";
+my $arrayid = 0;
 while (<SEQUENCES>){
 #  print "$arrayid\n"; #for troubleshooting
-  $line=$_;
-  if($line=~/^>/ and $sequence ne ""){
-    print {@filehandles[$arrayid]} $sequence;
-    $sequence=$line;
-    $arrayid++;
-    if($arrayid >= scalar @filehandles){
-      $arrayid=0;
+    my $line = $_;
+    if($line =~ /^>/ and $sequence ne ""){
+        print {@filehandles[$arrayid]} $sequence;
+        $sequence = $line;
+        $arrayid++;
+        if($arrayid >= scalar @filehandles){
+            $arrayid = 0;
+        }
+    }else{
+        $sequence .= $line;
     }
-  }else{
-    $sequence.=$line;
-  }
 }
+close SEQUENCES;
+
 print {@filehandles[$arrayid]} $sequence;
+
+

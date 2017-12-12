@@ -2,12 +2,15 @@
 
 use strict;
 
+use List::MoreUtils qw(uniq);
 use IO::Handle;
 use Getopt::Long;
 
 my $inputFile = "";
 my $outputFile = "";
 my $tableType = "";
+my $clanFile = "";
+my $unirefFile = "";
 my $append = undef;
 my $mergeDomain = undef;
 my $showProgress = undef;
@@ -19,6 +22,8 @@ my $result = GetOptions(
     "append"        => \$append,
     "merge-domain"  => \$mergeDomain,
     "progress"      => \$showProgress,
+    "clans=s"       => \$clanFile,
+    "uniref=s"      => \$unirefFile,
 );
 
 
@@ -32,6 +37,14 @@ Count the number of elements in the families in the input file.
     -type           the family type (e.g. INTERPRO, PFAM)
     -append         if present, the file is appended to instead of overwritten
     -merge-domain   if present, multiple occurences of the same accession ID in the same family are counted as one
+    -clans          if present and family type is PFAM, the clan sizes are also output
+    -uniref         if present, the file is parsed for UniRef seed sequences and those are output with the
+                    families as separate fields.
+
+The output format is as follows:
+
+FAMILY  FULL_COUNT  UNIREF50_COUNT  UNIREF90_COUNT
+
 USAGE
 ;
 
@@ -52,6 +65,20 @@ $showProgress = defined $showProgress ? 1 : 0;
 my %counts;
 my %merges;
 
+
+
+my %clanData;
+my %famToClan;
+if (-f $clanFile) {
+    getClanData($clanFile, \%clanData, \%famToClan);
+}
+
+my (%unirefData, %ur50Sizes, %ur90Sizes, %ur50ClanSizes, %ur90ClanSizes);
+if (-f $unirefFile) {
+    getUnirefData($unirefFile, \%unirefData);
+}
+
+
 open INPUT, $inputFile or die "Unable to open the input file '$inputFile': $!";
 
 my $size = -s $inputFile;
@@ -67,6 +94,20 @@ while (<INPUT>) {
         }
     } else {
         $counts{$family} = 1;
+    }
+
+    if ($unirefFile and exists $unirefData{$accId}) {
+        $ur50Sizes{$family}->{ $unirefData{$accId}->{ur50} } = 1;
+        $ur90Sizes{$family}->{ $unirefData{$accId}->{ur90} } = 1;
+    }
+
+    if (exists $famToClan{$family}) {
+        my $clan = $famToClan{$family};
+        push @{ $clanData{$clan}->{ids} }, $accId;
+        if ($unirefFile and exists $unirefData{$accId}) {
+            $ur50ClanSizes{$clan}->{ $unirefData{$accId}->{ur50} } = 1;
+            $ur90ClanSizes{$clan}->{ $unirefData{$accId}->{ur90} } = 1;
+        }
     }
 
     if ($showProgress) {
@@ -86,12 +127,16 @@ close INPUT;
 
 $append = defined $append ? ">>" : ">";
 open OUTPUT, "$append $outputFile" or die "Unable to open the output file '$outputFile' for writing ($append): $!";
+print join("\t", "Type", "Family", "TotalSize", "UniRef50Size", "UniRef90Size"), "\n"; #deliberately to stdout
 
 my @families = sort keys %counts;
 my $c = 0;
 my $progress = 0;
 foreach my $family (@families) {
-    print OUTPUT join("\t", $tableType, $family, $counts{$family}), "\n";
+    my @outCounts = ($counts{$family});
+    push @outCounts, scalar(keys(%{ $ur50Sizes{$family} })) if exists $ur50Sizes{$family};
+    push @outCounts, scalar(keys(%{ $ur90Sizes{$family} })) if exists $ur90Sizes{$family};
+    print OUTPUT join("\t", $tableType, $family, @outCounts), "\n";
 
     if ($showProgress) {
         my $pos = int($c++ * 100 / ($#families + 1));
@@ -103,8 +148,69 @@ foreach my $family (@families) {
     }
 }
 
+print "\nWriting clan data\n";
+foreach my $clan (sort keys %clanData) {
+    my @allIds = @{ $clanData{$clan}->{ids} };
+    my @ids = uniq @allIds;
+    my @outCounts = scalar @ids;
+    push @outCounts, scalar(keys(%{ $ur50ClanSizes{$clan} })) if exists $ur50ClanSizes{$clan};
+    push @outCounts, scalar(keys(%{ $ur90ClanSizes{$clan} })) if exists $ur90ClanSizes{$clan};
+    #my @fams = @{ $clanData{$clan}->{fams} };
+    print OUTPUT join("\t", "CLAN", $clan, @outCounts), "\n";
+}
+
+
+
 print "\n" if $showProgress;
 
+
+
 close OUTPUT;
+
+
+
+
+
+
+
+
+
+sub getClanData {
+    my $clanFile = shift;
+    my $clanData = shift;
+    my $famToClan = shift;
+
+    open CLANS, $clanFile or die "Unable to open $clanFile: $!";
+
+    while (<CLANS>) {
+        chomp;
+        my ($fam, $clan, @stuff) = split /\t/;
+        next if not $clan;
+   
+        $clanData->{$clan} = {fams => [], ids => [], ur50 => [], ur90 => []} if not exists $clanData->{$clan};
+        push @{$clanData->{$clan}->{fams}}, $fam;
+        $famToClan->{$fam} = $clan;
+    }
+
+    close CLANS;
+}
+
+
+
+sub getUnirefData {
+    my $file = shift;
+    my $data = shift;
+
+    open UR, $file or die "Unable to open UniRef file $file: $!";
+
+    while (<UR>) {
+        chomp;
+        my ($id, $ur50, $ur90) = split /\t/;
+
+        $data->{$id} = {ur50 => $ur50, ur90 => $ur90};
+    }
+
+    close UR;
+}
 
 

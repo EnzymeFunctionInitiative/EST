@@ -1,9 +1,15 @@
 #!/usr/bin/env perl
+
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 use strict;
 
 
 if (not exists $ENV{BLASTDB}) {
-    print "The BLASTDB environment variable must be present. Did you forget to \"module load blast\" before running this program?\n";
+    print "The BLASTDB environment variable must be present. Did you forget to \"module load BLAST\" before running this program?\n";
     exit(1);
 }
 if (not exists $ENV{EFIDBHOME}) {
@@ -16,12 +22,11 @@ use Getopt::Long;
 use FindBin;
 use Cwd qw(abs_path);
 
-use lib "$FindBin::Bin/../lib";
-use Biocluster::SchedulerApi;
-use Biocluster::Util qw(getSchedulerType);
-use Biocluster::Util::FileHandle;
-use Biocluster::Database;
-use Biocluster::Config qw(biocluster_configure);
+use EFI::SchedulerApi;
+use EFI::Util qw(getSchedulerType);
+use EFI::Util::FileHandle;
+use EFI::Database;
+use EFI::Config qw(biocluster_configure);
 
 use constant BUILD_ENA => 2;
 use constant BUILD_COUNTS => 4;
@@ -66,7 +71,8 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                        );
 
 my $usage = <<USAGE;
-Usage: $0 -dir=working_dir [-no-download -interactive -log=log_file-dryrun -exists -scheduler=scheduler
+Usage: $0
+    -dir=working_dir [-download -interactive -log=log_file-dryrun -exists -scheduler=scheduler
     -queue=queue -config=config_file -sql -no-prompt -no-submit -db-name=database_name -build-ena]
 
     -download       only create the script for downloading the input files
@@ -160,7 +166,7 @@ $buildOptions = $buildOptions | BUILD_COUNTS if $buildCountsOnly;
 
 my %dbArgs;
 $dbArgs{config_file_path} = $configFile if (defined $configFile and -f $configFile);
-my $DB = new Biocluster::Database(%dbArgs);
+my $DB = new EFI::Database(%dbArgs);
 
 
 # Output the sql commands necessary for creating the database and importing the data, then exit.
@@ -185,9 +191,9 @@ my $TaxonomyLocation = $config->{tax}->{remote_url};
 
 # Set up the scheduler API.
 my $schedType = getSchedulerType($scheduler);
-my $S = new Biocluster::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1, '100gb'],
+my $S = new EFI::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1, '100gb'],
     'default_working_dir' => $BuildDir, 'dryrun' => $dryRun);
-my $FH = new Biocluster::Util::FileHandle('dryrun' => $dryRun);
+my $FH = new EFI::Util::FileHandle('dryrun' => $dryRun);
 
 
 # Remove the file that indicates the build process (outside of database import) has completed.
@@ -242,15 +248,6 @@ if (defined $buildEna and $buildEna) {
     logprint "#PARSING TAXONOMY FILE\n";
     my $taxJobId = submitTaxonomyJob($S->getBuilder(), $unzipJobId, $fileNum++);
     
-    logprint "#FORMAT BLAST DATABASE\n";
-    my $splitJobId = submitSplitFastaJob($S->getBuilder(), $unzipJobId, $np, $PdbBuildDir, $fileNum++);
-    
-    logprint "#DO PDB BLAST\n";
-    my $blastJobId = submitBlastJob($S->getBuilder(), $splitJobId, $np, $PdbBuildDir, $fileNum++);
-    
-    logprint "#CAT BLAST FILES\n";
-    my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
-    
     # Chop up xml files so we can parse them easily
     logprint "#CHOP MATCH_COMPLETE AND .TAB FILES\n";
     my $ffJobId = submitFinalFileJob($S->getBuilder(), $unzipJobId, $fileNum++);
@@ -264,8 +261,22 @@ if (defined $buildEna and $buildEna) {
     
     # Create family_counts table
     logprint "#CREATING FAMILY COUNTS TABLE\n";
-    my $countJobId = submitBuildCountsJob($S->getBuilder(), $unzipJobId, $fileNum++);
-}
+    my $countJobId = submitBuildCountsJob($S->getBuilder(), $ffJobId, $fileNum++);
+    
+    # Create uniref table
+    logprint "#CREATING UNIREF TABLE\n";
+    my $unirefJobId = submitBuildUnirefJob($S->getBuilder(), $unzipJobId, $fileNum++);
+
+    # We try to do this after everything else has completed so that we don't hog the queue.
+    logprint "#FORMAT BLAST DATABASE\n";
+    my $splitJobId = submitFormatDbAndSplitFastaJob($S->getBuilder(), $structJobId, $np, $PdbBuildDir, $fileNum++);
+    
+    logprint "#DO PDB BLAST\n";
+    my $blastJobId = submitBlastJob($S->getBuilder(), $splitJobId, $np, $PdbBuildDir, $fileNum++);
+    
+    logprint "#CAT BLAST FILES\n";
+    my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
+}   
 
 
 
@@ -332,7 +343,7 @@ sub submitEnaJob {
         
         $B->addAction("gunzip -r $enaInputDir");
         $B->addAction("date > $CompletedFlagFile.unzip_ena\n");
-        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -log $BuildDir/make_ena_table.log");
+        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -idmapping $OutputDir/idmapping.tab -log $BuildDir/make_ena_table.log");
         $B->addAction("date > $CompletedFlagFile.make_ena_table\n");
         $B->addAction("cat $enaDir/env.tab $enaDir/fun.tab $enaDir/pro.tab > $OutputDir/ena.tab");
         $B->addAction("date > $CompletedFlagFile.cat_ena\n");
@@ -395,7 +406,7 @@ sub submitBuildCountsJob {
     $B->addAction("module load $PerlMod");
     
     if (not $skipIfExists or not -f "$OutputDir/family_counts.tab") {
-        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/PFAM.tab -output $OutputDir/family_counts.tab -type PFAM -merge-domain");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/PFAM.tab -output $OutputDir/family_counts.tab -type PFAM -merge-domain -clans $InputDir/Pfam-A.clans.tsv");
         $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/INTERPRO.tab -output $OutputDir/family_counts.tab -type INTERPRO -merge-domain -append");
         $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/GENE3D.tab -output $OutputDir/family_counts.tab -type GENE3D -merge-domain -append");
         $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/SSF.tab -output $OutputDir/family_counts.tab -type SSF -merge-domain -append");
@@ -411,7 +422,43 @@ sub submitBuildCountsJob {
 }
 
 
-sub submitSplitFastaJob {
+sub submitBuildUnirefJob {
+    my ($B, $depId, $fileNum) = @_;
+
+    waitForInput();
+
+    my $file = "$BuildDir/$fileNum-buildUniref.sh";
+    $B->dependency(0, $depId);
+    $B->resource(1, 1, "350gb");
+    
+    addLibxmlIfNecessary($B);
+    $B->addAction("module load $PerlMod");
+    
+    if (not $skipIfExists or not -f "$OutputDir/uniref.tab") {
+        my $urDir = "$BuildDir/uniref";
+        mkdir $urDir if not -d $urDir;
+
+        foreach my $ver ("50", "90") {
+            my $outDir = "$BuildDir/uniref/uniref$ver";
+            mkdir $outDir if not -d $outDir;
+            $B->addAction("rm -rf $outDir/*");
+            $B->addAction("$ScriptDir/chop_uniref_xml.pl.pl -in $InputDir/uniref$ver.xml -outdir $outDir");
+            $B->addAction("$ScriptDir/make_uniref_table.pl -in-dir $outDir -out-list $BuildDir/uniref/uniref$ver.list -out-map $BuildDir/uniref/uniref$ver.tab");
+        }
+        $B->addAction("$ScriptDir/merge_uniref_tables.pl $BuildDir/uniref/uniref50.tab $BuildDir/uniref/uniref90.tab $OutputDir/uniref.tab");
+        $B->addAction("date > $CompletedFlagFile.make-merge_uniref\n");
+    }
+
+    $B->addAction("date > $CompletedFlagFile.$fileNum-buildUniref\n");
+
+    $B->outputBaseFilepath($file);
+    $B->renderToFile($file);
+
+    return $DoSubmit ? $S->submit($file) : undef;
+}
+
+
+sub submitFormatDbAndSplitFastaJob {
     my ($B, $depId, $np, $pdbBuildDir, $fileNum) = @_;
 
     my $file = "$BuildDir/$fileNum-splitfasta.sh";
@@ -521,7 +568,7 @@ sub submitTaxonomyJob {
 
     my $file = "$BuildDir/$fileNum-taxonomy.sh";
 
-    $B->dependency($depId);
+    $B->dependency(0, $depId);
 
     addLibxmlIfNecessary($B);
     $B->addAction("module load $PerlMod");
@@ -542,46 +589,65 @@ sub submitDownloadJob {
     waitForInput();
 
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.dat.gz" and not -f "$InputDir/uniprot_sprot.dat") {
-        logprint "#  Downloading $UniprotLocation/uniprot_sprot.dat.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.dat.gz\n";
+        $B->addAction("echo Downloading uniprot_sprot.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.dat.gz" and not -f "$InputDir/uniprot_trembl.dat") {
-        logprint "#  Downloading $UniprotLocation/uniprot_trembl.dat.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.dat.gz\n";
+        $B->addAction("echo Downloading uniprot_trembl.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.fasta.gz" and not -f "$InputDir/uniprot_sprot.fasta") {
-        logprint "#  Downloading $UniprotLocation/uniprot_sprot.fasta.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.fasta.gz\n";
+        $B->addAction("echo Downloading uniprot_sprot.fasta.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.fasta.gz" and not -f "$InputDir/uniprot_trembl.fasta") {
-        logprint "#  Downloading $UniprotLocation/uniprot_trembl.fasta.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.fasta.gz\n";
+        $B->addAction("echo Downloading uniprot_trembl.fasta.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/match_complete.xml.gz" and not -f "$InputDir/match_complete.xml") {
         logprint "#  Downloading $InterproLocation/match_complete.xml.gz\n";
+        $B->addAction("echo Downloading match_complete.xml.gz");
         $B->addAction("curl -sS $InterproLocation/match_complete.xml.gz > $InputDir/match_complete.xml.gz");
         $B->addAction("date > $CompletedFlagFile.match_complete.xml\n");
     }
     if (not $skipIfExists or not -f "$InputDir/idmapping.dat.gz" and not -f "$InputDir/idmapping.dat") {
-        logprint "#  Downloading $UniprotLocation/idmapping/idpmapping.dat.gz\n";
-        $B->addAction("curl -sS $UniprotLocation/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
+        logprint "#  Downloading $UniprotLocation/knowledgebase/idmapping/idpmapping.dat.gz\n";
+        $B->addAction("echo Downloading idmapping.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/idmapping/idmapping.dat.gz > $InputDir/idmapping.dat.gz");
         $B->addAction("date > $CompletedFlagFile.idmapping.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/taxonomy.xml.gz" and not -f "$InputDir/taxonomy.xml") {
         if (defined $TaxonomyLocation) {
             logprint "#  Downloading $TaxonomyLocation\n";
+            $B->addAction("echo Downloading taxonomy.xml.gz");
             $B->addAction("curl -sS $TaxonomyLocation > $InputDir/taxonomy.xml.gz");
             $B->addAction("date > $CompletedFlagFile.taxonomy.xml\n");
         }
     }
-
+    if (not $skipIfExists or not -f "$InputDir/uniref50.xml.gz" and not -f "$InputDir/uniref50.xml") {
+        logprint "#  Downloading $UniprotLocation/uniref/uniref50/uniref50.xml.gz\n";
+        $B->addAction("echo Downloading uniref50.xml.gz");
+        $B->addAction("curl -sS $UniprotLocation/uniref/uniref50/uniref50.xml.gz > $InputDir/uniref50.xml.gz");
+        $B->addAction("date > $CompletedFlagFile.uniref50.xml\n");
+    }
+    if (not $skipIfExists or not -f "$InputDir/uniref90.xml.gz" and not -f "$InputDir/uniref90.xml") {
+        logprint "#  Downloading $UniprotLocation/uniref/uniref90/uniref90.xml.gz\n";
+        $B->addAction("echo Downloading uniref90.xml.gz");
+        $B->addAction("curl -sS $UniprotLocation/uniref/uniref90/uniref90.xml.gz > $InputDir/uniref90.xml.gz");
+        $B->addAction("date > $CompletedFlagFile.uniref90.xml\n");
+    }
     my $pfamInfoUrl = $config->{build}->{pfam_info_url};
     if (not $skipIfExists or not -f "$InputDir/Pfam-A.clans.tsv.gz" and not -f "$InputDir/Pfam-A.clans.tsv") {
         logprint "#  Downloading $pfamInfoUrl\n";
+        $B->addAction("echo Downloading Pfam-A.clans.tsv.gz");
         $B->addAction("curl -sS $pfamInfoUrl > $InputDir/Pfam-A.clans.tsv.gz");
         $B->addAction("date > $CompletedFlagFile.Pfam-A.clans.tsv\n");
     }
@@ -606,6 +672,7 @@ sub submitUnzipJob {
     my $file = "$BuildDir/$fileNum-process-downloads.sh";
 
     $B->dependency(0, $depId);
+    $B->mailError();
     $B->addAction("module load $PerlMod");
 
     waitForInput();
@@ -614,6 +681,14 @@ sub submitUnzipJob {
     if (scalar @gzFiles) {
         $B->addAction("gunzip $InputDir/*.gz");
         $B->addAction("date > $CompletedFlagFile.gunzip\n");
+        # If there was an error (e.g. bad gz) then there will be one or more .gz files in the dir.
+        # If that is the case we exit with an error code of 1 which will cause all of the dependent
+        # jobs to abort.
+        $B->addAction("NUM_GZ=`ls -l $InputDir | grep '\.gz\s*$' | wc -l`");
+        $B->addAction("if (( \$NUM_GZ > 0 ));");
+        $B->addAction("then");
+        $B->addAction("    exit 1");
+        $B->addAction("fi");
     }
 
     #create new copies of trembl databases
@@ -694,8 +769,8 @@ sub submitAnnotationsJob {
 
     if (not $skipIfExists or not -f "$OutputDir/annotations.tab") {
         # Exclude GI
-        #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -struct $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
-        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -struct $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
+        #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
+        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
         $B->addAction("date > $CompletedFlagFile.make_annotations_table\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/organism.tab") {
@@ -777,7 +852,9 @@ create table annotations(accession varchar(10) primary key,
                          HMP_Oxygen varchar(50),
                          EFI_ID varchar(6),
                          EC varchar(185),
-                         Cazy varchar(30));
+                         Cazy varchar(30),
+                         UniRef50_Cluster varchar(10),
+                         UniRef90_Cluster varchar(10));
 create index TaxID_Index ON annotations (Taxonomy_ID);
 create index accession_Index ON annotations (accession);
 
@@ -795,6 +872,13 @@ select 'CREATING PFAM' as '';
 drop table if exists PFAM;
 create table PFAM(id varchar(24), accession varchar(10), start integer, end integer);
 create index PAM_ID_Index on PFAM (id);
+
+select 'CREATING UNIREF' as '';
+drop table if exists uniref;
+create table uniref(accession varchar(10), uniref50_seed varchar(10), uniref90_seed varchar(10));
+create index uniref_accession_index on uniref (accession);
+create index uniref50_seed_index on uniref (uniref50_seed);
+create index uniref90_seed_index on uniref (uniref90_seed);
 
 select 'CREATING SSF' as '';
 drop table if exists SSF;
@@ -837,6 +921,9 @@ load data local infile '$OutputDir/taxonomy.tab' into table taxonomy;
 
 select 'LOADING GENE3D' as '';
 load data local infile '$OutputDir/GENE3D.tab' into table GENE3D;
+
+select 'LOADING UNIREF' as '';
+load data local infile '$OutputDir/uniref.tab' into table uniref;
 
 select 'LOADING PFAM' as '';
 load data local infile '$OutputDir/PFAM.tab' into table PFAM;

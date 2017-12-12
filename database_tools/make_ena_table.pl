@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
+    use lib $ENV{EFISHARED};
+}
+
 #example
 #make_ena_table.pl -embl /home/mirrors/embl/Release_XXX -pro enaOutDir/pro.tab -fun enaOutDir/fun.tab -env enaOutDir/env.tab
 #                  -com enaOutDir/com.tab -pfam EFI_DB/PFAM.tab
@@ -19,7 +24,6 @@ use FindBin;
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 
-use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/lib";
 
 use IdMappingFile;
@@ -44,8 +48,13 @@ sub process{
     my @proteinIds;
     my %processedAlready;
 
-    open(OUT, ">$out") or die "cannot write to output file $out"
-        if not defined $LIST_FILES_ONLY;
+    # Debug mode
+    if (not defined $out) {
+        *OUT = STDOUT;
+    } else {
+        open(OUT, ">$out") or die "cannot write to output file $out" if not defined $LIST_FILES_ONLY;
+    }
+
     foreach $file (@files){
         logprint "Processing $file";
         continue if defined $LIST_FILES_ONLY;
@@ -76,7 +85,7 @@ sub process{
                 }else{
                     $DIR=1;
                 }
-                if($line=~/(\d+)\..*\.(\d+)/){
+                if($line=~/(\d+)\..*\.\>?(\d+)/){
                     $START=$1;
                     $END=$2;
                 }
@@ -107,8 +116,8 @@ sub process{
                 my @revUniprotIdsToAdd;
 
                 # Only lookup a protein ID if there were no uniprot IDs found for this section
-                if ($#uniprotIds == -1) { 
-                    my ($revUniprotIds, $noMatch) = $idMapper->reverseLookup(Biocluster::IdMapping::Util::GENBANK, @proteinIds);
+                if ($#uniprotIds == -1) {
+                    my ($revUniprotIds, $noMatch) = $idMapper->reverseLookup(EFI::IdMapping::Util::GENBANK, @proteinIds);
                     @revUniprotIdsToAdd = grep { not exists $processedAlready{$_} } @$revUniprotIds;
                     if (scalar @revUniprotIdsToAdd) {
                         logprint "Found a mapping of protein ID ", join(",", @proteinIds), " to UniProt ID ", join(",", @revUniprotIdsToAdd);
@@ -133,9 +142,10 @@ sub process{
         }
         close FILE;
     }
-    close OUT
-        if not defined $LIST_FILES_ONLY;
 
+    if ($out) {
+        close OUT if not defined $LIST_FILES_ONLY;
+    }
 }
 
 sub tabletohashary {
@@ -195,6 +205,10 @@ sub makechooser {
 }
 #end functions
 
+print "using new version\n";
+open NEW, ">/home/groups/efi/databases/20171005/build/make.new";
+print NEW "using new version\n";
+close NEW;
 
 $result = GetOptions(
     "embl=s"        => \$embl,
@@ -208,6 +222,7 @@ $result = GetOptions(
     "v"             => \$verbose,
     "log=s"         => \$log,
     "config=s"      => \$configFile,
+    "debug=s"       => \$debugParseFile,
 );
 
 # We're not currently using the EFI database for reverse lookups, rather we're using the flat file so this
@@ -219,12 +234,26 @@ $result = GetOptions(
 #my $idMapper = new EFI::IdMapping(config_file_path => $configFile);
 
 my $idMapper = new IdMappingFile(); #Same signature as EFI::IdMapping
-$idMapper->parseTable($idMappingFile) if $idMappingFile and -f $idMappingFile;
+$idMapper->parseTable($idMappingFile) if $idMappingFile and -f $idMappingFile and not -f $debugParseFile;
+
+
+my %accessions;
+my %organisms;
 
 
 
-die "Invalid arguments specified" if not defined $embl or not defined $pro or not defined $env or not defined $fun or
-                                     not defined $com or not defined $table or not defined $orgtable;
+die "Invalid arguments specified" if not -f $debugParseFile and (
+                                         not defined $embl or not defined $pro or not defined $env or not defined $fun or
+                                         not defined $com or not defined $table or not defined $orgtable
+                                     );
+
+# Parse the specified file and output it to the console in debug mode, and then exit.
+if (-f $debugParseFile) {
+    my @files = ($debugParseFile);
+    process(\@files, \%accessions, \%organisms, undef, $idMapper);
+    exit;
+}
+
 
 $logName = defined $LIST_FILES_ONLY ? "$0.debug.log" : "$0.log";
 $log = $ENV{PWD} . "/" . $logName unless defined $log;
@@ -278,7 +307,7 @@ logprint "processing tab files";
 logprint "\tbase files";
 process \@pro, \%accessions, \%organisms, $pro, $idMapper;
 process \@fun, \%accessions, \%organisms, $fun, $idMapper;
-process \@env, \%accessions, \%organisms, $env; $idMapper;
+process \@env, \%accessions, \%organisms, $env, $idMapper;
 
 $idMapper->finish();
 
