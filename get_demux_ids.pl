@@ -1,8 +1,5 @@
 #!/usr/bin/env perl
 
-#program to re-add sequences removed by initial cdhit
-#version 0.9.3 Program created
-
 use strict;
 
 use List::MoreUtils qw(uniq);

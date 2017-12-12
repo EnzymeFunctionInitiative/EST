@@ -251,7 +251,7 @@ sub parseFastaHeaders {
             my $result = $parser->parse_line_for_headers($line);
 
             if ($result->{state} eq EFI::Fasta::Headers::HEADER) {
-                $headerCount += $result->{count};
+                $headerCount++;
             }
             # When we get here we are at the end of the headers and have started reading a sequence.
             elsif ($result->{state} eq EFI::Fasta::Headers::FLUSH) {
@@ -337,6 +337,7 @@ sub parseFastaHeaders {
     foreach my $seqIdx (sort sortFn keys %seq) {
         # Since multiple Uniprot IDs may map to the same sequence in the FASTA file, we need to write those
         # as sepearate sequences which is what "Expanding" means.
+        next if not exists $seq{$seqIdx}->{ids};
         my @seqIds = @{ $seq{$seqIdx}->{ids} };
         push(@seqToWrite, @seqIds);
         $numMultUniprotIdSeq++ if scalar @seqIds > 1;

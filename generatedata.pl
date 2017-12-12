@@ -506,7 +506,10 @@ CMDS
         $B->addAction("mv $outputDir/allsequences.fa $outputDir/allsequences.fa.before_demux");
         $B->addAction("cp $outputDir/sequences.fa $outputDir/allsequences.fa");
     }
-    $B->addAction("$efiEstTools/get_demux_ids.pl -struct $outputDir/struct.out -cluster $outputDir/sequences.fa.clstr -domain $domain");
+    # Add in CD-HIT attributes to SSN
+    if ($noDemuxArg) {
+        $B->addAction("$efiEstTools/get_demux_ids.pl -struct $outputDir/struct.out -cluster $outputDir/sequences.fa.clstr -domain $domain");
+    }
 } else {
     $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
 }
