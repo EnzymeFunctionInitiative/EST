@@ -4,6 +4,7 @@ password=
 host=
 port=
 database=
+ip_range=10.1.1.0/255.255.252.0
 
 [idmapping]
 remote_url=ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/idmapping.dat.gz
