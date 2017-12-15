@@ -40,7 +40,7 @@ close ACC;
 close FASTA;
 
 open COUNT, ">$countFile";
-print COUNT "total_ssn_nodes\t$accCount\n";
+print COUNT "Total\t$accCount\n";
 close COUNT;
 
 
