@@ -8,14 +8,20 @@
 use strict;
 use Getopt::Long;
 
-my ($shortFile, $longFile, $combinedFile, $outputFile);
+my ($shortFile, $longFile, $combinedFile, $outputFile, $countsFile);
 
-my $result = GetOptions("short=s"       => \$shortFile,
-                        "long=s"        => \$longFile,
-                        "combined=s"    => \$combinedFile,
-                        "out=s"         => \$outputFile);
+my $result = GetOptions("short=s"           => \$shortFile,
+                        "long=s"            => \$longFile,
+                        "combined=s"        => \$combinedFile,
+                        "merge-counts=s"    => \$countsFile,
+                        "out=s"             => \$outputFile);
 
-my %pfams = ();
+my %pfams;
+my %counts;
+
+if (defined $countsFile and -f $countsFile) {
+    %counts = loadFamilySizes($countsFile);
+}
 
 if (defined $combinedFile) {
     open COMBINED, $combinedFile or die "Cannot open combined description file '$combinedFile': $!";
@@ -58,8 +64,44 @@ foreach my $key (sort keys %pfams){
     #print "insert into $table (pfam, short_name, long_name) values ('$key','".$pfams{$key}{'short'}."','".$pfams{$key}{'long'}."') on duplicate key update short_name='".$pfams{$key}{'short'}."', long_name='".$pfams{$key}{'long'}."';\n";
     #$sth=$dbh->prepare("insert into $table (pfam, short_name, long_name) values ('$key','".$pfams{$key}{'short'}."','".$pfams{$key}{'long'}."') on duplicate key update short_name='".$pfams{$key}{'short'}."', long_name='".$pfams{$key}{'long'}."';");
     #$sth->execute;
-    print OUT "$key\t$pfams{$key}{short}\t$pfams{$key}{long}\n";
+    my @data = (0, 0, 0);
+    if (exists $counts{$key}) {
+        @data = @{ $counts{$key} };
+    }
+    print OUT join("\t", $key, $pfams{$key}{short}, $pfams{$key}{long}, @data), "\n";
 }
 
 close OUT;
+
+
+
+
+sub loadFamilySizes {
+    my $file = shift;
+
+    my %counts;
+
+    open FILE, $file;
+
+    while (<FILE>) {
+        chomp;
+        my @parts = split m/\t/;
+        my $data = [0, 0, 0];
+        if ($#parts >= 2) {
+            $data->[0] = $parts[2];
+        }
+        if ($#parts >= 3) {
+            $data->[1] = $parts[3];
+        }
+        if ($#parts >= 4) {
+            $data->[2] = $parts[4];
+        }
+        $counts{$parts[1]} = $data;
+    }
+
+    close FILE;
+
+    return %counts;
+}
+
 

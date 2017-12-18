@@ -40,10 +40,12 @@ $result = GetOptions(
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
+die "The Perl environment must be loaded in order to run $0" if $ENV{LOADEDMODULES} !~ m/\bperl\b/i; # Ensure that the Perl module is loaded (e.g. module load Perl)
 
 my $toolpath = $ENV{EFIEST};
 my $efiEstMod = $ENV{EFIESTMOD};
 my $efiDbMod = $ENV{EFIDBMOD};
+(my $perlMod = $ENV{LOADEDMODULES}) =~ s/^.*\b(perl)\b.*$/$1/i;
 
 my $dbver = "";
 if (-f "$tmpdir/database_version") {
@@ -55,7 +57,7 @@ if (not $dbver) {
 }
 
 $minlen = 0             unless defined $minlen;
-$maxlen = 0             unless defined $maxlen;
+$maxlen = 50000         unless defined $maxlen;
 $filter = "bit"         unless defined $filter;
 $minval = 0             unless defined $minval;
 $title = "Untitled"     unless defined $title;
@@ -106,10 +108,15 @@ if (defined($oldapps)) {
 
 my $wordOption = $lengthOverlap < 1 ? "-n 2" : "";
 
+my $baseOutputDir = $ENV{PWD};
 
 
-
-my $S = new EFI::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my $logDir = "$baseOutputDir/log";
+mkdir $logDir;
+$logDir = "" if not -d $logDir;
+my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+$schedArgs{output_base_dirpath} = $logDir if $logDir;
+my $S = new EFI::SchedulerApi(%schedArgs);
 my $B = $S->getBuilder();
 
 print "Data from runs will be saved to $tmpdir/$filter-$minval-$minlen-$maxlen/\n";
@@ -121,12 +128,12 @@ if (not -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
 
     #submit the job for filtering out extraneous edges
     $B->addAction("module load oldapps") if $oldapps;
-    $B->addAction("module load perl/5.16.1");
-    $B->addAction("$toolpath/filterblast.pl -blastin $ENV{PWD}/$tmpdir/1.out -blastout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $ENV{PWD}/$tmpdir/allsequences.fa -fastaout $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
+    $B->addAction("module load $perlMod");
+    $B->addAction("$toolpath/filterblast.pl -blastin $baseOutputDir/$tmpdir/1.out -blastout $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $baseOutputDir/$tmpdir/allsequences.fa -fastaout $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
     $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh");
 
     $filterjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun);
-    print "Filterblast job is:\n $filterjob";
+    print "Filterblast job is:\n $filterjob\n";
 
     @filterjobline = split /\./, $filterjob;
 } else {
@@ -143,15 +150,16 @@ $B->dependency(0, @filterjobline[0])
     if not $priorFilter;
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
-my $outFile = "$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}full_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver");
+$B->addAction("module load $perlMod");
+my $outFile = "$baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}full_ssn.xgmml";
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $baseOutputDir/$tmpdir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh");
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
 
 $fulljob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh", $dryrun, $schedType);
-print "Full xgmml job is:\n $fulljob";
+print "Full xgmml job is:\n $fulljob\n";
 
 @fulljobline = split /\./, $fulljob;
 
@@ -164,16 +172,16 @@ $B->dependency(0, @fulljobline[0]);
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load cd-hit");
-$B->addAction("CDHIT=\$(echo \"scale=2; \${PBS_ARRAYID}/100\" |bc -l)");
-$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
-$outFile = "$ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $ENV{PWD}/$tmpdir/struct.out -out $outFile -title=\"$title\" -dbver $dbver");
+$B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
+$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
+$outFile = "$baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $baseOutputDir/$tmpdir/struct.out -out $outFile -title=\"$title\" -dbver $dbver");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 $repnodejob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh", $dryrun, $schedType);
-print "Repnodes job is:\n $repnodejob";
+print "Repnodes job is:\n $repnodejob\n";
 
 
 @repnodejobline = split /\./, $repnodejob;
@@ -190,7 +198,7 @@ $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh");
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 
 $fixjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh", $dryrun, $schedType);
-print "Fix job is:\n $fixjob";
+print "Fix job is:\n $fixjob\n";
 @fixjobline = split /\./, $fixjob;
 
 #submit series of repnode network calculations
@@ -201,11 +209,11 @@ $B->dependency(0, @fulljobline[0] . ":" . $fixjobline[0]);
 $B->mailEnd();
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
-$B->addAction("$toolpath/stats.pl -tmp $ENV{PWD}/$tmpdir -run $filter-$minval-$minlen-$maxlen -out $ENV{PWD}/$tmpdir/$filter-$minval-$minlen-$maxlen/stats.tab");
+$B->addAction("$toolpath/stats.pl -tmp $baseOutputDir/$tmpdir -run $filter-$minval-$minlen-$maxlen -out $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/stats.tab");
 $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 $statjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh", $dryrun, $schedType);
-print "Stats job is:\n $statjob";
+print "Stats job is:\n $statjob\n";
 
 

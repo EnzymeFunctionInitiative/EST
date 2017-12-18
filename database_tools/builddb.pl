@@ -188,6 +188,8 @@ biocluster_configure($config, %dbArgs);
 my $UniprotLocation = $config->{build}->{uniprot_url};
 my $InterproLocation = $config->{build}->{interpro_url};
 my $TaxonomyLocation = $config->{tax}->{remote_url};
+my $IpRange = $config->{db}->{ip_range};
+my $DbUser = $config->{db}->{user};
 
 # Set up the scheduler API.
 my $schedType = getSchedulerType($scheduler);
@@ -259,20 +261,20 @@ if (defined $buildEna and $buildEna) {
     logprint "#CREATE ANNOTATIONS (STRUCT) TAB FILES\n";
     my $structJobId = submitAnnotationsJob($S->getBuilder(), $idmappingJobId, $fileNum++);
     
-    # Create family_counts table
-    logprint "#CREATING FAMILY COUNTS TABLE\n";
-    my $countJobId = submitBuildCountsJob($S->getBuilder(), $ffJobId, $fileNum++);
-    
     # Create uniref table
     logprint "#CREATING UNIREF TABLE\n";
     my $unirefJobId = submitBuildUnirefJob($S->getBuilder(), $unzipJobId, $fileNum++);
 
+    # Create family_counts table
+    logprint "#CREATING FAMILY COUNTS TABLE\n";
+    my $countJobId = submitBuildCountsJob($S->getBuilder(), [$ffJobId, $unirefJobId], $fileNum++);
+    
     # We try to do this after everything else has completed so that we don't hog the queue.
     logprint "#FORMAT BLAST DATABASE\n";
     my $splitJobId = submitFormatDbAndSplitFastaJob($S->getBuilder(), $structJobId, $np, $PdbBuildDir, $fileNum++);
     
     logprint "#DO PDB BLAST\n";
-    my $blastJobId = submitBlastJob($S->getBuilder(), $splitJobId, $np, $PdbBuildDir, $fileNum++);
+    my $blastJobId = submitBlastJob($S->getBuilder(), [$splitJobId, $unirefJobId, $countJobId], $np, $PdbBuildDir, $fileNum++);
     
     logprint "#CAT BLAST FILES\n";
     my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
@@ -371,10 +373,6 @@ sub submitFinalFileJob {
     
     mkdir "$BuildDir/match_complete" unless(-d "$BuildDir/match_complete");
     
-    if (not $skipIfExists or not -f "$OutputDir/pfam_info.tab") {
-        $B->addAction("$ScriptDir/create_pfam_info.pl -combined $InputDir/Pfam-A.clans.tsv -out $OutputDir/pfam_info.tab");
-        $B->addAction("date > $CompletedFlagFile.create_pfam_info\n");
-    }
     if (not $skipIfExists or not -f "$BuildDir/match_complete/0.xml") {
         $B->addAction("$ScriptDir/chopxml.pl -in $InputDir/match_complete.xml -outdir $BuildDir/match_complete");
         $B->addAction("date > $CompletedFlagFile.chopxml\n");
@@ -406,11 +404,23 @@ sub submitBuildCountsJob {
     $B->addAction("module load $PerlMod");
     
     if (not $skipIfExists or not -f "$OutputDir/family_counts.tab") {
-        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/PFAM.tab -output $OutputDir/family_counts.tab -type PFAM -merge-domain -clans $InputDir/Pfam-A.clans.tsv");
-        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/INTERPRO.tab -output $OutputDir/family_counts.tab -type INTERPRO -merge-domain -append");
-        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/GENE3D.tab -output $OutputDir/family_counts.tab -type GENE3D -merge-domain -append");
-        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/SSF.tab -output $OutputDir/family_counts.tab -type SSF -merge-domain -append");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/PFAM.tab -output $OutputDir/family_counts.tab -type PFAM -uniref $OutputDir/uniref.tab -merge-domain -clans $InputDir/Pfam-A.clans.tsv");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/INTERPRO.tab -output $OutputDir/family_counts.tab -type INTERPRO -uniref $OutputDir/uniref.tab -merge-domain -append");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/GENE3D.tab -output $OutputDir/family_counts.tab -type GENE3D -uniref $OutputDir/uniref.tab -merge-domain -append");
+        $B->addAction("$ScriptDir/count_families.pl -input $OutputDir/SSF.tab -output $OutputDir/family_counts.tab -type SSF -uniref $OutputDir/uniref.tab -merge-domain -append");
         $B->addAction("date > $CompletedFlagFile.family_counts\n");
+    }
+    if (not $skipIfExists or not -f "$OutputDir/family_info.tab") {
+        $B->addAction("$ScriptDir/create_family_info.pl -combined $InputDir/Pfam-A.clans.tsv -merge-counts $OutputDir/family_counts.tab -out $BuildDir/pfam_family_info.tab");
+        $B->addAction("$ScriptDir/create_family_info.pl -long $InputDir/interpro_names.dat -short $InputDir/interpro_short_names.dat -merge-counts $OutputDir/family_counts.tab -out $BuildDir/interpro_family_info.tab");
+        $B->addAction("cp $BuildDir/pfam_family_info.tab $OutputDir/family_info.tab");
+        $B->addAction("cat $BuildDir/interpro_family_info.tab >> $OutputDir/family_info.tab");
+        # Add clans to the info table
+        $B->addAction("grep CLAN $OutputDir/family_counts.tab | awk '" . '{print $2, "\t", $3, $4, $5}' . "' >> $OutputDir/family_info.tab");
+        $B->addAction("date > $CompletedFlagFile.create_family_info\n");
+    }
+    if (not $skipIfExists or not -f "$OutputDir/PFAM_clans.tab") {
+        $B->addAction("cut -f1,2 $InputDir/Pfam-A.clans.tsv > $OutputDir/PFAM_Clans.tab");
     }
 
     $B->addAction("date > $CompletedFlagFile.$fileNum-buildCounts\n");
@@ -442,7 +452,7 @@ sub submitBuildUnirefJob {
             my $outDir = "$BuildDir/uniref/uniref$ver";
             mkdir $outDir if not -d $outDir;
             $B->addAction("rm -rf $outDir/*");
-            $B->addAction("$ScriptDir/chop_uniref_xml.pl.pl -in $InputDir/uniref$ver.xml -outdir $outDir");
+            $B->addAction("$ScriptDir/chop_uniref_xml.pl -in $InputDir/uniref$ver.xml -outdir $outDir");
             $B->addAction("$ScriptDir/make_uniref_table.pl -in-dir $outDir -out-list $BuildDir/uniref/uniref$ver.list -out-map $BuildDir/uniref/uniref$ver.tab");
         }
         $B->addAction("$ScriptDir/merge_uniref_tables.pl $BuildDir/uniref/uniref50.tab $BuildDir/uniref/uniref90.tab $OutputDir/uniref.tab");
@@ -591,25 +601,25 @@ sub submitDownloadJob {
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.dat.gz" and not -f "$InputDir/uniprot_sprot.dat") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.dat.gz\n";
         $B->addAction("echo Downloading uniprot_sprot.dat.gz");
-        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/uniprot_sprot.dat.gz > $InputDir/uniprot_sprot.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.dat.gz" and not -f "$InputDir/uniprot_trembl.dat") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.dat.gz\n";
         $B->addAction("echo Downloading uniprot_trembl.dat.gz");
-        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/uniprot_trembl.dat.gz > $InputDir/uniprot_trembl.dat.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.dat\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_sprot.fasta.gz" and not -f "$InputDir/uniprot_sprot.fasta") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_sprot.fasta.gz\n";
         $B->addAction("echo Downloading uniprot_sprot.fasta.gz");
-        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/uniprot_sprot.fasta.gz > $InputDir/uniprot_sprot.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_sprot.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/uniprot_trembl.fasta.gz" and not -f "$InputDir/uniprot_trembl.fasta") {
         logprint "#  Downloading $UniprotLocation/knowledgebase/complete/uniprot_trembl.fasta.gz\n";
         $B->addAction("echo Downloading uniprot_trembl.fasta.gz");
-        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
+        $B->addAction("curl -sS $UniprotLocation/knowledgebase/complete/uniprot_trembl.fasta.gz > $InputDir/uniprot_trembl.fasta.gz");
         $B->addAction("date > $CompletedFlagFile.uniprot_trembl.fasta\n");
     }
     if (not $skipIfExists or not -f "$InputDir/match_complete.xml.gz" and not -f "$InputDir/match_complete.xml") {
@@ -651,6 +661,13 @@ sub submitDownloadJob {
         $B->addAction("curl -sS $pfamInfoUrl > $InputDir/Pfam-A.clans.tsv.gz");
         $B->addAction("date > $CompletedFlagFile.Pfam-A.clans.tsv\n");
     }
+    if (not $skipIfExists or not -f "$InputDir/interpro_short_names.dat") {
+        logprint "#  Downloading $InterproLocation/short_names.dat\n";
+        $B->addAction("echo Downloading short_names.dat");
+        $B->addAction("curl -sS $InterproLocation/short_names.dat > $InputDir/interpro_short_names.dat");
+        $B->addAction("curl -sS $InterproLocation/names.dat > $InputDir/interpro_names.dat");
+        $B->addAction("date > $CompletedFlagFile.interpro_names.xml\n");
+    }
 
     $B->addAction("echo To download the ENA files, run");
     $B->addAction("echo rsync -auv rsync://bio-mirror.net/biomirror/embl/release/ $InputDir/ena");
@@ -679,12 +696,12 @@ sub submitUnzipJob {
 
     my @gzFiles = glob("$InputDir/*.gz");
     if (scalar @gzFiles) {
-        $B->addAction("gunzip $InputDir/*.gz");
+        $B->addAction("gunzip -f $InputDir/*.gz");
         $B->addAction("date > $CompletedFlagFile.gunzip\n");
         # If there was an error (e.g. bad gz) then there will be one or more .gz files in the dir.
         # If that is the case we exit with an error code of 1 which will cause all of the dependent
         # jobs to abort.
-        $B->addAction("NUM_GZ=`ls -l $InputDir | grep '\.gz\s*$' | wc -l`");
+        $B->addAction("NUM_GZ=`ls -l $InputDir | grep '\.gz\\s*\$' | wc -l`");
         $B->addAction("if (( \$NUM_GZ > 0 ));");
         $B->addAction("then");
         $B->addAction("    exit 1");
@@ -696,7 +713,7 @@ sub submitUnzipJob {
         $B->addAction("cp $InputDir/uniprot_trembl.fasta $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.combined.fasta_cp\n");
     }
-    if (not $skipIfExists or not -f "$InputDir/combined.dat") {
+    if (not $skipIfExists or not -f "$CombinedDir/combined.dat") {
         $B->addAction("cp $InputDir/uniprot_trembl.dat $CombinedDir/combined.dat");
         $B->addAction("date > $CompletedFlagFile.combined.dat_cp\n");
     }
@@ -706,7 +723,7 @@ sub submitUnzipJob {
         $B->addAction("cat $InputDir/uniprot_sprot.fasta >> $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.combined.fasta_cat\n");
     }
-    if (not $skipIfExists or not -f "$InputDir/combined.dat") {
+    if (not $skipIfExists or not -f "$CombinedDir/combined.dat") {
         $B->addAction("cat $InputDir/uniprot_sprot.dat >> $CombinedDir/combined.dat");
         $B->addAction("date > $CompletedFlagFile.combined.dat_cat\n");
     }
@@ -797,14 +814,22 @@ sub writeSqlCommands {
     if ($buildOptions & BUILD_COUNTS) {
         $countSql = <<SQL;
 
-select 'CREATED family_counts' as '';
-drop table if exists family_counts;
-create table family_counts (family_type varchar(15), family varchar(100), num_members integer);
+select 'CREATING family_info' as '';
+drop table if exists family_info;
+create table family_info(family varchar(10) primary key, short_name varchar(50), long_name varchar(255), num_members integer, num_uniref50_members integer, num_uniref90_members integer);
 create index family_Index on family_counts (family);
-create index family_type_Index on family_counts (family_type);
 
-select 'LOADING family_counts' as '';
-load data local infile '$OutputDir/family_counts.tab' into table family_counts;
+select 'LOADING family_info' as '';
+load data local infile '$OutputDir/family_info.tab' into table family_info;
+
+select 'CREATING PFAM_clans' as '';
+drop table if exists PFAM_clans;
+create table PFAM_clans(pfam_id varchar(24), clan_id varchar(24));
+create index clan_id_Index on PFAM_clans (clan_id);
+
+select 'LOADING PFAM_clans' as '';
+load data local infile '$OutputDir/PFAM_clans.tab' into table PFAM_clans;
+
 SQL
         ;
     }
@@ -899,10 +924,6 @@ select 'CREATING colors' as '';
 drop table if exists colors;
 create table colors(cluster int primary key,color varchar(7));
 
-select 'CREATING pfam_info' as '';
-drop table if exists pfam_info;
-create table pfam_info(pfam varchar(10) primary key, short_name varchar(50), long_name varchar(255));
-
 select 'CREATING idmapping' as '';
 drop table if exists idmapping;
 create table idmapping (uniprot_id varchar(15), foreign_id_type varchar(15), foreign_id varchar(20));
@@ -937,11 +958,10 @@ load data local infile '$OutputDir/INTERPRO.tab' into table INTERPRO;
 select 'LOADING pdbhits' as '';
 load data local infile '$OutputDir/pdb.tab' into table pdbhits;
 
-select 'LOADING pfam_info' as '';
-load data local infile '$OutputDir/pfam_info.tab' into table pfam_info;
-
 select 'LOADING idmapping' as '';
 load data local infile '$OutputDir/idmapping.tab' into table idmapping;
+
+GRANT SELECT ON `$dbName`.* TO '$DbUser'@'$IpRange';
 
 SQL
         ;
@@ -1032,8 +1052,8 @@ if [ ! -f $OutputDir/pdb.tab  ]; then
     exit
 fi
 
-if [ ! -f $OutputDir/pfam_info.tab ]; then
-    echo "$OutputDir/pfam_info.tab does not exist. Did the build complete?"
+if [ ! -f $OutputDir/family_info.tab ]; then
+    echo "$OutputDir/family_info.tab does not exist. Did the build complete?"
     echo "Bye."
     exit
 fi

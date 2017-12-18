@@ -186,7 +186,7 @@ unless (defined $queue) {
 }
 unless (defined $memqueue) {
     print "-memqueue not specifiied, using default\n";
-    $memqueue = "efi-mem";
+    $memqueue = $queue;
 }
 
 # Working directory must be defined
@@ -306,7 +306,7 @@ if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $baseOutputDir . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
     $accessionFileOption = "-accession-file $accessionFile";
 
-    $noMatchFile = "$tmpdir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
+    $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $baseOutputDir . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFile = "-no-match-file $noMatchFile";
 
@@ -356,12 +356,13 @@ if ($fastaFileZip =~ /\.zip$/i) {
 
 
 # Create tmp directories
-mkdir $tmpdir;
+#mkdir $tmpdir;
+mkdir $outputDir;
 
 # Write out the database version to a file
 $efiDbMod=~/(\d+)$/;
 print "database version is $1 of $efiDbMod\n";
-system("echo $1 >$tmpdir/database_version");
+system("echo $1 >$outputDir/database_version");
 
 # Set up the scheduler API so we can work with Torque or Slurm.
 my $schedType = "torque";
@@ -374,7 +375,16 @@ if (defined($oldapps)) {
 }
 
 
-my $S = new EFI::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my $logDir = "$baseOutputDir/log";
+mkdir $logDir;
+$logDir = "" if not -d $logDir;
+my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+$schedArgs{output_base_dirpath} = $logDir if $logDir;
+my $S = new EFI::SchedulerApi(%schedArgs);
+
+my $scriptDir = "$baseOutputDir/scripts";
+mkdir $scriptDir;
+$scriptDir = $outputDir if not -d $scriptDir;
 
 
 ########################################################################################################################
@@ -407,12 +417,13 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
     $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
-    $B->renderToFile("$tmpdir/initial_import.sh");
+    $B->renderToFile("$scriptDir/initial_import.sh");
 
     # Submit and keep the job id for next dependancy
-    $importjob = $S->submit("$outputDir/initial_import.sh");
+    $importjob = $S->submit("$scriptDir/initial_import.sh");
+    chomp $importjob;
 
-    print "import job is:\n $importjob";
+    print "import job is:\n $importjob\n";
     @importjobline=split /\./, $importjob;
 
 # Tax id code is different, so it is exclusive
@@ -432,11 +443,12 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $userHeaderFile=~s/^-userdat //;
         $B->addAction("cat $userHeaderFile >> struct.out");
     }
-    $B->renderToFile("$tmpdir/initial_import.sh");
+    $B->renderToFile("$scriptDir/initial_import.sh");
 
-    $importjob = $S->submit("$outputDir/initial_import.sh");
+    $importjob = $S->submit("$scriptDir/initial_import.sh");
+    chomp $importjob;
 
-    print "import job is:\n $importjob";
+    print "import job is:\n $importjob\n";
     @importjobline=split /\./, $importjob;
 } else {
     die "Error Submitting Import Job\n$importjob\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
@@ -474,9 +486,10 @@ if ($cdHitOnly) {
     }
     $B->addAction("touch  $outputDir/1.out.completed");
 
-    $B->renderToFile("$tmpdir/cdhit.sh");
-    $cdhitjob = $S->submit("$outputDir/cdhit.sh");
-    print "CD-HIT job is:\n $cdhitjob";
+    $B->renderToFile("$scriptDir/cdhit.sh");
+    $cdhitjob = $S->submit("$scriptDir/cdhit.sh");
+    chomp $cdhitjob;
+    print "CD-HIT job is:\n $cdhitjob\n";
     exit;
 }
 
@@ -513,10 +526,11 @@ CMDS
 } else {
     $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
 }
-$B->renderToFile("$tmpdir/multiplex.sh");
+$B->renderToFile("$scriptDir/multiplex.sh");
 
-$muxjob = $S->submit("$outputDir/multiplex.sh");
-print "mux job is:\n $muxjob";
+$muxjob = $S->submit("$scriptDir/multiplex.sh");
+chomp $muxjob;
+print "mux job is:\n $muxjob\n";
 @muxjobline=split /\./, $muxjob;
 
 
@@ -528,10 +542,11 @@ $B = $S->getBuilder();
 $B->dependency(0, @muxjobline[0]);
 $B->addAction("mkdir $fracOutputDir");
 $B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source $outputDir/sequences.fa");
-$B->renderToFile("$tmpdir/fracfile.sh");
+$B->renderToFile("$scriptDir/fracfile.sh");
 
-$fracfilejob = $S->submit("$tmpdir/fracfile.sh");
-print "fracfile job is:\n $fracfilejob";
+$fracfilejob = $S->submit("$scriptDir/fracfile.sh");
+chomp $fracfilejob;
+print "fracfile job is:\n $fracfilejob\n";
 @fracfilejobline=split /\./, $fracfilejob;
 
 
@@ -551,10 +566,11 @@ if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
 } else {
     $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
 }
-$B->renderToFile("$tmpdir/createdb.sh");
+$B->renderToFile("$scriptDir/createdb.sh");
 
-$createdbjob = $S->submit("$tmpdir/createdb.sh");
-print "createdb job is:\n $createdbjob";
+$createdbjob = $S->submit("$scriptDir/createdb.sh");
+chomp $createdbjob;
+print "createdb job is:\n $createdbjob\n";
 @createdbjobline=split /\./, $createdbjob;
 
 
@@ -571,36 +587,37 @@ if ($blast =~ /diamond/){
 $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load oldapps") if $oldapps;
 #$B->addAction("module load blast+");
-#$B->addAction("blastp -query  $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
+#$B->addAction("blastp -query  $fracOutputDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("mkdir $blastOutputDir");
 if ($blast eq "blast") {
     $B->addAction("module load oldapps") if $oldapps;
     #$B->addAction("module load blast");
-    $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab");
+    $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
 } elsif ($blast eq "blast+") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load blast+");
-    $B->addAction("blastp -query  $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
+    $B->addAction("blastp -query  $fracOutputDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
 } elsif ($blast eq "diamond") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load diamond");
-    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
-    $B->addAction("diamond view -o $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
+    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
+    $B->addAction("diamond view -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
 } elsif ($blast eq "diamondsensitive") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load diamond");
-    $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
-    $B->addAction("diamond view -o $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-\${PBS_ARRAYID}.fa.daa");
+    $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
+    $B->addAction("diamond view -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
 } else {
     die "Blast control not set properly.  Can only be blast, blast+, or diamond.\n";
 }
-$B->renderToFile("$tmpdir/blast-qsub.sh");
+$B->renderToFile("$scriptDir/blast-qsub.sh");
 
 $B->jobArray("");
-$blastjob = $S->submit("$tmpdir/blast-qsub.sh");
-print "blast job is:\n $blastjob";
+$blastjob = $S->submit("$scriptDir/blast-qsub.sh");
+chomp $blastjob;
+print "blast job is:\n $blastjob\n";
 @blastjobline=split /\./, $blastjob;
 
 
@@ -613,9 +630,10 @@ $B->dependency(1, @blastjobline[0]);
 $B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
 #$B->addAction("rm  $blastOutputDir/blastout-*.tab");
 #$B->addAction("rm  $fracOutputDir/fracfile-*.fa");
-$B->renderToFile("$tmpdir/catjob.sh");
-$catjob = $S->submit("$tmpdir/catjob.sh");
-print "Cat job is:\n $catjob";
+$B->renderToFile("$scriptDir/catjob.sh");
+$catjob = $S->submit("$scriptDir/catjob.sh");
+chomp $catjob;
+print "Cat job is:\n $catjob\n";
 @catjobline=split /\./, $catjob;
 
 
@@ -630,10 +648,11 @@ $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $o
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
-$B->renderToFile("$tmpdir/blastreduce.sh");
+$B->renderToFile("$scriptDir/blastreduce.sh");
 
-$blastreducejob = $S->submit("$tmpdir/blastreduce.sh");
-print "Blastreduce job is:\n $blastreducejob";
+$blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
+chomp $blastreducejob;
+print "Blastreduce job is:\n $blastreducejob\n";
 
 @blastreducejobline=split /\./, $blastreducejob;
 my $depJob = @blastreducejobline[0];
@@ -658,10 +677,11 @@ if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
 
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
-$B->renderToFile("$tmpdir/demux.sh");
+$B->renderToFile("$scriptDir/demux.sh");
 
-$demuxjob = $S->submit("$tmpdir/demux.sh");
-print "Demux job is:\n $demuxjob";
+$demuxjob = $S->submit("$scriptDir/demux.sh");
+chomp $demuxjob;
+print "Demux job is:\n $demuxjob\n";
 @demuxjobline=split /\./, $demuxjob;
 
 $depJob = @demuxjobline[0];
@@ -674,9 +694,10 @@ if ($convRatioFile) {
     $B = $S->getBuilder();
     $B->dependency(0, $depJob); 
     $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
-    $B->renderToFile("$tmpdir/conv_ratio.sh");
-    my $convRatioJob = $S->submit("$tmpdir/conv_ratio.sh");
-    print "Convergence ratio job is:\n $convRatioJob";
+    $B->renderToFile("$scriptDir/conv_ratio.sh");
+    my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
+    chomp $convRatioJob;
+    print "Convergence ratio job is:\n $convRatioJob\n";
     my @convRatioJobLine=split /\./, $convRatioJob;
     $depJob = @convRatioJobLine[0];
 }
@@ -694,10 +715,11 @@ $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-align.pl -blastout $outputDir/1.out -align $outputDir/alignment_length.png");
-$B->renderToFile("$tmpdir/quartalign.sh");
+$B->renderToFile("$scriptDir/quartalign.sh");
 
-$quartalignjob = $S->submit("$tmpdir/quartalign.sh");
-print "Quartile Align job is:\n $quartalignjob";
+$quartalignjob = $S->submit("$scriptDir/quartalign.sh");
+chomp $quartalignjob;
+print "Quartile Align job is:\n $quartalignjob\n";
 
 
 $B->queue($memqueue);
@@ -707,10 +729,11 @@ $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-perid.pl -blastout $outputDir/1.out -pid $outputDir/percent_identity.png");
-$B->renderToFile("$tmpdir/quartpid.sh");
+$B->renderToFile("$scriptDir/quartpid.sh");
 
-$quartpidjob = $S->submit("$tmpdir/quartpid.sh");
-print "Quartiles Percent Identity job is:\n $quartpidjob";
+$quartpidjob = $S->submit("$scriptDir/quartpid.sh");
+chomp $quartpidjob;
+print "Quartiles Percent Identity job is:\n $quartpidjob\n";
 
 
 $B->queue($memqueue);
@@ -719,10 +742,11 @@ $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $outputDir/allsequences.fa -lengths $outputDir/length_histogram.png -incfrac $incfrac");
-$B->renderToFile("$tmpdir/simplegraphs.sh");
+$B->renderToFile("$scriptDir/simplegraphs.sh");
 
-$simplegraphjob = $S->submit("$tmpdir/simplegraphs.sh");
-print "Simplegraphs job is:\n $simplegraphjob";
+$simplegraphjob = $S->submit("$scriptDir/simplegraphs.sh");
+chomp $simplegraphjob;
+print "Simplegraphs job is:\n $simplegraphjob\n";
 =cut end comment
 
 
@@ -769,8 +793,10 @@ $B->addAction("Rscript $efiEstTools/quart-perid.r $outputDir/rdata $outputDir/pe
 $B->addAction("Rscript $efiEstTools/hist-length.r  $outputDir/length.tab  $outputDir/length_histogram.png");
 $B->addAction("Rscript $efiEstTools/hist-edges.r $outputDir/edge.tab $outputDir/number_of_edges.png");
 $B->addAction("touch  $outputDir/1.out.completed");
-$B->renderToFile("$tmpdir/graphs.sh");
+#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->renderToFile("$scriptDir/graphs.sh");
 
-$graphjob = $S->submit("$tmpdir/graphs.sh");
-print "Graph job is:\n $graphjob";
+$graphjob = $S->submit("$scriptDir/graphs.sh");
+chomp $graphjob;
+print "Graph job is:\n $graphjob\n";
 

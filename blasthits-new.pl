@@ -49,8 +49,11 @@ die "-config file argument is required" if not -f $configFile;
 
 die "-tmpdir argument is required" if not $tmpdir;
 
+my $baseOutputDir = $ENV{PWD};
+my $outputDir = "$baseOutputDir/$tmpdir";
+
 print "db is: $dbVer\n";
-mkdir $tmpdir or die "Could not make directory $tmpdir\n" if not -d $tmpdir;
+mkdir $outputDir or die "Could not make directory $outputDir\n" if not -d $outputDir;
 
 my $blastDb = "$data_files/combined.fasta";
 my $perpass = 1000;
@@ -122,7 +125,7 @@ unless(defined $memqueue){
     $memqueue="efi";
 }
 
-$seqCountFile = "$ENV{PWD}/$tmpdir/acc_counts.txt" if not $seqCountFile;
+$seqCountFile = "$outputDir/acc_counts.txt" if not $seqCountFile;
 
 
 # Set up the scheduler API so we can work with Torque or Slurm.
@@ -136,11 +139,20 @@ if (defined($oldapps)) {
 }
 
 
-my $S = new EFI::SchedulerApi(type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my $logDir = "$baseOutputDir/log";
+mkdir $logDir;
+$logDir = "" if not -d $logDir;
+my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+$schedArgs{output_base_dirpath} = $logDir if $logDir;
+my $S = new EFI::SchedulerApi(%schedArgs);
+
+my $scriptDir = "$baseOutputDir/scripts";
+mkdir $scriptDir;
+$scriptDir = $outputDir if not -d $scriptDir;
 
 
 
-open(QUERY, ">$ENV{PWD}/$tmpdir/query.fa") or die "Cannot write out Query File to \n";
+open(QUERY, ">$outputDir/query.fa") or die "Cannot write out Query File to \n";
 print QUERY ">000000\n$seq\n";
 close QUERY;
 
@@ -151,16 +163,17 @@ my $B = $S->getBuilder();
 $B = $S->getBuilder();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("cd $ENV{PWD}/$tmpdir");
+$B->addAction("cd $outputDir");
 $B->addAction("which perl");
-$B->addAction("blastall -p blastp -i $ENV{PWD}/$tmpdir/query.fa -d $blastDb -m 8 -e $evalue -b $nresults -o $ENV{PWD}/$tmpdir/initblast.out");
-$B->addAction("cat $ENV{PWD}/$tmpdir/initblast.out |grep -v '#'|cut -f 1,2,3,4,12 |sort -k5,5nr >$ENV{PWD}/$tmpdir/blastfinal.tab");
-#$B->addAction("rm $ENV{PWD}/$tmpdir/initblast.out");
-#$B->addAction("$efiEstTools/getannotations.pl $userdat -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa");
-$B->renderToFile("$tmpdir/blasthits_initial_blast.sh");
+$B->addAction("blastall -p blastp -i $outputDir/query.fa -d $blastDb -m 8 -e $evalue -b $nresults -o $outputDir/initblast.out");
+$B->addAction("cat $outputDir/initblast.out |grep -v '#'|cut -f 1,2,3,4,12 |sort -k5,5nr >$outputDir/blastfinal.tab");
+#$B->addAction("rm $outputDir/initblast.out");
+#$B->addAction("$efiEstTools/getannotations.pl $userdat -out $outputDir/struct.out -fasta $outputDir/allsequences.fa");
+$B->renderToFile("$scriptDir/blasthits_initial_blast.sh");
 
-$initblastjob= $S->submit("$tmpdir/blasthits_initial_blast.sh");
-print "initial blast job is:\n $initblastjob";
+$initblastjob = $S->submit("$scriptDir/blasthits_initial_blast.sh");
+chomp $initblastjob;
+print "initial blast job is:\n $initblastjob\n";
 @initblastjobline=split /\./, $initblastjob;
 
 
@@ -169,13 +182,14 @@ $B = $S->getBuilder();
 $B->dependency(0, @initblastjobline[0]); 
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("cd $ENV{PWD}/$tmpdir");
+$B->addAction("cd $outputDir");
 $B->addAction("which perl");
-$B->addAction("$efiEstTools/blasthits-getmatches.pl -blastfile $ENV{PWD}/$tmpdir/blastfinal.tab -accessions $ENV{PWD}/$tmpdir/accessions.txt -max $nresults");
-$B->renderToFile("$tmpdir/blasthits_getmatches.sh");
+$B->addAction("$efiEstTools/blasthits-getmatches.pl -blastfile $outputDir/blastfinal.tab -accessions $outputDir/accessions.txt -max $nresults");
+$B->renderToFile("$scriptDir/blasthits_getmatches.sh");
 
-$getmatchesjob= $S->submit("$tmpdir/blasthits_getmatches.sh");
-print "getmatches job is:\n $getmatchesjob";
+$getmatchesjob = $S->submit("$scriptDir/blasthits_getmatches.sh");
+chomp $getmatchesjob;
+print "getmatches job is:\n $getmatchesjob\n";
 @getmatchesjobline=split /\./, $getmatchesjob;
 
 
@@ -185,13 +199,14 @@ $B = $S->getBuilder();
 $B->dependency(0, @getmatchesjobline[0]); 
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("cd $ENV{PWD}/$tmpdir");
+$B->addAction("cd $outputDir");
 $B->addAction("which perl");
 $B->addAction("blasthits-createfasta.pl -fasta allsequences.fa -accessions accessions.txt -seq-count-file $seqCountFile");
-$B->renderToFile("$tmpdir/blasthits_createfasta.sh");
+$B->renderToFile("$scriptDir/blasthits_createfasta.sh");
 
-$createfastajob= $S->submit("$tmpdir/blasthits_createfasta.sh");
-print "createfasta job is:\n $createfastajob";
+$createfastajob = $S->submit("$scriptDir/blasthits_createfasta.sh");
+chomp $createfastajob;
+print "createfasta job is:\n $createfastajob\n";
 @createfastajobline=split /\./, $createfastajob;
 
 
@@ -200,13 +215,14 @@ $B = $S->getBuilder();
 $B->dependency(0, @createfastajobline[0]); 
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("cd $ENV{PWD}/$tmpdir");
+$B->addAction("cd $outputDir");
 $B->addAction("which perl");
-$B->addAction("getannotations.pl -out ".$ENV{PWD}."/$tmpdir/struct.out -fasta ".$ENV{PWD}."/$tmpdir/allsequences.fa -config=$configFile");
-$B->renderToFile("$tmpdir/blasthits_getannotations.sh");
+$B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa -config=$configFile");
+$B->renderToFile("$scriptDir/blasthits_getannotations.sh");
 
-$annotationjob= $S->submit("$tmpdir/blasthits_getannotations.sh");
-print "annotation job is:\n $annotationjob";
+$annotationjob = $S->submit("$scriptDir/blasthits_getannotations.sh");
+chomp $annotationjob;
+print "annotation job is:\n $annotationjob\n";
 @annotationjobline=split /\./, $annotationjob;
 
 
@@ -218,16 +234,17 @@ $B->dependency(0, @createfastajobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 #  $B->addAction("module load blast");
-$B->addAction("cd $ENV{PWD}/$tmpdir");
+$B->addAction("cd $outputDir");
 if($multiplexing eq "on"){
-    $B->addAction("cd-hit -c $sim -s $lengthdif -i $ENV{PWD}/$tmpdir/allsequences.fa -o $ENV{PWD}/$tmpdir/sequences.fa");
+    $B->addAction("cd-hit -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa");
 }else{
-    $B->addAction("cp $ENV{PWD}/$tmpdir/allsequences.fa $ENV{PWD}/$tmpdir/sequences.fa");
+    $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
 }
-$B->renderToFile("$tmpdir/blasthits_multiplex.sh");
+$B->renderToFile("$scriptDir/blasthits_multiplex.sh");
 
-$muxjob= $S->submit("$tmpdir/blasthits_multiplex.sh");
-print "multiplex job is:\n $muxjob";
+$muxjob = $S->submit("$scriptDir/blasthits_multiplex.sh");
+chomp $muxjob;
+print "multiplex job is:\n $muxjob\n";
 @muxjobline=split /\./, $muxjob;
 
 
@@ -237,11 +254,12 @@ $B = $S->getBuilder();
 
 $B->dependency(0, @muxjobline[0]); 
 $B->addAction("module load $efiEstMod");
-$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp ".$ENV{PWD}."/$tmpdir -source $ENV{PWD}/$tmpdir/sequences.fa");
-$B->renderToFile("$tmpdir/blasthits_fracfile.sh");
+$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $outputDir -source $outputDir/sequences.fa");
+$B->renderToFile("$scriptDir/blasthits_fracfile.sh");
 
-$fracfilejob= $S->submit("$tmpdir/blasthits_fracfile.sh");
-print "fracfile job is: $fracfilejob";
+$fracfilejob = $S->submit("$scriptDir/blasthits_fracfile.sh");
+chomp $fracfilejob;
+print "fracfile job is: $fracfilejob\n";
 @fracfilejobline=split /\./, $fracfilejob;
 
 
@@ -251,12 +269,13 @@ $B = $S->getBuilder();
 $B->dependency(0, @muxjobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("cd $ENV{PWD}/$tmpdir");
+$B->addAction("cd $outputDir");
 $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
-$B->renderToFile("$tmpdir/blasthits_createdb.sh");
+$B->renderToFile("$scriptDir/blasthits_createdb.sh");
 
-$createdbjob= $S->submit("$tmpdir/blasthits_createdb.sh");
-print "createdb job is:\n $createdbjob";
+$createdbjob = $S->submit("$scriptDir/blasthits_createdb.sh");
+chomp $createdbjob;
+print "createdb job is:\n $createdbjob\n";
 @createdbjobline=split /\./, $createdbjob;
 
 
@@ -266,16 +285,17 @@ $B = $S->getBuilder();
 $B->jobArray("1-$np");
 $B->dependency(0, @createdbjobline[0] . ":" . @fracfilejobline[0]);
 $B->addAction("module load $efiEstMod");
-$B->addAction("export BLASTDB=$ENV{PWD}/$tmpdir");
+$B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load blast+");
-#$B->addAction("blastp -query  $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
+#$B->addAction("blastp -query  $outputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $outputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
 $B->addAction("module load $efiDbMod");
-$B->addAction("blastall -p blastp -i $ENV{PWD}/$tmpdir/fracfile-\${PBS_ARRAYID}.fa -d $ENV{PWD}/$tmpdir/database -m 8 -e $evalue -b $blasthits -o $ENV{PWD}/$tmpdir/blastout-\${PBS_ARRAYID}.fa.tab");
-$B->renderToFile("$tmpdir/blasthits_blast-qsub.sh");
+$B->addAction("blastall -p blastp -i $outputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $outputDir/blastout-\${PBS_ARRAYID}.fa.tab");
+$B->renderToFile("$scriptDir/blasthits_blast-qsub.sh");
 
 
-$blastjob= $S->submit("$tmpdir/blasthits_blast-qsub.sh");
-print "blast job is:\n $blastjob";
+$blastjob = $S->submit("$scriptDir/blasthits_blast-qsub.sh");
+chomp $blastjob;
+print "blast job is:\n $blastjob\n";
 @blastjobline=split /\./, $blastjob;
 
 
@@ -284,13 +304,14 @@ print "blast job is:\n $blastjob";
 #join all the blast outputs back together
 $B = $S->getBuilder();
 $B->dependency(1, @blastjobline[0]); 
-$B->addAction("cat $ENV{PWD}/$tmpdir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$ENV{PWD}/$tmpdir/blastfinal.tab");
-$B->addAction("rm  $ENV{PWD}/$tmpdir/blastout-*.tab");
-$B->addAction("rm  $ENV{PWD}/$tmpdir/fracfile-*.fa");
-$B->renderToFile("$tmpdir/blasthits_catjob.sh");
+$B->addAction("cat $outputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
+$B->addAction("rm  $outputDir/blastout-*.tab");
+$B->addAction("rm  $outputDir/fracfile-*.fa");
+$B->renderToFile("$scriptDir/blasthits_catjob.sh");
 
-$catjob= $S->submit("$tmpdir/blasthits_catjob.sh");
-print "Cat job is:\n $catjob";
+$catjob = $S->submit("$scriptDir/blasthits_catjob.sh");
+chomp $catjob;
+print "Cat job is:\n $catjob\n";
 @catjobline=split /\./, $catjob;
 
 
@@ -301,15 +322,16 @@ $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, @catjobline[0]); 
 $B->addAction("module load $efiEstMod");
-#$B->addAction("mv $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.blastfinal.tab");
-$B->addAction("$efiEstTools/alphabetize.pl -in $ENV{PWD}/$tmpdir/blastfinal.tab -out $ENV{PWD}/$tmpdir/alphabetized.blastfinal.tab -fasta $ENV{PWD}/$tmpdir/sequences.fa");
-$B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $ENV{PWD}/$tmpdir/alphabetized.blastfinal.tab > $ENV{PWD}/$tmpdir/sorted.alphabetized.blastfinal.tab");
-$B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $ENV{PWD}/$tmpdir/sorted.alphabetized.blastfinal.tab -fasta $ENV{PWD}/$tmpdir/sequences.fa -out $ENV{PWD}/$tmpdir/unsorted.1.out");
-$B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $ENV{PWD}/$tmpdir/unsorted.1.out >$ENV{PWD}/$tmpdir/1.out");
-$B->renderToFile("$tmpdir/blasthits_blastreduce.sh");
+#$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
+$B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
+$B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
+$B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa -out $outputDir/unsorted.1.out");
+$B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->renderToFile("$scriptDir/blasthits_blastreduce.sh");
 
-$blastreducejob= $S->submit("$tmpdir/blasthits_blastreduce.sh");
-print "Blastreduce job is:\n $blastreducejob";
+$blastreducejob = $S->submit("$scriptDir/blasthits_blastreduce.sh");
+chomp $blastreducejob;
+print "Blastreduce job is:\n $blastreducejob\n";
 @blastreducejobline=split /\./, $blastreducejob;
 
 
@@ -321,18 +343,19 @@ $B->queue($memqueue);
 $B->dependency(0, @blastreducejobline[0]); 
 $B->addAction("module load $efiEstMod");
 if($multiplexing eq "on"){
-    $B->addAction("mv $ENV{PWD}/$tmpdir/1.out $ENV{PWD}/$tmpdir/mux.out");
-    $B->addAction("$efiEstTools/demux.pl -blastin $ENV{PWD}/$tmpdir/mux.out -blastout $ENV{PWD}/$tmpdir/1.out -cluster $ENV{PWD}/$tmpdir/sequences.fa.clstr");
+    $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
+    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
 }else{
-    $B->addAction("mv $ENV{PWD}/$tmpdir/1.out $ENV{PWD}/$tmpdir/mux.out");
-    $B->addAction("$efiEstTools/removedups.pl -in $ENV{PWD}/$tmpdir/mux.out -out $ENV{PWD}/$tmpdir/1.out");
+    $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
+    $B->addAction("$efiEstTools/removedups.pl -in $outputDir/mux.out -out $outputDir/1.out");
 }
-#$B->addAction("rm $ENV{PWD}/$tmpdir/*blastfinal.tab");
-#$B->addAction("rm $ENV{PWD}/$tmpdir/mux.out");
-$B->renderToFile("$tmpdir/blasthits_demux.sh");
+#$B->addAction("rm $outputDir/*blastfinal.tab");
+#$B->addAction("rm $outputDir/mux.out");
+$B->renderToFile("$scriptDir/blasthits_demux.sh");
 
-$demuxjob= $S->submit("$tmpdir/blasthits_demux.sh");
-print "Demux job is:\n $demuxjob";
+$demuxjob = $S->submit("$scriptDir/blasthits_demux.sh");
+chomp $demuxjob;
+print "Demux job is:\n $demuxjob\n";
 @demuxjobline=split /\./, $demuxjob;
 
 
@@ -346,23 +369,24 @@ $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 #$B->addAction("module load R/3.1.0");
-$B->addAction("mkdir $ENV{PWD}/$tmpdir/rdata");
-$B->addAction("$efiEstTools/Rgraphs.pl -blastout $ENV{PWD}/$tmpdir/1.out -rdata  $ENV{PWD}/$tmpdir/rdata -edges  $ENV{PWD}/$tmpdir/edge.tab -fasta  $ENV{PWD}/$tmpdir/allsequences.fa -length  $ENV{PWD}/$tmpdir/length.tab -incfrac $incfrac");
-$B->addAction("FIRST=`ls $ENV{PWD}/$tmpdir/rdata/perid*| head -1`");
+$B->addAction("mkdir $outputDir/rdata");
+$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
+$B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
 $B->addAction("FIRST=`head -1 \$FIRST`");
-$B->addAction("LAST=`ls $ENV{PWD}/$tmpdir/rdata/perid*| tail -1`");
+$B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
 $B->addAction("LAST=`head -1 \$LAST`");
-$B->addAction("MAXALIGN=`head -1 $ENV{PWD}/$tmpdir/rdata/maxyal`");
-$B->addAction("Rscript $efiEstTools/quart-align.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/alignment_length.png \$FIRST \$LAST \$MAXALIGN");
-$B->addAction("Rscript $efiEstTools/quart-perid.r $ENV{PWD}/$tmpdir/rdata $ENV{PWD}/$tmpdir/percent_identity.png \$FIRST \$LAST");
-$B->addAction("Rscript $efiEstTools/hist-length.r  $ENV{PWD}/$tmpdir/length.tab  $ENV{PWD}/$tmpdir/length_histogram.png");
-$B->addAction("Rscript $efiEstTools/hist-edges.r $ENV{PWD}/$tmpdir/edge.tab $ENV{PWD}/$tmpdir/number_of_edges.png");
-$B->addAction("touch  $ENV{PWD}/$tmpdir/1.out.completed");
-#$B->addAction("rm $ENV{PWD}/$tmpdir/alphabetized.blastfinal.tab $ENV{PWD}/$tmpdir/blastfinal.tab $ENV{PWD}/$tmpdir/sorted.alphabetized.blastfinal.tab $ENV{PWD}/$tmpdir/unsorted.1.out");
-$B->renderToFile("$tmpdir/blasthits_graphs.sh");
+$B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
+$B->addAction("Rscript $efiEstTools/quart-align.r $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN");
+$B->addAction("Rscript $efiEstTools/quart-perid.r $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST");
+$B->addAction("Rscript $efiEstTools/hist-length.r  $outputDir/length.tab  $outputDir/length_histogram.png");
+$B->addAction("Rscript $efiEstTools/hist-edges.r $outputDir/edge.tab $outputDir/number_of_edges.png");
+$B->addAction("touch  $outputDir/1.out.completed");
+#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->renderToFile("$scriptDir/blasthits_graphs.sh");
 
-$graphjob= $S->submit("$tmpdir/blasthits_graphs.sh");
-print "Graph job is:\n $graphjob";
+$graphjob = $S->submit("$scriptDir/blasthits_graphs.sh");
+chomp $graphjob;
+print "Graph job is:\n $graphjob\n";
 
 
 
