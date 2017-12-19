@@ -133,6 +133,7 @@ if (not -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
     $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh");
 
     $filterjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun);
+    chomp $filterjob;
     print "Filterblast job is:\n $filterjob\n";
 
     @filterjobline = split /\./, $filterjob;
@@ -159,6 +160,7 @@ $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh");
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
 
 $fulljob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh", $dryrun, $schedType);
+chomp $fulljob;
 print "Full xgmml job is:\n $fulljob\n";
 
 @fulljobline = split /\./, $fulljob;
@@ -181,6 +183,7 @@ $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 $repnodejob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh", $dryrun, $schedType);
+chomp $repnodejob;
 print "Repnodes job is:\n $repnodejob\n";
 
 
@@ -198,6 +201,7 @@ $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh");
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 
 $fixjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh", $dryrun, $schedType);
+chomp $fixjob;
 print "Fix job is:\n $fixjob\n";
 @fixjobline = split /\./, $fixjob;
 
@@ -214,6 +218,7 @@ $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 $statjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh", $dryrun, $schedType);
+chomp $statjob;
 print "Stats job is:\n $statjob\n";
 
 
