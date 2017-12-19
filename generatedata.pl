@@ -421,6 +421,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     # Submit and keep the job id for next dependancy
     $importjob = $S->submit("$scriptDir/initial_import.sh");
+    chomp $importjob;
 
     print "import job is:\n $importjob\n";
     @importjobline=split /\./, $importjob;
@@ -445,6 +446,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->renderToFile("$scriptDir/initial_import.sh");
 
     $importjob = $S->submit("$scriptDir/initial_import.sh");
+    chomp $importjob;
 
     print "import job is:\n $importjob\n";
     @importjobline=split /\./, $importjob;
@@ -486,6 +488,7 @@ if ($cdHitOnly) {
 
     $B->renderToFile("$scriptDir/cdhit.sh");
     $cdhitjob = $S->submit("$scriptDir/cdhit.sh");
+    chomp $cdhitjob;
     print "CD-HIT job is:\n $cdhitjob\n";
     exit;
 }
@@ -526,6 +529,7 @@ CMDS
 $B->renderToFile("$scriptDir/multiplex.sh");
 
 $muxjob = $S->submit("$scriptDir/multiplex.sh");
+chomp $muxjob;
 print "mux job is:\n $muxjob\n";
 @muxjobline=split /\./, $muxjob;
 
@@ -541,6 +545,7 @@ $B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source
 $B->renderToFile("$scriptDir/fracfile.sh");
 
 $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
+chomp $fracfilejob;
 print "fracfile job is:\n $fracfilejob\n";
 @fracfilejobline=split /\./, $fracfilejob;
 
@@ -564,6 +569,7 @@ if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
 $B->renderToFile("$scriptDir/createdb.sh");
 
 $createdbjob = $S->submit("$scriptDir/createdb.sh");
+chomp $createdbjob;
 print "createdb job is:\n $createdbjob\n";
 @createdbjobline=split /\./, $createdbjob;
 
@@ -610,6 +616,7 @@ $B->renderToFile("$scriptDir/blast-qsub.sh");
 
 $B->jobArray("");
 $blastjob = $S->submit("$scriptDir/blast-qsub.sh");
+chomp $blastjob;
 print "blast job is:\n $blastjob\n";
 @blastjobline=split /\./, $blastjob;
 
@@ -625,6 +632,7 @@ $B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12
 #$B->addAction("rm  $fracOutputDir/fracfile-*.fa");
 $B->renderToFile("$scriptDir/catjob.sh");
 $catjob = $S->submit("$scriptDir/catjob.sh");
+chomp $catjob;
 print "Cat job is:\n $catjob\n";
 @catjobline=split /\./, $catjob;
 
@@ -643,6 +651,7 @@ $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$
 $B->renderToFile("$scriptDir/blastreduce.sh");
 
 $blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
+chomp $blastreducejob;
 print "Blastreduce job is:\n $blastreducejob\n";
 
 @blastreducejobline=split /\./, $blastreducejob;
@@ -671,6 +680,7 @@ if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
 $B->renderToFile("$scriptDir/demux.sh");
 
 $demuxjob = $S->submit("$scriptDir/demux.sh");
+chomp $demuxjob;
 print "Demux job is:\n $demuxjob\n";
 @demuxjobline=split /\./, $demuxjob;
 
@@ -686,6 +696,7 @@ if ($convRatioFile) {
     $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
     $B->renderToFile("$scriptDir/conv_ratio.sh");
     my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
+    chomp $convRatioJob;
     print "Convergence ratio job is:\n $convRatioJob\n";
     my @convRatioJobLine=split /\./, $convRatioJob;
     $depJob = @convRatioJobLine[0];
@@ -707,6 +718,7 @@ $B->addAction("$efiEstTools/quart-align.pl -blastout $outputDir/1.out -align $ou
 $B->renderToFile("$scriptDir/quartalign.sh");
 
 $quartalignjob = $S->submit("$scriptDir/quartalign.sh");
+chomp $quartalignjob;
 print "Quartile Align job is:\n $quartalignjob\n";
 
 
@@ -720,6 +732,7 @@ $B->addAction("$efiEstTools/quart-perid.pl -blastout $outputDir/1.out -pid $outp
 $B->renderToFile("$scriptDir/quartpid.sh");
 
 $quartpidjob = $S->submit("$scriptDir/quartpid.sh");
+chomp $quartpidjob;
 print "Quartiles Percent Identity job is:\n $quartpidjob\n";
 
 
@@ -732,6 +745,7 @@ $B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $o
 $B->renderToFile("$scriptDir/simplegraphs.sh");
 
 $simplegraphjob = $S->submit("$scriptDir/simplegraphs.sh");
+chomp $simplegraphjob;
 print "Simplegraphs job is:\n $simplegraphjob\n";
 =cut end comment
 
@@ -763,5 +777,6 @@ $B->addAction("touch  $outputDir/1.out.completed");
 $B->renderToFile("$scriptDir/graphs.sh");
 
 $graphjob = $S->submit("$scriptDir/graphs.sh");
+chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
 
