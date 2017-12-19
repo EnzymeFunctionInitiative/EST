@@ -1,5 +1,5 @@
 args <- commandArgs(trailingOnly = TRUE)
-png(args[2], width=2000, height=900);
+png(args[2], width=2000, height=900, type="cairo");
 #par(mar=c(4,4,4,4))
 datafiles=list.files(path = args[1], pattern = "perid")
 first=args[3]

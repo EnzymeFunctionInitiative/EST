@@ -255,6 +255,8 @@ $noMatchFile = ""   unless defined $noMatchFile;
 my $baseOutputDir = $ENV{PWD};
 my $outputDir = "$baseOutputDir/$tmpdir";
 
+my $pythonMod = getPythonLmod();
+
 print "Blast is $blast\n";
 print "domain is $domain\n";
 print "fraction is $fraction\n";
@@ -287,6 +289,7 @@ print "output directory is $outputDir\n";
 print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
 print "uniref-expand is $unirefExpand\n";
+print "Python module is $pythonMod\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -748,7 +751,7 @@ $B->mailEnd();
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("module load Python");
+$B->addAction("module load $pythonMod");
 $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
 $B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
 $B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId $fullWidth $fullHeight");
@@ -764,4 +767,19 @@ $B->renderToFile("$scriptDir/graphs.sh");
 
 $graphjob = $S->submit("$scriptDir/graphs.sh");
 print "Graph job is:\n $graphjob\n";
+
+
+
+
+sub getPythonLmod {
+    use Capture::Tiny qw(capture);
+
+    my ($out, $err) = capture {
+        `source /etc/profile; module -t avail`;
+    };
+    my @py2 = grep m{Python/2}, (split m/[\n\r]+/gs, $err);
+
+    return scalar @py2 ? $py2[0] : "Python";
+}
+
 

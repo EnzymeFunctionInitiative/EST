@@ -25,7 +25,7 @@ if (length(args) > 4) {
 
 
 print(paste(start,",",stop))
-png(pngfile, width=im_width, height=im_height)
+png(pngfile, width=im_width, height=im_height, type="cairo")
 
 newdata=t(rep(NA,stop))
 

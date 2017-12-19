@@ -6,7 +6,7 @@ maxalign=as.integer(args[5])
 print(paste("range",first,last))
 data=t(rep(NA,length(datafiles)))
 colnames(data)<-first:last
-png(args[2], width=2000, height=900);
+png(args[2], width=2000, height=900, type="cairo");
 print(maxalign)
 boxplot(data,  main = "Alignment Length vs Alignment Score", ylab = "Alignment Length", xlab = "Alignment Score",ylim=range(0,maxalign))
 for (i in 1:length(datafiles)){
@@ -20,7 +20,7 @@ for (i in 1:length(datafiles)){
 }
 dev.off()
 #data=read.delim(args[1], header=TRUE, sep="\t", check.names = FALSE)
-#png(args[2], width=1800, height=900);
+#png(args[2], width=1800, height=900, type="cairo");
 #par(mar=c(4,4,4,4))
 #boxplot(data, main = "Alignment Length vs Alignment Score", ylab = "Alignment Length", xlab = "Alignment Score", col = "red", border = "blue", range = 0)
 #dev.off()
