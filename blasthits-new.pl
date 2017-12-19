@@ -171,7 +171,8 @@ $B->addAction("cat $outputDir/initblast.out |grep -v '#'|cut -f 1,2,3,4,12 |sort
 #$B->addAction("$efiEstTools/getannotations.pl $userdat -out $outputDir/struct.out -fasta $outputDir/allsequences.fa");
 $B->renderToFile("$scriptDir/blasthits_initial_blast.sh");
 
-$initblastjob= $S->submit("$scriptDir/blasthits_initial_blast.sh");
+$initblastjob = $S->submit("$scriptDir/blasthits_initial_blast.sh");
+chomp $initblastjob;
 print "initial blast job is:\n $initblastjob\n";
 @initblastjobline=split /\./, $initblastjob;
 
@@ -186,7 +187,8 @@ $B->addAction("which perl");
 $B->addAction("$efiEstTools/blasthits-getmatches.pl -blastfile $outputDir/blastfinal.tab -accessions $outputDir/accessions.txt -max $nresults");
 $B->renderToFile("$scriptDir/blasthits_getmatches.sh");
 
-$getmatchesjob= $S->submit("$scriptDir/blasthits_getmatches.sh");
+$getmatchesjob = $S->submit("$scriptDir/blasthits_getmatches.sh");
+chomp $getmatchesjob;
 print "getmatches job is:\n $getmatchesjob\n";
 @getmatchesjobline=split /\./, $getmatchesjob;
 
@@ -202,7 +204,8 @@ $B->addAction("which perl");
 $B->addAction("blasthits-createfasta.pl -fasta allsequences.fa -accessions accessions.txt -seq-count-file $seqCountFile");
 $B->renderToFile("$scriptDir/blasthits_createfasta.sh");
 
-$createfastajob= $S->submit("$scriptDir/blasthits_createfasta.sh");
+$createfastajob = $S->submit("$scriptDir/blasthits_createfasta.sh");
+chomp $createfastajob;
 print "createfasta job is:\n $createfastajob\n";
 @createfastajobline=split /\./, $createfastajob;
 
@@ -217,7 +220,8 @@ $B->addAction("which perl");
 $B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa -config=$configFile");
 $B->renderToFile("$scriptDir/blasthits_getannotations.sh");
 
-$annotationjob= $S->submit("$scriptDir/blasthits_getannotations.sh");
+$annotationjob = $S->submit("$scriptDir/blasthits_getannotations.sh");
+chomp $annotationjob;
 print "annotation job is:\n $annotationjob\n";
 @annotationjobline=split /\./, $annotationjob;
 
@@ -238,7 +242,8 @@ if($multiplexing eq "on"){
 }
 $B->renderToFile("$scriptDir/blasthits_multiplex.sh");
 
-$muxjob= $S->submit("$scriptDir/blasthits_multiplex.sh");
+$muxjob = $S->submit("$scriptDir/blasthits_multiplex.sh");
+chomp $muxjob;
 print "multiplex job is:\n $muxjob\n";
 @muxjobline=split /\./, $muxjob;
 
@@ -255,7 +260,8 @@ $B->addAction("mkdir $blastOutDir");
 $B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $blastOutDir -source $outputDir/sequences.fa");
 $B->renderToFile("$scriptDir/blasthits_fracfile.sh");
 
-$fracfilejob= $S->submit("$scriptDir/blasthits_fracfile.sh");
+$fracfilejob = $S->submit("$scriptDir/blasthits_fracfile.sh");
+chomp $fracfilejob;
 print "fracfile job is: $fracfilejob\n";
 @fracfilejobline=split /\./, $fracfilejob;
 
@@ -270,7 +276,8 @@ $B->addAction("cd $outputDir");
 $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
 $B->renderToFile("$scriptDir/blasthits_createdb.sh");
 
-$createdbjob= $S->submit("$scriptDir/blasthits_createdb.sh");
+$createdbjob = $S->submit("$scriptDir/blasthits_createdb.sh");
+chomp $createdbjob;
 print "createdb job is:\n $createdbjob\n";
 @createdbjobline=split /\./, $createdbjob;
 
@@ -289,7 +296,8 @@ $B->addAction("blastall -p blastp -i $blastOutDir/fracfile-{JOB_ARRAYID}.fa -d $
 $B->renderToFile("$scriptDir/blasthits_blast-qsub.sh");
 
 
-$blastjob= $S->submit("$scriptDir/blasthits_blast-qsub.sh");
+$blastjob = $S->submit("$scriptDir/blasthits_blast-qsub.sh");
+chomp $blastjob;
 print "blast job is:\n $blastjob\n";
 @blastjobline=split /\./, $blastjob;
 
@@ -304,7 +312,8 @@ $B->addAction("rm  $blastOutDir/blastout-*.tab");
 $B->addAction("rm  $blastOutDir/fracfile-*.fa");
 $B->renderToFile("$scriptDir/blasthits_catjob.sh");
 
-$catjob= $S->submit("$scriptDir/blasthits_catjob.sh");
+$catjob = $S->submit("$scriptDir/blasthits_catjob.sh");
+chomp $catjob;
 print "Cat job is:\n $catjob\n";
 @catjobline=split /\./, $catjob;
 
@@ -323,7 +332,8 @@ $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphab
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->renderToFile("$scriptDir/blasthits_blastreduce.sh");
 
-$blastreducejob= $S->submit("$scriptDir/blasthits_blastreduce.sh");
+$blastreducejob = $S->submit("$scriptDir/blasthits_blastreduce.sh");
+chomp $blastreducejob;
 print "Blastreduce job is:\n $blastreducejob\n";
 @blastreducejobline=split /\./, $blastreducejob;
 
@@ -346,7 +356,8 @@ if($multiplexing eq "on"){
 #$B->addAction("rm $outputDir/mux.out");
 $B->renderToFile("$scriptDir/blasthits_demux.sh");
 
-$demuxjob= $S->submit("$scriptDir/blasthits_demux.sh");
+$demuxjob = $S->submit("$scriptDir/blasthits_demux.sh");
+chomp $demuxjob;
 print "Demux job is:\n $demuxjob\n";
 @demuxjobline=split /\./, $demuxjob;
 
@@ -376,7 +387,8 @@ $B->addAction("touch  $outputDir/1.out.completed");
 #$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->renderToFile("$scriptDir/blasthits_graphs.sh");
 
-$graphjob= $S->submit("$scriptDir/blasthits_graphs.sh");
+$graphjob = $S->submit("$scriptDir/blasthits_graphs.sh");
+chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
 
 
