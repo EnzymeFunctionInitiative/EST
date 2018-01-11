@@ -55,7 +55,7 @@ use File::Basename;
 use Getopt::Long;
 use POSIX qw(ceil);
 use EFI::SchedulerApi;
-use EFI::Util qw(usesSlurm);
+use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
 
@@ -256,7 +256,10 @@ $noMatchFile = ""   unless defined $noMatchFile;
 my $baseOutputDir = $ENV{PWD};
 my $outputDir = "$baseOutputDir/$tmpdir";
 
-my $pythonMod = getPythonLmod();
+my $pythonMod = getLmod("Python/2", "Python");
+my $gdMod = getLmod("GD.*Perl", "GD");
+my $perlMod = "Perl";
+my $rMod = "R";
 
 print "Blast is $blast\n";
 print "domain is $domain\n";
@@ -404,7 +407,6 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("cd $outputDir");
-    $B->addAction("which perl");
     $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
     $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
     if ($fastaFile) {
@@ -768,6 +770,9 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
     $B->resource(1, 24, "50gb");
+    $B->addAction("module load $gdMod");
+    $B->addAction("module load $perlMod");
+    $B->addAction("module load $rMod");
     $B->addAction("mkdir $outputDir/rdata");
     $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
@@ -799,18 +804,5 @@ $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
 
-
-
-
-sub getPythonLmod {
-    use Capture::Tiny qw(capture);
-
-    my ($out, $err) = capture {
-        `source /etc/profile; module -t avail`;
-    };
-    my @py2 = grep m{Python/2}, (split m/[\n\r]+/gs, $err);
-
-    return scalar @py2 ? $py2[0] : "Python";
-}
 
 
