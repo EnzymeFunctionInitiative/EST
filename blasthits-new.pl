@@ -142,7 +142,7 @@ if (defined($oldapps)) {
 my $logDir = "$baseOutputDir/log";
 mkdir $logDir;
 $logDir = "" if not -d $logDir;
-my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 my $S = new EFI::SchedulerApi(%schedArgs);
 
@@ -161,6 +161,7 @@ print "\nBlast for similar sequences and sort based off bitscore\n";
 my $B = $S->getBuilder();
 
 $B = $S->getBuilder();
+$B->resource(1, 1, "50gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
@@ -286,6 +287,7 @@ print "createdb job is:\n $createdbjob\n";
 #generate $np blast scripts for files from fracfile step
 $B = $S->getBuilder();
 $B->jobArray("1-$np");
+$B->resource(1, 1, "15gb");
 $B->dependency(0, @createdbjobline[0] . ":" . @fracfilejobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("export BLASTDB=$outputDir");
@@ -368,6 +370,7 @@ print "Demux job is:\n $demuxjob\n";
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]); 
+$B->resource(1, 24, "50gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
