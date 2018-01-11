@@ -142,7 +142,7 @@ if (defined($oldapps)) {
 my $logDir = "$baseOutputDir/log";
 mkdir $logDir;
 $logDir = "" if not -d $logDir;
-my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 my $S = new EFI::SchedulerApi(%schedArgs);
 
@@ -161,6 +161,7 @@ print "\nBlast for similar sequences and sort based off bitscore\n";
 my $B = $S->getBuilder();
 
 $B = $S->getBuilder();
+$B->resource(1, 1, "50gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
@@ -249,12 +250,15 @@ print "multiplex job is:\n $muxjob\n";
 
 
 
+my $blastOutDir = "$outputDir/blast";
+
 #break sequenes.fa into $np parts for blast
 $B = $S->getBuilder();
 
 $B->dependency(0, @muxjobline[0]); 
 $B->addAction("module load $efiEstMod");
-$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $outputDir -source $outputDir/sequences.fa");
+$B->addAction("mkdir $blastOutDir");
+$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $blastOutDir -source $outputDir/sequences.fa");
 $B->renderToFile("$scriptDir/blasthits_fracfile.sh");
 
 $fracfilejob = $S->submit("$scriptDir/blasthits_fracfile.sh");
@@ -283,13 +287,14 @@ print "createdb job is:\n $createdbjob\n";
 #generate $np blast scripts for files from fracfile step
 $B = $S->getBuilder();
 $B->jobArray("1-$np");
+$B->resource(1, 1, "15gb");
 $B->dependency(0, @createdbjobline[0] . ":" . @fracfilejobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load blast+");
-#$B->addAction("blastp -query  $outputDir/fracfile-\${PBS_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $outputDir/blastout-\${PBS_ARRAYID}.fa.tab -evalue $evalue");
+#$B->addAction("blastp -query  $blastOutDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
 $B->addAction("module load $efiDbMod");
-$B->addAction("blastall -p blastp -i $outputDir/fracfile-\${PBS_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $outputDir/blastout-\${PBS_ARRAYID}.fa.tab");
+$B->addAction("blastall -p blastp -i $blastOutDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab");
 $B->renderToFile("$scriptDir/blasthits_blast-qsub.sh");
 
 
@@ -304,9 +309,9 @@ print "blast job is:\n $blastjob\n";
 #join all the blast outputs back together
 $B = $S->getBuilder();
 $B->dependency(1, @blastjobline[0]); 
-$B->addAction("cat $outputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
-$B->addAction("rm  $outputDir/blastout-*.tab");
-$B->addAction("rm  $outputDir/fracfile-*.fa");
+$B->addAction("cat $blastOutDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
+$B->addAction("rm  $blastOutDir/blastout-*.tab");
+$B->addAction("rm  $blastOutDir/fracfile-*.fa");
 $B->renderToFile("$scriptDir/blasthits_catjob.sh");
 
 $catjob = $S->submit("$scriptDir/blasthits_catjob.sh");
@@ -344,7 +349,7 @@ $B->dependency(0, @blastreducejobline[0]);
 $B->addAction("module load $efiEstMod");
 if($multiplexing eq "on"){
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
-    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
+    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $blastOutDir/1.out -cluster $outputDir/sequences.fa.clstr");
 }else{
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/removedups.pl -in $outputDir/mux.out -out $outputDir/1.out");
@@ -365,12 +370,13 @@ print "Demux job is:\n $demuxjob\n";
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]); 
+$B->resource(1, 24, "50gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 #$B->addAction("module load R/3.1.0");
 $B->addAction("mkdir $outputDir/rdata");
-$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
+$B->addAction("$efiEstTools/Rgraphs.pl -blastout $blastOutDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
 $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
 $B->addAction("FIRST=`head -1 \$FIRST`");
 $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
