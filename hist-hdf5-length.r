@@ -28,7 +28,7 @@ maxy=maxy[1][1]
 #data2=t(data [, -1])
 #colnames(data2)=data[ ,1]
 colnames(newdata)=seq(start,stop-1)
-png(args[2], width=im_width, height=im_height);
+png(args[2], width=im_width, height=im_height, type="cairo");
 par(mar=c(4,4,4,4))
 
 barplot(newdata, main = paste("Number of Sequences at Each Length", jobnum), ylab = "Number of Sequences", xlab = "Length", col = "red", border = "blue")

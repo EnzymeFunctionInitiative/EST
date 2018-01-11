@@ -23,7 +23,7 @@ if (length(args) > 4) {
 }
 
 colnames(newdata)=seq(start,stop-1)
-png(args[2], width=im_width, height=im_height);
+png(args[2], width=im_width, height=im_height, type="cairo");
 par(mar=c(4,4,4,4))
 
 barplot(newdata, main = paste("Number of edges at score", jobnum), ylab = "Number of Edges", xlab = "Score", col = "red", border = "blue")

@@ -655,10 +655,14 @@ sub submitDownloadJob {
         $B->addAction("date > $CompletedFlagFile.uniref90.xml\n");
     }
     my $pfamInfoUrl = $config->{build}->{pfam_info_url};
+    my $clanInfoUrl = exists $config->{build}->{clan_info_url} ? $config->{build}->{clan_info_url} : "";
     if (not $skipIfExists or not -f "$InputDir/Pfam-A.clans.tsv.gz" and not -f "$InputDir/Pfam-A.clans.tsv") {
         logprint "#  Downloading $pfamInfoUrl\n";
         $B->addAction("echo Downloading Pfam-A.clans.tsv.gz");
         $B->addAction("curl -sS $pfamInfoUrl > $InputDir/Pfam-A.clans.tsv.gz");
+        if ($clanInfoUrl) {
+            $B->addAction("curl -sS $clanInfoUrl > $InputDir/Pfam-C.gz");
+        }
         $B->addAction("date > $CompletedFlagFile.Pfam-A.clans.tsv\n");
     }
     if (not $skipIfExists or not -f "$InputDir/interpro_short_names.dat") {

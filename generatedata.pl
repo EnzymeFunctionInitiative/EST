@@ -95,6 +95,7 @@ $result = GetOptions(
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
+    "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
     "config=s"          => \$configFile,    # new-style config file
 );
 
@@ -255,6 +256,8 @@ $noMatchFile = ""   unless defined $noMatchFile;
 my $baseOutputDir = $ENV{PWD};
 my $outputDir = "$baseOutputDir/$tmpdir";
 
+my $pythonMod = getPythonLmod();
+
 print "Blast is $blast\n";
 print "domain is $domain\n";
 print "fraction is $fraction\n";
@@ -287,6 +290,7 @@ print "output directory is $outputDir\n";
 print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
 print "uniref-expand is $unirefExpand\n";
+print "Python module is $pythonMod\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -378,7 +382,7 @@ if (defined($oldapps)) {
 my $logDir = "$baseOutputDir/log";
 mkdir $logDir;
 $logDir = "" if not -d $logDir;
-my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
+my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 my $S = new EFI::SchedulerApi(%schedArgs);
 
@@ -781,17 +785,31 @@ $B->mailEnd();
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("mkdir $outputDir/rdata");
-$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
-$B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
-$B->addAction("FIRST=`head -1 \$FIRST`");
-$B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
-$B->addAction("LAST=`head -1 \$LAST`");
-$B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
-$B->addAction("Rscript $efiEstTools/quart-align.r $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN");
-$B->addAction("Rscript $efiEstTools/quart-perid.r $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST");
-$B->addAction("Rscript $efiEstTools/hist-length.r  $outputDir/length.tab  $outputDir/length_histogram.png");
-$B->addAction("Rscript $efiEstTools/hist-edges.r $outputDir/edge.tab $outputDir/number_of_edges.png");
+if (defined $LegacyGraphs) {
+    $B->resource(1, 24, "50gb");
+    $B->addAction("mkdir $outputDir/rdata");
+    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
+    $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
+    $B->addAction("FIRST=`head -1 \$FIRST`");
+    $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
+    $B->addAction("LAST=`head -1 \$LAST`");
+    $B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
+    $B->addAction("Rscript $efiEstTools/quart-align.r $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN");
+    $B->addAction("Rscript $efiEstTools/quart-perid.r $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST");
+    $B->addAction("Rscript $efiEstTools/hist-length.r  $outputDir/length.tab  $outputDir/length_histogram.png");
+    $B->addAction("Rscript $efiEstTools/hist-edges.r $outputDir/edge.tab $outputDir/number_of_edges.png");
+} else {
+    $B->addAction("module load $pythonMod");
+    $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
+    $B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
+    $B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId $fullWidth $fullHeight");
+    $B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity_sm.png $jobId $smallWidth $smallHeight");
+    $B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId $fullWidth $fullHeight");
+    $B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
+    $B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram.png $jobId $fullWidth $fullHeight");
+    $B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+    $B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId $fullWidth $fullHeight");
+}
 $B->addAction("touch  $outputDir/1.out.completed");
 #$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->renderToFile("$scriptDir/graphs.sh");
@@ -799,4 +817,19 @@ $B->renderToFile("$scriptDir/graphs.sh");
 $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
+
+
+
+
+sub getPythonLmod {
+    use Capture::Tiny qw(capture);
+
+    my ($out, $err) = capture {
+        `source /etc/profile; module -t avail`;
+    };
+    my @py2 = grep m{Python/2}, (split m/[\n\r]+/gs, $err);
+
+    return scalar @py2 ? $py2[0] : "Python";
+}
+
 
