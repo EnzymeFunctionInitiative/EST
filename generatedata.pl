@@ -55,7 +55,7 @@ use File::Basename;
 use Getopt::Long;
 use POSIX qw(ceil);
 use EFI::SchedulerApi;
-use EFI::Util qw(usesSlurm);
+use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
 
@@ -259,6 +259,7 @@ my $outputDir = "$baseOutputDir/$tmpdir";
 my $pythonMod = getLmod("Python/2", "Python");
 my $gdMod = getLmod("GD.*Perl", "GD");
 my $perlMod = "Perl";
+my $rMod = "R";
 
 print "Blast is $blast\n";
 print "domain is $domain\n";
@@ -790,6 +791,7 @@ if (defined $LegacyGraphs) {
     $B->resource(1, 24, "50gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
+    $B->addAction("module load $rMod");
     $B->addAction("mkdir $outputDir/rdata");
     $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
@@ -820,21 +822,5 @@ $B->renderToFile("$scriptDir/graphs.sh");
 $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
-
-
-
-
-sub getLmod {
-    my ($pattern, $default) = @_;
-
-    use Capture::Tiny qw(capture);
-
-    my ($out, $err) = capture {
-        `source /etc/profile; module -t avail`;
-    };
-    my @py2 = grep m{$pattern}, (split m/[\n\r]+/gs, $err);
-
-    return scalar @py2 ? $py2[0] : $default;
-}
 
 
