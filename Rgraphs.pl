@@ -73,9 +73,10 @@ foreach $file (@align){
   unless($file=~/align/){
     die "something is wrong, file does not have align in name\n";
   }
-  unless($file=~/home/){
-    die "something is wrong, file does not have home in name\n";
-  }
+  # Why is this here?  -NO 1/12/2018
+  #unless($file=~/home/){
+  #  die "something is wrong, file does not have home in name\n";
+  #}
   if($removefile==0){
     $file=~/\s*(\d+)\s+([\w-\/.]+)/;
     $file=$2;

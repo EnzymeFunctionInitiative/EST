@@ -55,7 +55,7 @@ use File::Basename;
 use Getopt::Long;
 use POSIX qw(ceil);
 use EFI::SchedulerApi;
-use EFI::Util qw(usesSlurm);
+use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
 
@@ -104,7 +104,7 @@ die "Environment variables not set properly: missing EFIDB variable" if not exis
 my $efiEstTools = $ENV{EFIEST};
 my $efiEstMod = $ENV{EFIESTMOD};
 my $efiDbMod = $ENV{EFIDBMOD};
-my $sortdir = '/state/partition1';
+my $sortdir = '/scratch';
 
 #defaults and error checking for choosing of blast program
 if (defined $blast and $blast ne "blast" and $blast ne "blast+" and $blast ne "diamond" and $blast ne 'diamondsensitive') {
@@ -259,6 +259,7 @@ my $outputDir = "$baseOutputDir/$tmpdir";
 my $pythonMod = getLmod("Python/2", "Python");
 my $gdMod = getLmod("GD.*Perl", "GD");
 my $perlMod = "Perl";
+my $rMod = "R";
 
 print "Blast is $blast\n";
 print "domain is $domain\n";
@@ -583,6 +584,7 @@ print "createdb job is:\n $createdbjob\n";
 # Generate job array to blast files from fracfile step
 #
 $B = $S->getBuilder();
+mkdir $blastOutputDir;
 
 $B->jobArray("1-$np");
 $B->dependency(0, @createdbjobline[0]);
@@ -595,7 +597,6 @@ $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("blastp -query  $fracOutputDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
-$B->addAction("mkdir $blastOutputDir");
 if ($blast eq "blast") {
     $B->addAction("module load oldapps") if $oldapps;
     #$B->addAction("module load blast");
@@ -771,6 +772,7 @@ if (defined $LegacyGraphs) {
     $B->resource(1, 24, "50gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
+    $B->addAction("module load $rMod");
     $B->addAction("mkdir $outputDir/rdata");
     $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
@@ -801,21 +803,5 @@ $B->renderToFile("$scriptDir/graphs.sh");
 $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
-
-
-
-
-sub getLmod {
-    my ($pattern, $default) = @_;
-
-    use Capture::Tiny qw(capture);
-
-    my ($out, $err) = capture {
-        `source /etc/profile; module -t avail`;
-    };
-    my @py2 = grep m{$pattern}, (split m/[\n\r]+/gs, $err);
-
-    return scalar @py2 ? $py2[0] : $default;
-}
 
 

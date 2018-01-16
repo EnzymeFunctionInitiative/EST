@@ -9,7 +9,7 @@ use FindBin;
 use File::Basename;
 use Getopt::Long;
 use EFI::SchedulerApi;
-use EFI::Util qw(usesSlurm);
+use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
 
@@ -137,6 +137,11 @@ if (defined($oldapps)) {
 } else {
     $oldapps = 0;
 }
+
+my $pythonMod = getLmod("Python/2", "Python");
+my $gdMod = getLmod("GD.*Perl", "GD");
+my $perlMod = "Perl";
+my $rMod = "R";
 
 
 my $logDir = "$baseOutputDir/log";
@@ -374,7 +379,9 @@ $B->resource(1, 24, "50gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-#$B->addAction("module load R/3.1.0");
+$B->addAction("module load $gdMod");
+$B->addAction("module load $perlMod");
+$B->addAction("module load $rMod");
 $B->addAction("mkdir $outputDir/rdata");
 $B->addAction("$efiEstTools/Rgraphs.pl -blastout $blastOutDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
 $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
