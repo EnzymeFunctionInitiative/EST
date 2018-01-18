@@ -354,7 +354,7 @@ $B->dependency(0, @blastreducejobline[0]);
 $B->addAction("module load $efiEstMod");
 if($multiplexing eq "on"){
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
-    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $blastOutDir/1.out -cluster $outputDir/sequences.fa.clstr");
+    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
 }else{
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/removedups.pl -in $outputDir/mux.out -out $outputDir/1.out");
