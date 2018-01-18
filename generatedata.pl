@@ -410,12 +410,12 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
     $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
     if ($fastaFile) {
-        $B->addAction("dos2unix $fastaFile");
-        $B->addAction("mac2unix $fastaFile");
+        $B->addAction("dos2unix -q $fastaFile");
+        $B->addAction("mac2unix -q $fastaFile");
     }
     if ($accessionFile) {
-        $B->addAction("dos2unix $accessionFile");
-        $B->addAction("mac2unix $accessionFile");
+        $B->addAction("dos2unix -q $accessionFile");
+        $B->addAction("mac2unix -q $accessionFile");
     }
     # Don't enforce the limit here if we are using manual cd-hit parameters below (the limit
     # is checked below after cd-hit).
@@ -634,6 +634,12 @@ $B = $S->getBuilder();
 
 $B->dependency(1, @blastjobline[0]); 
 $B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
+$B->addAction("\$SZ=`stat -c% $outputDir/blastfinal.tab`");
+$B->addAction("if [[ \$SZ == 0 ]]; then");
+$B->addAction("    echo \"BLAST Failed. Check input file.\"");
+$B->addAction("    touch $outputDir/blast.failed");
+$B->addAction("    exit 1");
+$B->addAction("fi");
 #$B->addAction("rm  $blastOutputDir/blastout-*.tab");
 #$B->addAction("rm  $fracOutputDir/fracfile-*.fa");
 $B->renderToFile("$scriptDir/catjob.sh");
@@ -652,7 +658,7 @@ $B->dependency(0, @catjobline[0]);
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
-$B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa -out $outputDir/unsorted.1.out");
+$B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 
