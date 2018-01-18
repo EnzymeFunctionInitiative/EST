@@ -634,7 +634,7 @@ $B = $S->getBuilder();
 
 $B->dependency(1, @blastjobline[0]); 
 $B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
-$B->addAction("\$SZ=`stat -c% $outputDir/blastfinal.tab`");
+$B->addAction("SZ=`stat -c%s $outputDir/blastfinal.tab`");
 $B->addAction("if [[ \$SZ == 0 ]]; then");
 $B->addAction("    echo \"BLAST Failed. Check input file.\"");
 $B->addAction("    touch $outputDir/blast.failed");
