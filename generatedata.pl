@@ -790,6 +790,7 @@ $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, $depJob);
 $B->mailEnd();
+$B->setScriptAbortOnError(0); # don't abort on error
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
@@ -800,7 +801,13 @@ if (defined $LegacyGraphs) {
     $B->addAction("module load $rMod");
     $B->addAction("mkdir $outputDir/rdata");
     $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
-    $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
+    $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
+    $B->addAction("if [ -z \"\$FIRST\" ]; then");
+    $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
+    $B->addAction("    touch $outputDir/graphs.failed");
+    $B->addAction("    touch  $outputDir/1.out.completed");
+    $B->addAction("    exit 0 #Exit with no error");
+    $B->addAction("fi");
     $B->addAction("FIRST=`head -1 \$FIRST`");
     $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
     $B->addAction("LAST=`head -1 \$LAST`");
