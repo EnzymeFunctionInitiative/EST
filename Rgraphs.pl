@@ -111,6 +111,7 @@ open(my $EdgesFH, ">$edgesFile") or die "could not wirte to $edgesFile\n";
 #also populates .tab file for edges histogram at the same time
 my $removefile = 0;
 my $filekept = 0;
+my @filesToDelete;
 foreach my $file (@align) {
     chomp $file;
     unless ($file =~ /align/) {
@@ -130,10 +131,12 @@ foreach my $file (@align) {
             my $thisedge = int $1;
             $EdgesFH->print("$thisedge\t$edgecount\n");
         } else {
-            unlink $file or die "could not remove $file\n";
+            #unlink $file or die "could not remove $file\n";
+            push(@filesToDelete, $file);
             #although we are only looking at align files, the perid ones have to go as well
             $file =~ s/align(\d+)$/perid$1/;
-            unlink $file or die "could not remove $file\n";
+            #unlink $file or die "could not remove $file\n";
+            push(@filesToDelete, $file);
             #if we have already saved some data, do not save any more (sets right side of graph)
             if ($filekept > 0) {
                 $removefile = 1;
@@ -143,13 +146,21 @@ foreach my $file (@align) {
         $file =~ /\s*(\d+)\s+([\w-\/.]+)/; 
         $file = $2;
         #once we find one value at the end of the graph to remove, we remove the rest
-        unlink $file or die "could not remove $file\n";
+        #unlink $file or die "could not remove $file\n";
+        push(@filesToDelete, $file);
         #although we are only looking at align files, the perid ones have to go as well
         $file =~ s/align(\d+)$/perid$1/;
-        unlink $file or die "could not remove $file\n";
+        #unlink $file or die "could not remove $file\n";
+        push(@filesToDelete, $file);
     }
 }
 close($EdgesFH);
+
+# Eventually we want to do something different if all of the files are to be deleted so that there is
+# at least something to graph.
+#if (scalar(@filesToDelete)/2 >= scalar(@align) + 10) {}
+map { unlink($_); } @filesToDelete;
+
 print "$filekept results\n";
 
 print "1.out procession complete, now processing fasta\n";
