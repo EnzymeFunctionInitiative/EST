@@ -379,6 +379,7 @@ print "Demux job is:\n $demuxjob\n";
 
 #create information for R to make graphs and then have R make them
 $B = $S->getBuilder();
+$B->setScriptAbortOnError(0); # don't abort on error
 $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]); 
 $B->resource(1, 24, "50gb");

@@ -26,8 +26,11 @@ my $numSeq = `grep \\> $seqIn | wc -l`;
 chomp $numSeq;
 
 my $numerator = $numLines * 2;
-my $denominator = $numSeq * ($numSeq - 1);
-my $convRatio = $numerator / $denominator;
+my $denominator = int($numSeq * ($numSeq - 1));
+my $convRatio = 1;
+if ($denominator != 0) {
+    $convRatio = $numerator / $denominator;
+}
 
 print $convRatio;
 
