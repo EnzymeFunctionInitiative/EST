@@ -107,7 +107,7 @@ my $efiDbMod = $ENV{EFIDBMOD};
 my $sortdir = '/scratch';
 
 #defaults and error checking for choosing of blast program
-if (defined $blast and $blast ne "blast" and $blast ne "blast+" and $blast ne "diamond" and $blast ne 'diamondsensitive') {
+if (defined $blast and $blast ne "blast" and $blast ne "blast+" and $blast ne "blast+simple" and $blast ne "diamond" and $blast ne 'diamondsensitive') {
     die "blast program value of $blast is not valid, must be blast, blast+, diamondsensitive, or diamond\n";
 } elsif (not defined $blast) {
     $blast = "blast";
@@ -423,6 +423,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
     $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
+    $B->jobName("${jobNamePrefix}_initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
     # Submit and keep the job id for next dependancy
@@ -449,6 +450,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $userHeaderFile=~s/^-userdat //;
         $B->addAction("cat $userHeaderFile >> struct.out");
     }
+    $B->jobName("${jobNamePrefix}_initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
     $importjob = $S->submit("$scriptDir/initial_import.sh");
@@ -472,7 +474,7 @@ $B->mailEnd() if defined $cdHitOnly;
 
 # If we only want to do CD-HIT jobs then do that here.
 if ($cdHitOnly) {
-    $B->resource(1, 24, 20);
+    $B->resource(1, 24, "20GB");
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
@@ -492,6 +494,7 @@ if ($cdHitOnly) {
     }
     $B->addAction("touch  $outputDir/1.out.completed");
 
+    $B->jobName("${jobNamePrefix}_cdhit");
     $B->renderToFile("$scriptDir/cdhit.sh");
     $cdhitjob = $S->submit("$scriptDir/cdhit.sh");
     chomp $cdhitjob;
@@ -532,6 +535,7 @@ CMDS
 } else {
     $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
 }
+$B->jobName("${jobNamePrefix}_multiplex");
 $B->renderToFile("$scriptDir/multiplex.sh");
 
 $muxjob = $S->submit("$scriptDir/multiplex.sh");
@@ -546,8 +550,9 @@ print "mux job is:\n $muxjob\n";
 $B = $S->getBuilder();
 
 $B->dependency(0, @muxjobline[0]);
-$B->addAction("mkdir $fracOutputDir");
+$B->addAction("mkdir -p $fracOutputDir");
 $B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source $outputDir/sequences.fa");
+$B->jobName("${jobNamePrefix}_fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
 $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
@@ -572,6 +577,7 @@ if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
 } else {
     $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
 }
+$B->jobName("${jobNamePrefix}_createdb");
 $B->renderToFile("$scriptDir/createdb.sh");
 
 $createdbjob = $S->submit("$scriptDir/createdb.sh");
@@ -583,14 +589,17 @@ print "createdb job is:\n $createdbjob\n";
 ########################################################################################################################
 # Generate job array to blast files from fracfile step
 #
+my $blastFinalFile = "$outputDir/blastfinal.tab";
+
 $B = $S->getBuilder();
 mkdir $blastOutputDir;
 
-$B->jobArray("1-$np");
+$B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
+$B->jobArray("1-$np") if $blast eq "blast";
 $B->dependency(0, @createdbjobline[0]);
-if ($blast =~ /diamond/){
-    $B->resource(1, 24);
-}
+$B->resource(1, 24, "14G") if $blast =~ /diamond/i;
+$B->resource(2, 24, "14G") if $blast =~ /blast\+/i;
+
 $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load oldapps") if $oldapps;
 #$B->addAction("module load blast+");
@@ -603,21 +612,32 @@ if ($blast eq "blast") {
     $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
 } elsif ($blast eq "blast+") {
     $B->addAction("module load oldapps") if $oldapps;
-    $B->addAction("module load blast+");
-    $B->addAction("blastp -query  $fracOutputDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
+    $B->addAction("module load BLAST+");
+    $B->addAction("blastp -query $outputDir/sequences.fa -num_threads $np -db $outputDir/database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
+} elsif ($blast eq "blast+simple") {
+    $B->addAction("module load oldapps") if $oldapps;
+    $B->addAction("module load BLAST+");
+    $B->addAction("blastp -query $outputDir/sequences.fa -num_threads $np -db $outputDir/database -outfmt \"6\" -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
 } elsif ($blast eq "diamond") {
     $B->addAction("module load oldapps") if $oldapps;
-    $B->addAction("module load diamond");
-    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
-    $B->addAction("diamond view -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
+    $B->addAction("module load DIAMOND");
+    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $outputDir/sequences.fa -d $outputDir/database -a $blastOutputDir/blastout.daa");
+    $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
 } elsif ($blast eq "diamondsensitive") {
     $B->addAction("module load oldapps") if $oldapps;
-    $B->addAction("module load diamond");
-    $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
-    $B->addAction("diamond view -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -f tab -a $blastOutputDir/blastout-{JOB_ARRAYID}.fa.daa");
+    $B->addAction("module load DIAMOND");
+    $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout.daa");
+    $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
 } else {
     die "Blast control not set properly.  Can only be blast, blast+, or diamond.\n";
 }
+$B->addAction("OUT=\$?");
+$B->addAction("if [ \$OUT -ne 0 ]; then");
+$B->addAction("    echo \"BLAST failed; likely due to file format.\"");
+$B->addAction("    echo $OUT > $outputDir/blast.failed");
+$B->addAction("    exit 1");
+$B->addAction("fi");
+$B->jobName("${jobNamePrefix}_blast-qsub");
 $B->renderToFile("$scriptDir/blast-qsub.sh");
 
 $B->jobArray("");
@@ -633,8 +653,9 @@ print "blast job is:\n $blastjob\n";
 $B = $S->getBuilder();
 
 $B->dependency(1, @blastjobline[0]); 
-$B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
-$B->addAction("SZ=`stat -c%s $outputDir/blastfinal.tab`");
+$B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile")
+    if $blast eq "blast";
+$B->addAction("SZ=`stat -c%s $blastFinalFile`");
 $B->addAction("if [[ \$SZ == 0 ]]; then");
 $B->addAction("    echo \"BLAST Failed. Check input file.\"");
 $B->addAction("    touch $outputDir/blast.failed");
@@ -642,6 +663,7 @@ $B->addAction("    exit 1");
 $B->addAction("fi");
 #$B->addAction("rm  $blastOutputDir/blastout-*.tab");
 #$B->addAction("rm  $fracOutputDir/fracfile-*.fa");
+$B->jobName("${jobNamePrefix}_catjob");
 $B->renderToFile("$scriptDir/catjob.sh");
 $catjob = $S->submit("$scriptDir/catjob.sh");
 chomp $catjob;
@@ -654,9 +676,11 @@ print "Cat job is:\n $catjob\n";
 #
 $B = $S->getBuilder();
 
+$B->queue($memqueue);
+$B->resource(1, 1, "50gb");
 $B->dependency(0, @catjobline[0]); 
-#$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
-$B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
+#$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
+$B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
@@ -776,11 +800,11 @@ $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
-    $B->resource(1, 24, "50gb");
+    $B->resource(1, 1, "90gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
-    $B->addAction("mkdir $outputDir/rdata");
+    $B->addAction("mkdir -p $outputDir/rdata");
     $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
     $B->addAction("if [ -z \"\$FIRST\" ]; then");
@@ -810,7 +834,7 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId $fullWidth $fullHeight");
 }
 $B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->renderToFile("$scriptDir/graphs.sh");
 
 $graphjob = $S->submit("$scriptDir/graphs.sh");
