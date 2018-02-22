@@ -22,21 +22,24 @@ use Getopt::Long;
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm);
 
-$result = GetOptions(
-    "filter=s"      => \$filter,
-    "minval=s"      => \$minval,
-    "queue=s"       => \$queue,
-    "tmp=s"         => \$tmpdir,
-    "maxlen:i"      => \$maxlen,
-    "minlen:i"      => \$minlen,
-    "title:s"       => \$title,
-    "maxfull:i"     => \$maxfull,
-    "job-id=i"      => \$jobId,
-    "lengthdif=i"   => \$lengthOverlap,
-    "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm 
-    "dryrun"        => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
-    "oldapps"       => \$oldapps,       # to module load oldapps for biocluster2 testing
-    "config"        => \$config,        # config file path, if not given will look for EFICONFIG env var
+my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
+    $customClusterFile, $customClusterDir, $scheduler, $dryrun, $config);
+my $result = GetOptions(
+    "filter=s"              => \$filter,
+    "minval=s"              => \$minval,
+    "queue=s"               => \$queue,
+    "tmp=s"                 => \$relativeGenerateDir,
+    "maxlen:i"              => \$maxlen,
+    "minlen:i"              => \$minlen,
+    "title:s"               => \$title,
+    "maxfull:i"             => \$maxfull,
+    "job-id=i"              => \$jobId,
+    "lengthdif=i"           => \$lengthOverlap,
+    "custom-cluster-file=s" => \$customClusterFile,
+    "custom-cluster-dir=s"  => \$customClusterDir,
+    "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
+    "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
+    "config"                => \$config,        # config file path, if not given will look for EFICONFIG env var
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -48,8 +51,8 @@ my $efiDbMod = $ENV{EFIDBMOD};
 (my $perlMod = $ENV{LOADEDMODULES}) =~ s/^.*\b(perl)\b.*$/$1/i;
 
 my $dbver = "";
-if (-f "$tmpdir/database_version") {
-    $dbver = `head -1 $tmpdir/database_version`;
+if (-f "$relativeGenerateDir/database_version") {
+    $dbver = `head -1 $relativeGenerateDir/database_version`;
     chomp $dbver;
 }
 if (not $dbver) {
@@ -78,7 +81,7 @@ if (defined $maxfull and $maxfull !~ /^\d+$/) {
 }
 
 
-if (not defined $tmpdir) {
+if (not defined $relativeGenerateDir) {
     die "A temporary directory specified by -tmp is required for the program to run";
 }
 
@@ -90,76 +93,81 @@ if (not defined $config or not -f $config) {
     }
 }
 
-#quit if the xgmml files have been created in this directory
-#testing with fullxgmml because I am lazy
-if (-s "$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}full.xgmml") {
-    print "This run appears to have already been completed, exiting\n";
-    exit;
+my $baseOutputDir = $ENV{PWD};
+my $generateDir = "$baseOutputDir/$relativeGenerateDir";
+
+my $analysisDir = "$generateDir/$filter-$minval-$minlen-$maxlen";
+if ($customClusterDir and $customClusterFile and -f "$generateDir/$customClusterDir/$customClusterFile") {
+    $analysisDir = "$generateDir/$customClusterDir";
 }
 
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
 my $usesSlurm = $schedType eq "slurm";
-if (defined($oldapps)) {
-    $oldapps = $usesSlurm;
-} else {
-    $oldapps = 0;
-}
 
 my $wordOption = $lengthOverlap < 1 ? "-n 2" : "";
 
-my $baseOutputDir = $ENV{PWD};
+
+
+
+#quit if the xgmml files have been created in this directory
+#testing with fullxgmml because I am lazy
+if (-s "$analysisDir/${safeTitle}full.xgmml") {
+    print "This run appears to have already been completed, exiting\n";
+    exit;
+}
 
 
 my $logDir = "$baseOutputDir/log";
 mkdir $logDir;
 $logDir = "" if not -d $logDir;
+
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 my $S = new EFI::SchedulerApi(%schedArgs);
 my $B = $S->getBuilder();
 
-print "Data from runs will be saved to $tmpdir/$filter-$minval-$minlen-$maxlen/\n";
+print "Data from runs will be saved to $analysisDir\n";
 
+my $filteredBlastFile = "$analysisDir/2.out";
 #dont refilter if it has already been done
-$priorFilter = 0;
-if (not -d "$tmpdir/$filter-$minval-$minlen-$maxlen"){
-    mkdir "$tmpdir/$filter-$minval-$minlen-$maxlen" or die "could not make analysis folder $tmpdir/$filter-$minval-$minlen-$maxlen\n";
 
+$B->addAction("module load $perlMod");
+if ($customClusterDir and $customClusterFile) {
+    #TODO: implement custom clustering
+    $B->addAction("$toolpath/filter_custom.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -custom-cluster-file $analysisDir/$customClusterFile");
+    $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
+} elsif (not -d $analysisDir){
+    mkdir $analysisDir or die "could not make analysis folder $analysisDir\n";
     #submit the job for filtering out extraneous edges
-    $B->addAction("module load oldapps") if $oldapps;
-    $B->addAction("module load $perlMod");
-    $B->addAction("$toolpath/filterblast.pl -blastin $baseOutputDir/$tmpdir/1.out -blastout $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fastain $baseOutputDir/$tmpdir/allsequences.fa -fastaout $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
-    $B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh");
-
-    $filterjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/filterblast.sh", $dryrun);
-    chomp $filterjob;
-    print "Filterblast job is:\n $filterjob\n";
-
-    @filterjobline = split /\./, $filterjob;
+    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
 } else {
     print "Using prior filter\n";
-    $priorFilter = 1;
 }
+
+$B->renderToFile("$analysisDir/filterblast.sh");
+$filterjob = $S->submit("$analysisDir/filterblast.sh", $dryrun);
+chomp $filterjob;
+print "Filterblast job is:\n $filterjob\n";
+@filterjobline = split /\./, $filterjob;
+
 
 #submit the job for generating the full xgmml file
 #since struct.out is created in the first half, the full and repnode networks can all be generated at the same time
 #depends on ffilterblast
 
 $B = $S->getBuilder();
-$B->dependency(0, @filterjobline[0])
-    if not $priorFilter;
-$B->addAction("module load oldapps") if $oldapps;
+$B->dependency(0, @filterjobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
-my $outFile = "$baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}full_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -fasta $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -struct $baseOutputDir/$tmpdir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver");
+my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver");
 $B->addAction("zip -j $outFile.zip $outFile");
-$B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh");
+$B->renderToFile("$analysisDir/fullxgmml.sh");
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
 
-$fulljob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/fullxgmml.sh", $dryrun, $schedType);
+$fulljob = $S->submit("$analysisDir/fullxgmml.sh", $dryrun, $schedType);
 chomp $fulljob;
 print "Full xgmml job is:\n $fulljob\n";
 
@@ -171,18 +179,17 @@ print "Full xgmml job is:\n $fulljob\n";
 $B = $S->getBuilder();
 $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
 $B->dependency(0, @fulljobline[0]);
-$B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
-$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/sequences.fa -o $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
-$outFile = "$baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/2.out -cdhit $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit\$CDHIT.clstr -fasta $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/allsequences.fa -struct $baseOutputDir/$tmpdir/struct.out -out $outFile -title=\"$title\" -dbver $dbver");
+$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
+$outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/allsequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -dbver $dbver");
 $B->addAction("zip -j $outFile.zip $outFile");
-$B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh");
+$B->renderToFile("$analysisDir/cdhit.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
-$repnodejob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/cdhit.sh", $dryrun, $schedType);
+$repnodejob = $S->submit("$analysisDir/cdhit.sh", $dryrun, $schedType);
 chomp $repnodejob;
 print "Repnodes job is:\n $repnodejob\n";
 
@@ -193,14 +200,13 @@ print "Repnodes job is:\n $repnodejob\n";
 #depends on cdhit.sh
 $B = $S->getBuilder();
 $B->dependency(1, @repnodejobline[0]);
-$B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("sleep 5");
-$B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh");
+$B->renderToFile("$analysisDir/fix.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 
-$fixjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/fix.sh", $dryrun, $schedType);
+$fixjob = $S->submit("$analysisDir/fix.sh", $dryrun, $schedType);
 chomp $fixjob;
 print "Fix job is:\n $fixjob\n";
 @fixjobline = split /\./, $fixjob;
@@ -211,13 +217,12 @@ $B = $S->getBuilder();
 $B->dependency(0, @fulljobline[0] . ":" . $fixjobline[0]);
 #$B->dependency(0, @fulljobline[0]); 
 $B->mailEnd();
-$B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
-$B->addAction("$toolpath/stats.pl -tmp $baseOutputDir/$tmpdir -run $filter-$minval-$minlen-$maxlen -out $baseOutputDir/$tmpdir/$filter-$minval-$minlen-$maxlen/stats.tab");
-$B->renderToFile("$tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh");
+$B->addAction("$toolpath/stats.pl -tmp $generateDir -run $filter-$minval-$minlen-$maxlen -out $analysisDir/stats.tab");
+$B->renderToFile("$analysisDir/stats.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
-$statjob = $S->submit("$tmpdir/$filter-$minval-$minlen-$maxlen/stats.sh", $dryrun, $schedType);
+$statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
 chomp $statjob;
 print "Stats job is:\n $statjob\n";
 
