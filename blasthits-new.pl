@@ -166,12 +166,19 @@ print "\nBlast for similar sequences and sort based off bitscore\n";
 my $B = $S->getBuilder();
 
 $B = $S->getBuilder();
+$B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
 $B->resource(1, 1, "50gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("which perl");
 $B->addAction("blastall -p blastp -i $outputDir/query.fa -d $blastDb -m 8 -e $evalue -b $nresults -o $outputDir/initblast.out");
+$B->addAction("OUT=\$?");
+$B->addAction("if [ \$OUT -ne 0 ]; then");
+$B->addAction("    echo \"BLAST failed; likely due to file format.\"");
+$B->addAction("    echo $OUT > $outputDir/1.out.failed");
+$B->addAction("    exit 1");
+$B->addAction("fi");
 $B->addAction("cat $outputDir/initblast.out |grep -v '#'|cut -f 1,2,3,4,12 |sort -k5,5nr >$outputDir/blastfinal.tab");
 $B->addAction("SZ=`stat -c%s $outputDir/blastfinal.tab`");
 $B->addAction("if [[ \$SZ == 0 ]]; then");

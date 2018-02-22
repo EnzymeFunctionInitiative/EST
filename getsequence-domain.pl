@@ -68,6 +68,8 @@ my @ssfs = ();
 my @manualAccessions = ();
 my $isDomainOn;
 
+print "DATA: $data_files\n";
+
 verifyArgs();
 
 parseFamilyArgs();
@@ -92,7 +94,8 @@ if ($#manualAccessions >= 0) {
 
 ######################################################################################################################
 # COUNTS FOR KEEPING TRACK OF THE VARIOUS TYPES OF IDS
-my $familyIdCount = 0;
+my $familyIdCount = 0; # This is the number of IDs that came from the family, accounting for UniRef.
+my $fullFamilyIdCount = 0; # This is the full family size
 my $fileMatchedIdCount = 0;
 my $fileUnmatchedIdCount = 0;
 my $fileTotalIdCount = 0;
@@ -454,7 +457,17 @@ sub getDomainFromDb {
     }
     my @accessions = keys %$accessionHash;
     print "Initial " . scalar @accessions . " sequences after $table\n";
-    return $c;
+
+    # Get actual family count
+    my $fullFamCount = 0;
+    if ($unirefVersion) {
+        my $sql = "select count(*) from $table where $table.id in ('" . join("', '", @elements) . "')";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute;
+        $fullFamCount = $sth->fetchrow;
+    }
+
+    return [$c, $fullFamCount];
 }
 
 
@@ -826,6 +839,7 @@ sub writeSequenceCountFile {
         print SEQCOUNT "FastaFileSeqTotal\t$fileSequenceCount\n";
     
         print SEQCOUNT "Family\t$familyIdCount\n";
+        print SEQCOUNT "FullFamily\t$fullFamilyIdCount\n";
         print SEQCOUNT "Total\t$totalIdCount\n";
     
         close SEQCOUNT;
@@ -874,9 +888,13 @@ sub retrieveFamilyAccessions {
 
     print "Getting Acession Numbers in specified Families\n";
     my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ipros);
+    $fullFamilyIdCount += $famAcc->[1];
     $famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @pfams);
+    $fullFamilyIdCount += $famAcc->[1];
     $famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @gene3ds);
+    $fullFamilyIdCount += $famAcc->[1];
     $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ssfs);
+    $fullFamilyIdCount += $famAcc->[1];
     
     @accessions = uniq keys %accessionhash;
     $familyIdCount = scalar @accessions;

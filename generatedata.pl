@@ -423,6 +423,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
     $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
+    $B->jobName("${jobNamePrefix}_initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
     # Submit and keep the job id for next dependancy
@@ -449,6 +450,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $userHeaderFile=~s/^-userdat //;
         $B->addAction("cat $userHeaderFile >> struct.out");
     }
+    $B->jobName("${jobNamePrefix}_initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
     $importjob = $S->submit("$scriptDir/initial_import.sh");
@@ -472,7 +474,7 @@ $B->mailEnd() if defined $cdHitOnly;
 
 # If we only want to do CD-HIT jobs then do that here.
 if ($cdHitOnly) {
-    $B->resource(1, 24, 20);
+    $B->resource(1, 24, "20GB");
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
@@ -492,6 +494,7 @@ if ($cdHitOnly) {
     }
     $B->addAction("touch  $outputDir/1.out.completed");
 
+    $B->jobName("${jobNamePrefix}_cdhit");
     $B->renderToFile("$scriptDir/cdhit.sh");
     $cdhitjob = $S->submit("$scriptDir/cdhit.sh");
     chomp $cdhitjob;
@@ -532,6 +535,7 @@ CMDS
 } else {
     $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
 }
+$B->jobName("${jobNamePrefix}_multiplex");
 $B->renderToFile("$scriptDir/multiplex.sh");
 
 $muxjob = $S->submit("$scriptDir/multiplex.sh");
@@ -548,6 +552,7 @@ $B = $S->getBuilder();
 $B->dependency(0, @muxjobline[0]);
 $B->addAction("mkdir -p $fracOutputDir");
 $B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source $outputDir/sequences.fa");
+$B->jobName("${jobNamePrefix}_fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
 $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
@@ -572,6 +577,7 @@ if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
 } else {
     $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
 }
+$B->jobName("${jobNamePrefix}_createdb");
 $B->renderToFile("$scriptDir/createdb.sh");
 
 $createdbjob = $S->submit("$scriptDir/createdb.sh");
@@ -631,6 +637,7 @@ $B->addAction("    echo \"BLAST failed; likely due to file format.\"");
 $B->addAction("    echo $OUT > $outputDir/blast.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
+$B->jobName("${jobNamePrefix}_blast-qsub");
 $B->renderToFile("$scriptDir/blast-qsub.sh");
 
 $B->jobArray("");
@@ -656,6 +663,7 @@ $B->addAction("    exit 1");
 $B->addAction("fi");
 #$B->addAction("rm  $blastOutputDir/blastout-*.tab");
 #$B->addAction("rm  $fracOutputDir/fracfile-*.fa");
+$B->jobName("${jobNamePrefix}_catjob");
 $B->renderToFile("$scriptDir/catjob.sh");
 $catjob = $S->submit("$scriptDir/catjob.sh");
 chomp $catjob;
