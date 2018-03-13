@@ -801,7 +801,7 @@ $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
-    $B->resource(1, 1, "90gb");
+    $B->resource(1, 1, "200gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
