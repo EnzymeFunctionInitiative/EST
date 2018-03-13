@@ -26,7 +26,7 @@ use EFI::Database;
 
 
 
-my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile,
+my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $useOptionASettings,
     $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile,
     $seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile, $randomFraction);
 my $result = GetOptions(
@@ -39,6 +39,7 @@ my $result = GetOptions(
     "maxsequence=s"         => \$maxsequence,
     "accession-id=s"        => \$manualAccession,
     "accession-file=s"      => \$accessionFile,
+    "use-option-a-settings" => \$useOptionASettings, # This option appends the retrieved IDs to the accession file (used in the Option A/BLAST pipeline)
     "out=s"                 => \$fastaFileOut,
     "fasta-file=s"          => \$fastaFileIn,
     "meta-file=s"           => \$metaFileOut,
@@ -663,7 +664,12 @@ sub writeAccessions {
     print "Print out accessions\n";
 
     return if not $access;
-    open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
+    if ($useOptionASettings) {
+        open GREP, ">>$access" or die "Could not write to output accession ID file '$access': $!";
+    } else {
+        open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
+    }
+
     foreach my $accession (keys %accessionhash) {
         my @domains = @{$accessionhash{$accession}};
         foreach my $piece (@domains) {
@@ -683,7 +689,7 @@ sub writeAccessions {
 sub retrieveSequences {
     print "Retrieving Sequences\n";
 
-    if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
+    if ($useOptionASettings or ($fastaFileIn =~ /\w+/ and -s $fastaFileIn)) {
         open OUT, ">>$fastaFileOut" or die "Cannot write to output fasta $fastaFileOut\n";
     } elsif ($fastaFileOut) {
         open OUT, ">$fastaFileOut" or die "Cannot write to output fasta $fastaFileOut\n";
@@ -827,6 +833,19 @@ sub writeSequenceCountFile {
     print "Starting to write $seqCountFile\n";
     
     if ($seqCountFile) {
+        my $blastTotal = 0;
+        if ($useOptionASettings) {
+            open SEQCOUNT, "$seqCountFile" or die "Unable to read sequence count file $seqCountFile: $!";
+            while (<SEQCOUNT>) {
+                chomp;
+                if (m/Total.*\t(\d+)/) {
+                    $blastTotal = $1;
+                    last;
+                }
+            }
+            close SEQCOUNT;
+        }
+        
         open SEQCOUNT, "> $seqCountFile" or die "Unable to write to sequence count file $seqCountFile: $!";
     
         print SEQCOUNT "FileTotal\t$fileTotalIdCount\n";
@@ -840,7 +859,7 @@ sub writeSequenceCountFile {
     
         print SEQCOUNT "Family\t$familyIdCount\n";
         print SEQCOUNT "FullFamily\t$fullFamilyIdCount\n";
-        print SEQCOUNT "Total\t$totalIdCount\n";
+        print SEQCOUNT "Total\t" . ($totalIdCount + int($blastTotal)) . "\n";
     
         close SEQCOUNT;
     }
