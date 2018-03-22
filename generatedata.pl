@@ -678,13 +678,14 @@ print "Cat job is:\n $catjob\n";
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-$B->resource(1, 1, "50gb");
+$B->resource(1, 1, "150gb");
 $B->dependency(0, @catjobline[0]); 
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 
 $blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
@@ -714,6 +715,7 @@ if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
 
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
+$B->jobName("${jobNamePrefix}demux");
 $B->renderToFile("$scriptDir/demux.sh");
 
 $demuxjob = $S->submit("$scriptDir/demux.sh");
@@ -731,6 +733,7 @@ if ($convRatioFile) {
     $B = $S->getBuilder();
     $B->dependency(0, $depJob); 
     $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
+    $B->jobName("${jobNamePrefix}conv_ratio");
     $B->renderToFile("$scriptDir/conv_ratio.sh");
     my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
     chomp $convRatioJob;
@@ -836,6 +839,7 @@ if (defined $LegacyGraphs) {
 }
 $B->addAction("touch  $outputDir/1.out.completed");
 #$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 
 $graphjob = $S->submit("$scriptDir/graphs.sh");

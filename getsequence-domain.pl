@@ -462,7 +462,7 @@ sub getDomainFromDb {
     # Get actual family count
     my $fullFamCount = 0;
     if ($unirefVersion) {
-        my $sql = "select count(*) from $table where $table.id in ('" . join("', '", @elements) . "')";
+        my $sql = "select count(distinct accession) from $table where $table.id in ('" . join("', '", @elements) . "')";
         my $sth = $dbh->prepare($sql);
         $sth->execute;
         $fullFamCount = $sth->fetchrow;
