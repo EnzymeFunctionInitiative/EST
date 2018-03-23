@@ -211,6 +211,7 @@ chomp $fixjob;
 print "Fix job is:\n $fixjob\n";
 @fixjobline = split /\./, $fixjob;
 
+my $runName = ($customClusterFile and $customClusterDir) ? $customClusterDir : "$filter-$minval-$minlen-$maxlen";
 #submit series of repnode network calculations
 #depends on filterblast
 $B = $S->getBuilder();
@@ -218,7 +219,7 @@ $B->dependency(0, @fulljobline[0] . ":" . $fixjobline[0]);
 #$B->dependency(0, @fulljobline[0]); 
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
-$B->addAction("$toolpath/stats.pl -tmp $generateDir -run $filter-$minval-$minlen-$maxlen -out $analysisDir/stats.tab");
+$B->addAction("$toolpath/stats.pl -tmp $generateDir -run $runName -out $analysisDir/stats.tab");
 $B->renderToFile("$analysisDir/stats.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
