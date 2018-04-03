@@ -49,6 +49,10 @@ sub saveFile {
     chomp $nodes;
     chomp $edges;
 
+    if ($nodes == 0) {
+        $size = 0;
+    }
+
     (my $filename = $filePath) =~ s%^.*/([^/]+)$%$1%;
     $filename .= "\t" if $isFull;
 

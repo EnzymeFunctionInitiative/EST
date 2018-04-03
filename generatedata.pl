@@ -399,6 +399,8 @@ $scriptDir = $outputDir if not -d $scriptDir;
 # Get sequences and annotations.  This creates fasta and struct.out files.
 #
 my $B = $S->getBuilder();
+$B->resource(1, 1, "5gb");
+
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
     my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
@@ -475,7 +477,7 @@ $B->mailEnd() if defined $cdHitOnly;
 
 # If we only want to do CD-HIT jobs then do that here.
 if ($cdHitOnly) {
-    $B->resource(1, 24, "20GB");
+    $B->resource(1, 24, "10GB");
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
@@ -502,6 +504,8 @@ if ($cdHitOnly) {
     print "CD-HIT job is:\n $cdhitjob\n";
     exit;
 }
+
+$B->resource(1, 1, "10gb");
 
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
@@ -549,6 +553,7 @@ print "mux job is:\n $muxjob\n";
 # Break sequenes.fa into parts so we can run blast in parallel.
 #
 $B = $S->getBuilder();
+$B->resource(1, 1, "5gb");
 
 $B->dependency(0, @muxjobline[0]);
 $B->addAction("mkdir -p $fracOutputDir");
@@ -568,6 +573,7 @@ print "fracfile job is:\n $fracfilejob\n";
 $B = $S->getBuilder();
 
 $B->dependency(0, @fracfilejobline[0]);
+$B->resource(1, 1, "5gb");
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
@@ -653,6 +659,7 @@ print "blast job is:\n $blastjob\n";
 #
 $B = $S->getBuilder();
 
+$B->resource(1, 1, "5gb");
 $B->dependency(1, @blastjobline[0]); 
 $B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile")
     if $blast eq "blast";
@@ -678,7 +685,7 @@ print "Cat job is:\n $catjob\n";
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-$B->resource(1, 1, "150gb");
+$B->resource(1, 1, "400gb");
 $B->dependency(0, @catjobline[0]); 
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
@@ -702,6 +709,7 @@ my $depJob = @blastreducejobline[0];
 $B = $S->getBuilder();
 
 $B->dependency(0, @blastreducejobline[0]); 
+$B->resource(1, 1, "5gb");
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
@@ -732,6 +740,7 @@ $depJob = @demuxjobline[0];
 if ($convRatioFile) {
     $B = $S->getBuilder();
     $B->dependency(0, $depJob); 
+    $B->resource(1, 1, "5gb");
     $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
     $B->jobName("${jobNamePrefix}conv_ratio");
     $B->renderToFile("$scriptDir/conv_ratio.sh");
@@ -804,7 +813,7 @@ $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
-    $B->resource(1, 1, "200gb");
+    $B->resource(1, 1, "250gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");

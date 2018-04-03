@@ -126,6 +126,7 @@ my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 my $S = new EFI::SchedulerApi(%schedArgs);
 my $B = $S->getBuilder();
+$B->resource(1, 1, "5gb");
 
 print "Data from runs will be saved to $analysisDir\n";
 
@@ -158,6 +159,7 @@ print "Filterblast job is:\n $filterjob\n";
 
 $B = $S->getBuilder();
 $B->dependency(0, @filterjobline[0]);
+$B->resource(1, 1, "10gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
@@ -179,12 +181,13 @@ print "Full xgmml job is:\n $fulljob\n";
 $B = $S->getBuilder();
 $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
 $B->dependency(0, @fulljobline[0]);
+$B->resource(1, 1, "10gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
 $B->addAction("cd-hit $wordOption -s $lengthOverlap -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
 $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/allsequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -dbver $dbver");
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/allsequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->renderToFile("$analysisDir/cdhit.sh");
 
@@ -199,6 +202,7 @@ print "Repnodes job is:\n $repnodejob\n";
 #test to fix dependancies
 #depends on cdhit.sh
 $B = $S->getBuilder();
+$B->resource(1, 1, "1gb");
 $B->dependency(1, @repnodejobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("sleep 5");
@@ -216,6 +220,7 @@ my $runName = ($customClusterFile and $customClusterDir) ? $customClusterDir : "
 #depends on filterblast
 $B = $S->getBuilder();
 $B->dependency(0, @fulljobline[0] . ":" . $fixjobline[0]);
+$B->resource(1, 1, "5gb");
 #$B->dependency(0, @fulljobline[0]); 
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");

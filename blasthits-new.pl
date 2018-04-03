@@ -194,7 +194,6 @@ print "\nBlast for similar sequences and sort based off bitscore\n";
 
 my $B = $S->getBuilder();
 
-$B = $S->getBuilder();
 $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
 $B->resource(1, 1, "50gb");
 $B->addAction("module load $efiEstMod");
@@ -228,6 +227,7 @@ print "initial blast job is:\n $initblastjob\n";
 
 $B = $S->getBuilder();
 $B->dependency(0, @initblastjobline[0]); 
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
@@ -245,6 +245,7 @@ my $depId = $getmatchesjobline[0];
 
 $B = $S->getBuilder();
 $B->dependency(0, $depId);
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
@@ -276,6 +277,7 @@ if ($pfam or $ipro) {
     my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
 
     $B = $S->getBuilder();
+    $B->resource(1, 1, "5gb");
     $B->dependency(0, $depId);
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load $efiDbMod");
@@ -295,6 +297,7 @@ if ($pfam or $ipro) {
 
 $B = $S->getBuilder();
 $B->dependency(0, $depId);
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
@@ -313,6 +316,7 @@ print "annotation job is:\n $annotationjob\n";
 #if not, just copy allsequences.fa to sequences.fa so next part of program is set up right
 $B = $S->getBuilder();
 $B->dependency(0, $depId);
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 #  $B->addAction("module load blast");
@@ -338,6 +342,7 @@ my $blastOutDir = "$outputDir/blast";
 $B = $S->getBuilder();
 
 $B->dependency(0, @muxjobline[0]); 
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("mkdir $blastOutDir");
 $B->addAction("NP=$np");
@@ -367,6 +372,7 @@ print "fracfile job is: $fracfilejob\n";
 #make the blast database and put it into the temp directory
 $B = $S->getBuilder();
 $B->dependency(0, @muxjobline[0]);
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
@@ -384,7 +390,7 @@ print "createdb job is:\n $createdbjob\n";
 #generate $np blast scripts for files from fracfile step
 $B = $S->getBuilder();
 $B->jobArray("1-$np"); # We reserve $np slots.  However, due to the new way that fracefile works, some of those may complete immediately.
-$B->resource(1, 1, "15gb");
+$B->resource(1, 1, "5gb");
 $B->dependency(0, @createdbjobline[0] . ":" . @fracfilejobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("export BLASTDB=$outputDir");
@@ -410,6 +416,7 @@ print "blast job is:\n $blastjob\n";
 #join all the blast outputs back together
 $B = $S->getBuilder();
 $B->dependency(1, @blastjobline[0]); 
+$B->resource(1, 1, "5gb");
 $B->addAction("cat $blastOutDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
 $B->addAction("rm  $blastOutDir/blastout-*.tab");
 $B->addAction("rm  $blastOutDir/fracfile-*.fa");
@@ -428,6 +435,7 @@ print "Cat job is:\n $catjob\n";
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, @catjobline[0]); 
+$B->resource(1, 1, "35gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
@@ -449,6 +457,7 @@ print "Blastreduce job is:\n $blastreducejob\n";
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, @blastreducejobline[0]); 
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 if($multiplexing eq "on"){
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
@@ -475,7 +484,7 @@ $B = $S->getBuilder();
 $B->setScriptAbortOnError(0); # don't abort on error
 $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]); 
-$B->resource(1, 24, "200gb");
+$B->resource(1, 1, "20gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
@@ -505,6 +514,7 @@ print "Graph job is:\n $graphjob\n";
 
 if ($removeTempFiles) {
     $B = $S->getBuilder();
+    $B->resource(1, 1, "5gb");
     $B->addAction("rm -rf $outputDir/rdata");
     $B->addAction("rm -rf $outputDir/blast");
     $B->addAction("rm -f $outputDir/blastfinal.tab");
