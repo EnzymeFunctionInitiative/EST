@@ -16,16 +16,16 @@ my $result = GetOptions(
 
 
 
-if (not defined $customClusterFile and not -f $customClusterFile) {
-    die "you must specify an input custom cluster mapping file.";
+if (not defined $customClusterFile or not -f $customClusterFile) {
+    die "you must specify an input custom cluster mapping file (-custom-cluster-file)";
 }
 
 unless (defined $out) {
-    die "you must specify an output file with -out";
+    die "you must specify an output file with -blastout";
 }
 
 unless (defined $blast) {
-    die "you must specify an input blast file with -blast";
+    die "you must specify an input blast file with -blastin";
 }
 
 
@@ -64,11 +64,17 @@ sub loadClusterMapping {
 
     open MAP, $file or die "Unable to read cluster map file $file: $!";
 
+    my $firstLine = 1;
     while (my $line = <MAP>) {
         chomp $line;
-        my ($id, $clusterId, @rest) = split(m/\t/, $line);
-        die "Invalid ID format; do you have the protein ID in the first column and the cluster number in the second?"
-            if length($id) != 6 and length($id) != 10;
+        my ($id, $clusterId, @rest) = split(m/[\s,]+/, $line);
+        
+        if (!(length($id) == 6 or length($id) == 10) or $id !~ m/[A-Z0-9]/i) {
+            next if $firstLine; # if the ID isn't proper, and this is the first line we assume that this row is the column header.
+            print STDERR "Invalid ID format ($id $clusterId); do you have the protein ID in the first column and the cluster number in the second?\n";
+            next;
+        }
+        $firstLine = 0;
         $data{$id} = $clusterId;
     }
 

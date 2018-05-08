@@ -26,9 +26,9 @@ use EFI::Database;
 
 
 
-my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile,
+my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $useOptionASettings,
     $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile,
-    $seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile, $randomFraction);
+    $seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile, $randomFraction, $maxFullFam);
 my $result = GetOptions(
     "ipro=s"                => \$ipro,
     "pfam=s"                => \$pfam,
@@ -37,8 +37,10 @@ my $result = GetOptions(
     "accession-output=s"    => \$access,
     "error-file=s"          => \$errorFile,
     "maxsequence=s"         => \$maxsequence,
+    "max-full-fam-ur90=i"   => \$maxFullFam,
     "accession-id=s"        => \$manualAccession,
     "accession-file=s"      => \$accessionFile,
+    "use-option-a-settings" => \$useOptionASettings, # This option appends the retrieved IDs to the accession file (used in the Option A/BLAST pipeline)
     "out=s"                 => \$fastaFileOut,
     "fasta-file=s"          => \$fastaFileIn,
     "meta-file=s"           => \$metaFileOut,
@@ -107,7 +109,6 @@ my $fileSequenceCount = 0; # The number of actual sequences in the FASTA file, n
 #
 my $unirefData = {};
 # If $unirefVersion is set, %accessionhash will contain the UniRef cluster IDs that are in the family.
-
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S), AND/OR PFAM CLANS
@@ -418,8 +419,8 @@ sub getDomainFromDb {
     my $joinClause = $unirefVersion ? "left join uniref on $table.accession = uniref.accession" : "";
 
     foreach my $element (@elements) {
-        #my $sth = $dbh->prepare("select accession,start,end,uniref50_cluster_id,uniref90_cluster_id from $table where id = '$element'");
-        my $sth = $dbh->prepare("select * from $table $joinClause where $table.id = '$element'");
+        my $sql = "select * from $table $joinClause where $table.id = '$element'";
+        my $sth = $dbh->prepare($sql);
         $sth->execute;
         my $ac = 1;
         while (my $row = $sth->fetchrow_hashref) {
@@ -461,13 +462,35 @@ sub getDomainFromDb {
     # Get actual family count
     my $fullFamCount = 0;
     if ($unirefVersion) {
-        my $sql = "select count(*) from $table where $table.id in ('" . join("', '", @elements) . "')";
+        my $sql = "select count(distinct accession) from $table where $table.id in ('" . join("', '", @elements) . "')";
         my $sth = $dbh->prepare($sql);
         $sth->execute;
         $fullFamCount = $sth->fetchrow;
     }
 
     return [$c, $fullFamCount];
+}
+
+
+sub getRawFamilyCount {
+    my ($dbh, $table, $ids, $fractionFunc, @fams) = @_;
+
+    my $c = 0;
+    foreach my $fam (@fams) {
+        my $sth = $dbh->prepare("select * from $table where $table.id = '$fam'");
+        $sth->execute;
+        my $ac = 1;
+        while (my $row = $sth->fetchrow_hashref) {
+            (my $uniprotId = $row->{accession}) =~ s/\-\d+$//;
+
+            if (&$fractionFunc($c)) {
+                $ac++;
+                $ids->{$uniprotId} = 1;
+            }
+            $c++;
+        }
+        $sth->finish;
+    }
 }
 
 
@@ -663,7 +686,12 @@ sub writeAccessions {
     print "Print out accessions\n";
 
     return if not $access;
-    open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
+    if ($useOptionASettings) {
+        open GREP, ">>$access" or die "Could not write to output accession ID file '$access': $!";
+    } else {
+        open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
+    }
+
     foreach my $accession (keys %accessionhash) {
         my @domains = @{$accessionhash{$accession}};
         foreach my $piece (@domains) {
@@ -683,7 +711,7 @@ sub writeAccessions {
 sub retrieveSequences {
     print "Retrieving Sequences\n";
 
-    if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
+    if ($useOptionASettings or ($fastaFileIn =~ /\w+/ and -s $fastaFileIn)) {
         open OUT, ">>$fastaFileOut" or die "Cannot write to output fasta $fastaFileOut\n";
     } elsif ($fastaFileOut) {
         open OUT, ">$fastaFileOut" or die "Cannot write to output fasta $fastaFileOut\n";
@@ -827,6 +855,19 @@ sub writeSequenceCountFile {
     print "Starting to write $seqCountFile\n";
     
     if ($seqCountFile) {
+        my $blastTotal = 0;
+        if ($useOptionASettings) {
+            open SEQCOUNT, "$seqCountFile" or die "Unable to read sequence count file $seqCountFile: $!";
+            while (<SEQCOUNT>) {
+                chomp;
+                if (m/Total.*\t(\d+)/) {
+                    $blastTotal = $1;
+                    last;
+                }
+            }
+            close SEQCOUNT;
+        }
+        
         open SEQCOUNT, "> $seqCountFile" or die "Unable to write to sequence count file $seqCountFile: $!";
     
         print SEQCOUNT "FileTotal\t$fileTotalIdCount\n";
@@ -840,7 +881,7 @@ sub writeSequenceCountFile {
     
         print SEQCOUNT "Family\t$familyIdCount\n";
         print SEQCOUNT "FullFamily\t$fullFamilyIdCount\n";
-        print SEQCOUNT "Total\t$totalIdCount\n";
+        print SEQCOUNT "Total\t" . ($totalIdCount + int($blastTotal)) . "\n";
     
         close SEQCOUNT;
     }
@@ -886,6 +927,22 @@ sub retrieveFamilyAccessions {
         };
     }
 
+    # Check if the combined size of the families is greater than the given threshold, then we force uniref usage.
+    # This is a bit brute force but the SQL table structure doesn't lend itself easily to do this in SQL.
+    if ($maxFullFam > 0 and not $unirefVersion) {
+        my %ids;
+        getRawFamilyCount($dbh, "INTERPRO", \%ids, $fractionFunc, @ipros);
+        getRawFamilyCount($dbh, "PFAM", \%ids, $fractionFunc, @pfams);
+        getRawFamilyCount($dbh, "GENE3D", \%ids, $fractionFunc, @gene3ds);
+        getRawFamilyCount($dbh, "SSF", \%ids, $fractionFunc, @ssfs);
+
+        my $numFullFamilyIds = scalar keys %ids;
+        if ($numFullFamilyIds > $maxFullFam) {
+            print "Automatically switching to using UniRef90 since there the number of full family IDs ($numFullFamilyIds) is greater than the maximum value of $maxFullFam.\n";
+            $unirefVersion = "90";
+        }
+    }
+
     print "Getting Acession Numbers in specified Families\n";
     my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ipros);
     $fullFamilyIdCount += $famAcc->[1];
@@ -919,9 +976,11 @@ sub verifyArgs {
     } else {
         $fraction=1;
     }
-    
+   
+    $unirefVersion = ""             if not defined $unirefVersion;
     $unirefExpand = 0               if not defined $unirefExpand or not $unirefVersion;
     $maxsequence = 0                unless(defined $maxsequence);
+    $maxFullFam = 0                 unless(defined $maxFullFam);
     $errorFile = "$access.failed"   if not $errorFile;
     $isDomainOn = lc($domain) eq "on";
 

@@ -26,24 +26,24 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $fasta, $struct, $output, $title, $maxfull, $dbver);
+my ($blast, $fasta, $struct, $output, $title, $maxNumEdges, $dbver);
 my $result=GetOptions ("blast=s"	=> \$blast,
     "fasta=s"	=> \$fasta,
     "struct=s"	=> \$struct,
     "output=s"	=> \$output,
     "title=s"	=> \$title,
-    "maxfull=i"	=> \$maxfull,
+    "maxNumEdges=i"	=> \$maxNumEdges,
     "dbver=s"	=> \$dbver);
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver;
 
 
-if(defined $maxfull){
-    unless($maxfull=~/^\d+$/){
-        die "maxfull must be an integer\n";
+if(defined $maxNumEdges){
+    unless($maxNumEdges=~/^\d+$/){
+        die "maxNumEdges must be an integer\n";
     }
 }else{
-    $maxfull=10000000;
+    $maxNumEdges=10000000;
 }
 
 
@@ -55,12 +55,13 @@ my %uprot=();
 my @uprotnumbers=();
 
 my $blastlength=`wc -l $blast`;
-my @blastlength=split( "\s+" , $blastlength);
-if(int(@blastlength[0])>$maxfull){
+my @blastlength=split(/\s+/, $blastlength);
+my $numEdges = $blastlength[0];
+chomp($numEdges);
+if(int($numEdges) > $maxNumEdges){
     open(OUTPUT, ">$output") or die "cannot write to $output\n";
-    chomp @blastlength[0];
-    print OUTPUT "Too many edges (@blastlength[0]) not creating file\n";
-    print OUTPUT "Maximum edges is $maxfull\n";
+    print OUTPUT "Too many edges ($numEdges) not creating file\n";
+    print OUTPUT "Maximum edges is $maxNumEdges\n";
     exit;
 }
 

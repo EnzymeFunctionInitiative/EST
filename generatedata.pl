@@ -75,6 +75,7 @@ $result = GetOptions(
     "blasthits=i"       => \$blasthits,
     "memqueue=s"        => \$memqueue,
     "maxsequence=s"     => \$maxsequence,
+    "max-full-family=i" => \$maxFullFam,
     "userfasta=s"       => \$fastaFile,
     "use-fasta-headers" => \$useFastaHeaders,
     "seq-count-file=s"  => \$seqCountFile,
@@ -238,6 +239,7 @@ $minlen = 0         unless (defined $minlen);
 $unirefVersion = "" unless (defined $unirefVersion);
 $unirefExpand = 0   unless (defined $unirefExpand);
 $domain = "off"     if $unirefVersion;
+$maxFullFam = 0     unless (defined $maxFullFam);
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    unless (defined $maxsequence);
@@ -294,6 +296,7 @@ print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
 print "uniref-expand is $unirefExpand\n";
 print "Python module is $pythonMod\n";
+print "max-full-family is $maxFullFam\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -399,10 +402,13 @@ $scriptDir = $outputDir if not -d $scriptDir;
 # Get sequences and annotations.  This creates fasta and struct.out files.
 #
 my $B = $S->getBuilder();
+$B->resource(1, 1, "5gb");
+
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
     my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
     my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
+    my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
@@ -422,7 +428,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     # is checked below after cd-hit).
     my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
     my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
@@ -475,7 +481,7 @@ $B->mailEnd() if defined $cdHitOnly;
 
 # If we only want to do CD-HIT jobs then do that here.
 if ($cdHitOnly) {
-    $B->resource(1, 24, "20GB");
+    $B->resource(1, 24, "10GB");
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
@@ -502,6 +508,8 @@ if ($cdHitOnly) {
     print "CD-HIT job is:\n $cdhitjob\n";
     exit;
 }
+
+$B->resource(1, 1, "10gb");
 
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
@@ -549,6 +557,7 @@ print "mux job is:\n $muxjob\n";
 # Break sequenes.fa into parts so we can run blast in parallel.
 #
 $B = $S->getBuilder();
+$B->resource(1, 1, "5gb");
 
 $B->dependency(0, @muxjobline[0]);
 $B->addAction("mkdir -p $fracOutputDir");
@@ -568,6 +577,7 @@ print "fracfile job is:\n $fracfilejob\n";
 $B = $S->getBuilder();
 
 $B->dependency(0, @fracfilejobline[0]);
+$B->resource(1, 1, "5gb");
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
@@ -653,6 +663,7 @@ print "blast job is:\n $blastjob\n";
 #
 $B = $S->getBuilder();
 
+$B->resource(1, 1, "5gb");
 $B->dependency(1, @blastjobline[0]); 
 $B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile")
     if $blast eq "blast";
@@ -678,13 +689,14 @@ print "Cat job is:\n $catjob\n";
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-$B->resource(1, 1, "50gb");
+$B->resource(1, 1, "400gb");
 $B->dependency(0, @catjobline[0]); 
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 
 $blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
@@ -701,6 +713,7 @@ my $depJob = @blastreducejobline[0];
 $B = $S->getBuilder();
 
 $B->dependency(0, @blastreducejobline[0]); 
+$B->resource(1, 1, "5gb");
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
@@ -714,6 +727,7 @@ if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
 
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
+$B->jobName("${jobNamePrefix}demux");
 $B->renderToFile("$scriptDir/demux.sh");
 
 $demuxjob = $S->submit("$scriptDir/demux.sh");
@@ -730,7 +744,9 @@ $depJob = @demuxjobline[0];
 if ($convRatioFile) {
     $B = $S->getBuilder();
     $B->dependency(0, $depJob); 
+    $B->resource(1, 1, "5gb");
     $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
+    $B->jobName("${jobNamePrefix}conv_ratio");
     $B->renderToFile("$scriptDir/conv_ratio.sh");
     my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
     chomp $convRatioJob;
@@ -793,6 +809,8 @@ print "Simplegraphs job is:\n $simplegraphjob\n";
 $B = $S->getBuilder();
 
 my ($smallWidth, $fullWidth, $smallHeight, $fullHeight) = (700, 2000, 315, 900);
+
+#create information for R to make graphs and then have R make them
 $B->queue($memqueue);
 $B->dependency(0, $depJob);
 $B->mailEnd();
@@ -801,7 +819,7 @@ $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
-    $B->resource(1, 1, "90gb");
+    $B->resource(1, 1, "250gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
@@ -835,7 +853,8 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId $fullWidth $fullHeight");
 }
 $B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 
 $graphjob = $S->submit("$scriptDir/graphs.sh");

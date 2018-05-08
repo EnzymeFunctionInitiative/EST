@@ -20,25 +20,35 @@ use strict;
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
-use IO;
+use IO::File;
 use XML::Writer;
 use XML::LibXML;
 use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $cdhit, $fasta, $struct, $output, $title, $dbver);
+my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges);
 my $result = GetOptions(
-    "blast=s"	=> \$blast,
-    "cdhit=s"	=> \$cdhit,
-    "fasta=s"	=> \$fasta,
-    "struct=s"	=> \$struct,
-    "output=s"	=> \$output,
-    "title=s"	=> \$title,
-    "dbver=s"	=> \$dbver,
+    "blast=s"	        => \$blast,
+    "cdhit=s"	        => \$cdhit,
+    "fasta=s"	        => \$fasta,
+    "struct=s"	        => \$struct,
+    "output=s"	        => \$outputFile,
+    "title=s"	        => \$title,
+    "dbver=s"	        => \$dbver,
+    "maxfull=i"	        => \$maxNumEdges,
 );
 
-die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver or not $cdhit;
+die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $outputFile or not $title or not $dbver or not $cdhit;
+
+if(defined $maxNumEdges){
+    unless($maxNumEdges=~/^\d+$/){
+        die "maxfull must be an integer\n";
+    }
+}else{
+    $maxNumEdges=10000000;
+}
+
 
 my $anno = new EFI::Annotations;
 
@@ -50,11 +60,11 @@ my %sequence=();
 my %uprot=();
 my %headuprot=();
 
-my ($edgecount, $nodecount) = (0, 0);
+my ($numEdges, $nodecount) = (0, 0);
 
-my $parser=XML::LibXML->new();
-my $output=new IO::File(">$output");
-my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
+my $parser = XML::LibXML->new();
+my $fh = new IO::File(">$outputFile");
+my $writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $fh);
 
 #if struct file (annotation information) exists, use that to generate annotation information
 my @metas;
@@ -227,7 +237,7 @@ while (<BLASTFILE>){
     if(exists $headuprot{@line[0]} and exists $headuprot{@line[1]}){
         #my $log=-(log(@line[3])/log(10))+@line[2]*log(2)/log(10);
         my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
-        $edgecount++;
+        $numEdges++;
         $writer->startTag('edge', 'id' => "@line[0],@line[1]", 'label'=> "@line[0],@line[1]", 'source' => @line[0], 'target' => @line[1]);
         $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[2]);
         $writer->emptyTag('att', 'name' => 'alignment_score', 'type' => 'real', 'value' => $log);
@@ -239,7 +249,20 @@ close BLASTFILE;
 
 #close primary container
 $writer->endTag();
-print "finished $nodecount nodes $edgecount edges to file $output\n";
+$fh->close();
+
+# Check if the number of edges is greater than what's allowed.  We have to do this after creating the
+# xgmml file since we don't know apriori how many edges there are.  If the edge threshold is exceeded
+# then we clear the file.
+if ($numEdges > $maxNumEdges) {
+    my $clearOutputFh = new IO::File(">$outputFile");
+    print $clearOutputFh "Too many edges ($numEdges) not creating file\n";
+    print $clearOutputFh "Maximum edges is $maxNumEdges\n";
+    $clearOutputFh->close();
+}
+
+
+print "finished $nodecount nodes $numEdges edges to file $outputFile\n";
 
 sub is_array {
     my ($ref) = @_;
