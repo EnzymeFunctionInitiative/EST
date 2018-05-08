@@ -17,7 +17,7 @@ use EFI::IdMapping::Util;
 
 
 my ($inputFile, $outputFile, $giFile, $uniprotref, $efiTidFile, $gdnaFile, $hmpFile, $oldPhyloFile, $debug, $idMappingFile);
-my ($uniref50File, $uniref90File);
+my ($uniref50File, $uniref90File, $pfamFile, $ipFile);
 my $result = GetOptions(
     "dat=s"         => \$inputFile,
     "annotations=s" => \$outputFile,
@@ -30,6 +30,8 @@ my $result = GetOptions(
     "idmapping=s"   => \$idMappingFile,
     "uniref50=s"    => \$uniref50File,
     "uniref90=s"    => \$uniref90File,
+    "pfam=s"        => \$pfamFile,
+    "interpro=s"    => \$ipFile,
     "debug=i"       => \$debug,  #TODO: debug
 );
 
@@ -37,7 +39,8 @@ my $usage = <<USAGE;
 Usage: $0 -dat combined_dat_input_file -annotations output_annotations_tab_file
             [-uniprotgi gi_file_path -efitid efi_tid_file_path -gdna gdna_file_path -hmp hmp_file_path
              -phylo old_phylogeny_file_path -debug num_iterations_to_run -idmapping idmapping_tab_file_path
-             -uniref50 uniref50_tab_file -uniref90 uniref90_tab_file]
+             -uniref50 uniref50_tab_file -uniref90 uniref90_tab_file -pfam pfam_tab_file
+             -interpro interpro_tab_file]
 
     Anything in [] is optional.
 
@@ -47,6 +50,10 @@ Usage: $0 -dat combined_dat_input_file -annotations output_annotations_tab_file
                     refseq, embl-cds, and gi numbers 
         -uniref50   use the given tab file to add the UniRef50 cluster ID field
         -uniref90   use the given tab file to add the UniRef90 cluster ID field
+        -pfam       use the Pfam families from the given tab file to fill the Pfam field; if not given
+                    the families from the input file will be used
+        -interpro   use the InterPro families from the given tab file to fill the Pfam field; if not given
+                    the families from the input file will be used
 
 USAGE
 
@@ -129,6 +136,19 @@ if ($uniref90File) {
     print "Done\n";
 }
 
+my $PfamData = {};
+if (defined $pfamFile and -f $pfamFile) {
+    print "Using Pfam families from pfam file\n";
+    $PfamData = getFamilyData($pfamFile);
+    print "Done\n";
+}
+
+my $IproData = {};
+if (defined $ipFile and -f $ipFile) {
+    print "Using Pfam families from pfam file\n";
+    $IproData = getFamilyData($ipFile);
+    print "Done\n";
+}
 
 
 
@@ -246,7 +266,9 @@ sub write_line {
         my $ncbiStr = "None";
         $ncbiStr = join(",", @NCBI) if scalar @NCBI;
 
-        if(scalar @PFAM){
+        if (exists $PfamData->{$element}) {
+            $PFAM = join(',', @{ $PfamData->{$element} });
+        } elsif (scalar @PFAM) {
             $PFAM=join ',', @PFAM;
         }else{
             $PFAM="None";
@@ -256,7 +278,9 @@ sub write_line {
         }else{
             $PDB="None";
         }
-        if(scalar @INTERPRO){
+        if(exists $IproData->{$element}) {
+            $IPRO = join(',', @{ $IproData->{$element} });
+        } elsif (scalar @INTERPRO){
             $IPRO=join ',', @INTERPRO;
         }else{
             $IPRO="None";
@@ -486,6 +510,23 @@ sub getUnirefData {
         $data->{$member} = $seed;
     }
     close UR;
+
+    return $data;
+}
+
+
+sub getFamilyData {
+    my $file = shift;
+
+    my $data = {};
+
+    open DATA, $file or die "Could not open family file $file for reading: $!";
+    while (<DATA>) {
+        chomp;
+        my ($family, $acId) = split /\t/;
+        push(@{ $data->{$acId} }, $family);
+    }
+    close DATA;
 
     return $data;
 }

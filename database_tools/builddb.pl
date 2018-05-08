@@ -49,6 +49,7 @@ my $buildEna;
 my $Legacy;
 my $enaDir;
 my $buildCountsOnly;
+my $doPdbBlast;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "download"      => \$doDownload,
@@ -68,11 +69,12 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                                                             # been already created, and the idmapping table must be present.
                         "ena-dir=s"     => \$enaDir,
                         "build-counts"  => \$buildCountsOnly,   # build the family count table only
+                        "pdb-blast"     => \$doPdbBlast,
                        );
 
 my $usage = <<USAGE;
 Usage: $0
-    -dir=working_dir [-download -interactive -log=log_file-dryrun -exists -scheduler=scheduler
+    -dir=working_dir [-download -interactive -log=log_file -dryrun -exists -scheduler=scheduler
     -queue=queue -config=config_file -sql -no-prompt -no-submit -db-name=database_name -build-ena]
 
     -download       only create the script for downloading the input files
@@ -90,10 +92,10 @@ Usage: $0
     -dryrun         don't do anything, just display all commands to be executed to the console
     -exists         skip any output or intermediate files that already exist
     -no-prompt      don't prompt the user to confirm the GOLD data version
-    -no-sumit       create all of the job files but don't submit them
+    -no-submit      create all of the job files but don't submit them
 
     -bc1            configure the scripts to work with biocluster1 instead of biocluster 2
-    -scheduler      specify the scheduler to use (defaults to torque, can be slurm)
+    -scheduler      specify the scheduler to use (defaults to slurm, can be torque)
     -queue          the cluster queue to use for computation
 
     -config         path to configuration file (defaults to EFICONFIG env var, if present)
@@ -147,6 +149,8 @@ mkdir $CombinedDir if not -d $CombinedDir;
 mkdir $PdbBuildDir if not -d $PdbBuildDir;
 mkdir "$PdbBuildDir/output" if not -d "$PdbBuildDir/output";
 
+$configFile = $ENV{EFICONFIG} if not $configFile and exists $ENV{EFICONFIG};
+
 
 # Setup logging. Also redirect stderr to console stdout.
 $logFile = "$BuildDir/builddb.log" unless (defined $logFile and length $logFile);
@@ -157,12 +161,12 @@ sub logprint { print join("", @_), "\n"; print LOG join("", @_), "\n"; }
 
 logprint "#STARTED builddb.pl AT " . scalar localtime() . "\n";
 logprint "# USING WORKING DIR OF $WorkingDir AND SCRIPTS IN $ScriptDir";
+logprint "# USING CONFIG FILE $configFile";
 
 
 my $buildOptions = 0;
 $buildOptions = $buildOptions | BUILD_ENA if $buildEna;
 $buildOptions = $buildOptions | BUILD_COUNTS if $buildCountsOnly;
-
 
 my %dbArgs;
 $dbArgs{config_file_path} = $configFile if (defined $configFile and -f $configFile);
@@ -194,7 +198,7 @@ my $DbUser = $config->{db}->{user};
 # Set up the scheduler API.
 my $schedType = getSchedulerType($scheduler);
 my $S = new EFI::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1, '100gb'],
-    'default_working_dir' => $BuildDir, 'dryrun' => $dryRun);
+    'default_working_dir' => $BuildDir, 'dryrun' => $dryRun, 'abort_script_on_action_fail' => 0);
 my $FH = new EFI::Util::FileHandle('dryrun' => $dryRun);
 
 
@@ -259,7 +263,7 @@ if (defined $buildEna and $buildEna) {
     my $idmappingJobId = submitIdMappingJob($S->getBuilder(), $unzipJobId, $fileNum++);
     
     logprint "#CREATE ANNOTATIONS (STRUCT) TAB FILES\n";
-    my $structJobId = submitAnnotationsJob($S->getBuilder(), $idmappingJobId, $fileNum++);
+    my $structJobId = submitAnnotationsJob($S->getBuilder(), [$idmappingJobId, $ffJobId], $fileNum++);
     
     # Create uniref table
     logprint "#CREATING UNIREF TABLE\n";
@@ -273,11 +277,13 @@ if (defined $buildEna and $buildEna) {
     logprint "#FORMAT BLAST DATABASE\n";
     my $splitJobId = submitFormatDbAndSplitFastaJob($S->getBuilder(), $structJobId, $np, $PdbBuildDir, $fileNum++);
     
-    logprint "#DO PDB BLAST\n";
-    my $blastJobId = submitBlastJob($S->getBuilder(), [$splitJobId, $unirefJobId, $countJobId], $np, $PdbBuildDir, $fileNum++);
-    
-    logprint "#CAT BLAST FILES\n";
-    my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
+    if (defined $doPdbBlast) {
+       logprint "#DO PDB BLAST\n";
+       my $blastJobId = submitBlastJob($S->getBuilder(), [$splitJobId, $unirefJobId, $countJobId], $np, $PdbBuildDir, $fileNum++);
+       
+       logprint "#CAT BLAST FILES\n";
+       my $catJobId = submitCatBlastJob($S->getBuilder(), $blastJobId, $PdbBuildDir, $fileNum++);
+   }
 }   
 
 
@@ -310,13 +316,15 @@ sub submitIdMappingJob {
 
     waitForInput();
 
+    my $configParam = ($configFile and -f $configFile) ? "-config $configFile" : "";
+
     my $file = "$BuildDir/$fileNum-idmapping.sh";
     $B->dependency(0, $depId);
    
     $B->addAction("module load $PerlMod");
     $B->addAction("module load $DbMod");
     $B->addAction("module load $EstMod");
-    $B->addAction("perl $ScriptDir/import_id_mapping.pl -config $configFile -input $InputDir/idmapping.dat -output $OutputDir/idmapping.tab");
+    $B->addAction("perl $ScriptDir/import_id_mapping.pl $configParam -input $InputDir/idmapping.dat -output $OutputDir/idmapping.tab");
     $B->addAction("date > $CompletedFlagFile.$fileNum-idmapping\n");
    
     $B->outputBaseFilepath($file);
@@ -333,6 +341,7 @@ sub submitEnaJob {
 
     my $file = "$BuildDir/$fileNum-ena.sh";
     
+    $B->resource(1, 1, "150gb");
     $B->addAction("module load $PerlMod");
     $B->addAction("module load $DbMod");
    
@@ -343,8 +352,6 @@ sub submitEnaJob {
         #my $release = $emblDirs[-1];
         #my $enaInputDir = "$ENV{EFIEMBL}/Release_$release";
         
-        $B->addAction("gunzip -r $enaInputDir");
-        $B->addAction("date > $CompletedFlagFile.unzip_ena\n");
         $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -idmapping $OutputDir/idmapping.tab -log $BuildDir/make_ena_table.log");
         $B->addAction("date > $CompletedFlagFile.make_ena_table\n");
         $B->addAction("cat $enaDir/env.tab $enaDir/fun.tab $enaDir/pro.tab > $OutputDir/ena.tab");
@@ -378,7 +385,7 @@ sub submitFinalFileJob {
         $B->addAction("date > $CompletedFlagFile.chopxml\n");
     }
     # Build PFAM, SSF, INTERPRO, and GENE3D .tab files
-    if (not $skipIfExists or not -f "$OutputDir/GENE3D.tab") {
+    if (not $skipIfExists or not -f "$OutputDir/INTERPRO.tab") {
         $B->addAction("$ScriptDir/make_family_tables.pl -outdir $OutputDir -indir $BuildDir/match_complete");
         $B->addAction("date > $CompletedFlagFile.make_family_tables\n");
     }
@@ -411,16 +418,16 @@ sub submitBuildCountsJob {
         $B->addAction("date > $CompletedFlagFile.family_counts\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/family_info.tab") {
-        $B->addAction("$ScriptDir/create_family_info.pl -combined $InputDir/Pfam-A.clans.tsv -merge-counts $OutputDir/family_counts.tab -out $BuildDir/pfam_family_info.tab");
+        $B->addAction("$ScriptDir/create_family_info.pl -combined $InputDir/Pfam-A.clans.tsv -merge-counts $OutputDir/family_counts.tab -out $BuildDir/pfam_family_info.tab -use-clans");
         $B->addAction("$ScriptDir/create_family_info.pl -long $InputDir/interpro_names.dat -short $InputDir/interpro_short_names.dat -merge-counts $OutputDir/family_counts.tab -out $BuildDir/interpro_family_info.tab");
         $B->addAction("cp $BuildDir/pfam_family_info.tab $OutputDir/family_info.tab");
         $B->addAction("cat $BuildDir/interpro_family_info.tab >> $OutputDir/family_info.tab");
         # Add clans to the info table
-        $B->addAction("grep CLAN $OutputDir/family_counts.tab | awk '" . '{print $2, "\t", $3, $4, $5}' . "' >> $OutputDir/family_info.tab");
+        #$B->addAction("grep CLAN $OutputDir/family_counts.tab | awk '" . '{print $2, "\t", $3, $4, $5}' . "' >> $OutputDir/family_info.tab");
         $B->addAction("date > $CompletedFlagFile.create_family_info\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/PFAM_clans.tab") {
-        $B->addAction("cut -f1,2 $InputDir/Pfam-A.clans.tsv > $OutputDir/PFAM_Clans.tab");
+        $B->addAction("cut -f1,2 $InputDir/Pfam-A.clans.tsv > $OutputDir/PFAM_clans.tab");
     }
 
     $B->addAction("date > $CompletedFlagFile.$fileNum-buildCounts\n");
@@ -497,7 +504,7 @@ sub submitFormatDbAndSplitFastaJob {
     my $fracDir = "$pdbBuildDir/fractions";
     mkdir $fracDir if not -d $fracDir;
 
-    if (not $skipIfExists or not -f "$fracDir/fractfile-1.fa") {
+    if (not $skipIfExists or not -f "$fracDir/fracfile-1.fa") {
         $B->addAction("rm -rf $fracDir");
         $B->addAction("$ScriptDir/splitfasta.pl -parts $np -tmp $fracDir -source $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.splitfasta\n");
@@ -791,7 +798,7 @@ sub submitAnnotationsJob {
     if (not $skipIfExists or not -f "$OutputDir/annotations.tab") {
         # Exclude GI
         #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
-        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
+        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -pfam $OutputDir/PFAM.tab -interpro $OutputDir/INTERPRO.tab");
         $B->addAction("date > $CompletedFlagFile.make_annotations_table\n");
     }
     if (not $skipIfExists or not -f "$OutputDir/organism.tab") {
@@ -821,7 +828,7 @@ sub writeSqlCommands {
 select 'CREATING family_info' as '';
 drop table if exists family_info;
 create table family_info(family varchar(10) primary key, short_name varchar(50), long_name varchar(255), num_members integer, num_uniref50_members integer, num_uniref90_members integer);
-create index family_Index on family_counts (family);
+create index family_Index on family_info (family);
 
 select 'LOADING family_info' as '';
 load data local infile '$OutputDir/family_info.tab' into table family_info;
@@ -901,6 +908,7 @@ select 'CREATING PFAM' as '';
 drop table if exists PFAM;
 create table PFAM(id varchar(24), accession varchar(10), start integer, end integer);
 create index PAM_ID_Index on PFAM (id);
+create index PAM_Accession_Index on PFAM (accession);
 
 select 'CREATING UNIREF' as '';
 drop table if exists uniref;
@@ -918,6 +926,7 @@ select 'CREATING INTERPRO' as '';
 drop table if exists INTERPRO;
 create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer);
 create index INTERPRO_ID_Index on INTERPRO (id);
+create index INTERPRO_Accession_Index on INTERPRO (accession);
 
 select 'CREATING pdbhits' as '';
 drop table if exists pdbhits;
@@ -965,7 +974,7 @@ load data local infile '$OutputDir/pdb.tab' into table pdbhits;
 select 'LOADING idmapping' as '';
 load data local infile '$OutputDir/idmapping.tab' into table idmapping;
 
-GRANT SELECT ON `$dbName`.* TO '$DbUser'@'$IpRange';
+GRANT SELECT ON `$dbName`.* TO '$DbUser'\@'$IpRange';
 
 SQL
         ;
