@@ -79,7 +79,7 @@ foreach my $xmlfile (glob("$inputDir/*.xml")){
         my $accession=$protein->getAttribute('id');
         if($protein->hasChildNodes){
             foreach my $match ($protein->findnodes('./match')){
-                my $matchdb;
+                my $matchdb = "";
                 my $matchid;
                 my ($start, $end);
                 if($match->hasChildNodes){
@@ -92,14 +92,14 @@ foreach my $xmlfile (glob("$inputDir/*.xml")){
                                 $start=$child->getAttribute('start');
                                 $end=$child->getAttribute('end');
                             }else{
-                                die "Child lcn did not have start and end at ".$match->getAttribute('dbname').",".$match->getAttribute('id')."\n";
+                                die "Child lcn did not have start and end at ".$matchdb.",".$matchid."\n";
                             }
                         }elsif($child->nodeName eq 'ipr'){
                             if($child->hasAttribute('id')){
                                 #print "ipr match ".$child->getAttribute('id')."\n";
                                 $interpro=$child->getAttribute('id');
                             }else{
-                                die "Child ipr did not have an id at".$match->getAttribute('dbname').",".$match->getAttribute('id')."\n";
+                                die "Child ipr did not have an id at".$matchdb.",".$matchid."\n";
                             }
                         }else{
                             die "unknown child $child\n";
@@ -121,12 +121,12 @@ foreach my $xmlfile (glob("$inputDir/*.xml")){
                         }
                     }
                 }else{
-                    die "No Children in".$match->getAttribute('dbname').",".$match->getAttribute('id')."\n";
+                    die "No Children in".$matchdb.",".$matchid."\n";
                 }
                 if($verbose>0){
-                    print "\tDatabase ".$match->getAttribute('dbname').",".$match->getAttribute('id')." start $start end $end\n";
+                    print "\tDatabase ".$matchdb.",".$matchid." start $start end $end\n";
                 }
-                if(defined $databases{$match->getAttribute('dbname')}) {
+                if(defined $databases{$matchdb}) {
                     # Map accession ID to UniRef cluster accession ID
                     my $ur50 = exists $uniref50->{$accession} ? $uniref50->{$accession} : "";
                     my $ur90 = exists $uniref90->{$accession} ? $uniref90->{$accession} : "";

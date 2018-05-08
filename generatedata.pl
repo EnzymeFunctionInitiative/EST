@@ -75,6 +75,7 @@ $result = GetOptions(
     "blasthits=i"       => \$blasthits,
     "memqueue=s"        => \$memqueue,
     "maxsequence=s"     => \$maxsequence,
+    "max-full-family=i" => \$maxFullFam,
     "userfasta=s"       => \$fastaFile,
     "use-fasta-headers" => \$useFastaHeaders,
     "seq-count-file=s"  => \$seqCountFile,
@@ -238,6 +239,7 @@ $minlen = 0         unless (defined $minlen);
 $unirefVersion = "" unless (defined $unirefVersion);
 $unirefExpand = 0   unless (defined $unirefExpand);
 $domain = "off"     if $unirefVersion;
+$maxFullFam = 0     unless (defined $maxFullFam);
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    unless (defined $maxsequence);
@@ -294,6 +296,7 @@ print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
 print "uniref-expand is $unirefExpand\n";
 print "Python module is $pythonMod\n";
+print "max-full-family is $maxFullFam\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -405,6 +408,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
     my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
+    my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
@@ -424,7 +428,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     # is checked below after cd-hit).
     my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
     my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption -config=$configFile");
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
@@ -804,24 +808,7 @@ print "Simplegraphs job is:\n $simplegraphjob\n";
 #
 $B = $S->getBuilder();
 
-#my ($smallWidth, $fullWidth, $smallHeight, $fullHeight) = (700, 2000, 315, 900);
-#$B->queue($memqueue);
-#$B->dependency(0, $depJob);
-#$B->mailEnd();
-#$B->addAction("module load oldapps") if $oldapps;
-#$B->addAction("module load $efiEstMod");
-#$B->addAction("module load $efiDbMod");
-#$B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
-#$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
-#$B->addAction("Rscript $efiEstTools/quart-align-hdf5.r $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId $fullWidth $fullHeight");
-#$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity_sm.png $jobId $smallWidth $smallHeight");
-#$B->addAction("Rscript $efiEstTools/quart-perid-hdf5.r $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId $fullWidth $fullHeight");
-#$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
-#$B->addAction("Rscript $efiEstTools/hist-hdf5-length.r $outputDir/rdata.hdf5 $outputDir/length_histogram.png $jobId $fullWidth $fullHeight");
-#$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-#$B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId $fullWidth $fullHeight");
-#$B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+my ($smallWidth, $fullWidth, $smallHeight, $fullHeight) = (700, 2000, 315, 900);
 
 #create information for R to make graphs and then have R make them
 $B->queue($memqueue);
@@ -866,7 +853,7 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/hist-hdf5-edges.r $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId $fullWidth $fullHeight");
 }
 $B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 

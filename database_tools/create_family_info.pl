@@ -8,16 +8,21 @@
 use strict;
 use Getopt::Long;
 
-my ($shortFile, $longFile, $combinedFile, $outputFile, $countsFile);
+my ($shortFile, $longFile, $combinedFile, $outputFile, $countsFile, $useClans);
 
 my $result = GetOptions("short=s"           => \$shortFile,
                         "long=s"            => \$longFile,
                         "combined=s"        => \$combinedFile,
                         "merge-counts=s"    => \$countsFile,
-                        "out=s"             => \$outputFile);
+                        "out=s"             => \$outputFile,
+                        "use-clans"         => \$useClans,
+                    );
+
+$useClans = 0 if not defined $useClans;                    
 
 my %pfams;
 my %counts;
+my %clans;
 
 if (defined $countsFile and -f $countsFile) {
     %counts = loadFamilySizes($countsFile);
@@ -28,9 +33,10 @@ if (defined $combinedFile) {
 
     while (my $line = <COMBINED>) {
         chomp $line;
-        my ($pfam, undef, undef, $shortName, $longName) = split(m/\t/, $line);
+        my ($pfam, $clan, $clanShortName, $shortName, $longName) = split(m/\t/, $line);
         $pfams{$pfam}{short} = $shortName;
         $pfams{$pfam}{long} = $longName;
+        $clans{$clan} = $clanShortName;
     }
 
     close COMBINED;
@@ -70,6 +76,18 @@ foreach my $key (sort keys %pfams){
     }
     print OUT join("\t", $key, $pfams{$key}{short}, $pfams{$key}{long}, @data), "\n";
 }
+
+if ($useClans) {
+    foreach my $key (sort keys %clans) {
+        next if not $key;
+        my @data = (0, 0, 0);
+        if (exists $counts{$key}) {
+            @data = @{ $counts{$key} };
+        }
+        print OUT join("\t", $key, $clans{$key}, "", @data), "\n";
+    }
+}
+
 
 close OUT;
 

@@ -29,7 +29,7 @@ if (not defined $configFile or not -f $configFile) {
     }
 }
 
-die "--idmapping=id_mapping.dat input file must be provided" unless (defined $idMappingFile and -f $idMappingFile);
+die "--input=id_mapping.dat input file must be provided" unless (defined $idMappingFile and -f $idMappingFile);
 die "--output=output_tab_file must be provided" unless defined $outputFile;
 
 $buildDir = "" if not defined $buildDir;
