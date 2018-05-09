@@ -32,7 +32,7 @@ my $result=GetOptions ("blast=s"	=> \$blast,
     "struct=s"	=> \$struct,
     "output=s"	=> \$output,
     "title=s"	=> \$title,
-    "maxNumEdges=i"	=> \$maxNumEdges,
+    "maxfull=i"	=> \$maxNumEdges,
     "dbver=s"	=> \$dbver);
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver;

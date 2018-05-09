@@ -3,11 +3,10 @@
 use Getopt::Long;
 use strict;
 
-my ($run, $tmpdir, $out);
+my ($runDir, $out);
 my $result = GetOptions(
-    "run=s"	=> \$run,
-    "tmp=s"	=> \$tmpdir,
-    "out=s"	=> \$out,
+    "run-dir=s"     => \$runDir,
+    "out=s"         => \$out,
 );
 
 
@@ -15,10 +14,10 @@ my $result = GetOptions(
 open(OUT, ">$out") or die "cannot write to $out\n";
 print OUT "File\t\t\tNodes\tEdges\tSize\n";
 
-my $fullFile = glob("$tmpdir/$run/*full_ssn*");
+my $fullFile = glob("$runDir/*full_ssn*");
 print OUT saveFile($fullFile, 1);
 
-foreach my $filePath (sort {$b cmp $a} glob("$tmpdir/$run/*")){
+foreach my $filePath (sort {$b cmp $a} glob("$runDir/*")){
     if ($filePath =~ /\.xgmml$/) {
         if (-s $filePath) {
             if ($filePath !~ /_full_ssn\.xgmml/) {
@@ -40,7 +39,7 @@ system("touch $out.completed");
 sub saveFile {
     my ($filePath, $isFull) = @_;
 
-#    my $filePath = "$tmpdir/$run/$filename";
+#    my $filePath = "$tmpdir/$runDir/$filename";
 #    $filePath = $filename if $filename =~ /full/;
 
     my $size = -s $filePath;
@@ -48,6 +47,15 @@ sub saveFile {
     my $edges = `grep "^  <edge" $filePath | wc -l`;
     chomp $nodes;
     chomp $edges;
+
+    if ($edges == 0) {
+        open FILE, $filePath;
+        my $line = <FILE>;
+        chomp $line;
+        $line =~ s/^.*\((\d+)\).*$/$1/;
+        $edges = $line ? $line : 0;
+        close FILE;
+    }
 
     if ($nodes == 0) {
         $size = 0;
