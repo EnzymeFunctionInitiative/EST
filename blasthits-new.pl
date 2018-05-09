@@ -527,7 +527,7 @@ if ($removeTempFiles) {
     $B->addAction("rm -f $outputDir/formatdb.log");
     $B->addAction("rm -f $outputDir/mux.out");
     $B->addAction("rm -f $outputDir/sequences.fa.*");
-    B->jobName("${jobNamePrefix}blasthits_cleanup");
+    $B->jobName("${jobNamePrefix}blasthits_cleanup");
     $B->renderToFile("$scriptDir/blasthits_cleanup.sh");
     my $cleanupJob = $S->submit("$scriptDir/blasthits_cleanup.sh");
 }
