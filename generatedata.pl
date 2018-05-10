@@ -819,12 +819,13 @@ $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
+    my $evalueFile = "$outputDir/evalue.tab";
     $B->resource(1, 1, "250gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
     $B->addAction("mkdir -p $outputDir/rdata");
-    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
+    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
     $B->addAction("if [ -z \"\$FIRST\" ]; then");
     $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
