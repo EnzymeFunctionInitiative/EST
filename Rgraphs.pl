@@ -13,14 +13,19 @@ use Statistics::R;
 use Data::Dumper;
 #use FileCache;
 
-my ($blastfile, $edgesFile, $lenhist, $rdata, $fasta, $incfrac);
+my ($blastfile, $edgesFile, $lenhist, $rdata, $fasta, $incfrac, $evalueFile);
 my $result = GetOptions(
     "blastout=s"    => \$blastfile,
     "edges=s"       => \$edgesFile,
     "length=s"      => \$lenhist,
     "rdata=s"       => \$rdata,
     "fasta=s"       => \$fasta,
-    "incfrac=f"     => \$incfrac);
+    "incfrac=f"     => \$incfrac,
+    "evalue-file=s" => \$evalueFile, # Output evalues to a file if specified
+);
+
+
+$evalueFile = (defined $evalueFile and $evalueFile) ? $evalueFile : "";
 
 my $edgelimit = 10;
 my @evalues;
@@ -32,6 +37,8 @@ my @edges;
 my %alignData;
 my %peridData;
 my %metadata;
+my %evalueEdges;
+
 
 #my $LenHistFH = cacheout($lenhist) or die "could not write to length histogram file ($lenhist): $!\n";
 #my $EdgesFH = cacheout($edgesFile) or die "could not wirte to edges file ($edgesFile): $!\n";
@@ -71,10 +78,22 @@ while (<BLAST>){
         push(@{ $alignData{$evalue} }, $align);
         push(@{ $peridData{$evalue} }, $pid);
     }
+    $evalueEdges{$evalue} = 0 if not exists $evalueEdges{$evalue};
+    $evalueEdges{$evalue}++;
 }
 close(BLAST);
 
-foreach my $ev (sort keys %metadata) {
+
+my $evSum = 0;
+my %evFunc;
+foreach my $ev (sort { $b <=> $a } keys %metadata) {
+    $evSum += $evalueEdges{$ev};
+    $evFunc{$ev} = $evSum; # Integrate
+}
+
+open(EVALUE, ">$evalueFile") if $evalueFile or die "Unable to open evalue file $evalueFile for writing: $!";
+
+foreach my $ev (sort { $a <=> $b } keys %metadata) {
     my $num = $metadata{$ev};
     my $aFile = "$rdata/align$num";
     my $pFile = "$rdata/perid$num";
@@ -95,8 +114,11 @@ foreach my $ev (sort keys %metadata) {
 
     close AFH;
     close PFH;
+
+    print EVALUE join("\t", $ev, $evalueEdges{$ev}, $evFunc{$ev}), "\n" if $evalueFile;
 }
 
+close(EVALUE) if $evalueFile;
 
 
 #get list of alignment files
