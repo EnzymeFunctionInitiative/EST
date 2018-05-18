@@ -479,6 +479,7 @@ print "Demux job is:\n $demuxjob\n";
 
 
 
+my $evalueFile = "$outputDir/evalue.tab";
 #create information for R to make graphs and then have R make them
 $B = $S->getBuilder();
 $B->setScriptAbortOnError(0); # don't abort on error
@@ -492,7 +493,7 @@ $B->addAction("module load $gdMod");
 $B->addAction("module load $perlMod");
 $B->addAction("module load $rMod");
 $B->addAction("mkdir $outputDir/rdata");
-$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
+$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
 $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
 $B->addAction("FIRST=`head -1 \$FIRST`");
 $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
