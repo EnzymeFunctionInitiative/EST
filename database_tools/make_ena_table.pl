@@ -222,8 +222,11 @@ $result = GetOptions(
     "v"             => \$verbose,
     "log=s"         => \$log,
     "config=s"      => \$configFile,
+    "legacy-wgs"    => \$legacyWgs,
     "debug=s"       => \$debugParseFile,
 );
+
+my $baseDir = $ENV{PWD};
 
 # We're not currently using the EFI database for reverse lookups, rather we're using the flat file so this
 # config file is now optional.
@@ -242,10 +245,20 @@ my %organisms;
 
 
 
-die "Invalid arguments specified" if not -f $debugParseFile and (
-                                         not defined $embl or not defined $pro or not defined $env or not defined $fun or
-                                         not defined $com or not defined $table or not defined $orgtable
-                                     );
+die "Invalid arguments specified" if not -f $debugParseFile and not defined $embl;
+#(
+#                                         not defined $embl or not defined $pro or not defined $env or not defined $fun or
+#                                         not defined $com
+#                                             or not defined $table or not defined $orgtable
+#                                     );
+
+$pro = "$baseDir/pro.tab" if not defined $pro or not $pro;
+$fun = "$baseDir/fun.tab" if not defined $fun or not $fun;
+$env = "$baseDir/env.tab" if not defined $env or not $env;
+$com = "$baseDir/com.tab" if not defined $com or not $com;
+
+$legacyWgs = defined $legacyWgs ? 1 : 0;
+
 
 # Parse the specified file and output it to the console in debug mode, and then exit.
 if (-f $debugParseFile) {
@@ -256,45 +269,69 @@ if (-f $debugParseFile) {
 
 
 $logName = defined $LIST_FILES_ONLY ? "$0.debug.log" : "$0.log";
-$log = $ENV{PWD} . "/" . $logName unless defined $log;
+$log = "$baseDir/$logName" unless defined $log;
 open LOG, "> $log";
 
-#$table=$ENV{'EFIEST'}."/match_complete_data/xml_fragments/PFAM.sorted.tab";
 
-logprint "read in accession to pfam table";
-%accessions=%{tabletohashary($table)};
-logprint "read in accession to organism table";
-%organisms=%{tabletohash($orgtable)};
+if (defined $table and -f $table) {
+    logprint "read in accession to pfam table";
+    %accessions=%{tabletohashary($table)};
+}
+if (defined $orgtable and -f $orgtable) {
+    logprint "read in accession to organism table";
+    %organisms=%{tabletohash($orgtable)};
+}
 
-opendir(DIR, "$embl/std") or die "cannot open embl mirror directory $embl/std";
+opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std";
 @pro=apply {$_="$embl/std/".$_} grep {$_=~/.*_pro.*/} readdir DIR;
 closedir DIR;
-opendir(DIR, "$embl/std") or die "cannot open embl mirror directory $embl/std";
+opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std";
 @fun=apply {$_="$embl/std/".$_} grep {$_=~/.*_fun.*/} readdir DIR;
 closedir DIR;
-opendir(DIR, "$embl/std") or die "cannot open embl mirror directory $embl/std";
+opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std";
 @env=apply {$_="$embl/std/".$_} grep {$_=~/.*_env.*/} readdir DIR;
 closedir DIR;
-opendir(DIR, "$embl/con") or die "cannot open embl mirror directory $embl/con";
+opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con";
 push(@pro, apply {$_="$embl/con/".$_} grep {$_=~/.*_pro.*/} readdir DIR);
 closedir DIR;
-opendir(DIR, "$embl/con") or die "cannot open embl mirror directory $embl/con";
+opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con";
 push(@fun, apply {$_="$embl/con/".$_} grep {$_=~/.*_fun.*/} readdir DIR);
 closedir DIR;
-opendir(DIR, "$embl/con") or die "cannot open embl mirror directory $embl/con";
+opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con";
 push(@env, apply {$_="$embl/con/".$_} grep {$_=~/.*_env.*/} readdir DIR);
 closedir DIR;
-opendir(WGS, "$embl/wgs") or die "cannot open wgs direcotry in embl mirror directory $embl/wgs";;
+opendir(WGS, "$embl/wgs") or warn "cannot open wgs direcotry in embl mirror directory $embl/wgs";;
 @wgsdirs= sort{ $a cmp $b } grep {$_!~/\./ && $_ ne 'etc'}readdir WGS;
 closedir WGS;
 foreach $dir (@wgsdirs){
     logprint "Listing $embl/wgs/$dir";
     opendir(DIR, "$embl/wgs/$dir") or die "could not open embl subdirectory $embl/wgs/$dir";
-    @wgsdir=readdir DIR;
-    push @pro, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_pro.*/} @wgsdir;
-    push @fun, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_fun.*/} @wgsdir;
-    push @env, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_env.*/} @wgsdir;
-    closedir DIR;
+    my @wgsdir = readdir DIR;
+    closedir(DIR);
+
+    if ($legacyWgs) {
+        push @pro, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_pro.*/} @wgsdir;
+        push @fun, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_fun.*/} @wgsdir;
+        push @env, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_env.*/} @wgsdir;
+    } else {
+        my @sorted = sort{ $a cmp $b } grep {$_=~/\.master\.dat$/} @wgsdir;
+        my @masters = apply {$_="$embl/wgs/$dir/".$_} @sorted;
+        my @datFiles = apply {$_ =~ s/^(.*)\.master\.dat$/$1/} @sorted;
+        for (my $i = 0; $i <= $#masters; $i++) {
+            my $type = getMasterType($masters[$i]);
+            print join("\t", $type, $datFiles[$i]), "\n";
+            if ($type eq "pro") {
+                push @pro, "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
+            } elsif ($type eq "fun") {
+                push @fun, "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
+            } elsif ($type eq "env") {
+                push @env, "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
+            }
+        }
+        #print "PRO: ", join(",", @pro), "\n\n\n\n\n";
+        #print "FUN: ", join(",", @fun), "\n\n\n\n\n";
+        #print "ENV: ", join(",", @env), "\n\n\n\n\n";
+    }
 }
 
 #opendir(ETC, "$embl/wgs/etc") or die "could not open embl subdirectory $embl/wgs/etc";
@@ -321,62 +358,31 @@ logprint "done processing";
 close LOG;
 
 
-#make the sqlite database
-#system("sqlite3 $sqlite </home/groups/efi/gnn/creategnndatabase.sql");
+
+sub getMasterType {
+    my $masterFile = shift;
+    my $type = "";
+
+    open MASTER, $masterFile or die "Unable to open master file $masterFile: $!";
+
+    while (<MASTER>) {
+        chomp;
+        if (m/^ID\s+(\S+);\s+(.+)$/) {
+            my $id = $1;
+            my $rest = $2;
+            my @parts = split(m/;\s*/, $rest);
+
+            if ($#parts >= 4) {
+                $type = $parts[4];
+                break;
+            }
+        }
+    }
+
+    close MASTER;
+
+    return lc $type;
+}
 
 
-## We are abstracting the mapping code in case we want to start using the database again instead of
-## the table directly.
-#package Mapper;
-#
-#sub new {
-#    my $class = shift;
-#    my %args = @_;
-#
-#    my $self = {};
-#    bless($self, $class);
-#
-#    return $self;
-#}
-#
-#
-#sub parseTable {
-#    my $self = shift;
-#    my $tablePath = shift;
-#
-#    open TABLE, $tablePath or die "Unable to open idmapping table '$tablePath' for reading: $!";
-#
-#    while (my $line = <TABLE>) {
-#        chomp $line;
-#        my ($uniprotId, $type, $foreignId) = split /\t/, $line;
-#        if (lc $type eq "embl-cds") {
-#            $self->{map}->{$foriegnId} = $uniprotId;
-#        }
-#    }
-#
-#    close TABLE;
-#}
-#
-#sub reverseLookup {
-#    my $self = shift;
-#    my $idType = shift; # not used; here for compatibility with the EFI::IdMapper module.
-#    my @foreignIds = @_;
-#
-#    my @uniprotIds;
-#    my @noMatches;
-#    foreach my $id (@foreignIds) {
-#        if (exists $self->{map}->{$id}) {
-#            push @uniprotIds, $self->{map}->{$id};
-#        } else {
-#            push @noMatches, $id;
-#        }
-#    }
-#
-#    return \@uniprotIds, \@noMatches;
-#}
-#
-#sub finish {
-#}
-#
-#1;
 

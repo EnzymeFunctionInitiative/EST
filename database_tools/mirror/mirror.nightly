@@ -1,0 +1,62 @@
+#!/bin/sh
+# Manage a nightly mirror run.
+# Most of the dirty work is done via mm.  This
+# really just handles the logs and mails them out.
+
+# Where mirror and mm are to be found
+home=/opt/sunsite/mirror
+
+# Who and how to mail stuff back
+mailto=lmjm
+mail=/usr/bin/mailx
+mailargs="-s 'nightly mirror log'"
+
+# Argument to pass to sort to get it to show the biggest files
+# in a directory listing.
+#BSD usually +3n, System 5 usually +4n.
+biggest=+3n
+
+# Make sure we dont wast space with core dumps (perl5 does do this)
+ulimit -c 0
+
+# You shouldn't have to change anything below here.
+
+# Log output here.
+log=mirror.nightly.out
+
+cd $home
+
+if [ -r $log ]; then
+	# Keep one days backups of the old logs
+	mv -f $log $log.old
+fi
+
+# Run mirror master
+#  It will output all the package log info' into files in
+# the logs/ directory.
+rm -f $log
+if test ! -d logs; then mkdir logs; fi
+./mm -debug mmin >$log 2>&1 < /dev/null
+
+# Send me the "interesting" bits of the logs
+# The old, new and big stuff
+ls -ltr logs > /tmp/mn-log
+(
+	cd logs
+	echo Unlinks needed on:
+	grep -l "^NEED" *
+	echo
+	echo Old:
+	head /tmp/mn-log
+	echo
+	echo Recent:
+	tail /tmp/mn-log
+	echo
+	echo Biggest:
+	sort $biggest < /tmp/mn-log | tail
+	echo
+	echo The interesting logs::
+	../prune_logs *
+) > /tmp/mn-msg
+eval $mail $mailargs $mailto < /tmp/mn-msg
+rm -f /tmp/mn-log /tmp/mn-msg

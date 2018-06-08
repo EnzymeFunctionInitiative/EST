@@ -1,0 +1,89 @@
+Changed the copyright.  Same meaning but uses a wording from Debian Linux.
+
+Allow for multiple algorithms on scan and compare.
+The default is algorithm=0 which does:
+   scan-all-here, scan-all-there, compare, pull
+added algorithm=1 to scan/compare by directory.
+by lmjm
+
+Now works on both Unix and Windows NT.
+by lmjm
+
+Added Debian Linux support.
+by lmjm
+
+Upgraded do_unlinks to allow it to recursively delete areas if
+processing the output of algorithm=1 mirrors.
+by lmjm
+
+Upgraded ftp.pl (partly with changes for ftpmail).  
+by lmjm
+
+Added skey support into ftp.pl. 
+by lmjm
+
+Added PASV support
+by lmjm
+
+Allow for non-compliant ftp servers and better error reporting on PASV
+by Travis Hassloch <travish@dejanews.com>
+
+Fixes to PASV mode in ftp.pl
+by Luc Beurton <Luc.Beurton@univ-evry.fr>
+
+Time out accept() attempts
+by lmjm
+
+lsparse.pl improved directory scanning
+by lmjm
+
+Added OS2 support
+by lmjm
+
+Correct lsparse'line_os2 file sizing
+by Denis Roudenko <denis@elvis.msk.su> 
+
+Added EPLF support
+by lmjm
+
+UCX-FTP support
+by Dassing@wetzell.ifag.de
+
+Ignore the 'm' in ls listings for those using OpenVisions ARIA*SMM
+by Carlos Eduarte <eduarte@qapla.arh.ms.cdc.com>
+
+Avoid pulling back both .gz and .Z if using compress_conv
+by ezk@cs.columbia.edu
+
+Correct filename handling on restarts
+by Julio Sanchez <jsanchez@gmv.es>
+
+FTP account (can follow standard user,pass stuff) support
+by Gert Poletiek <gert@fwi.uva.nl>
+
+Handle files called '0' correctly
+by Chris Cogdon <chris@felidae.apana.org.au>
+
+Better output when putting files
+by Bob Friesenhahn <bfriesen@simple.dallas.tx.us>
+
+Allow for compressed local_ls_lR_files.
+Check the result of uncompressing local_ls_lR_files.
+by Alexandre Oliva <oliva@dcc.unicamp.br>
+
+Allow for spaces in NT file names
+by Tim Towers <towers@ateam.lonnds.ml.com>
+
+Copy with dosish times 12-12:59 and round midnight
+by Tundra Slosek <tundra@nnenews.com>
+
+Ignore files greater than max_size
+by Andrey Chichak <root@gateway.tasur.edu.ru>
+
+mm should know to skip the package called defaults
+by Philippe.Gresse@ifhamy.insa-lyon.fr
+
+
+
+If I've left anybody off my deepest apologies and please email:
+	 Lee McLoughlin <lmjm@icparc.ic.ac.uk>
