@@ -59,7 +59,7 @@ my $result = GetOptions(
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
 my @accessions = ();
-my $perpass = $ENV{EFIPASS};
+my $perpass = (exists $ENV{EFIPASS} and $ENV{EFIPASS}) ? $ENV{EFIPASS} : 1000;
 my $data_files = $ENV{EFIDBPATH};
 my %ids = ();
 my %accessionhash = ();
@@ -250,7 +250,7 @@ sub parseFastaHeaders {
         my $headerLine = 0;
         my $writeSeq = 0;
 
-        # Option E
+        # Option C + read FASTA headers
         if ($useFastaHeaders) {
             my $result = $parser->parse_line_for_headers($line);
 
@@ -416,10 +416,20 @@ sub getDomainFromDb {
     print "Accessions found in $table:\n";
     my %idsProcessed;
 
-    my $joinClause = $unirefVersion ? "left join uniref on $table.accession = uniref.accession" : "";
+    my $unirefField = "";
+    my $unirefCol = "";
+    my $unirefGroup = "";
+    my $unirefJoin = "";
+    if ($unirefVersion) {
+        $unirefField = $unirefVersion eq "90" ? "uniref90_seed" : "uniref50_seed";
+        $unirefCol = ", $unirefField";
+        $unirefGroup = "group by $unirefField";
+        $unirefJoin = "left join uniref on $table.accession = uniref.accession";
+    }
 
     foreach my $element (@elements) {
-        my $sql = "select * from $table $joinClause where $table.id = '$element'";
+        my $sql = "select $table.accession as accession, start, end $unirefCol from $table $unirefJoin where $table.id = '$element' $unirefGroup";
+        #my $sql = "select * from $table $joinClause where $table.id = '$element'";
         my $sth = $dbh->prepare($sql);
         $sth->execute;
         my $ac = 1;
@@ -429,9 +439,7 @@ sub getDomainFromDb {
             $idsProcessed{$uniprotId} = 1;
 
             if ($unirefVersion) {
-                my $idx = $unirefVersion eq "90" ? "uniref90_seed" : "uniref50_seed";
-                #my $idx = $unirefVersion eq "90" ? "uniref90_cluster_id" : "uniref50_cluster_id";
-                my $unirefId = $row->{$idx};
+                my $unirefId = $row->{$unirefField};
                 if (&$fractionFunc($c)) {
                     push @{$unirefData->{$unirefId}}, $uniprotId;
                     # The accessionHash element will be overwritten multiple times, once for each accession ID 
@@ -718,7 +726,7 @@ sub retrieveSequences {
     } else {
         open OUT, ">/dev/null";
     }
-    
+
     @origAccessions = @accessions;
     while(scalar @accessions) {
         my @batch=splice(@accessions, 0, $perpass);
