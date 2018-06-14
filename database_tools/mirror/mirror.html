@@ -1,0 +1,1958 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.03 [en] (X11; I; Linux 2.0.32 i686) [Netscape]">
+   <META NAME="Author" CONTENT="Lee McLoughlin and Zoe Leech">
+   <TITLE>Mirror 2.9 Reference Manual</TITLE>
+<!--
+  Copyright (C) 1990 - 1997   Lee McLoughlin
+ 
+  Permission to use, copy, and distribute this software and its
+  documentation for any purpose with or without fee is hereby granted,
+  provided that the above copyright notice appear in all copies and
+  that both that copyright notice and this permission notice appear
+  in supporting documentation.
+ 
+  Permission to modify the software is granted, but not the right to
+  distribute the modified code.  Modifications are to be distributed
+  as patches to released version.
+ 
+  This software is provided "as is" without express or implied warranty.
+ 
+  $Id: mirror.html,v 2.9 1998/05/29 19:03:01 lmjm Exp lmjm $
+  $Log: mirror.html,v $
+  Revision 2.9  1998/05/29 19:03:01  lmjm
+  *** empty log message ***
+
+-->
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EF" VLINK="#51188E" ALINK="#FF0000">
+
+<CENTER>
+<H1>
+Mirror 2.9 Reference Manual</H1></CENTER>
+
+<CENTER>
+<H1>
+<I>Lee McLoughlin</I></H1></CENTER>
+
+<CENTER><I><FONT SIZE=+0>and</FONT></I></CENTER>
+
+<CENTER>
+<H1>
+<I><FONT SIZE=+3>Zo&euml; Leech</FONT></I></H1></CENTER>
+
+<CENTER>1 June 1998</CENTER>
+
+<CENTER><TT><A HREF="mailto:lmjm@icparc.ic.ac.uk">lmjm@icparc.ic.ac.uk</A></TT></CENTER>
+
+<CENTER><TT><A HREF="zl@icparc.ic.ac.uk">zl@icparc.ic.ac.uk</A></TT></CENTER>
+
+<UL>
+<LI>
+<A HREF="#Introduction">Introduction</A></LI>
+
+<LI>
+<A HREF="#Description">Description</A></LI>
+
+<LI>
+<A HREF="#Flags">Flags</A></LI>
+
+<LI>
+<A HREF="#Package Files">Package Files</A></LI>
+
+<UL>
+<LI>
+<A HREF="#Keywords">Keywords</A></LI>
+</UL>
+
+<LI>
+<A HREF="#Filestores">Filestores</A></LI>
+
+<LI>
+<A HREF="#Examples">Examples</A></LI>
+
+<LI>
+<A HREF="#Temporary Filenames">Temporary Filenames</A></LI>
+
+<LI>
+<A HREF="#Regular Expressions">Regular Expressions</A></LI>
+
+<LI>
+<A HREF="#Hints">Hints</A></LI>
+
+<LI>
+<A HREF="#Netiquette">Netiquette</A></LI>
+
+<LI>
+<A HREF="#Bugs">Bugs</A></LI>
+
+<LI>
+<A HREF="#Remember!">Remember!</A></LI>
+
+<LI>
+<A HREF="#Author">Author</A></LI>
+</UL>
+
+<H2>
+<A NAME="Introduction"></A>Introduction</H2>
+<B>Mirror</B> is a package written in <B><A HREF="http://www.perl.com/">Perl</A></B>
+that uses the FTP<A HREF="http://sunsite.org.uk/rfc/rfc959.txt"> protocol
+</A>to duplicate a directory hierarchy between the machine it is run on
+and a remote host. It avoids copying files unnecessarily by comparing the
+file time-stamps and file sizes before transferring. Amongst other things,
+it can optionally rename, compress, gzip, and split files.
+
+<P><B>Mirror</B> was written by <A HREF="http://sunsite.org.uk/~lmjm/">Lee
+McLoughlin</A> &lt;<A HREF="mailto:lmjm@icparc.ic.ac.uk">lmjm@icparc.ic.ac.uk</A>>
+for use by archive maintainers but can be used by anyone wanting to transfer
+a lot of files via FTP.&nbsp; Although originally only available on Un*x
+with version 2.9 <B>mirror</B> will also run on Wind*ws 95 and Wind*ws
+NT.
+<BR>&nbsp;
+
+<P>The latest version of <B>mirror</B> can always be found at either:
+<UL><TT><FONT SIZE=+1><A HREF="ftp://sunsite.org.uk/packages/mirror/mirror.tar.gz">ftp://sunsite.org.uk/packages/mirror/mirror.tar.gz</A></FONT></TT>
+<BR><TT><FONT SIZE=+1><A HREF="ftp://sunsite.org.uk/packages/mirror/mirror.zip">ftp://sunsite.org.uk/packages/mirror/mirror.zip</A></FONT></TT></UL>
+The latest version of this guide can always be found at:
+<UL><TT><FONT SIZE=+1><A HREF="http://sunsite.org.uk/packages/mirror/mirror-guide.html">http://sunsite.org.uk/packages/mirror/</A></FONT></TT></UL>
+
+<H2>
+<A NAME="Description"></A>Description</H2>
+<B>Mirror</B> is called in one of two ways (see also mirror master):
+<UL>
+<PRE><TT><FONT SIZE=+1>mirror [flags] <A HREF="#-g">-g</A>site:pathname</FONT></TT></PRE>
+
+<PRE><TT><FONT SIZE=+1>mirror [flags] [<A HREF="#Package Files">package-files</A>]</FONT></TT></PRE>
+</UL>
+The first method is used to retrieve a remote file or directory into the
+current directory. If you are mirroring a directory it is best to end the
+pathname in a slash ('/') as this makes the remote recursive listing smaller
+or use the <B><A HREF="#-r">-r</A></B> flag to suppress recursion (see
+<B><A HREF="#-g">-g</A></B> below). The <B><A HREF="#Setting Defaults">mirror.defaults</A></B>
+file is not used.
+
+<P>In the second method given above, a minimal number of arguments are
+required and <B>mirror</B> is controlled by <B><I><A HREF="#Keywords">keyword=value</A></I></B>
+lines read from the package files.&nbsp;<A NAME="Finding Defaults"></A>If
+a file named <B><A HREF="#Setting Defaults">mirror.defaults</A></B> is
+found in either the directory containing the <B>mirror</B> executable or
+in the <B>PERLLIB</B> path, then it is loaded before any of the <TT><FONT SIZE=+1>package-files</FONT></TT>.&nbsp;
+<B><A HREF="#Setting Defaults">mirror.defaults</A></B> normally just contains&nbsp;
+the package of keyword settings called <B><I><A HREF="#Setting Defaults">defaults</A></I></B>
+that is used to provide common defaults for all <TT><FONT SIZE=+1>package-files</FONT></TT>.&nbsp;&nbsp;
+If no <B><A HREF="#Setting Defaults">mirror.defaults</A></B> file is found&nbsp;
+the <A HREF="#Keywords">default settings</A> built into <B>mirror&nbsp;</B>
+are used.
+
+<P>Each <TT><FONT SIZE=+1><A HREF="#Package Files">package-files</A></FONT></TT>
+is read in turn, looking for named <A HREF="#Package Files">packages</A>.&nbsp;
+If the package is not named <B><I><A HREF="#Setting Defaults">defaults</A></I>,</B>
+then <B>mirror</B> will perform the following steps.
+
+<P>If <B>mirror</B> is already connected to a site, other than the target
+site, it will disconnect from the site.&nbsp; It then changes to the given
+local directory, creating it if necessary, and scans it to get the details
+of the local files that are already there.&nbsp; <B>Mirror</B> then attempts
+to connect to the remote site's FTP daemon. It will then login using the
+given <B><I><A HREF="#remote_user">remote_user</A></I></B> and <B><I><A HREF="#remote_password">remote_password</A></I></B>.&nbsp;
+The remote directory is then scanned. <B>Mirror</B> does this by changing
+to the remote directory (<B><I><A HREF="#remote_dir">remote_dir</A></I></B>)
+and running the FTP LIST command, passing the <B><I><A HREF="#flags_recursive">flags_recursive</A></I></B>&nbsp;
+or <B><I><A HREF="#flags_nonrecursive">flags_nonrecursive</A></I></B> options
+depending on the value of <B><I><A HREF="#recursive">recursive</A></I></B>.&nbsp;
+Alternatively a file containing the directory listing may be retrieved
+(see <B><I><A HREF="#ls_lR_file">ls_lR_file</A></I></B> and <B><I><A HREF="#local_ls_lR_file">local_ls_lR_file</A></I></B>)
+. Each remote pathname will have any required mappings performed on it
+to create a local pathname. Then any checks specified by the <I><B><A HREF="#exclude_patt">exclude_patt</A></B>,</I>
+<B><I><A HREF="#max_days">max_days</A></I></B>, <B><I><A HREF="#get_newer">get_newer</A></I></B>
+and <B><I><A HREF="#get_size_change">get_size_change</A> </I></B>keywords
+are applied to names of files or symlinks. <B><I><A HREF="#max_days">max_days</A></I></B>,
+<B><I><A HREF="#get_newer">get_newer</A></I></B> and <B><I><A HREF="#get_size_change">get_size_change</A>&nbsp;
+</I></B>are not applied to directories.&nbsp; This creates a list of all
+required remote files and the local pathnames to store them in.
+
+<P>Local versions of all required directories are then created.&nbsp; Then
+all required files are fetched from the remote site into their local pathnames.
+This is done by retrieving the file into a <A HREF="#Temporary Filenames">temporary
+file</A> in the target directory. The transfer is normally done in binary
+mode (see <B><I><A HREF="#vms_xfer_text">vms_xfer_text</A></I></B>).&nbsp;
+If required the temporary file may be <A HREF="#File Compression">compressed,
+gzip'ed</A> or <A HREF="#File Splitting">split</A>. The file's time-stamps
+are reset to match those of the remote file.&nbsp; Finally the temporary
+file is renamed to have the correct name.
+
+<P>Once all files have been transferred any required symbolic links are
+created (where support by your Operating System) and any unnecessary pathnames
+in the mirror are <A HREF="#File Deletion">deleted</A>.
+
+<P>Unless an internal failure is detected, any error will cause the current
+package to be skipped and the next one tried.
+
+<P><B>Mirror</B> can handle symbolic links but not hard links. It does
+not duplicate owner or group information as usually this is meaningless
+over a network (but see <B><I><A HREF="#user">user</A></I></B> and <B><I><A HREF="#group">group</A></I></B>).
+If you require any of these options and you are on Un*x use <B>rdist(1)</B>
+instead.
+
+<P><B>Mirror</B> was written to mirror remote Un*x archives, but has grown
+(like topsy).
+<H2>
+<A NAME="Flags"></A>Flags</H2>
+Although <B>mirror</B> has a large number of command line flags most should
+only really be used when doing a very simple mirror as a one-time event.&nbsp;
+If you intend to maintain a mirror area it is much better to put all the
+details into a <B>mirror</B> <A HREF="#Package Files">package</A> file
+and then run <B>mirror</B> on that file.
+
+<P>The only flags you should use often are <B><A HREF="#-n">-n</A></B>
+and, if you like to see what mirror is up to,<B><A HREF="#-d">-d</A></B>.
+<BR>&nbsp;
+<TABLE>
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="-d"></A><B>-d&nbsp;</B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Enable debugging. If this argument is given more
+than once (e.g. -d -d) the debugging level will increase. Currently the
+maximum useful level is four.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="-n"></A><B>-n</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Do nothing except compare local and remote directories,
+no file transfers are done. Sets debug level to two, so that you are shown
+a trace of what would be done.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="-g"></A><B>-g site:path</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Get all files&nbsp; matching path, which is a
+<A HREF="#Regular Expressions">regexp</A>, on the given site. If path matches
+.*/.+ (e.g. /fred or /fred/bloggs) then it is the name of the directory
+and everything after the last / is the pattern of filenames to get. If
+path ends with / then it is the name of a directory and all its contents
+are retrieved.&nbsp; One note of caution. If you use host:/fred, a full
+directory listing of / on the remote host will be done. If all you wanted
+was the contents of the directory /fred then specify host:/fred/</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="-p"></A><B>-p package</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>When using multiple <A HREF="#Package Files">package
+files </A>only mirror the given package. This option may be given multiple
+times in which case all the given packages will be mirrored. Without this
+option, all packages will be mirrored. Package is a <A HREF="#Regular Expressions">regexp</A>
+matched against the package name following the -p.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-R package</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Similar to <B><A HREF="#-p">-p</A></B> but skips
+all packages until it reaches the given package. Useful for restarting
+failed <B>mirror</B> runs from where they left off.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-F</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Use temporary <B>dbm</B> files for the information
+about files. This is useful if you mirror a very large directory.&nbsp;
+See the variable <B><I><A HREF="#use_files">use_files</A>.</I></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="-r"></A><B>-r</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Equivalent to <B>-k <I><A HREF="#recursive">recursive</A></I>=false</B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-v</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Print the version details of <B>mirror</B> and
+exit.<A NAME="-T"></A></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-T</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Do not do any file transfers just force the time-stamps
+of any local files to be reset to be the same as the remote files. Normally
+only used when initialising a mirror that already contains files retrieved
+another way (e.g. from CDROM).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-Ufilename</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Record all files transfered by mirror into the
+given filename. Remember that <B>mirror</B> changes into <I><A HREF="#local_dir">local_dir</A></I>
+to do its work, so it should be a full pathname. If no filename is given,
+it defaults to <TT><FONT SIZE=+1>upload_log.day.month.year</FONT></TT>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="-k"></A><B>-k <I>key</I>=value</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Override any default key/value.&nbsp; See below</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-m</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Equivalent to <B><A HREF="#-k">-k</A> <I><A HREF="#mode_copy">mode_copy</A></I>=true</B>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-t</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Equivalent to <B><A HREF="#-k">-k</A> <I><A HREF="#text_mode">text_mode</A></I>=true</B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-f</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Equivalent to <B><A HREF="#-k">-k</A> <I><A HREF="#force">force</A></I>=true</B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-s site</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Equivalent to <B><A HREF="#-k">-k</A> <I><A HREF="#site">site</A></I>=site</B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-u user</B>&nbsp;</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Equivalent to <B><A HREF="#-k">-k</A> <I><A HREF="#remote_user">remote_user</A></I>=user</B>
+You are then prompted for a password, with echo turned off. The password
+is used as the <B><I><A HREF="#remote_password">remote_password</A></I></B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B>-L</B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Just generate a pretty printed version of the
+input and exit.</TD>
+</TR>
+</TABLE>
+
+<H2>
+<A NAME="Package Files"></A>Package Files</H2>
+Each group of keywords defines how to mirror a particular package and should
+begin with a unique <B><I><A HREF="#package">package</A></I></B> line.
+The package name is used in report generation and by the <B><A HREF="#-p">-p</A></B>
+argument, so pick something mnemonic. The minimum needed for each package
+is <B><I><A HREF="#package">package</A></I></B>, <B><I><A HREF="#site">site</A></I></B>,
+<B><I><A HREF="#remote_dir">remote_dir</A></I></B> and <B><I><A HREF="#local_dir">local_dir</A></I></B>
+. On finding a <B><I><A HREF="#package">package</A></I></B> line, all the
+default values are reset to either the values from the <B><I><A HREF="#Setting Defaults">defaults</A></I></B>
+package (or built-in values if defaults has not been set).&nbsp; A package
+ends at either the next <B><I><A HREF="#package">package</A></I></B> statement
+or at the end of file.
+
+<P>Package files are parsed as a series of statements. Blank lines and
+lines beginning with a hash are ignored. Each statement is of the form
+<UL><B><I>keyword</I>=value</B></UL>
+or
+<UL><B><I>keyword</I>+value</B></UL>
+&nbsp;You can add whitespace before the keyword and the equals/plus. Everything
+immediately following the equals/plus is the value, including any leading
+or trailing whitespace. The equals version sets the keyword to this value,
+while the plus version concatenates the value onto the end of the existing
+value (normally set in <B><I><A HREF="#Setting Defaults">defaults</A></I></B>
+package).
+
+<P>A statement can be continued over multiple lines by ending all lines
+except the last, with the character ampersand ('&amp;'). The line following
+the ampersand, is appended to the current line with all leading whitespace
+removed.
+
+<P>Although there are a lot of keywords that can be set, the built-in defaults
+will handle most cases. Normally only <B><I><A HREF="#package">package</A></I></B>,&nbsp;
+<B><I><A HREF="#site">site</A></I></B>,&nbsp; <B><I><A HREF="#remote_dir">remote_dir</A></I></B>
+and <B><I><A HREF="#local_dir">local_dir</A></I></B> need to be set.
+<H3>
+<A NAME="Setting Defaults"></A>Setting Defaults</H3>
+If the package name is <B>defaults</B>, then no site is contacted, but
+the default values given for any keywords are changed. Normally all the
+defaults are in the file <B>mirror.defaults</B> which will be automatically
+loaded before any <A HREF="#Package Files">package files</A> (see <A HREF="#Finding Defaults">Description</A>).
+<PRE><TT># Sample mirror.defaults
+package=defaults
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # The LOCAL hostname - if not the same as `hostname` returns
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # (I advertise the name sunsite.org.uk but the machine is
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; #&nbsp; really swallow.doc.ic.ac.uk.)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hostname=sunsite.org.uk
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Keep all local_dirs relative to here
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_dir=/public/
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remote_password=wizards@sunsite.org.uk</TT></PRE>
+
+<H3>
+<A NAME="Keywords"></A>Keywords</H3>
+The following is a list of all the available keywords and the default values
+built into <B>mirror</B>.&nbsp; To change these defaults it is usually
+best to change your <B><A HREF="#Setting Defaults">mirror.defaults </A></B>file.
+<BR>&nbsp;
+<BR>The keywords are grouped into the following sections:
+<UL>
+<LI>
+<A HREF="#Required Keywords">Required Keywords</A></LI>
+
+<LI>
+<A HREF="#FTP Related">FTP Related</A></LI>
+
+<LI>
+<A HREF="#File Copying">File Copying</A></LI>
+
+<LI>
+<A HREF="#Local File Attributes">Local File Attributes</A></LI>
+
+<LI>
+<A HREF="#File Deletion">File Deletion</A></LI>
+
+<LI>
+<A HREF="#File Compression">File Compression</A></LI>
+
+<LI>
+<A HREF="#File Splitting">File Splitting</A></LI>
+
+<LI>
+<A HREF="#Directory Listings">Directory Listings</A></LI>
+
+<LI>
+<A HREF="#Logging">Logging</A></LI>
+
+<LI>
+<A HREF="#Special">Special</A></LI>
+</UL>
+&nbsp;
+<TABLE NOSAVE >
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="Required Keywords"></A><B><U><FONT SIZE=+1>Required
+Keywords&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="package"></A><B><I>package</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>A name for the package to be mirrored.&nbsp;
+Should be different from all other package names you use.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="site"></A><B><I>site</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Hostname or IP address of the remote site to
+mirror from.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="remote_dir"></A><B><I>remote_dir</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Remote directory to mirror. See also <B><I><A HREF="#recurse_hard">recurse_hard</A></I></B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="local_dir"></A><B><I>local_dir</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Local directory.</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="FTP Related"></A><B><U><FONT SIZE=+1>FTP Related&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="remote_user"></A><B><I>remote_user</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>anonymous</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Username to use at remote site.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="remote_password"></A><B><I>remote_password</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>localuser@localhostname</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Password to use at remote site.&nbsp; Note: <I>localuser</I>
+is will be your name and <I>localhostname</I> will be the name of the local
+machine (if it can be found, see <B><I><A HREF="#hostname">hostname</A></I></B>)</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="remote_account"></A><B><I>remote_account</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Account name/password to use at remote site,
+after logging in anonymously (for systems that require it).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="remote_group"></A><B><I>remote_group</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If present set the remote 'site group'.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="remote_gpass"></A><B><I>remote_gpass</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If present set the remote 'site gpass'.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="timeout"></A><B><I>timeout</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>40</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Timeout FTP requests after this many seconds.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="failed_gets_excl"></A><B><I>failed_gets_excl</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+error messages to skip reporting, when the FTP GET command fails.&nbsp;
+(E.g. permission denied.)</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="ftp_port"></A><B><I>ftp_port</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>21</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Port number of remote FTP daemon.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="proxy"></A><B><I>proxy</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Set to true to use proxy FTP service.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="proxy_ftp_port"></A><B><I>proxy_ftp_port</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>4514</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Port number of proxy-service FTP daemon. This
+value should be changed depending on which proxy library you are using.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="proxy_gateway"></A><B><I>proxy_gateway</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>internet-gateway</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Name of proxy-service, may also be supplied by
+the environment variable <B>INTERNET_HOST</B>.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="using_socks"></A><B><I>using_socks</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Set to true if you are using a SOCKS version
+of <B>Perl</B>.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="passive_ftp"></A><B><I>passive_ftp</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Set to true if you want to use the PASV extension
+of the FTP protocol. Especially useful with firewalls, other proxy FTP
+servers, and the variable <B><I><A HREF="#using_socks">using_socks</A></I></B>.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>retry_call</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=BASELINE><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=BASELINE>If initial connect fails, retry ONCE after
+ONE minute. This is to handle sites which reverse lookup the incoming host
+but sometimes timeout on the first attempt.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>disconnect</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Disconnect from remote site at end of package.&nbsp;
+Normally only disconnects if the next <B><I><A HREF="#package">package</A></I></B>
+specifies a different site.&nbsp; (Some sites will not let you change to
+certain directories except when first connecting in.)</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>remote_idle</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If set try and set the remote idle timer to this.</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="File Copying"></A><B><U><FONT SIZE=+1>File Copying&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="get_patt"></A><B><I>get_patt</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>.</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+remote pathnames to retrieve.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="exclude_patt"></A><B><I>exclude_patt</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+remote pathnames to ignore.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>local_ignore</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+local pathnames to ignore. Useful to skip restricted local directories.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="get_newer"></A><B><I>get_newer</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Get the remote file if it is more recent that
+the local file.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="get_size_change"></A><B><I>get_size_change</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Get the file if the size is different from local.
+If the file is to be <A HREF="#File Compression">compressed</A> after being
+fetched <B><I>get_size_change</I></B> is automatically set to false.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="make_bad_symlinks"></A><B><I>make_bad_symlinks</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If true, symlinks will be made to invalid (non-existent)
+pathnames. (In older versions of <B>mirror</B> this defaulted to true.)</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>follow_local_symlinks</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+pathnames of local symbolic links.&nbsp; Rather than treating them as symlinks
+the target files or directories they reference are used instead. This makes
+local symlinks invisible to <B>mirror</B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>get_missing</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Really get files. When set to false, only deletions
+and symlinking will be done. Used to delete expired files older than <B><I><A HREF="#max_days">max_days</A></I></B>
+without retrieving older files.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>get_file</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Get files.&nbsp; If set to false <B>mirror</B>
+will try to put files.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="text_mode"></A><B><I>text_mode</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If true, all files are transferred in TEXT mode.
+Un*x prefers binary so that is the default.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>strip_cr</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Strip carriage returns from any file as it is
+retrieved.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="vms_keep_versions"></A><B><I>vms_keep_versions</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>When mirroring VMS files, keep the version numbers.
+If false, the versions are stripped off and the only the base filenames
+are kept.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="vms_xfer_text"></A><B><I>vms_xfer_text</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>(readme|info|listing|\.c)$</TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Pattern of VMS files to transfer in TEXT mode
+(case insensitive).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="name_mappings"></A><B><I>name_mappings</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Remote to local pathname mappings (a <B>Perl</B>
+substitute command, e.g. s:old:new:).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>external_mapping</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Specifies a file that should contain a Perl module
+called <TT><FONT SIZE=+1>extmap</FONT></TT> containing at least a function
+called <TT><FONT SIZE=+1>map</FONT></TT>.&nbsp; This function is used as
+the <B><I><A HREF="#name_mappings">name_mappings</A></I></B> function.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>update_local</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Set <B><I><A HREF="#get_patt">get_patt</A></I></B>
+to be all the files and directories already present in <B><I><A HREF="#local_dir">local_dir</A></I></B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="max_days"></A><B><I>max_days</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>0</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If >0, ignore files older than this many days.&nbsp;
+Any ignored files will not be transferred or deleted.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD><B><I>max_size</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>0</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If >0, do not transfer any files any larger than
+this many bytes.</TD>
+</TR>
+
+<TR VALIGN=TOP NOSAVE>
+<TD ALIGN=LEFT VALIGN=TOP NOSAVE><B><I>chmod</I></B></TD>
+
+<TD>true</TD>
+
+<TD>By default try and set the file attributes (e.g. time-stamps) of the
+copied file.&nbsp; If false do not set attributes.&nbsp;</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="Local File Attributes"></A><B><U><FONT SIZE=+1>Local
+File Attributes&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="user"></A><B><I>user</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>User name or uid to give to local pathnames.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="group"></A><B><I>group</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Group name or gid to give to local pathnames.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="mode_copy"></A><B><I>mode_copy</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Flag indicating if we need to copy the file/dir
+modes.&nbsp; If this is false then <B><I><A HREF="#file_mode">file_mode</A></I></B>
+and <B><I><A HREF="#dir_mode">dir_mode</A></I></B> will be used instead.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="file_mode"></A><B><I>file_mode</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>0444</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Mode to give files created locally if <B><I><A HREF="#mode_copy">mode_copy</A></I></B>
+is false.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="dir_mode"></A><B><I>dir_mode</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>0755</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Mode to give directories created locally if <B><I><A HREF="#mode_copy">mode_copy</A></I></B>
+is false.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="force"></A><B><I>force</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If true, all files will be transferred regardless
+of the results from size or time-stamp comparisons.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>umask</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>07000</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Do not create setuid files by default (see the
+<B>chmod(1)</B> on Un*x).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>use_timelocal</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Time-stamp files to local time zone. If false,
+the time zone is set to GMT (older versions of <B>mirror</B> had a bug
+setting all files to GMT).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>force_times</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>yes</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Force local times to match remote times.</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="File Deletion"></A><B><U><FONT SIZE=+1>File Deletion&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>do_deletes</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Delete destination files if not in source tree.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="delete_patt"></A><B><I>delete_patt</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>.</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+local pathnames to check for deletions. Names that are not matched are
+not checked. The match by <B><I><A HREF="#delete_excl">delete_excl</A>
+</I></B>is done to all files selected by this pattern.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>delete_get_patt</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Set <A HREF="#delete_patt"><B><I>delete_patt</I></B>
+</A>to be <B><I><A HREF="#get_patt">get_patt</A></I></B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="delete_excl"></A><B><I>delete_excl</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+local pathnames that <B>mirror</B> will not delete.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="max_delete_files"></A><B><I>max_delete_files</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>10%</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If this is set to just a number and there are
+more than this many files to delete, do not delete just warn. If this is
+set to <I>number%</I> and the percentage of files that would be deleted
+is greater than the number, do not delete just warn.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="max_delete_dirs"></A><B><I>max_delete_dirs</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>10%</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>As <B><I><A HREF="#max_delete_files">max_delete_files</A></I></B>
+except applies to directories.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="save_deletes"></A><B><I>save_deletes</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Instead of deleting local files move them into
+<B><I><A HREF="#save_dir">save_dir</A></I></B> .&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="save_dir"></A><B><I>save_dir</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>Old</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Where local files no longer on remote site are
+moved to.&nbsp; Either begins with / or is relative to <B><I>local_dir</I></B>.&nbsp;
+Only used when <B><I><A HREF="#save_deletes">save_deletes</A></I></B> is
+true.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>store_remote_listing</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Local pathname where remote listings are kept.
+Useful if you have a slow network or want to perform several operations
+on the same package without retrieving the index every time.</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="File Compression"></A><B><U><FONT SIZE=+1>File
+Compression&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="compress_patt"></A><B><I>compress_patt</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+files to compress before storing locally. See <B><I><A HREF="#get_size_change">get_size_change</A></I></B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>compress_excl</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>\.(z|gz)$</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+files not to compress (case insensitive).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="compress_prog"></A><B><I>compress_prog</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>compress</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Program to compress files. If set to the word
+<B>compress</B> or <B>gzip</B>, the full pathname for the program and correct
+<B><I>compress_suffix</I></B> will automatically be set. When using <B>gzip</B>,
+level -9 is used. Note that <B><I><A HREF="#compress_suffix">compress_suffix</A>
+</I></B>can be reset to a non-standard value by setting it after <B><I>compress_prog</I></B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="compress_suffix"></A><B><I>compress_suffix</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Character(s) the compress program appends to
+files. If <B><I><A HREF="#compress_prog">compress_prog</A></I></B> is <B>compress</B>,
+this defaults to .Z. If <B><I><A HREF="#compress_prog">compress_prog</A></I></B>
+is <B>gzip</B>, this defaults to .gz.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>compress_conv_patt</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>(\.Z|\.taz)$</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If <B><I><A HREF="#compress_prog">compress_prog
+</A></I></B>is gzip, files matching this pattern are uncompressed and gzip'ed
+before storing locally. Compression conversion is only meant to do compress
+to gzip conversion.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>compress_conv_expr</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>s/\.Z$/\.gz/;</I>&nbsp;
+<BR><I>s/\.taz$/\.tgz/</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><B>Perl</B> expression to convert suffix from
+compress to gzip style. Change .Z to .gz and .taz to .tgz.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>compress_size_floor</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>0</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Do not compress files smaller than this size,
+in bytes.</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="File Splitting"></A><B><U><FONT SIZE=+1>File Splitting&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>split_max</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>0</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If >0 and the size of the file is greater than
+this many bytes, the file is split up to be stored locally (filename must
+also match <B><I>split_patt</I></B>).&nbsp; The name of the file being
+split up is used as the directory name and each part is stored in a file
+called part1, part2... in that directory.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>split_patt</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><A HREF="#Regular Expressions">Regexp</A> of
+remote pathnames to split up before storing locally.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>split_chunk</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>102400</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Size, in bytes, of chunks to split files into.</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="Directory Listings"></A><B><U><FONT SIZE=+1>Directory
+Listings</FONT></U></B>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="remote_fs"></A><B><I>remote_fs</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>unix</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>File store type. Currently can be one of <B><A HREF="#remote_fs=unix">unix</A></B>,
+<B><A HREF="#remote_fs=dls">dls</A></B>, <B><A HREF="#remote_fs=netware">netware</A></B>,
+<B><A HREF="#remote_fs=vms">vms</A></B>, <B><A HREF="#remote_fs=dosftp">dosftp</A></B>,
+<B><A HREF="#remote_fs=macos">macos</A></B>, <B><A HREF="#remote_fs=lsparse">lsparse</A></B>
+and <B><A HREF="#remote_fs=infomac">infomac</A></B>. See the <A HREF="#Filestores">Filestores</A>
+section for more details.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="ls_lR_file"></A><B><I>ls_lR_file</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Remote file containing ls-lR (result of running
+ls -lR on that machine), otherwise run remote <B>ls</B> command.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="local_ls_lR_file"></A><B><I>local_ls_lR_file</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Local file containing ls-lR, otherwise use remote
+<I><A HREF="#ls_lR_file">ls_lR_file</A></I>. This is useful when first
+mirroring a large package.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="recursive"></A><B><I>recursive</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>true</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Mirror both the contents of <B><I><A HREF="#local_dir">local_dir</A></I></B>
+and sub directories of <B><I><A HREF="#local_dir">local_dir</A></I></B>.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="recurse_hard"></A><B><I>recurse_hard</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Generate remote ls by doing CWD and ls for each
+sub directory. In this case <B><I><A HREF="#remote_dir">remote_dir </A></I></B>must
+be absolute (begin with a /) not relative. Use the CWD command in FTP to
+find the path for the start of the remote archive area. (Not available
+if <B><I><A HREF="#remote_fs">remote_fs</A></I></B> is VMS.)</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="flags_recursive"></A><B><I>flags_recursive</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>-lRat</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Flags to send to remote ls to do a recursive
+listing.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="flags_nonrecursive"></A><B><I>flags_nonrecursive</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>-lat</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Flags to send to remote ls to do a non-recursive
+listing.</TD>
+</TR>
+
+<TR>
+<TD><B><I>ls_fix_mappings</I></B></TD>
+
+<TD><I>none</I></TD>
+
+<TD>Edit pathnames in remote directory listings (a <B>Perl</B> substitute
+command, e.g. s:/usr/spool/pub:/:).</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="Logging"></A><B><U><FONT SIZE=+1>Logging&nbsp;</FONT></U></B></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>update_log</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Filename, relative to <B><I><A HREF="#remote_dir">local_dir</A></I></B>,
+where <B>mirror</B> will write a report of all it does to maintain a package.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="mail_to"></A><B><I>mail_to</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Mail a log of the work done to this comma separated
+list of addresses (currently only supported on Un*x).</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="mail_prog"></A><B><I>mail_prog</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Program called to send to the <B><I><A HREF="#mail_to">mail_to</A>
+</I></B>list. May be passed the argument <B><I><A HREF="#mail_subject">mail_subject</A></I></B>.
+Defaults to <B>mailx</B>, <B>Mail</B>, or <B>mail</B>. (Not supported under
+Wind*ws)</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="mail_subject"></A><B><I>mail_subject</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>-s "mirror update"</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>This can contain <B><I>$keyword</I></B>.&nbsp;
+These will be replaced by the current value for that keyword (e.g.: -s
+"mirror update: $package")</TD>
+</TR>
+
+<TR>
+<TD>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD COLSPAN="3"><A NAME="Special"></A><B><U><FONT SIZE=+1>Special</FONT></U></B>&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I><U>keyword</U></I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I><U>default</U></I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><U>Description</U></TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="hostname"></A><B><I>hostname</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><B>Mirror</B> automatically skips packages whose
+<B><I><A HREF="#site">site</A></I></B> variable matches this host. Defaults
+to the local hostname.&nbsp; This is normally only ever set in the <B><I><A HREF="#Setting Defaults">defaults</A></I></B>
+package.&nbsp; Useful if you are sharing <B>mirror</B> <A HREF="#Package Files">package
+files</A> with others.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>comment</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Used in reports.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>use_files</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Put the associative arrays that <B>mirror</B>
+uses into temporary files (currently only support on Un*x).&nbsp; The files
+are created in /var/tmp with names: local_map and remote_map.&nbsp; The
+suffixes will depend on which DBM library was set as default when <B>Perl</B>
+was installed on your machine.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>interactive</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>A non-batch transfer. Implied by <B><A HREF="#-g">-g</A></B>
+flag.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>skip</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>none</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>If set causes this package to be skipped.&nbsp;
+The value is reported as the reason for skipping.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><B><I>verbose</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Verbose messages.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP><A NAME="algorithm"></A><B><I>algorithm</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP><I>0</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Sets the basic algorithm that <B>mirror</B> uses.&nbsp;
+
+<P><B><I>Algorithm=0</I></B> mirrors an entire site at a time.&nbsp; This
+is very friendly on the remote site as it uses few of its resources.&nbsp;
+However it can chew up a lot of memory on the local machine.&nbsp;
+
+<P><B><I>Algorithm=1</I></B> mirrors a site directory-by-directory.&nbsp;
+Should <B>ONLY</B> be used for true mirrors (i.e.: no differences between
+the this mirror copy and the original). This uses up a lot less local resources.
+However it is very unfriendly to the remote site as it requires remote
+site to run an <B>ls</B> command for each directory mirrored.&nbsp;&nbsp;
+<B>Mirror</B> will only "see" the one directory it is mirroring so it will
+not know that files outside this directory exists so symlinks outside this
+directory are considered bad, see <A HREF="#make_bad_symlinks"><B><I>make_bad_symlinks</I></B>.</A>&nbsp;
+Deletions are done on a directory by directory basis so be extra careful
+about the settings of <A HREF="#max_delete_files">max_delete_files</A>
+and <A HREF="#max_delete_dirs">max_delete_dirs</A>.&nbsp; <B><I><A HREF="#get_patt">get_patt</A></I></B>
+is applied to just the filename in this directory not the full path, as
+are other name checks. You will almost certainly need to set <B><I><A HREF="#remote_dir">remote_dir</A></I></B>
+to be an absolute pathname (beginning with /).&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP NOSAVE>
+<TD ALIGN=LEFT VALIGN=TOP NOSAVE><B><I>local_dir_check</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP NOSAVE><I>false</I></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP NOSAVE>If true and the <B><I><A HREF="#local_dir">local_dir
+</A></I></B>does not exit skip this package.&nbsp; By default the <B><I><A HREF="#local_dir">local_dir</A></I></B>
+will be created if it does not already exist.</TD>
+</TR>
+
+<TR>
+<TD></TD>
+
+<TD></TD>
+
+<TD></TD>
+</TR>
+</TABLE>
+
+<H2>
+<A NAME="Filestores"></A>Filestores</H2>
+<B>Mirror</B> uses the remote directory listing to work out what files
+are available. <B>Mirror</B> was originally targeted connect to Un*x FTP
+daemons using a standard <B>ls</B> command. To use a Un*x host with a non-standard
+<B>ls</B> or a non Un*x host it is necessary to set the <B><I><A HREF="#remote_fs">remote_fs</A></I></B>
+variable to match the kind of directory listing that will be returned.
+There is some interaction between <B><I>remote_fs</I></B> and other variables
+in particular <B><I><A HREF="#flags_nonrecursive">flags_nonrecursive</A></I></B>,
+<B><I><A HREF="#recurse_hard">recurse_hard</A></I></B> and <B><I><A HREF="#get_size_change">get_size_change</A>.</I></B>
+The following sections show examples of the results of running the FTP
+DIR command on the various kinds of archive and recommendations for related
+variables. With some unusual set-ups archive you may have to vary from
+the recommended variable set-ups.
+<H3>
+<A NAME="remote_fs=unix"></A>remote_fs=unix</H3>
+
+<PRE>total 65
+-rw-r--r-- 1 nobody nobody&nbsp;&nbsp; 2245 Jan 28 20:06 README
+-rw-r--r-- 1 nobody nobody&nbsp; 45881 Jan 29 19:13 mirror.html</PRE>
+This is the default and you should not normally have to reset any other
+related variables.
+<H3>
+<A NAME="remote_fs=dls"></A>remote_fs=dls</H3>
+
+<PRE>00index.txt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 189916&nbsp;&nbsp;
+0readme&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 5793&nbsp;&nbsp;
+1_x/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; =&nbsp; OS/2 1.x-specific files</PRE>
+This is an <B>ls</B> variant used on some Un*x archives. It provides descriptions
+of known items in the listing. Set <B><I><A HREF="#flags_recursive">flags_recursive</A></I></B>
+to -dtR.
+<H3>
+<A NAME="remote_fs=netware"></A>remote_fs=netware</H3>
+
+<PRE>- [R----F--] jrd&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1646&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; May 07 21:43&nbsp;&nbsp;&nbsp; index
+d [R----F--] jrd&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 512&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Sep 09 10:52&nbsp;&nbsp;&nbsp; netwire
+d [R----F--] jrd&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 512&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Sep 02 01:31&nbsp;&nbsp;&nbsp; pktdrvr
+d [RWCE-F--] jrd&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 512&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Sep 04 10:55&nbsp;&nbsp;&nbsp; incoming</PRE>
+or
+<PRE>-[R----F--] 1 jrd&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1646&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; May 07 21:43&nbsp;&nbsp;&nbsp; index
+d[R----F--] 1 jrd&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 512&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Sep 09 10:52&nbsp;&nbsp;&nbsp; netwire
+d[R----F--] 1 jrd&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 512&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Sep 02 01:31&nbsp;&nbsp;&nbsp; pktdrvr</PRE>
+This is used by Novell archives. Set <B><I><A HREF="#recurse_hard">recurse_hard</A></I></B>
+to true and set <B><I><A HREF="#flags_nonrecursive">flags_nonrecursive</A></I></B>
+to be nothing. See also <B><I><A HREF="#remote_dir">remote_dir</A></I></B>.
+<H3>
+<A NAME="remote_fs=dosftp"></A>remote_fs=dosftp</H3>
+
+<PRE>00-index.txt&nbsp; 6,471 13:54&nbsp; 7/20/93&nbsp;&nbsp; alabama.txt&nbsp;&nbsp; 1,246 23:29&nbsp; 5/08/97
+alaska.txt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 873 23:29&nbsp; 5/08/92&nbsp;&nbsp; alberta.txt&nbsp;&nbsp; 2,162 23:29&nbsp; 5/08/97</PRE>
+dosftp is for an FTP daemon on D*S boxes. Set <B><I><A HREF="#recurse_hard">recurse_hard</A></I></B>
+to true and set <B><I><A HREF="#flags_nonrecursive">flags_nonrecursive</A></I></B>
+to nothing. See also <B><I><A HREF="#remote_dir">remote_dir</A></I></B>.
+<H3>
+<A NAME="remote_fs=macos"></A>remote_fs=macos</H3>
+
+<PRE>-------r--&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 127&nbsp;&nbsp; 127 Aug 27 13:53 !Gopher Links
+drwxrwxr-x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; folder&nbsp;&nbsp;&nbsp; 32 Sep&nbsp; 9 16:30 FAQ
+drwxrwx-wx&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; folder&nbsp;&nbsp;&nbsp;&nbsp; 0 Sep&nbsp; 9 09:59 incoming</PRE>
+macos is for one of Macintosh FTP daemon variants. Although the output
+is similar to Un*x&nbsp; the Un*x <B><I>remote_fs</I></B> type cannot cope
+with it because there are three file sizes for each file. Set <B><I><A HREF="#recurse_hard">recurse_hard</A></I></B>
+to true, <B><I><A HREF="#flags_nonrecursive">flags_nonrecursive</A></I></B>
+to nothing, <B><I><A HREF="#get_size_change">get_size_change</A></I></B>
+to false and <B><I><A HREF="#compress_patt">compress_patt</A></I></B> to
+nothing (this last setting is due to the unusual file names upsetting the
+shell used to run compress). See also <B><I><A HREF="#remote_dir">remote_dir</A></I></B>.
+<H3>
+<A NAME="remote_fs=vms"></A>remote_fs=vms</H3>
+
+<PRE>USERS:[ANONYMOUS.PUBLIC]
+
+1-README.FIRST;13&nbsp;&nbsp;&nbsp;&nbsp; 9&nbsp; 14-JUN-1993 13:09 [ANONYMOUS] (RWE,RWE,RE,RE)
+PALTER.DIR;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; 18-JAN-1993 11:56 [ANONYMOUS] (RWE,RWE,RE,RE)
+PRESS-RELEASES.DIR;1
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; 11-AUG-1992 20:05 [ANONYMOUS] (RWE,RWE,,)</PRE>
+alternatively:
+<PRE>[VMSSERV.FILES]ALARM.DIR;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1/3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 5-MAR-1993 18:09
+[VMSSERV.FILES]ALARM.TXT;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1/3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4-FEB-1993 12:20</PRE>
+Set <B><I><A HREF="#flags_recursive">flags_recursive</A></I></B> to '[...]'
+and <B><I><A HREF="#get_size_change">get_size_change</A></I></B> to false.
+<B><I><A HREF="#recurse_hard">recurse_hard</A></I></B> is <B>not</B> available
+with VMS. See also the <B><I><A HREF="#vms_keep_versions">vms_keep_versions</A></I></B>
+and <B><I><A HREF="#vms_xfer_text">vms_xfer_text</A></I></B> variables.
+<BR>&nbsp;
+<H3>
+<A NAME="remote_fs=infomac"></A>remote_fs=infomac</H3>
+
+<PRE>-r&nbsp;&nbsp;&nbsp;&nbsp; 1974 Jul 21 00:06 00readme.txt
+lr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3 Sep&nbsp; 8 08:34 AntiVirus -> vir</PRE>
+This is a special case just meant to handle the sumex-aim.stanford.edu
+info-mac directory listing stored on that archive in help/all-files. <B><I><A HREF="#recurse_hard">recurse_hard</A></I></B>
+should be set to true.
+<H3>
+<A NAME="remote_fs=dosish"></A>remote_fs=dosish</H3>
+This is for a D*S/Wind*ws FTP server with a faintly DOS like output
+<PRE>03-04-94&nbsp; 08:45PM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;DIR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; .
+03-04-94&nbsp; 08:45PM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;DIR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ..
+03-04-94&nbsp; 09:58AM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 9718 Conduit
+03-04-94&nbsp; 09:59AM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 8745 Eve</PRE>
+<B><I><A HREF="#recurse_hard">recurse_hard</A></I></B> should be set to
+true and <B><I><A HREF="#flags_nonrecursive">flags_nonrecursive</A></I></B>
+to nothing.
+<H3>
+<A NAME="remote_fs=lsparse"></A>remote_fs=lsparse</H3>
+Allow reparsing of the listing generated by <B>mirror</B> with debugging
+turned to a high level. Meant only for <A HREF="mailto:lmjm@icparc.ic.ac.uk?SUBJECT=You Are A Wizard"><B>mirror</B>
+wizards</A>.
+<H2>
+<A NAME="Examples"></A>Examples</H2>
+Here is the <A HREF="#Setting Defaults">mirror.defaults</A> file from the
+archive on sunsite.org.uk:
+<PRE># This is the default mirror settings used by my site:
+# sunsite.org.uk (193.63.255.4)
+
+package=defaults
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # The LOCAL hostname - if not the same as `hostname`
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # (I advertise the name sunsite.org.uk but the machine is
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; #&nbsp; really swallow.sunsite.org.uk)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hostname=sunsite.org.uk
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Keep all local_dirs relative to here
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_dir=/public/Mirrors
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remote_password=wizards@sunsite.org.uk
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; mail_to=
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Don't mirror file modes.&nbsp; Set all dirs/files to these
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; dir_mode=0755
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; file_mode=0444
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # By default, files are owned by root.zero
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; user=0
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; group=0
+#&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Keep a log file in each updated directory
+#&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; update_log=.mirror
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; update_log=
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Don't overwrite my mirror log with the remote one.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Don't retrieve any of their mirror temporary files.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Don't touch anything whose name begins with a space!
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # nor any FSP or gopher files...
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exclude_patt=(^|/)(\.mirror$|\.in\..*\.$|MIRROR.LOG|#.*#|\.FSP|\.cache|\.zipped|lost+found/|)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Try to compress everything
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; compress_patt=.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; compress_prog=compress
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Don't compress information files, files that don't benefit from
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # being compressed, files that tell ftpd, gopher, wais... to do things,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # the sources for compression programs...
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # (Note this is the only regexp that is case insensitive.)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; compress_excl+|^\.notar$|-z|\.gz$|\.taz$|\.tar.Z|\.arc$|\.zip$|\.lzh$|\.zoo$|\.exe$|\.lha$|\.zom$|\.gif$|\.jpeg$|\.jpg$|\.mpeg$|\.au$|read.*me|index|\.message|info|faq|gzip|compress
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Don't delete own mirror log or any .notar files (incl in subdirs)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; delete_excl=(^|/)\.(mirror|notar)$
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Ignore any local readme files
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_ignore=README.doc.ic
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Automatically delete local copies of files that the
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # remote site has zapped
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; do_deletes=true</PRE>
+Here are some sample package descriptions:
+<PRE>package=gnu
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; comment=Powerful and free Un*x utilities
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; site=prep.ai.mit.edu
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remote_dir=/pub/gnu
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Local_dir+ causes gnu to be appended to the default local_dir
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # so making /public/gnu
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_dir+gnu
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exclude_patt+|^ListArchives/|^lost+found/|^scheme-7.0/|^\.history
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # I tend to only keep the latest couple of versions of things
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # this stops mirror from retrieving the older versions I've removed
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; max_days=30
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; do_deletes=false
+
+package=X11R6
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; comment=X Windows (windowing graphics system for Un*x)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; site=ftp.x.org
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remote_dir=/pub/R6
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_dir+ftp.x.org/pub/R6
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # This is a local symlink to the free-for-all contrib area
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # and is mirrored elsewhere
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_ignore=^contrib$
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Don't compress a thing.&nbsp; It is already compressed&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # but doesn't look it.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; compress_patt=
+
+
+# THIS IS JUST A TEST
+package=test vms site
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; site=vmsbox.somewhere.ac.uk
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_dir=/tmp/copy4
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remote_dir=vmsserv/files
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remote_fs=vms
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Must do these settings for VMS
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; flags_recursive=[...]
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; get_size_change=false
+
+# and on, and on ...</PRE>
+
+<H2>
+<A NAME="Temporary Filenames"></A>Temporary Filenames</H2>
+By default when mirror creates a temporary filename it takes the real filename
+and puts <B><TT><FONT SIZE=+1>.in.</FONT></TT></B> at the start.
+<BR>If your system limits the length of a filename a lot (some older Un*xes
+were limited to 14 characters) then look for:
+<PRE>&nbsp; <TT>LIMITED NAMELEN</TT></PRE>
+which is about 75% of the way through mirror.pl, for a note on how to reduce
+temporary filename length.&nbsp; I only know of one site using this.
+<H2>
+<A NAME="Regular Expressions"></A>Regular Expressions</H2>
+This is a short explanation of regular expressions.&nbsp; For a more comprehensive
+guide see the <B>Perl</B> manual pages or the O'Reilly book "Mastering
+Regular Expressions".
+
+<P>A regular expression, or regexp, is a way of using matching patterns
+in text strings.&nbsp; For example the regexp:
+<UL>
+<PRE>&nbsp;^s</PRE>
+</UL>
+would match any string that begins with an <B><TT><FONT SIZE=+1>s</FONT></TT></B>.&nbsp;
+The <B><TT><FONT SIZE=+1>^</FONT></TT></B> is a special character that
+means <I>beginning of string</I>.&nbsp; There are a number of specials
+possible in a regexp, everything that is not special is taken as a literal
+character, such as the <B><TT><FONT SIZE=+1>s</FONT></TT></B> in the example
+above.&nbsp; To turn off a special character put a backslash, <B><TT><FONT SIZE=+1>\</FONT></TT></B>,
+in front of it.&nbsp; This only effects the special character immediately
+following it.
+
+<P>A word of warning: although very similar to Un*x shell (and D*S COMMAND)
+wildcards there are differences.&nbsp; For example any Un*x and D*S would
+treat *.ZIP as any filename ending in .ZIP, *.ZIP as a regular expression
+is an error!&nbsp; The * is special that must follow something (see below).
+<H3>
+Regexp Specials</H3>
+
+<TABLE>
+<TR>
+<TD>^</TD>
+
+<TD>beginning of string</TD>
+</TR>
+
+<TR>
+<TD>$</TD>
+
+<TD>end of string</TD>
+</TR>
+
+<TR>
+<TD>.</TD>
+
+<TD>any character</TD>
+</TR>
+
+<TR>
+<TD>[r]</TD>
+
+<TD>a range or characters either as a list <I>abcef</I> or a hyphen separated
+range <I>a-f</I></TD>
+</TR>
+
+<TR>
+<TD>[^r]</TD>
+
+<TD>anything not in the given list or range</TD>
+</TR>
+
+<TR>
+<TD>(p1|p2|p3...)</TD>
+
+<TD>patterns p1 or p2 or p3 ... (the patterns may be specials)</TD>
+</TR>
+
+<TR>
+<TD>*</TD>
+
+<TD>zero or more of the preceding item (which may be a special)</TD>
+</TR>
+
+<TR>
+<TD>+</TD>
+
+<TD>one or more of the preceding item (which may be a special)</TD>
+</TR>
+
+<TR>
+<TD>\d</TD>
+
+<TD>any digit (same as [0-9])</TD>
+</TR>
+
+<TR>
+<TD>\D</TD>
+
+<TD>any non-digit (same as [^0-9])</TD>
+</TR>
+
+<TR>
+<TD>\s</TD>
+
+<TD>any whitespace character</TD>
+</TR>
+
+<TR>
+<TD>\S</TD>
+
+<TD>any non-whitespace character</TD>
+</TR>
+</TABLE>
+
+<H3>
+Regexp Examples</H3>
+
+<TABLE>
+<TR>
+<TD>abc</TD>
+
+<TD>matches <I>abc</I>, also <I>xxxabcyyy</I> but not <I>xabbcy</I>&nbsp;</TD>
+</TR>
+
+<TR>
+<TD>^abc$</TD>
+
+<TD>matches only <I>abc</I></TD>
+</TR>
+
+<TR>
+<TD>a.*z</TD>
+
+<TD>matches <I>a</I> <I>any string z</I>. e.g. <I>asdkjfhaksdjfhz</I></TD>
+</TR>
+
+<TR>
+<TD>index.html</TD>
+
+<TD>matches <I>index.html </I>AND <I>indexXhtml index/html</I> (. matches
+any character)</TD>
+</TR>
+
+<TR>
+<TD>index\.html</TD>
+
+<TD>matches <I>index.html </I>(the backslash stops . matching any character)</TD>
+</TR>
+
+<TR>
+<TD>[rR][eE][aA][dD][mM][eE]</TD>
+
+<TD>matches <I>readme</I>, <I>Readme</I>, <I>README</I> ...</TD>
+</TR>
+
+<TR>
+<TD>\.(gz|Z)$</TD>
+
+<TD>matches strings ending in <I>.gz </I>or <I>.Z</I></TD>
+</TR>
+</TABLE>
+
+<H2>
+<A NAME="Hints"></A>Hints</H2>
+When adding a new package, first test it by running <B>mirror</B> with
+the <B><A HREF="#-n">-n</A></B> option.
+
+<P>If you are adding to an existing archive that was not created by <B>mirror</B>
+(perhaps you copied the files from a CDROM) then it is usually best to
+force the time-stamps of the existing local files so time comparisons with
+the remote files show the files as identical (see <B><A HREF="#-T">-T</A></B>).
+
+<P>Try and keep all packages that are being retrieved from the same site
+together in the same <A HREF="#Package Files">package file</A>. That way
+<B>mirror</B> will only have to login once.
+
+<P>Remember that all regexp's are <B>Perl</B> regular expressions.
+
+<P>If the remote site contains symlinks that you want to "flatten out"
+into the corresponding files, then do this by changing the flags passed
+to the remote <B>ls</B> which will be either <B><I><A HREF="#flags_recursive">flags_recursive</A></I></B>
+or <B><I><A HREF="#flags_nonrecursive">flags_nonrecursive</A></I></B> to
+include <B><I>L</I></B>&nbsp; First test this by trying a <B>ls -lRatL</B>
+on the remote site under the FTP command to check whether the remote filestore
+has any symlink loops.&nbsp;&nbsp; These cause ls to go into an infinite
+loop - if this happens you will have to talk to the manager of the remote
+area about removing them.
+
+<P>If you are mirroring a very large site that changes infrequently, add
+<B><I><A HREF="#max_days">max_days</A>=7</I></B> to the settings <B>after</B>
+it is initially mirrored. That way <B>mirror</B> will only have to consider
+recent files when updating. Then once a week, or whenever necessary, call
+<B>mirror</B> with <B><A HREF="#-k">-k </A><I><A HREF="#max_days">max_days</A>=0
+</I></B>to force a full update.
+
+<P>If you don't want to compress anything from the remote site the easiest
+way to do this is to set the <B><I><A HREF="#compress_patt">compress_patt</A></I></B>
+to nothing.
+
+<P>If you want to run a command at the end of mirroring a package a useful
+trick is to reset the <B><I><A HREF="#mail_prog">mail_prog</A></I></B>
+variable to be the program name and <B><I><A HREF="#mail_to">mail_to</A></I></B>
+to be the arguments.
+
+<P>For netware, dosftp, macos and VMS you should normally set <B><I><A HREF="#remote_dir">remote_dir</A></I></B>
+to be the home directory of the remote FTP daemon. Connect in manually
+and before changing directory use the pwd command to find where home is.
+If you are only mirroring part of the tree then give the full pathname
+including this home directory at the start.
+
+<P>macos names can sometimes contain characters that make it hard to pass
+them through Un*x shells. Since compressing files is done via a shell it
+would be best to turn off compression with <B><I><A HREF="#compress_patt">compress_patt</A>=</I></B>
+
+<P>macos files seem to always change size when transfered, in either binary
+or text mode. So it would be best to set get_size_change=false
+<H2>
+<A NAME="Netiquette"></A>Netiquette</H2>
+If you are going to mirror a remote site, please obey any restrictions
+that the site administrators place on access. You can generally find the
+restrictions on connecting to the archive using the standard FTP command.
+Any restrictions are normally given as a login banner or in a (hopefully)
+obvious file.
+
+<P>Here are, what I hope are, some good general rules:
+
+<P>You should probably get permission from the remote site <B>before</B>
+setting up a mirror of it.&nbsp; Some sites require detailed logs.&nbsp;
+Unauthorised mirrors would take traffic from the site generating the logs
+and so ruin their statistics.&nbsp; There may also be <B>SERIOUS LEGAL
+REASONS</B> why mirrors are unwanted.
+
+<P>Only mirror a site well outside the working hours of both the local
+and remote sites.
+
+<P>It is probably unfriendly to try to mirror a remote site more than once
+a day.
+
+<P>Before trying to mirror a remote site, try and find the packages you
+want from local archives, as no one will be pleased if you soak up a lot
+of network bandwidth needlessly.
+
+<P>If you have a local archive, then tell people about it so they don't
+have to waste bandwidth and CPU at the remote site.
+
+<P>Do remember to check your package-files from time to time in case the
+remote archive has changed their access restrictions.
+<BR>&nbsp;
+<H2>
+<A NAME="Bugs"></A>Bugs</H2>
+Some of the netiquette guidelines should be enforced.
+
+<P>Should be able to cope with links as well as symlinks.
+
+<P>Suffers from creeping featurism. (Actually more like galloping featurism!.)
+
+<P>If you are using Perl 4 (Perl 5 users skip this):
+<UL>If h2ph has been run for your system then you should probably remove
+the socket.ph shipped with mirror and use the one <I>meant</I> for your
+machine.&nbsp; If h2ph has not been run then you should persuade your systems
+administrators to do so.&nbsp; The contents of socket.ph are operating
+system specific and it is possible that what works for me will not work
+for you.
+
+<P>A special note for Solaris 2.x users.&nbsp; The socket.ph created by
+h2ph doesn't work.&nbsp; Install the socket.ph-solaris from this distribution
+instead.</UL>
+
+
+<P>There seems to be a problem with older versions of Perl that causes
+mirror to fail with the message 'fstype unix unknown'.&nbsp; If you experience
+<BR>this then please upgrade your Perl to 5.004 or better.
+<BR>&nbsp;
+<H2>
+<A NAME="Remember!"></A>Remember!</H2>
+Objects in a mirror are closer than you think!
+<H2>
+<A NAME="Author"></A>Author</H2>
+Mirror was writen by <A HREF="http://sunsite.org.uk/~lmjm/">Lee McLoughlin</A>
+&lt;<A HREF="mailto:lmjm@icparc.ic.ac.uk">lmjm@icparc.ic.ac.uk</A>>. It
+uses a heavily rewritten and extended version of the ftp.pl package originally
+by: Alan R. Martello &lt;al@ee.pitt.edu> which uses lchat.pl which is based
+on the chat2.pl package by: Randal L. Schwartz &lt;merlyn@ora.com>
+
+<P>Special thanks to the following people for patches, comments and other
+suggestions that have helped to improve <B>mirror</B>. If I have omitted
+anyone, please contact me.
+
+<P>Zo&euml; Leech &lt;zl@icparc.ic.ac.uk>
+<BR>James Revell &lt;revell@uunet.uu.net>
+<BR>Chris Myers &lt;chris@wugate.wustl.edu>
+<BR>Amos Shapira &lt;amoss@cs.huji.ac.il>
+<BR>Paul A Vixie &lt;vixie@pa.dec.com>
+<BR>Jonathan Kamens &lt;jik@pit-manager.mit.edu>
+<BR>Christian Andretzky &lt;casys@otto.mb3.tu-chemnitz.de>
+<BR>Kean Stump &lt;kean@ucs.orst.edu>
+<BR>Anita Eijs &lt;anita@hermes.bouw.tno.nl>
+<BR>Simon E Sperro &lt;S.E.Sperro@gdr.bath.ac.uk>
+<BR>Aaron Wohl &lt;aw0g+@andrew.cmu.edu>
+<BR>Michael Meissner &lt;meissner@osf.org>
+<BR>Michael Graff &lt;explorer@iastate.edu>
+<BR>Bradley Rhoades &lt;us267388@mail.mmmg.com>
+<BR>Edwards Reed &lt;eer@cinops.xerox.com>
+<BR>Joachim Schrod &lt;schrod@iti.informatik.th-darmstadt.de>
+<BR>David Woodgate &lt;David.Woodgate@mel.dit.csiro.au>
+<BR>Pieter Immelman &lt;pi@itu1.sun.ac.za>
+<BR>Jost Krieger &lt;x920031@bus072.rz.ruhr-uni-bochum.de>
+<BR>Erez Zadok &lt;ezk@cs.columbia.edu>
+<BR>&nbsp;
+<H2>
+Copyright</H2>
+Mirror, both the software and all the accompanying documentation including
+this document, is under the following copyright.
+
+<P><FONT SIZE=-1>Copyright &copy; 1990 - 1998 Lee McLoughlin</FONT>
+
+<P><FONT SIZE=-1>Permission to use, copy, and distribute this software
+and its documentation for any purpose with or without fee is hereby granted,
+provided that the above copyright notice appear in all copies and that
+both that copyright notice and this permission notice appear in supporting
+documentation.</FONT>
+
+<P><FONT SIZE=-1>Permission to modify the software is granted, but not
+the right to distribute the modified code. Modifications are to be distributed
+as patches to released version.</FONT>
+
+<P><FONT SIZE=-1>This software is provided "as is" without express or implied
+warranty.</FONT>
+</BODY>
+</HTML>

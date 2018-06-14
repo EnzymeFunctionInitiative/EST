@@ -681,7 +681,8 @@ sub submitDownloadJob {
     }
 
     $B->addAction("echo To download the ENA files, run");
-    $B->addAction("echo rsync -auv rsync://bio-mirror.net/biomirror/embl/release/ $InputDir/ena");
+    $B->addAction("echo rsync -auv rsync://bio-mirror.net/biomirror/embl/release/ TARGET_ENA_DIR");
+    $B->addAction("echo $ScriptDir/mirror/mirror.pl emblwgs_pub PATH_TO_MIRROR_PACKAGE_DIR/emblwgs");
     #rsync -auv rsync://bio-mirror.net/biomirror/embl/release/
 
     $B->outputBaseFilepath($file);

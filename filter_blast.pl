@@ -90,21 +90,25 @@ close BLAST;
 
 open FASTAIN, $fastain or die "Cannot open fasta file $fastain\n";
 open FASTAOUT, ">$fastaout" or die "Cannot write to fasta file $fastaout\n";
-$sequence="";
+my $sequence = "";
+my @seqLines; # keep track of individual lines in the sequence since we write them out as they come in
+my $key = "";
 while (<FASTAIN>){
-  $line=$_;
+  my $line = $_;
   chomp $line;
-  if($line=~/^>/){
-    if(length $sequence>= $minlen and (length $sequence <= $maxlen or $maxlen==0)){ 
-      print FASTAOUT "$key\n$sequence";
+  if ($line =~ /^>/) {
+    if (length $sequence >= $minlen and (length $sequence <= $maxlen or $maxlen == 0)) { 
+      print FASTAOUT "$key\n", join("\n", @seqLines), "\n\n";
     }
-    $key=$line;
-    $sequence="";
-  }else{
-    $sequence.="$line\n";
+    $key = $line;
+    $sequence = "";
+    @seqLines = ();
+  } else {
+    $sequence .= $line;
+    push @seqLines, $line;
   }
 }
-print FASTAOUT "$key\n$sequence\n";
+print FASTAOUT "$key\n", join("\n", @seqLines), "\n\n";
 close FASTAOUT;
 close FASTAIN;
 

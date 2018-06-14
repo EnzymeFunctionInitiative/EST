@@ -1,0 +1,157 @@
+.\"
+.\"
+.\"
+.\" Copyright (C) 1990 - 1998   Lee McLoughlin
+.\"
+.\" Permission to use, copy, and distribute this software and its
+.\" documentation for any purpose with or without fee is hereby granted,
+.\" provided that the above copyright notice appear in all copies and
+.\" that both that copyright notice and this permission notice appear
+.\" in supporting documentation.
+.\"
+.\" Permission to modify the software is granted, but not the right to
+.\" distribute the modified code.  Modifications are to be distributed
+.\" as patches to released version.
+.\"
+.\" This software is provided "as is" without express or implied warranty.
+.\"
+.\"
+.\"
+.\" $Id: mm.man,v 2.9 1998/05/29 19:09:58 lmjm Exp lmjm $
+.\" $Log: mm.man,v $
+.\" Revision 2.9  1998/05/29 19:09:58  lmjm
+.\" mostly gone in favour of html
+.\"
+.\" Revision 2.1  1993/06/28  15:21:58  lmjm
+.\" Full 2.1 release
+.\"
+.\" Revision 1.1  1993/06/22  19:43:32  lmjm
+.\" Initial revision
+.\"
+.TH MM 1L "21 April 1993"
+.SH NAME
+mm \- mirror master
+.SH SYNOPSIS
+.B mm
+.B [flags] [package-files]
+.SH DESCRIPTION
+.B mm
+is the mirror master.  It runs multiple calls to
+.B mirror
+in parallel and handles locking and minimal retry times.
+.LP
+As with
+.B mirror,
+.B mm
+is a package written in Perl.
+.LP
+.B mm
+presumes that all the package details are stored in a directory called
+packages.  All the packages for a given site must be in a file whose
+name is the same as that of the site.  So in packages/sunsite.org.uk
+will be all the package details for the host sunsite.org.uk.
+.SH OPTIONS
+.TP
+.B \-t
+Ignore the minimal retry timers.
+.TP
+.B \-o site:package
+Only mirror the given site:package.
+.TP
+.B \-debug
+Enable debugging.  If this argument is given more than once the
+debugging level will increase.  Currently the maximum useful level is
+four.
+.TP
+.B \-s
+Enable status debugging.  This will print out the status of any
+subprocess as it is spawned or as it exits.
+.TP -
+.SH CONFIGURATION FILE
+The configuration file is parsed as a series of statements.
+Blank lines and lines beginning with a hash are ignored.
+There are are two kinds of statements, controls and site:package details.
+.LP
+Control statements are of the form:
+.PD 0
+.IP
+.IB keyword = value
+.P
+.PD
+.LP
+You can add whitespace around the equals.
+.LP
+Here is a list of the keywords and their values, any defaults are
+given inside square brackets:
+.de kV
+.TP 15m
+.I \\$1
+\\$3
+.if !'\\$2'' [\\$2]
+..
+.kV home '' "Directory that mm chdirs to before doing any work.
+.kV max '6' "Maximum number of mirrors that can be running in parallel at any one time
+.kV mirror '' "This is the way to call mirror.  Any occurence of \
+$args, $package or $site is replace with the appropriate entry from \
+the package. Any $pkg is replaced with a version of $package with all \
+characters that cause problems in filenames converted to underscore. \
+The default is: exec ./mirror \e$args -p'\e$package' packages/\e$site > logs/\e$site:\e$pkg 2>&1
+.kV cmd '' "Run the given command. This can occur multiple times.
+.kV cmdin '' "Run the given command and use its output as mm input. This can occur multiple times.
+.kV skip '' "Skip the given site:package when it occurs.
+.LP
+In addition to control statements there are also package details.
+Each package details statement is of the form:
+.LP
+.RS
+.ft B
+.nf
+site:package min-restart-last-ok min-restart-last-notok mirror-args
+.fi
+.ft R
+.RE
+.LP
+The site and package fields are matched against those in the packages.
+A mirror will only be run to this site:package if the last mirror run
+was more than
+.B min
+hours out.
+The 
+.B min-restart-last-ok
+limit will be used if the last call to mirror was successful.  If the
+mirror call failed then
+.B min-restart-last-notok
+will be used.
+.SH EXAMPLES
+.LP
+Here is a simple
+.B mm
+input file to manage mirroring two packages.
+.LP
+.RS
+.ft B
+.nf
+home=/public/mirror
+
+ftp.cl.cam.ac.uk:JIPS-nrs 20 20
+hcrl.open.ac.uk:hcrl-psion 20 20
+.fi
+.ft R
+.RE
+.LP
+More usually the auxilly program
+.B pkgs_to_mmin
+will be used to automatically convert the contents of the packages
+directory into the site:package statements.
+.LP
+.RS
+.ft B
+.nf
+home=/public/mirror
+
+cmdin=./pkgs_to_mmin packages/*
+.fi
+.ft R
+.RE
+.SH AUTHOR
+Written by Lee McLoughlin <lmjm@icparc.ic.ac.uk>.

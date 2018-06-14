@@ -1,0 +1,56 @@
+.\"
+.\"
+.\"
+.\" Copyright (C) 1990 - 1998   Lee McLoughlin
+.\"
+.\" Permission to use, copy, and distribute this software and its
+.\" documentation for any purpose with or without fee is hereby granted,
+.\" provided that the above copyright notice appear in all copies and
+.\" that both that copyright notice and this permission notice appear
+.\" in supporting documentation.
+.\"
+.\" Permission to modify the software is granted, but not the right to
+.\" distribute the modified code.  Modifications are to be distributed
+.\" as patches to released version.
+.\"
+.\" This software is provided "as is" without express or implied warranty.
+.\"
+.\"
+.\"
+.\" $Id: mirror.man,v 2.9 1998/05/29 19:07:48 lmjm Exp lmjm $
+.\" $Log: mirror.man,v $
+.\" Revision 2.9  1998/05/29 19:07:48  lmjm
+.\" Mostly gone in favour of html
+.\"
+.\"
+.\"
+.de Rv
+.ds Rs Mirror \\$2
+..
+.de kV
+.TP 15m
+.I \\$1
+\\$3
+.if !'\\$2'' [\\$2]
+..
+.de eG
+.LP
+.RS
+.ft B
+.nf
+..
+.de Ge
+.fi
+.ft R
+.RE
+.LP
+..
+.Rv $Revision: 2.9 $
+.TH MIRROR 1L "\*(Rs"
+.SH NAME
+mirror \- mirror packages on remote sites
+.SH DESCRIPTION
+Please read the HTML documentation for mirror that should have been
+supplied with the program or can be read at:
+.LP
+http://sunsite.org.uk/packages/mirror/

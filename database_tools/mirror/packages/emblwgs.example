@@ -1,0 +1,15 @@
+package=emblwgs_pub
+    comment=EMBL wgs public from EBI
+    site=ftp.ebi.ac.uk
+    remote_dir=pub/databases/ena/wgs/public
+    local_dir=LOCAL_DIR_HERE
+    get_patt=(\.dat.gz|\.master\.dat|README)
+    exclude_patt+|fasta
+    get_newer=0
+    get_size_change=1
+    recursive=true
+    passive_ftp=true
+    timeout=1600
+    max_delete_files=50%
+    compress_prog=gzip
+

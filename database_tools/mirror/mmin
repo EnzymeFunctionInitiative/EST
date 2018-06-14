@@ -1,0 +1,8 @@
+# How many mirrors to run at the same time.
+# a few of the sites are *BIG* any more than this and others fail
+# with "Out of memory"
+max=8
+
+home=/opt/sunsite/mirror
+
+cmdin=./pkgs_to_mmin packages/*

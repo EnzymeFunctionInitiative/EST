@@ -70,7 +70,7 @@ my $blastDb = "$data_files/combined.fasta";
 my $perpass = 1000;
 my $incfrac = 0.95;
 my $maxhits = 5000;
-my $sortdir = '/state/partition1';
+my $sortdir = '/scratch';
 
 if (not defined $evalue and defined $famEvalue) {
     $evalue = $famEvalue;
