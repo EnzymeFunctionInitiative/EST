@@ -319,18 +319,21 @@ foreach $dir (@wgsdirs){
         my @datFiles = apply {$_ =~ s/^(.*)\.master\.dat$/$1/} @sorted;
         for (my $i = 0; $i <= $#masters; $i++) {
             my $type = getMasterType($masters[$i]);
-            print join("\t", $type, $datFiles[$i]), "\n";
+            my $datFilePath = "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
+            
+            if (not -f $datFilePath) {
+                warn "Unable to find $datFilePath so ignoring $masters[$i]";
+                next;
+            }
+
             if ($type eq "pro") {
-                push @pro, "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
+                push @pro, $datFilePath;
             } elsif ($type eq "fun") {
-                push @fun, "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
+                push @fun, $datFilePath;
             } elsif ($type eq "env") {
-                push @env, "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
+                push @env, $datFilePath;
             }
         }
-        #print "PRO: ", join(",", @pro), "\n\n\n\n\n";
-        #print "FUN: ", join(",", @fun), "\n\n\n\n\n";
-        #print "ENV: ", join(",", @env), "\n\n\n\n\n";
     }
 }
 
