@@ -16,6 +16,7 @@ my $result = GetOptions(
 
 die "Missing command line arguments" if not $fasta or not $accessions or not $countFile;
 
+
 my $data_files = $ENV{EFIDBPATH};
 
 print "using $data_files/combined.fasta as the Blast database\n";
@@ -38,6 +39,8 @@ while(<ACC>){
 
 close ACC;
 close FASTA;
+
+$accCount++; # to account for the input sequence.
 
 open COUNT, ">$countFile";
 print COUNT "Total\t$accCount\n";
