@@ -423,7 +423,7 @@ sub getDomainFromDb {
     if ($unirefVersion) {
         $unirefField = $unirefVersion eq "90" ? "uniref90_seed" : "uniref50_seed";
         $unirefCol = ", $unirefField";
-        $unirefGroup = "group by $unirefField";
+        #Don't do this!  $unirefGroup = "group by $unirefField";
         $unirefJoin = "left join uniref on $table.accession = uniref.accession";
     }
 
@@ -776,7 +776,11 @@ sub writeMetadata {
 
     return if not $metaFileOut;
 
-    open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+    if ($useOptionASettings) {
+        open META, ">>$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+    } else {
+        open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+    }
     
     my @metaAcc = @origAccessions;
     # Add in the sequences that were in the fasta file (which we didn't retrieve from the fasta database).

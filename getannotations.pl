@@ -32,6 +32,8 @@ my $result = GetOptions(
 die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
+
+
 print "Using $fasta as the input FASTA file\n";
 
 my %idTypes;
@@ -73,6 +75,7 @@ foreach my $accession (@accessions){
 }
 
 $dbh->disconnect();
+
 
 close OUT;
 
