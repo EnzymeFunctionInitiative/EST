@@ -311,7 +311,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("cat $queryFile >> $allSeqFile");
-$B->addAction("merge-attributes.pl -meta-file $metadataFile");
+$B->addAction("merge_sequece_source.pl -meta-file $metadataFile");
 $B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $allSeqFile -meta-file $metadataFile -config=$configFile");
 $B->jobName("${jobNamePrefix}blasthits_getannotations");
 $B->renderToFile("$scriptDir/blasthits_getannotations.sh");
