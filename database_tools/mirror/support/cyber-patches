@@ -1,0 +1,107 @@
+# From: x920031@rubb.rz.ruhr-uni-bochum.de (Jost Krieger)
+#
+# Now here is my file cyber.pl, accessed via external_mapping=cyber.pl.
+# Problems are: I get "malformed cmd-links" for each access to the file.
+#For the first access I get one malformed cmd-link for the tempname kludge
+#(well deserved), and for any further access in the same run, I get one
+#malformed ... for each subroutine. It works, though.
+#
+#Remark: this is for a filesystems where filenames are restricted to
+#31 chars *after* some funny remapping.
+#
+#=========================================================================
+
+#override filename (very unclean)
+
+sub filename_to_tempname
+{
+	local( $dir, $file ) = @_;
+
+	# dir 
+	return "$dir.$file.";
+}
+
+package extmap;
+
+# constant for cyber file name length
+$cyber_length_max = 29;		# leave room for temp name letters ...
+
+
+sub map {
+	local($dest_path) = @_;
+	local($dest_file,@new_path);
+	local(@old_path)=split("/",$dest_path);
+	for $dest_file (@old_path) {
+	   if(&cyber_length($dest_file)>$cyber_length_max) {
+	       $dest_file = &cyber_length_trim($dest_file,$cyber_length_max);
+	   }
+           push(@new_path, $dest_file);
+	}
+        $dest_path=join("/",@new_path);
+	return $dest_path;
+}
+
+
+# cut name length for cyber
+sub cyber_length_trim {
+    local ($unix_name, $max_name) = @_;
+    local ($postfix); 
+    local($toomuch)=&cyber_length($unix_name)-$max_name; 
+
+    $unix_name = reverse($unix_name);
+#	print $unix_name,$toomuch,"\n";
+
+    if( $unix_name =~ s/^(..?.?\.)//) {
+        $postfix = $1;
+    }
+
+    if ($toomuch>0) {
+        $unix_name =~ tr/A-Z/a-z/;
+        $toomuch = &cyber_length(reverse($postfix . $unix_name))-$max_name; 
+    }
+#	print $unix_name,$toomuch,"\n";
+
+    while($toomuch>0) {
+        last unless ($unix_name =~ s/[aeiou]// > 0);
+        $toomuch -= 1;
+    }
+#	print $unix_name,$toomuch,"\n";
+
+    if ($toomuch > 0) {
+        $unix_name = substr($unix_name, $toomuch);
+    }
+#	print $unix_name,$toomuch,"\n";
+
+    $unix_name = reverse($postfix . $unix_name);
+}
+
+# file name length on cyber
+sub cyber_length {
+    local ($unix_name) = @_;
+    local ($length) = 0;
+    
+    $length +=1 if $unix_name =~ /^[0-9]/;
+#	print $unix_name,$length,"\n";
+    $length -=1 if $unix_name =~ /[A-Z]$/;
+#	print $unix_name,$length,"\n";
+    $length += 3* ($unix_name =~ tr/A-Za-z0-9$._][-//cd);
+#	print $unix_name,$length,"\n";
+    $length += 2* ($unix_name =~ tr/-][//d);
+#	print $unix_name,$length,"\n";
+    $length += ($unix_name =~ tr/0-9$._//d);
+#	print $unix_name,$length,"\n";
+    $length += ($unix_name =~ tr/A-Z/A/s);
+#	print $unix_name,$length,"\n";
+    $length += 2*($unix_name =~ tr/A-Z//d);
+#	print $unix_name,$length,"\n";
+    $length += length($unix_name);
+#	print $unix_name,$length,"\n";
+    $length;
+}
+
+#=========================================================================
+#
+#--
+#Jost Krieger, Rechenzentrum der Ruhr-Universitaet Bochum
+#x920031@rubb.rz.ruhr-uni-bochum.de
+#g=Jost;s=Krieger;ou=ruba;ou=rz;pd=ruhr-uni-bochum;ad=dbp;c=de

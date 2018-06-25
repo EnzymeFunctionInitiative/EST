@@ -1,0 +1,66 @@
+                 Mirror: Quick Start Guide for the Impatient
+
+ If you are NOT impatient what you should do is:
+
+
+  1. Get the latest version of mirror from:
+     ftp://sunsite.org.uk/packages/mirror/mirror.tar.gz
+     ftp://sunsite.org.uk/packages/mirror/mirror.zip
+
+  2. Read the mirror documentation to be found at:
+     http://sunsite.org.uk/packages/mirror/
+
+But if you are reading this then you are probably too impatient so please
+read on:
+
+  1. Get the latest version of mirror (see above) an extract it into a
+     suitable directory (e.g. $HOME/mirror or c:\mirror).
+
+  2. Check whether Perl is installed on the machine you are about to install
+     mirror on.  If it isn't then either get your support staff to install
+     perl or wander round http://www.perl.com/ and pull back a suitable copy
+     of perl and install it.
+
+  3. Run
+              perl install.pl here
+     If you want to install mirror as a command available to everyone on
+     your system thats harder and you'll have to read the full
+     documentation.  But for most users it is enough to run mirror from the
+     directory you extracted it into.
+
+  4. Edit the mirror.defaults to customise it for you system. You should
+     probably change:
+                 hostname
+                 local_dir
+                 remote_password
+                 mail_to
+
+  5. Create a file, using the name of the site as the file name, in the
+     packages directory for each site that you want to mirror.
+                 e.g. packages/ftp.some_useful_site.com
+
+  6. Edit the package file for each site you want to mirror
+
+     package=<package name>
+             comment=<something to remind you what it is your mirroring>
+             site=ftp.some_useful_site.com
+             # where to start pulling files back from
+             remote_dir=/pub
+             # where to put the files on your machine
+             local_dir=/public/Mirrors/ftp.some_useful_site.com/pub
+             #
+             # If you are under Wind*ws then use a line like this instead:
+             #       local_dir=c:\tmp\mirror
+             #
+
+
+     Keep <package name> simple like just mirror or FTP-Copier avoid spaces
+     and non-alphanumerics as much as possible.
+
+  7. Test mirror to see what it would do
+                     mirror -n packages/ftp.some_useful_site.com
+
+  8. Run mirror for real.  I suggest the first time you do
+                     mirror -d packages/ftp.some_useful_site.com
+     so you can see what mirror is actually doing.  If it appears to work OK
+     then you can drop the -d for future runs.

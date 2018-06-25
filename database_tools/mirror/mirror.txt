@@ -1,0 +1,1130 @@
+                         Mirror 2.9 Reference Manual
+
+                               Lee McLoughlin
+
+                                     and
+
+                                  Zoë Leech
+
+                                 1 June 1998
+                            lmjm@icparc.ic.ac.uk
+                             zl@icparc.ic.ac.uk
+
+   * Introduction
+   * Description
+   * Flags
+   * Package Files
+        o Keywords
+   * Filestores
+   * Examples
+   * Temporary Filenames
+   * Regular Expressions
+   * Hints
+   * Netiquette
+   * See Also
+   * Bugs
+   * Remember!
+   * Author
+
+Introduction
+
+Mirror is a package written in Perl that uses the FTP protocol to duplicate
+a directory hierarchy between the machine it is run on and a remote host. It
+avoids copying files unnecessarily by comparing the file time-stamps and
+file sizes before transferring. Amongst other things, it can optionally
+rename, compress, gzip, and split files.
+
+Mirror was written by Lee McLoughlin <lmjm@icparc.ic.ac.uk> for use by
+archive maintainers but can be used by anyone wanting to transfer a lot of
+files via FTP.  Although originally only available on Un*x with version 2.9
+mirror will also run on Wind*ws 95 and Wind*ws NT.
+
+
+The latest version of mirror can always be found at either:
+
+     ftp://sunsite.org.uk/packages/mirror/mirror.tar.gz
+     ftp://sunsite.org.uk/packages/mirror/mirror.zip
+
+The latest version of this guide can always be found at:
+
+     http://sunsite.org.uk/packages/mirror/
+
+Description
+
+Mirror is called in one of two ways (see also mirror master):
+
+     mirror [flags] -gsite:pathname
+
+     mirror [flags] [package-files]
+
+The first method is used to retrieve a remote file or directory into the
+current directory. If you are mirroring a directory it is best to end the
+pathname in a slash ('/') as this makes the remote recursive listing smaller
+or use the -r flag to suppress recursion (see -g below). The mirror.defaults
+file is not used.
+
+In the second method given above, a minimal number of arguments are required
+and mirror is controlled by keyword=value lines read from the package
+files. If a file named mirror.defaults is found in either the directory
+containing the mirror executable or in the PERLLIB path, then it is loaded
+before any of the package-files.  mirror.defaults normally just contains
+the package of keyword settings called defaults that is used to provide
+common defaults for all package-files.   If no mirror.defaults file is
+found  the default settings built into mirror  are used.
+
+Each package-files is read in turn, looking for named packages.  If the
+package is not named defaults, then mirror will perform the following steps.
+
+If mirror is already connected to a site, other than the target site, it
+will disconnect from the site.  It then changes to the given local
+directory, creating it if necessary, and scans it to get the details of the
+local files that are already there.  Mirror then attempts to connect to the
+remote site's FTP daemon. It will then login using the given remote_user and
+remote_password.  The remote directory is then scanned. Mirror does this by
+changing to the remote directory (remote_dir) and running the FTP LIST
+command, passing the flags_recursive  or flags_nonrecursive options
+depending on the value of recursive.  Alternatively a file containing the
+directory listing may be retrieved (see ls_lR_file and local_ls_lR_file) .
+Each remote pathname will have any required mappings performed on it to
+create a local pathname. Then any checks specified by the exclude_patt,
+max_days, get_newer and get_size_change keywords are applied to names of
+files or symlinks. max_days, get_newer and get_size_change  are not applied
+to directories.  This creates a list of all required remote files and the
+local pathnames to store them in.
+
+Local versions of all required directories are then created.  Then all
+required files are fetched from the remote site into their local pathnames.
+This is done by retrieving the file into a temporary file in the target
+directory. The transfer is normally done in binary mode (see
+vms_xfer_text).  If required the temporary file may be compressed, gzip'ed
+or split. The file's time-stamps are reset to match those of the remote
+file.  Finally the temporary file is renamed to have the correct name.
+
+Once all files have been transferred any required symbolic links are created
+(where support by your Operating System) and any unnecessary pathnames in
+the mirror are deleted.
+
+Unless an internal failure is detected, any error will cause the current
+package to be skipped and the next one tried.
+
+Mirror can handle symbolic links but not hard links. It does not duplicate
+owner or group information as usually this is meaningless over a network
+(but see user and group). If you require any of these options and you are on
+Un*x use rdist(1) instead.
+
+Mirror was written to mirror remote Un*x archives, but has grown (like
+topsy).
+
+Flags
+
+Although mirror has a large number of command line flags most should only
+really be used when doing a very simple mirror as a one-time event.  If you
+intend to maintain a mirror area it is much better to put all the details
+into a mirror package file and then run mirror on that file.
+
+The only flags you should use often are -n and, if you like to see what
+mirror is up to,-d.
+
+ -d           Enable debugging. If this argument is given more than once
+              (e.g. -d -d) the debugging level will increase. Currently the
+              maximum useful level is four.
+ -n           Do nothing except compare local and remote directories, no
+              file transfers are done. Sets debug level to two, so that you
+              are shown a trace of what would be done.
+ -g site:path Get all files  matching path, which is a regexp, on the given
+              site. If path matches .*/.+ (e.g. /fred or /fred/bloggs) then
+              it is the name of the directory and everything after the last
+              / is the pattern of filenames to get. If path ends with /
+              then it is the name of a directory and all its contents are
+              retrieved.  One note of caution. If you use host:/fred, a
+              full directory listing of / on the remote host will be done.
+              If all you wanted was the contents of the directory /fred
+              then specify host:/fred/
+ -p package   When using multiple package files only mirror the given
+              package. This option may be given multiple times in which
+              case all the given packages will be mirrored. Without this
+              option, all packages will be mirrored. Package is a regexp
+              matched against the package name following the -p.
+ -R package   Similar to -p but skips all packages until it reaches the
+              given package. Useful for restarting failed mirror runs from
+              where they left off.
+ -F           Use temporary dbm files for the information about files. This
+              is useful if you mirror a very large directory.  See the
+              variable use_files.
+ -r           Equivalent to -k recursive=false
+ -v           Print the version details of mirror and exit.
+ -T           Do not do any file transfers just force the time-stamps of
+              any local files to be reset to be the same as the remote
+              files. Normally only used when initialising a mirror that
+              already contains files retrieved another way (e.g. from
+              CDROM).
+ -Ufilename   Record all files transfered by mirror into the given
+              filename. Remember that mirror changes into local_dir to do
+              its work, so it should be a full pathname. If no filename is
+              given, it defaults to upload_log.day.month.year.
+ -k key=value Override any default key/value.  See below
+ -m           Equivalent to -k mode_copy=true
+ -t           Equivalent to -k text_mode=true
+ -f           Equivalent to -k force=true
+ -s site      Equivalent to -k site=site
+ -u user      Equivalent to -k remote_user=user You are then prompted for a
+              password, with echo turned off. The password is used as the
+              remote_password.
+ -L           Just generate a pretty printed version of the input and exit.
+
+Package Files
+
+Each group of keywords defines how to mirror a particular package and should
+begin with a unique package line. The package name is used in report
+generation and by the -p argument, so pick something mnemonic. The minimum
+needed for each package is package, site, remote_dir and local_dir . On
+finding a package line, all the default values are reset to either the
+values from the defaults package (or built-in values if defaults has not
+been set).  A package ends at either the next package statement or at the
+end of file.
+
+Package files are parsed as a series of statements. Blank lines and lines
+beginning with a hash are ignored. Each statement is of the form
+
+     keyword=value
+
+or
+
+     keyword+value
+
+ You can add whitespace before the keyword and the equals/plus. Everything
+immediately following the equals/plus is the value, including any leading or
+trailing whitespace. The equals version sets the keyword to this value,
+while the plus version concatenates the value onto the end of the existing
+value (normally set in defaults package).
+
+A statement can be continued over multiple lines by ending all lines except
+the last, with the character ampersand ('&'). The line following the
+ampersand, is appended to the current line with all leading whitespace
+removed.
+
+Although there are a lot of keywords that can be set, the built-in defaults
+will handle most cases. Normally only package,  site,  remote_dir and
+local_dir need to be set.
+
+Setting Defaults
+
+If the package name is defaults, then no site is contacted, but the default
+values given for any keywords are changed. Normally all the defaults are in
+the file mirror.defaults which will be automatically loaded before any
+package files (see Description).
+
+# Sample mirror.defaults
+package=defaults
+        # The LOCAL hostname - if not the same as `hostname` returns
+        # (I advertise the name sunsite.org.uk but the machine is
+        #  really swallow.doc.ic.ac.uk.)
+        hostname=sunsite.org.uk
+        # Keep all local_dirs relative to here
+        local_dir=/public/
+        remote_password=wizards@sunsite.org.uk
+
+Keywords
+
+The following is a list of all the available keywords and the default values
+built into mirror.  To change these defaults it is usually best to change
+your mirror.defaults file.
+
+The keywords are grouped into the following sections:
+
+   * Required Keywords
+   * FTP Related
+   * File Copying
+   * Local File Attributes
+   * File Deletion
+   * File Compression
+   * File Splitting
+   * Directory Listings
+   * Logging
+   * Special
+
+
+ Required Keywords
+ keyword              default                    Description
+ package              none                       A name for the package to
+                                                 be mirrored.  Should be
+                                                 different from all other
+                                                 package names you use.
+ site                 none                       Hostname or IP address of
+                                                 the remote site to mirror
+                                                 from.
+ remote_dir           none                       Remote directory to
+                                                 mirror. See also
+                                                 recurse_hard.
+ local_dir            none                       Local directory.
+
+ FTP Related
+ keyword              default                    Description
+ remote_user          anonymous                  Username to use at remote
+                                                 site.
+ remote_password      localuser@localhostname    Password to use at remote
+                                                 site.  Note: localuser is
+                                                 will be your name and
+                                                 localhostname will be the
+                                                 name of the local machine
+                                                 (if it can be found, see
+                                                 hostname)
+ remote_account       none                       Account name/password to
+                                                 use at remote site, after
+                                                 logging in anonymously
+                                                 (for systems that require
+                                                 it).
+ remote_group         none                       If present set the remote
+                                                 'site group'.
+ remote_gpass         none                       If present set the remote
+                                                 'site gpass'.
+ timeout              40                         Timeout FTP requests after
+                                                 this many seconds.
+ failed_gets_excl     none                       Regexp of error messages
+                                                 to skip reporting, when
+                                                 the FTP GET command
+                                                 fails.  (E.g. permission
+                                                 denied.)
+ ftp_port             21                         Port number of remote FTP
+                                                 daemon.
+ proxy                false                      Set to true to use proxy
+                                                 FTP service.
+ proxy_ftp_port       4514                       Port number of
+                                                 proxy-service FTP daemon.
+                                                 This value should be
+                                                 changed depending on which
+                                                 proxy library you are
+                                                 using.
+ proxy_gateway        internet-gateway           Name of proxy-service, may
+                                                 also be supplied by the
+                                                 environment variable
+                                                 INTERNET_HOST.
+ using_socks          false                      Set to true if you are
+                                                 using a SOCKS version of
+                                                 Perl.
+ passive_ftp          false                      Set to true if you want to
+                                                 use the PASV extension of
+                                                 the FTP protocol.
+                                                 Especially useful with
+                                                 firewalls, other proxy FTP
+                                                 servers, and the variable
+                                                 using_socks.
+ retry_call           true                       If initial connect fails,
+                                                 retry ONCE after ONE
+                                                 minute. This is to handle
+                                                 sites which reverse lookup
+                                                 the incoming host but
+                                                 sometimes timeout on the
+                                                 first attempt.
+ disconnect           false                      Disconnect from remote
+                                                 site at end of package.
+                                                 Normally only disconnects
+                                                 if the next package
+                                                 specifies a different
+                                                 site.  (Some sites will
+                                                 not let you change to
+                                                 certain directories except
+                                                 when first connecting in.)
+ remote_idle          none                       If set try and set the
+                                                 remote idle timer to this.
+
+ File Copying
+ keyword              default                    Description
+ get_patt             .                          Regexp of remote pathnames
+                                                 to retrieve.
+ exclude_patt         none                       Regexp of remote pathnames
+                                                 to ignore.
+ local_ignore         none                       Regexp of local pathnames
+                                                 to ignore. Useful to skip
+                                                 restricted local
+                                                 directories.
+ get_newer            true                       Get the remote file if it
+                                                 is more recent that the
+                                                 local file.
+ get_size_change      true                       Get the file if the size
+                                                 is different from local.
+                                                 If the file is to be
+                                                 compressed after being
+                                                 fetched get_size_change is
+                                                 automatically set to
+                                                 false.
+ make_bad_symlinks    false                      If true, symlinks will be
+                                                 made to invalid
+                                                 (non-existent) pathnames.
+                                                 (In older versions of
+                                                 mirror this defaulted to
+                                                 true.)
+ follow_local_symlinksnone                       Regexp of pathnames of
+                                                 local symbolic links.
+                                                 Rather than treating them
+                                                 as symlinks the target
+                                                 files or directories they
+                                                 reference are used
+                                                 instead. This makes local
+                                                 symlinks invisible to
+                                                 mirror.
+ get_missing          true                       Really get files. When set
+                                                 to false, only deletions
+                                                 and symlinking will be
+                                                 done. Used to delete
+                                                 expired files older than
+                                                 max_days without
+                                                 retrieving older files.
+ get_file             true                       Get files.  If set to
+                                                 false mirror will try to
+                                                 put files.
+ text_mode            false                      If true, all files are
+                                                 transferred in TEXT mode.
+                                                 Un*x prefers binary so
+                                                 that is the default.
+ strip_cr             false                      Strip carriage returns
+                                                 from any file as it is
+                                                 retrieved.
+ vms_keep_versions    true                       When mirroring VMS files,
+                                                 keep the version numbers.
+                                                 If false, the versions are
+                                                 stripped off and the only
+                                                 the base filenames are
+                                                 kept.
+ vms_xfer_text        (readme|info|listing|\.c)$ Pattern of VMS files to
+                                                 transfer in TEXT mode
+                                                 (case insensitive).
+ name_mappings        none                       Remote to local pathname
+                                                 mappings (a Perl
+                                                 substitute command, e.g.
+                                                 s:old:new:).
+ external_mapping     none                       Specifies a file that
+                                                 should contain a Perl
+                                                 module called extmap
+                                                 containing at least a
+                                                 function called map.  This
+                                                 function is used as the
+                                                 name_mappings function.
+ update_local         false                      Set get_patt to be all the
+                                                 files and directories
+                                                 already present in
+                                                 local_dir.
+ max_days             0                          If >0, ignore files older
+                                                 than this many days.  Any
+                                                 ignored files will not be
+                                                 transferred or deleted.
+ max_size             0                          If >0, do not transfer any
+                                                 files any larger than this
+                                                 many bytes.
+ chmod                true                       By default try and set the
+                                                 file attributes (e.g.
+                                                 time-stamps) of the copied
+                                                 file.  If false do not set
+                                                 attributes.
+
+ Local File Attributes
+ keyword              default                    Description
+ user                 none                       User name or uid to give
+                                                 to local pathnames.
+ group                none                       Group name or gid to give
+                                                 to local pathnames.
+ mode_copy            false                      Flag indicating if we need
+                                                 to copy the file/dir
+                                                 modes.  If this is false
+                                                 then file_mode and
+                                                 dir_mode will be used
+                                                 instead.
+ file_mode            0444                       Mode to give files created
+                                                 locally if mode_copy is
+                                                 false.
+ dir_mode             0755                       Mode to give directories
+                                                 created locally if
+                                                 mode_copy is false.
+ force                false                      If true, all files will be
+                                                 transferred regardless of
+                                                 the results from size or
+                                                 time-stamp comparisons.
+ umask                07000                      Do not create setuid files
+                                                 by default (see the
+                                                 chmod(1) on Un*x).
+ use_timelocal        true                       Time-stamp files to local
+                                                 time zone. If false, the
+                                                 time zone is set to GMT
+                                                 (older versions of mirror
+                                                 had a bug setting all
+                                                 files to GMT).
+ force_times          yes                        Force local times to match
+                                                 remote times.
+
+ File Deletion
+ keyword              default                    Description
+ do_deletes           false                      Delete destination files
+                                                 if not in source tree.
+ delete_patt          .                          Regexp of local pathnames
+                                                 to check for deletions.
+                                                 Names that are not matched
+                                                 are not checked. The match
+                                                 by delete_excl is done to
+                                                 all files selected by this
+                                                 pattern.
+ delete_get_patt      false                      Set delete_patt to be
+                                                 get_patt.
+ delete_excl          none                       Regexp of local pathnames
+                                                 that mirror will not
+                                                 delete.
+ max_delete_files     10%                        If this is set to just a
+                                                 number and there are more
+                                                 than this many files to
+                                                 delete, do not delete just
+                                                 warn. If this is set to
+                                                 number% and the percentage
+                                                 of files that would be
+                                                 deleted is greater than
+                                                 the number, do not delete
+                                                 just warn.
+ max_delete_dirs      10%                        As max_delete_files except
+                                                 applies to directories.
+ save_deletes         false                      Instead of deleting local
+                                                 files move them into
+                                                 save_dir .
+ save_dir             Old                        Where local files no
+                                                 longer on remote site are
+                                                 moved to.  Either begins
+                                                 with / or is relative to
+                                                 local_dir.  Only used when
+                                                 save_deletes is true.
+ store_remote_listing none                       Local pathname where
+                                                 remote listings are kept.
+                                                 Useful if you have a slow
+                                                 network or want to perform
+                                                 several operations on the
+                                                 same package without
+                                                 retrieving the index every
+                                                 time.
+
+ File Compression
+ keyword              default                    Description
+ compress_patt        none                       Regexp of files to
+                                                 compress before storing
+                                                 locally. See
+                                                 get_size_change.
+ compress_excl        \.(z|gz)$                  Regexp of files not to
+                                                 compress (case
+                                                 insensitive).
+ compress_prog        compress                   Program to compress files.
+                                                 If set to the word
+                                                 compress or gzip, the full
+                                                 pathname for the program
+                                                 and correct
+                                                 compress_suffix will
+                                                 automatically be set. When
+                                                 using gzip, level -9 is
+                                                 used. Note that
+                                                 compress_suffix can be
+                                                 reset to a non-standard
+                                                 value by setting it after
+                                                 compress_prog.
+ compress_suffix      none                       Character(s) the compress
+                                                 program appends to files.
+                                                 If compress_prog is
+                                                 compress, this defaults to
+                                                 .Z. If compress_prog is
+                                                 gzip, this defaults to
+                                                 .gz.
+ compress_conv_patt   (\.Z|\.taz)$               If compress_prog is gzip,
+                                                 files matching this
+                                                 pattern are uncompressed
+                                                 and gzip'ed before storing
+                                                 locally. Compression
+                                                 conversion is only meant
+                                                 to do compress to gzip
+                                                 conversion.
+ compress_conv_expr   s/\.Z$/\.gz/;              Perl expression to convert
+                      s/\.taz$/\.tgz/            suffix from compress to
+                                                 gzip style. Change .Z to
+                                                 .gz and .taz to .tgz.
+ compress_size_floor  0                          Do not compress files
+                                                 smaller than this size, in
+                                                 bytes.
+
+ File Splitting
+ keyword              default                    Description
+ split_max            0                          If >0 and the size of the
+                                                 file is greater than this
+                                                 many bytes, the file is
+                                                 split up to be stored
+                                                 locally (filename must
+                                                 also match split_patt).
+                                                 The name of the file being
+                                                 split up is used as the
+                                                 directory name and each
+                                                 part is stored in a file
+                                                 called part1, part2... in
+                                                 that directory.
+ split_patt           none                       Regexp of remote pathnames
+                                                 to split up before storing
+                                                 locally.
+ split_chunk          102400                     Size, in bytes, of chunks
+                                                 to split files into.
+
+ Directory Listings
+ keyword              default                    Description
+ remote_fs            unix                       File store type. Currently
+                                                 can be one of unix, dls,
+                                                 netware, vms, dosftp,
+                                                 macos, lsparse and
+                                                 infomac. See the
+                                                 Filestores section for
+                                                 more details.
+ ls_lR_file           none                       Remote file containing
+                                                 ls-lR (result of running
+                                                 ls -lR on that machine),
+                                                 otherwise run remote ls
+                                                 command.
+ local_ls_lR_file     none                       Local file containing
+                                                 ls-lR, otherwise use
+                                                 remote ls_lR_file. This is
+                                                 useful when first
+                                                 mirroring a large package.
+ recursive            true                       Mirror both the contents
+                                                 of local_dir and sub
+                                                 directories of local_dir.
+ recurse_hard         false                      Generate remote ls by
+                                                 doing CWD and ls for each
+                                                 sub directory. In this
+                                                 case remote_dir must be
+                                                 absolute (begin with a /)
+                                                 not relative. Use the CWD
+                                                 command in FTP to find the
+                                                 path for the start of the
+                                                 remote archive area. (Not
+                                                 available if remote_fs is
+                                                 VMS.)
+ flags_recursive      -lRat                      Flags to send to remote ls
+                                                 to do a recursive listing.
+ flags_nonrecursive   -lat                       Flags to send to remote ls
+                                                 to do a non-recursive
+                                                 listing.
+                                                 Edit pathnames in remote
+ ls_fix_mappings      none                       directory listings (a Perl
+                                                 substitute command, e.g.
+                                                 s:/usr/spool/pub:/:).
+
+ Logging
+ keyword              default                    Description
+ update_log           none                       Filename, relative to
+                                                 local_dir, where mirror
+                                                 will write a report of all
+                                                 it does to maintain a
+                                                 package.
+ mail_to              none                       Mail a log of the work
+                                                 done to this comma
+                                                 separated list of
+                                                 addresses (currently only
+                                                 supported on Un*x).
+ mail_prog            none                       Program called to send to
+                                                 the mail_to list. May be
+                                                 passed the argument
+                                                 mail_subject. Defaults to
+                                                 mailx, Mail, or mail. (Not
+                                                 supported under Wind*ws)
+ mail_subject         -s "mirror update"         This can contain
+                                                 $keyword.  These will be
+                                                 replaced by the current
+                                                 value for that keyword
+                                                 (e.g.: -s "mirror update:
+                                                 $package")
+
+ Special
+ keyword              default                    Description
+ hostname             none                       Mirror automatically skips
+                                                 packages whose site
+                                                 variable matches this
+                                                 host. Defaults to the
+                                                 local hostname.  This is
+                                                 normally only ever set in
+                                                 the defaults package.
+                                                 Useful if you are sharing
+                                                 mirror package files with
+                                                 others.
+ comment              none                       Used in reports.
+ use_files            false                      Put the associative arrays
+                                                 that mirror uses into
+                                                 temporary files (currently
+                                                 only support on Un*x).
+                                                 The files are created in
+                                                 /var/tmp with names:
+                                                 local_map and remote_map.
+                                                 The suffixes will depend
+                                                 on which DBM library was
+                                                 set as default when Perl
+                                                 was installed on your
+                                                 machine.
+ interactive          false                      A non-batch transfer.
+                                                 Implied by -g flag.
+ skip                 none                       If set causes this package
+                                                 to be skipped.  The value
+                                                 is reported as the reason
+                                                 for skipping.
+ verbose              false                      Verbose messages.
+ algorithm            0                          Sets the basic algorithm
+                                                 that mirror uses.
+
+                                                 Algorithm=0 mirrors an
+                                                 entire site at a time.
+                                                 This is very friendly on
+                                                 the remote site as it uses
+                                                 few of its resources.
+                                                 However it can chew up a
+                                                 lot of memory on the local
+                                                 machine.
+
+                                                 Algorithm=1 mirrors a site
+                                                 directory-by-directory.
+                                                 Should ONLY be used for
+                                                 true mirrors (i.e.: no
+                                                 differences between the
+                                                 this mirror copy and the
+                                                 original). This uses up a
+                                                 lot less local resources.
+                                                 However it is very
+                                                 unfriendly to the remote
+                                                 site as it requires remote
+                                                 site to run an ls command
+                                                 for each directory
+                                                 mirrored.   Mirror will
+                                                 only "see" the one
+                                                 directory it is mirroring
+                                                 so it will not know that
+                                                 files outside this
+                                                 directory exists so
+                                                 symlinks outside this
+                                                 directory are considered
+                                                 bad, see
+                                                 make_bad_symlinks.
+                                                 Deletions are done on a
+                                                 directory by directory
+                                                 basis so be extra careful
+                                                 about the settings of
+                                                 max_delete_files and
+                                                 max_delete_dirs.  get_patt
+                                                 is applied to just the
+                                                 filename in this directory
+                                                 not the full path, as are
+                                                 other name checks. You
+                                                 will almost certainly need
+                                                 to set remote_dir to be an
+                                                 absolute pathname
+                                                 (beginning with /).
+ local_dir_check      false                      If true and the local_dir
+                                                 does not exit skip this
+                                                 package.  By default the
+                                                 local_dir will be created
+                                                 if it does not already
+                                                 exist.
+
+Filestores
+
+Mirror uses the remote directory listing to work out what files are
+available. Mirror was originally targeted connect to Un*x FTP daemons using
+a standard ls command. To use a Un*x host with a non-standard ls or a non
+Un*x host it is necessary to set the remote_fs variable to match the kind of
+directory listing that will be returned. There is some interaction between
+remote_fs and other variables in particular flags_nonrecursive, recurse_hard
+and get_size_change. The following sections show examples of the results of
+running the FTP DIR command on the various kinds of archive and
+recommendations for related variables. With some unusual set-ups archive you
+may have to vary from the recommended variable set-ups.
+
+remote_fs=unix
+
+total 65
+-rw-r--r-- 1 nobody nobody   2245 Jan 28 20:06 README
+-rw-r--r-- 1 nobody nobody  45881 Jan 29 19:13 mirror.html
+
+This is the default and you should not normally have to reset any other
+related variables.
+
+remote_fs=dls
+
+00index.txt      189916
+0readme            5793
+1_x/                  =  OS/2 1.x-specific files
+
+This is an ls variant used on some Un*x archives. It provides descriptions
+of known items in the listing. Set flags_recursive to -dtR.
+
+remote_fs=netware
+
+- [R----F--] jrd                  1646       May 07 21:43    index
+d [R----F--] jrd                   512       Sep 09 10:52    netwire
+d [R----F--] jrd                   512       Sep 02 01:31    pktdrvr
+d [RWCE-F--] jrd                   512       Sep 04 10:55    incoming
+
+or
+
+-[R----F--] 1 jrd                  1646       May 07 21:43    index
+d[R----F--] 1 jrd                   512       Sep 09 10:52    netwire
+d[R----F--] 1 jrd                   512       Sep 02 01:31    pktdrvr
+
+This is used by Novell archives. Set recurse_hard to true and set
+flags_nonrecursive to be nothing. See also remote_dir.
+
+remote_fs=dosftp
+
+00-index.txt  6,471 13:54  7/20/93   alabama.txt   1,246 23:29  5/08/97
+alaska.txt      873 23:29  5/08/92   alberta.txt   2,162 23:29  5/08/97
+
+dosftp is for an FTP daemon on D*S boxes. Set recurse_hard to true and set
+flags_nonrecursive to nothing. See also remote_dir.
+
+remote_fs=macos
+
+-------r--      0      127   127 Aug 27 13:53 !Gopher Links
+drwxrwxr-x          folder    32 Sep  9 16:30 FAQ
+drwxrwx-wx          folder     0 Sep  9 09:59 incoming
+
+macos is for one of Macintosh FTP daemon variants. Although the output is
+similar to Un*x  the Un*x remote_fs type cannot cope with it because there
+are three file sizes for each file. Set recurse_hard to true,
+flags_nonrecursive to nothing, get_size_change to false and compress_patt to
+nothing (this last setting is due to the unusual file names upsetting the
+shell used to run compress). See also remote_dir.
+
+remote_fs=vms
+
+USERS:[ANONYMOUS.PUBLIC]
+
+1-README.FIRST;13     9  14-JUN-1993 13:09 [ANONYMOUS] (RWE,RWE,RE,RE)
+PALTER.DIR;1          1  18-JAN-1993 11:56 [ANONYMOUS] (RWE,RWE,RE,RE)
+PRESS-RELEASES.DIR;1
+                      1  11-AUG-1992 20:05 [ANONYMOUS] (RWE,RWE,,)
+
+alternatively:
+
+[VMSSERV.FILES]ALARM.DIR;1      1/3          5-MAR-1993 18:09
+[VMSSERV.FILES]ALARM.TXT;1      1/3          4-FEB-1993 12:20
+
+Set flags_recursive to '[...]' and get_size_change to false. recurse_hard is
+not available with VMS. See also the vms_keep_versions and vms_xfer_text
+variables.
+
+
+remote_fs=infomac
+
+-r     1974 Jul 21 00:06 00readme.txt
+lr        3 Sep  8 08:34 AntiVirus -> vir
+
+This is a special case just meant to handle the sumex-aim.stanford.edu
+info-mac directory listing stored on that archive in help/all-files.
+recurse_hard should be set to true.
+
+remote_fs=dosish
+
+This is for a D*S/Wind*ws FTP server with a faintly DOS like output
+
+03-04-94  08:45PM       <DIR>          .
+03-04-94  08:45PM       <DIR>          ..
+03-04-94  09:58AM                 9718 Conduit
+03-04-94  09:59AM                 8745 Eve
+
+recurse_hard should be set to true and flags_nonrecursive to nothing.
+
+remote_fs=lsparse
+
+Allow reparsing of the listing generated by mirror with debugging turned to
+a high level. Meant only for mirror wizards.
+
+Examples
+
+Here is the mirror.defaults file from the archive on sunsite.org.uk:
+
+# This is the default mirror settings used by my site:
+# sunsite.org.uk (193.63.255.4)
+
+package=defaults
+        # The LOCAL hostname - if not the same as `hostname`
+        # (I advertise the name sunsite.org.uk but the machine is
+        #  really swallow.sunsite.org.uk)
+        hostname=sunsite.org.uk
+        # Keep all local_dirs relative to here
+        local_dir=/public/Mirrors
+        remote_password=wizards@sunsite.org.uk
+        mail_to=
+        # Don't mirror file modes.  Set all dirs/files to these
+        dir_mode=0755
+        file_mode=0444
+        # By default, files are owned by root.zero
+        user=0
+        group=0
+#       # Keep a log file in each updated directory
+#       update_log=.mirror
+        update_log=
+        # Don't overwrite my mirror log with the remote one.
+        # Don't retrieve any of their mirror temporary files.
+        # Don't touch anything whose name begins with a space!
+        # nor any FSP or gopher files...
+        exclude_patt=(^|/)(\.mirror$|\.in\..*\.$|MIRROR.LOG|#.*#|\.FSP|\.cache|\.zipped|lost+found/|)
+        # Try to compress everything
+        compress_patt=.
+        compress_prog=compress
+        # Don't compress information files, files that don't benefit from
+        # being compressed, files that tell ftpd, gopher, wais... to do things,
+        # the sources for compression programs...
+        # (Note this is the only regexp that is case insensitive.)
+        compress_excl+|^\.notar$|-z|\.gz$|\.taz$|\.tar.Z|\.arc$|\.zip$|\.lzh$|\.zoo$|\.exe$|\.lha$|\.zom$|\.gif$|\.jpeg$|\.jpg$|\.mpeg$|\.au$|read.*me|index|\.message|info|faq|gzip|compress
+        # Don't delete own mirror log or any .notar files (incl in subdirs)
+        delete_excl=(^|/)\.(mirror|notar)$
+        # Ignore any local readme files
+        local_ignore=README.doc.ic
+        # Automatically delete local copies of files that the
+        # remote site has zapped
+        do_deletes=true
+
+Here are some sample package descriptions:
+
+package=gnu
+        comment=Powerful and free Un*x utilities
+        site=prep.ai.mit.edu
+        remote_dir=/pub/gnu
+        # Local_dir+ causes gnu to be appended to the default local_dir
+        # so making /public/gnu
+        local_dir+gnu
+        exclude_patt+|^ListArchives/|^lost+found/|^scheme-7.0/|^\.history
+        # I tend to only keep the latest couple of versions of things
+        # this stops mirror from retrieving the older versions I've removed
+        max_days=30
+        do_deletes=false
+
+package=X11R6
+        comment=X Windows (windowing graphics system for Un*x)
+        site=ftp.x.org
+        remote_dir=/pub/R6
+        local_dir+ftp.x.org/pub/R6
+        # This is a local symlink to the free-for-all contrib area
+        # and is mirrored elsewhere
+        local_ignore=^contrib$
+        # Don't compress a thing.  It is already compressed
+        # but doesn't look it.
+        compress_patt=
+
+# THIS IS JUST A TEST
+package=test vms site
+        site=vmsbox.somewhere.ac.uk
+        local_dir=/tmp/copy4
+        remote_dir=vmsserv/files
+        remote_fs=vms
+        # Must do these settings for VMS
+        flags_recursive=[...]
+        get_size_change=false
+
+# and on, and on ...
+
+Temporary Filenames
+
+By default when mirror creates a temporary filename it takes the real
+filename and puts .in. at the start.
+If your system limits the length of a filename a lot (some older Un*xes were
+limited to 14 characters) then look for:
+
+  LIMITED NAMELEN
+
+which is about 75% of the way through mirror.pl, for a note on how to reduce
+temporary filename length.  I only know of one site using this.
+
+Regular Expressions
+
+This is a short explanation of regular expressions.  For a more
+comprehensive guide see the Perl manual pages or the O'Reilly book
+"Mastering Regular Expressions".
+
+A regular expression, or regexp, is a way of using matching patterns in text
+strings.  For example the regexp:
+
+      ^s
+
+would match any string that begins with an s.  The ^ is a special character
+that means beginning of string.  There are a number of specials possible in
+a regexp, everything that is not special is taken as a literal character,
+such as the s in the example above.  To turn off a special character put a
+backslash, \, in front of it.  This only effects the special character
+immediately following it.
+
+A word of warning: although very similar to Un*x shell (and D*S COMMAND)
+wildcards there are differences.  For example any Un*x and D*S would treat
+*.ZIP as any filename ending in .ZIP, *.ZIP as a regular expression is an
+error!  The * is special that must follow something (see below).
+
+Regexp Specials
+
+ ^            beginning of string
+ $            end of string
+ .            any character
+
+ [r]          a range or characters either as a list abcef or a hyphen
+              separated range a-f
+ [^r]         anything not in the given list or range
+ (p1|p2|p3...)patterns p1 or p2 or p3 ... (the patterns may be specials)
+ *            zero or more of the preceding item (which may be a special)
+ +            one or more of the preceding item (which may be a special)
+ \d           any digit (same as [0-9])
+ \D           any non-digit (same as [^0-9])
+ \s           any whitespace character
+ \S           any whitespace character
+
+Regexp Examples
+
+ abc                     matches abc, also xxxabcyyy but not xabbcy
+ ^abc$                   matches only abc
+ a.*z                    matches a any string z. e.g. asdkjfhaksdjfhz
+
+ index.html              matches index.html AND indexXhtml index/html (.
+                         matches any character)
+
+ index\.html             matches index.html (the backslash stops . matching
+                         any character)
+ [rR][eE][aA][dD][mM][eE]matches readme, Readme, README ...
+ \.(gz|Z)$               matches strings ending in .gz or .Z
+
+Hints
+
+When adding a new package, first test it by running mirror with the -n
+option.
+
+If you are adding to an existing archive that was not created by mirror
+(perhaps you copied the files from a CDROM) then it is usually best to force
+the time-stamps of the existing local files so time comparisons with the
+remote files show the files as identical (see -T).
+
+Try and keep all packages that are being retrieved from the same site
+together in the same package file. That way mirror will only have to login
+once.
+
+Remember that all regexp's are Perl regular expressions.
+
+If the remote site contains symlinks that you want to "flatten out" into the
+corresponding files, then do this by changing the flags passed to the remote
+ls which will be either flags_recursive or flags_nonrecursive to include L
+First test this by trying a ls -lRatL on the remote site under the FTP
+command to check whether the remote filestore has any symlink loops.   These
+cause ls to go into an infinite loop - if this happens you will have to talk
+to the manager of the remote area about removing them.
+
+If you are mirroring a very large site that changes infrequently, add
+max_days=7 to the settings after it is initially mirrored. That way mirror
+will only have to consider recent files when updating. Then once a week, or
+whenever necessary, call mirror with -k max_days=0 to force a full update.
+
+If you don't want to compress anything from the remote site the easiest way
+to do this is to set the compress_patt to nothing.
+
+If you want to run a command at the end of mirroring a package a useful
+trick is to reset the mail_prog variable to be the program name and mail_to
+to be the arguments.
+
+For netware, dosftp, macos and VMS you should normally set remote_dir to be
+the home directory of the remote FTP daemon. Connect in manually and before
+changing directory use the pwd command to find where home is. If you are
+only mirroring part of the tree then give the full pathname including this
+home directory at the start.
+
+macos names can sometimes contain characters that make it hard to pass them
+through Un*x shells. Since compressing files is done via a shell it would be
+best to turn off compression with compress_patt=
+
+macos files seem to always change size when transfered, in either binary or
+text mode. So it would be best to set get_size_change=false
+
+Netiquette
+
+If you are going to mirror a remote site, please obey any restrictions that
+the site administrators place on access. You can generally find the
+restrictions on connecting to the archive using the standard FTP command.
+Any restrictions are normally given as a login banner or in a (hopefully)
+obvious file.
+
+Here are, what I hope are, some good general rules:
+
+You should probably get permission from the remote site before setting up a
+mirror of it.  Some sites require detailed logs.  Unauthorised mirrors would
+take traffic from the site generating the logs and so ruin their
+statistics.  There may also be SERIOUS LEGAL REASONS why mirrors are
+unwanted.
+
+Only mirror a site well outside the working hours of both the local and
+remote sites.
+
+It is probably unfriendly to try to mirror a remote site more than once a
+day.
+
+Before trying to mirror a remote site, try and find the packages you want
+from local archives, as no one will be pleased if you soak up a lot of
+network bandwidth needlessly.
+
+If you have a local archive, then tell people about it so they don't have to
+waste bandwidth and CPU at the remote site.
+
+Do remember to check your package-files from time to time in case the remote
+archive has changed their access restrictions.
+
+See Also
+
+perl(l), ftp(1), mm(1)
+
+Bugs
+
+Some of the netiquette guidelines should be enforced.
+
+Should be able to cope with links as well as symlinks.
+
+Suffers from creeping featurism. (Actually more like galloping featurism!.)
+
+Remember!
+
+Objects in a mirror are closer than you think!
+
+Author
+
+Mirror was writen by Lee McLoughlin <lmjm@icparc.ic.ac.uk>. It uses a
+heavily rewritten and extended version of the ftp.pl package originally by:
+Alan R. Martello <al@ee.pitt.edu> which uses lchat.pl which is based on the
+chat2.pl package by: Randal L. Schwartz <merlyn@ora.com>
+
+Special thanks to the following people for patches, comments and other
+suggestions that have helped to improve mirror. If I have omitted anyone,
+please contact me.
+
+Zoë Leech <zl@icparc.ic.ac.uk>
+James Revell <revell@uunet.uu.net>
+Chris Myers <chris@wugate.wustl.edu>
+Amos Shapira <amoss@cs.huji.ac.il>
+Paul A Vixie <vixie@pa.dec.com>
+Jonathan Kamens <jik@pit-manager.mit.edu>
+Christian Andretzky <casys@otto.mb3.tu-chemnitz.de>
+Kean Stump <kean@ucs.orst.edu>
+Anita Eijs <anita@hermes.bouw.tno.nl>
+Simon E Sperro <S.E.Sperro@gdr.bath.ac.uk>
+Aaron Wohl <aw0g+@andrew.cmu.edu>
+Michael Meissner <meissner@osf.org>
+Michael Graff <explorer@iastate.edu>
+Bradley Rhoades <us267388@mail.mmmg.com>
+Edwards Reed <eer@cinops.xerox.com>
+Joachim Schrod <schrod@iti.informatik.th-darmstadt.de>
+David Woodgate <David.Woodgate@mel.dit.csiro.au>
+Pieter Immelman <pi@itu1.sun.ac.za>
+Jost Krieger <x920031@bus072.rz.ruhr-uni-bochum.de>
+Erez Zadok <ezk@cs.columbia.edu>
+
+
+Copyright
+
+Mirror, both the software and all the accompanying documentation including
+this document, is under the following copyright.
+
+Copyright © 1990 - 1998 Lee McLoughlin
+
+Permission to use, copy, and distribute this software and its documentation
+for any purpose with or without fee is hereby granted, provided that the
+above copyright notice appear in all copies and that both that copyright
+notice and this permission notice appear in supporting documentation.
+
+Permission to modify the software is granted, but not the right to
+distribute the modified code. Modifications are to be distributed as patches
+to released version.
+
+This software is provided "as is" without express or implied warranty.

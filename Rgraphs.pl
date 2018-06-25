@@ -91,7 +91,7 @@ foreach my $ev (sort { $b <=> $a } keys %metadata) {
     $evFunc{$ev} = $evSum; # Integrate
 }
 
-open(EVALUE, ">$evalueFile") if $evalueFile or die "Unable to open evalue file $evalueFile for writing: $!";
+open(EVALUE, ">$evalueFile") or die "Unable to open evalue file $evalueFile for writing: $!" if $evalueFile;
 
 foreach my $ev (sort { $a <=> $b } keys %metadata) {
     my $num = $metadata{$ev};

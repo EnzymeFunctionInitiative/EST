@@ -1,0 +1,248 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.03 [en] (X11; I; Linux 2.0.32 i686) [Netscape]">
+   <META NAME="Author" CONTENT="Lee McLoughlin and Zoe Leech">
+   <TITLE>MM - Mirror Master</TITLE>
+<!--
+  Copyright (C) 1990 - 1997   Lee McLoughlin
+ 
+  Permission to use, copy, and distribute this software and its
+  documentation for any purpose with or without fee is hereby granted,
+  provided that the above copyright notice appear in all copies and
+  that both that copyright notice and this permission notice appear
+  in supporting documentation.
+ 
+  Permission to modify the software is granted, but not the right to
+  distribute the modified code.  Modifications are to be distributed
+  as patches to released version.
+ 
+  This software is provided "as is" without express or implied warranty.
+ 
+  $Id: mm.html,v 2.9 1998/05/29 19:13:34 lmjm Exp lmjm $
+  $Log: mm.html,v $
+  Revision 2.9  1998/05/29 19:13:34  lmjm
+  id update for 2.9 release
+
+-->
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EF" VLINK="#55188A" ALINK="#FF0000">
+
+<CENTER>
+<H1>
+Mirror Master</H1></CENTER>
+
+<CENTER>
+<H1>
+<I>Lee McLoughlin</I></H1></CENTER>
+
+<CENTER><I><FONT SIZE=+0>and</FONT></I></CENTER>
+
+<CENTER>
+<H1>
+<I><FONT SIZE=+3>Zo&euml; Leech</FONT></I></H1></CENTER>
+
+<CENTER>22 May 1998</CENTER>
+
+<CENTER><TT><A HREF="mailto:lmjm@icparc.ic.ac.uk">lmjm@icparc.ic.ac.uk</A></TT></CENTER>
+
+<CENTER><TT><A HREF="zl@icparc.ic.ac.uk">zl@icparc.ic.ac.uk</A></TT></CENTER>
+
+<UL>
+<LI>
+<A HREF="#Warning">Warning</A></LI>
+
+<LI>
+<A HREF="#Introduction">Introduction</A></LI>
+
+<LI>
+<A HREF="#Description">Description</A></LI>
+
+<LI>
+<A HREF="#Flags">Flags</A></LI>
+
+<LI>
+<A HREF="#Configuration File">Configuration File</A></LI>
+
+<LI>
+<A HREF="#Examples">Examples</A></LI>
+
+<LI>
+<A HREF="#See Also">See Also</A></LI>
+
+<LI>
+<A HREF="#Author">Author</A></LI>
+</UL>
+
+<H2>
+<A NAME="Warning"></A>Warning</H2>
+mm is not for the faint-hearted
+<H2>
+<A NAME="Introduction"></A>Introduction</H2>
+mm [flags] [configuration file]
+<H2>
+<A NAME="Description"></A>Description</H2>
+<B>mm</B> is a <B>Perl </B>program designed to manage the running of multiple
+mirrors. It will keep as many mirrors running in parallel as it can, up
+to a user defined maximum, automatically starting another when one finishes.
+It will also handle locking so that only one mirror of a package can occur
+at a time and allows configuration of the minimum time between attempts
+to mirror a package.
+
+<P><B>mm</B> presumes that all the package details are stored in a directory
+called <TT><FONT SIZE=+1>packages</FONT></TT>. All the packages for a given
+site must be in a file whose name is the same as that of the site. So in
+<TT><FONT SIZE=+1>packages/sunsite.org.uk</FONT></TT> will be all the package
+details for the host sunsite.org.uk.
+<H2>
+<A NAME="Flags"></A>Flags</H2>
+
+<TABLE>
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="-t"></A><B>-t&nbsp;</B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Ignore the minimal retry timers.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="-o site:package"></A><B>-o
+site:package&nbsp;</B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Only mirror the given site and package.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="-debug"></A><B>-debug&nbsp;</B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Enable debugging. If this argument is given more
+than once the level of debugging will increase. Currently the maximum possible
+level is four.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="-s"></A><B>-s&nbsp;</B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Enable status debugging. This will print out
+the status of any subprocesses as they are spawned or as they exit.&nbsp;</TD>
+</TR>
+</TABLE>
+Any unrecognized arguments are passed as arguments to <B>mirror </B>for
+example:
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<B>mm -d mmin</B>
+<BR>will pass <B>mirror </B>the <B>-d</B> flag (so mirror will run in debug
+mode).
+<BR>&nbsp;
+<H2>
+<A NAME="Configuration File"></A><B>Configuration File</B></H2>
+The configuration file is parsed as a series of statements. Blank lines
+and lines beginning with a hash are ignored. There are are two kinds of
+statements: control statements and site:package details.
+
+<P>Control statements are of the form:
+<UL><B><I>keyword</I>=value</B></UL>
+Whitespace around the equals sign is ignored.
+
+<P>Statements are obeyed in sequence as they are reached.
+
+<P>Here is a list of the keywords and their values and any defaults:
+<TABLE>
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="home"></A><B><I>home</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Directory that mm chdirs to before doing any
+work. The default is the current directory (i.e. .)&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="max"></A><B><I>max</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Maximum number of mirrors that can be running
+in parallel at any one time. The default is 6.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="mirror"></A><B><I>mirror</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>This is the way to call mirror.&nbsp;
+<BR>The default is:&nbsp;
+<BR><TT>exec ./mirror \$args -p'\$package' packages/\$site > logs/\$ site:\$pkg
+2>&amp;1</TT>&nbsp;
+
+<P>$args, $package and $site are replaced with the appropriate values from
+the package file. Any $pkg is replaced with a version of $package with
+all characters that cause problems in filenames converted to underscore.&nbsp;</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="cmd"></A><B><I>cmd</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Run the given command. This can occur multiple
+times. It can be used to delete temporary files or send mail.</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="cmdin"></A><B><I>cmdin</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Run the given command and use its output as mm
+input. This can occur multiple times. For example&nbsp;
+<BR>cmdin=./pkgs_to_mmin packages/*</TD>
+</TR>
+
+<TR VALIGN=TOP>
+<TD ALIGN=LEFT VALIGN=TOP WIDTH="15%"><A NAME="skip"></A><B><I>skip</I></B></TD>
+
+<TD ALIGN=LEFT VALIGN=TOP>Skip the given site:package when it occurs.&nbsp;</TD>
+</TR>
+</TABLE>
+In addition to control statements there are also package details. Each
+package details statement is of the form:
+<BLOCKQUOTE><B>site:package&nbsp; min-restart-last-ok&nbsp; min-restart-last-notok&nbsp;
+mirror-args</B></BLOCKQUOTE>
+The site and package fields are matched against those in the files in the
+packages directory. A mirror for this site:package will only be run if
+the last mirror run was successful and was more than <TT>min-restart-last-ok</TT>
+hours ago. If the last mirror of this was unsuccessful then <TT>min-restart-last-notok</TT>
+will be used to decide if the mirror will be run. The information about
+the last mirror run is stored in a file called <TT>mm.status</TT> in the
+directory defined by <B><I><A HREF="#home">home</A></I></B>
+<BR>&nbsp;
+<BR>&nbsp;
+<H2>
+<A NAME="Examples"></A>Examples</H2>
+Here is a&nbsp; <B>mm</B> <A HREF="#Configuration File">configuration file</A>
+to manage the mirroring of two packages.
+<BR>&nbsp;
+<UL><TT># Configuration file for mm</TT>
+<BR><TT>max=1</TT>
+<BR><TT>cmd=/usr/bin/rm -f /public/mirror/tmp</TT>
+<BR><TT>home=/public/mirror</TT>
+
+<P><TT>ftp.cl.cam.ac.uk:JIPS-nrs 20 20</TT>
+<BR><TT>hcrl.open.ac.uk:hcrl-psion 20 20</TT></UL>
+&nbsp;
+
+<P>However maintaining this file where there are a large number of mirrors
+can be a problem. To overcome this the program <B>pkgs_to_mmin</B>, was
+<BR>designed to take a list of package files as input and turn these into
+the necessary input for <B>mm</B>
+<UL><B>pkgs_to_mmin [-y min-restart-last-ok]&nbsp; [-n min-restart-last-notok]&nbsp;
+package-files-to-use</B></UL>
+In this&nbsp; <B>mm</B> <A HREF="#Configuration File">configuration file</A>
+pkgs_to_mmin is used to manage all the packages in the /public/mirror/packages
+directory.
+<BR>&nbsp;
+<UL><TT># Configuration file for mm</TT>
+<BR><TT>home=/public/mirror</TT>
+
+<P><TT>cmdin=./pkgs_to_mmin packages/*</TT>
+<BR>&nbsp;</UL>
+
+<H2>
+<A NAME="See Also"></A>See Also</H2>
+perl(l), ftp(1), mirror
+<H2>
+<A NAME="Author"></A>Author</H2>
+Written by Lee McLoughlin &lt;lmjm@icparc.ic.ac.uk>.
+</BODY>
+</HTML>

@@ -1,0 +1,112 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.03 [en] (X11; I; Linux 2.0.32 i686) [Netscape]">
+   <META NAME="Author" CONTENT="Lee McLoughlin and Zoe Leech">
+   <TITLE>Mirror: Quick Start Guide for the Impatient</TITLE>
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EF" VLINK="#55188A" ALINK="#FF0000">
+
+<CENTER>
+<H2>
+Mirror: Quick Start Guide for the Impatient</H2></CENTER>
+&nbsp;If you are <B>NOT</B> impatient what you should do is:
+<BR>&nbsp;
+<OL>
+<LI>
+Get the latest version of mirror from:</LI>
+
+<BR><A HREF="ftp://sunsite.org.uk/packages/mirror/mirror/tar.gz">ftp://sunsite.org.uk/packages/mirror/mirror.tar.gz</A>
+<BR><A HREF="ftp://sunsite.org.uk/packages/mirror/mirror.zip">ftp://sunsite.org.uk/packages/mirror/mirror.zip</A>&nbsp;<BR>
+<BR>
+<LI>
+Read the mirror documentation to be found at:</LI>
+
+<BR><A HREF="http://sunsite.org.uk/packages/mirror/">http://sunsite.org.uk/packages/mirror/</A></OL>
+But if you are reading this then you are probably <I>too</I> impatient
+so please read on:
+<OL>
+<LI>
+Get the latest version of <B>mirror</B> (see above) an extract it into
+a suitable directory (e.g. $HOME/mirror or c:\mirror).<BR>
+<BR></LI>
+
+<LI>
+Check whether <B>Perl</B> is installed on the machine you are about to
+install <B>mirror</B> on.&nbsp; If it isn't then either get your support
+staff to install perl or wander round <A HREF="http://www.perl.com/">http://www.perl.com/</A>
+and pull back a suitable copy of perl and install it.<BR>
+<BR></LI>
+
+<LI>
+Run</LI>
+
+<BR><B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; perl install.pl
+here</B>
+<BR>If you want to install <B>mirror</B> as a command available to everyone
+on your system thats harder and you'll have to read the full documentation.&nbsp;
+But for most users it is enough to run <B>mirror</B> from the directory
+you extracted it into.&nbsp;<BR>
+<BR>
+<LI>
+Edit the <B>mirror.defaults</B> to customise it for you system. You should
+probably change:</LI>
+
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<B><I>hostname</I></B>
+<BR><B><I>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+local_dir</I></B>
+<BR><B><I>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+remote_password</I></B>
+<BR><B><I>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+mail_to</I></B>
+<BR>&nbsp;
+<LI>
+Create a file, using the name of the site as the file name, in the <TT><FONT SIZE=+1>packages</FONT></TT>
+directory for each site that you want to mirror.</LI>
+
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+e.g. <B>packages/ftp.some_useful_site.com</B>
+<BR>&nbsp;
+<LI>
+Edit the package file for each site you want to mirror</LI>
+
+
+<P><TT>package=&lt;package name></TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; comment=&lt;something
+to remind you what it is your mirroring></TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; site=ftp.some_useful_site.com</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # where to start pulling
+files back from</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; remote_dir=/pub</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # where to put the files
+on your machine</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; local_dir=/public/Mirrors/ftp.some_useful_site.com/pub</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; #</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # If you are under Wind*ws
+then use a line like this instead:</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; #&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+local_dir=c:\tmp\mirror</TT>
+<BR><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; #</TT>
+<BR>&nbsp;
+
+<P>Keep <TT><FONT SIZE=+1>&lt;package name></FONT></TT> simple like just
+<TT><FONT SIZE=+1>mirror</FONT></TT> or <TT><FONT SIZE=+1>FTP-Copier </FONT></TT>avoid
+spaces and non-alphanumerics as much as possible.
+<BR>&nbsp;
+<LI>
+Test mirror to see what it would do</LI>
+
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<B>mirror -n packages/ftp.some_useful_site.com</B>&nbsp;<BR>
+<BR>
+<LI>
+Run mirror for real.&nbsp; I suggest the first time you do</LI>
+
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<B>mirror -d packages/ftp.some_useful_site.com</B>
+<BR>so you can see what mirror is actually doing.&nbsp; If it appears to
+work OK then you can drop the -d for future runs.</OL>
+
+</BODY>
+</HTML>

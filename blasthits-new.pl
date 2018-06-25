@@ -12,6 +12,9 @@ use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
+use lib $FindBin::Bin . "/lib";
+use BlastUtil;
+
 
 $result = GetOptions(
     "seq=s"             => \$seq,
@@ -70,7 +73,7 @@ my $blastDb = "$data_files/combined.fasta";
 my $perpass = 1000;
 my $incfrac = 0.95;
 my $maxhits = 5000;
-my $sortdir = '/state/partition1';
+my $sortdir = '/scratch';
 
 if (not defined $evalue and defined $famEvalue) {
     $evalue = $famEvalue;
@@ -186,9 +189,12 @@ $maxsequence = 0 if not $maxsequence;
 
 my $jobNamePrefix = $jobId ? $jobId . "_" : ""; 
 
-open(QUERY, ">$outputDir/query.fa") or die "Cannot write out Query File to \n";
-print QUERY ">000000\n$seq\n";
-close QUERY;
+my $queryFile = "$outputDir/query.fa";
+my $allSeqFilename = "allsequences.fa";
+my $allSeqFile = "$outputDir/$allSeqFilename";
+my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
+
+BlastUtil::save_input_sequence($queryFile, $seq);
 
 print "\nBlast for similar sequences and sort based off bitscore\n";
 
@@ -214,7 +220,7 @@ $B->addAction("    touch $outputDir/1.out.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
 #$B->addAction("rm $outputDir/initblast.out");
-#$B->addAction("$efiEstTools/getannotations.pl $userdat -out $outputDir/struct.out -fasta $outputDir/allsequences.fa");
+#$B->addAction("$efiEstTools/getannotations.pl $userdat -out $outputDir/struct.out -fasta $allSeqFile");
 $B->jobName("${jobNamePrefix}blasthits_initial_blast");
 $B->renderToFile("$scriptDir/blasthits_initial_blast.sh");
 
@@ -232,6 +238,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("$efiEstTools/blasthits-getmatches.pl -blastfile $outputDir/blastfinal.tab -accessions $outputDir/accessions.txt -max $nresults");
+$B->addAction("$efiEstTools/blasthits-write-metadata.pl -accession $outputDir/accessions.txt -meta-file $metadataFile -sequence \"$seq\"");
 $B->jobName("${jobNamePrefix}blasthits_getmatches");
 $B->renderToFile("$scriptDir/blasthits_getmatches.sh");
 
@@ -250,6 +257,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("blasthits-createfasta.pl -fasta allsequences.fa -accessions accessions.txt -seq-count-file $seqCountFile");
+
 $B->jobName("${jobNamePrefix}blasthits_createfasta");
 $B->renderToFile("$scriptDir/blasthits_createfasta.sh");
 
@@ -282,7 +290,7 @@ if ($pfam or $ipro) {
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load $efiDbMod");
     $B->addAction("cd $outputDir");
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain off $famOpt -out allsequences.fa -fraction $fraction $seqCountFileOption $unirefOption $unirefExpandOption -accession-output $outputDir/accessions.txt -maxsequence $maxsequence -config=$configFile -use-option-a-settings");
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain off $famOpt -out allsequences.fa -fraction $fraction $seqCountFileOption $unirefOption $unirefExpandOption -accession-output $outputDir/accessions.txt -maxsequence $maxsequence -config=$configFile -use-option-a-settings -meta-file $metadataFile");
     $B->jobName("${jobNamePrefix}blasthits_getfamilyids");
     $B->renderToFile("$scriptDir/blasthits_getfamilyids.sh");
     
@@ -295,13 +303,16 @@ if ($pfam or $ipro) {
 }
 
 
+my $seqLength = length($seq);
 $B = $S->getBuilder();
 $B->dependency(0, $depId);
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
-$B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa -config=$configFile");
+$B->addAction("cat $queryFile >> $allSeqFile");
+$B->addAction("merge_sequece_source.pl -meta-file $metadataFile");
+$B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $allSeqFile -meta-file $metadataFile -config=$configFile");
 $B->jobName("${jobNamePrefix}blasthits_getannotations");
 $B->renderToFile("$scriptDir/blasthits_getannotations.sh");
 
@@ -322,9 +333,9 @@ $B->addAction("module load $efiDbMod");
 #  $B->addAction("module load blast");
 $B->addAction("cd $outputDir");
 if($multiplexing eq "on"){
-    $B->addAction("cd-hit -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa");
+    $B->addAction("cd-hit -c $sim -s $lengthdif -i $allSeqFile -o $outputDir/sequences.fa");
 }else{
-    $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
+    $B->addAction("cp $allSeqFile $outputDir/sequences.fa");
 }
 $B->jobName("${jobNamePrefix}blasthits_multiplex");
 $B->renderToFile("$scriptDir/blasthits_multiplex.sh");
@@ -479,6 +490,7 @@ print "Demux job is:\n $demuxjob\n";
 
 
 
+my $evalueFile = "$outputDir/evalue.tab";
 #create information for R to make graphs and then have R make them
 $B = $S->getBuilder();
 $B->setScriptAbortOnError(0); # don't abort on error
@@ -492,7 +504,7 @@ $B->addAction("module load $gdMod");
 $B->addAction("module load $perlMod");
 $B->addAction("module load $rMod");
 $B->addAction("mkdir $outputDir/rdata");
-$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac");
+$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
 $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
 $B->addAction("FIRST=`head -1 \$FIRST`");
 $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
