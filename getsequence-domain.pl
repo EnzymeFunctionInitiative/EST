@@ -114,6 +114,8 @@ my $unirefData = {};
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S), AND/OR PFAM CLANS
 #
 
+# Map any UniRef cluster members to the UniRef seed sequence.  Used to avoid duplicates from Option C and Option D inputs.
+my %unirefMapping;
 my @accessions;
 my $FracCount = 0;
 my $FracFlag = 0;
@@ -416,19 +418,19 @@ sub getDomainFromDb {
     print "Accessions found in $table:\n";
     my %idsProcessed;
 
+    #@manualAccessions is a global variable
+
     my $unirefField = "";
     my $unirefCol = "";
-    my $unirefGroup = "";
     my $unirefJoin = "";
     if ($unirefVersion) {
         $unirefField = $unirefVersion eq "90" ? "uniref90_seed" : "uniref50_seed";
         $unirefCol = ", $unirefField";
-        #Don't do this!  $unirefGroup = "group by $unirefField";
         $unirefJoin = "left join uniref on $table.accession = uniref.accession";
     }
 
     foreach my $element (@elements) {
-        my $sql = "select $table.accession as accession, start, end $unirefCol from $table $unirefJoin where $table.id = '$element' $unirefGroup";
+        my $sql = "select $table.accession as accession, start, end $unirefCol from $table $unirefJoin where $table.id = '$element'";
         #my $sql = "select * from $table $joinClause where $table.id = '$element'";
         my $sth = $dbh->prepare($sql);
         $sth->execute;
@@ -453,6 +455,7 @@ sub getDomainFromDb {
                     $unirefFamSizeHelper{$unirefId} = 1;
                     $c++;
                 }
+                $unirefMapping{$uniprotId} = $unirefId;
             } else {
                 if (&$fractionFunc($c)) {
                     $ac++;
@@ -561,12 +564,8 @@ sub parseManualAccessionFile {
     $/ = $delim;
     
     my @lines = split /[\r\n\s]+/, $line;
-#    my $c = 1;
     foreach my $line (grep m/.+/, map { split(",", $_) } @lines) {
-#        if ($fraction == 1 or $c % $fraction == 0) {
-            push(@manualAccessions, $line);
-#        }
-#        $c++;
+        push(@manualAccessions, $line);
     }
 
     print "There were ", scalar @manualAccessions, " manual accession IDs taken from ", scalar @lines, " lines in the accession file\n";
@@ -633,6 +632,7 @@ sub verifyAccessions {
     
     my $noMatchCount = 0;
     my $numDuplicate = (scalar @accUniprotIds) - (scalar @uniqAccUniprotIds);
+    my $numUnirefOverlap = 0;
     
     # Lookup each manual accession ID to get the domain as well as verify that it exists.
     foreach my $element (@uniqAccUniprotIds) {
@@ -644,13 +644,19 @@ sub verifyAccessions {
             
             if (exists $accessionhash{$element}) {
                 $overlapCount++;
+                $accessionhash{$element} = [{}];
+                $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
             } else {
                 $addedFromFile++;
-                push(@accessions, $element);
+                # Only add to the list if it's not a UniRef seed sequence or part of a UniRef cluster.
+                if (not exists $unirefMapping{$element}) {
+                    push(@accessions, $element);
+                    $accessionhash{$element} = [{}];
+                    $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
+                } else {
+                    $numUnirefOverlap++;
+                }
             }
-    
-            $accessionhash{$element} = [{}];
-            $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
         } else {
             $noMatchCount++;
             print NOMATCH "$element\tNOT_FOUND_DATABASE\n";
@@ -661,6 +667,7 @@ sub verifyAccessions {
     print "The number of Uniprot IDs in the accession file that were already in the specified family is $overlapCount.\n";
     print "The number of Uniprot IDs in the accession file that were added to the retrieval list is $addedFromFile.\n";
     print "The number of Uniprot IDs in the accession file that didn't have a match in the annotations database is $noMatchCount\n";
+    print "The number of Uniprot IDs in the accession file that are excluded because they are part of a UniRef cluster in the specified family is $numUnirefOverlap.\n";
 }
 
 

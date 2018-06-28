@@ -495,7 +495,6 @@ if ($cdHitOnly) {
         my $sLen = $#seqId == $#seqLength ? $seqLength[$i] : $seqLength[0];
         my $sId = $seqId[$i];
         my $nParm = ($sId < 1 and $sLen < 1) ? "-n 2" : "";
-        ##$B->addAction("/home/n-z/noberg/dev/cd-hit-v4.6.8-2017-0621/cd-hit $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2 -T 24");
         $B->addAction("cd-hit $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2");
         $B->addAction("$efiEstTools/get_cluster_count.pl -id $sId -len $sLen -cluster $outputDir/sequences-$sId-$sLen.fa.clstr >> $cdHitOnly");
     }
