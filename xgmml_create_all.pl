@@ -111,6 +111,7 @@ if ($#metas < 0) {
 }
 
 my $SizeKey = "Cluster Size";
+my $UniRefKey = "UniRef90_Cluster_Size";
 unshift @metas, "ACC";
 unshift @metas, $SizeKey;
 
@@ -155,7 +156,9 @@ while (<CDHIT>){
             if ($key eq $SizeKey) {
                 $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $count);
             } else {
-                @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
+                if ($key ne $UniRefKey) {
+                    @{$clusterdata{$key}} = uniq @{$clusterdata{$key}};
+                }
                 $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
                 foreach my $piece (@{$clusterdata{$key}}){
                     #remove illegal xml characters from annotation data

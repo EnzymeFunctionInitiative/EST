@@ -69,8 +69,8 @@ my @gene3ds = ();
 my @ssfs = ();
 my @manualAccessions = ();
 my $isDomainOn;
+my %excludeIds; # A list of IDs that we exclude from database retrieval.
 
-print "DATA: $data_files\n";
 
 verifyArgs();
 
@@ -85,6 +85,10 @@ my $dbh = $db->getHandle();
 #
 if (defined $accessionFile and -f $accessionFile) {
     parseManualAccessionFile();
+}
+
+if ($useOptionASettings and defined $access and -f $access) {
+    getExcludeIds();
 }
 
 # Do reverse-id database lookup if we've been given manual accessions.
@@ -263,7 +267,6 @@ sub parseFastaHeaders {
             elsif ($result->{state} eq EFI::Fasta::Headers::FLUSH) {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
-#                    print "ZZZ\n";
                     $id = makeSequenceId($seqCount);
                     $seqMeta->{$id}->{description} = $result->{raw_headers}; # substr($result->{raw_headers}, 0, 200);
                     $seqMeta->{$id}->{other_ids} = $result->{other_ids};
@@ -271,7 +274,6 @@ sub parseFastaHeaders {
                 } else {
                     foreach my $res (@{ $result->{uniprot_ids} }) {
                         $id = $res->{uniprot_id};
-#                        print "FASTA ID $id\n";
                         my $ss = $seqMeta->{$id};
                         push(@{ $ss->{query_ids} }, $res->{other_id});
                         foreach my $dupId (@{ $result->{duplicates}->{$id} }) {
@@ -284,8 +286,6 @@ sub parseFastaHeaders {
                     }
                 }
 
-#                print "END FLUSH\n";
-                
                 # Ensure that the first line of the sequence is written to the file.
                 $writeSeq = 1;
                 $seqCount++;
@@ -345,6 +345,12 @@ sub parseFastaHeaders {
         # as sepearate sequences which is what "Expanding" means.
         next if not exists $seq{$seqIdx}->{ids};
         my @seqIds = @{ $seq{$seqIdx}->{ids} };
+
+        if (grep { exists($unirefMapping{$_}) } @seqIds) {
+            print "found a sequence in the fasta file that maps to a uniref cluster: ", join(",", @seqIds), "\n";
+            continue;
+        }
+
         push(@seqToWrite, @seqIds);
         $numMultUniprotIdSeq++ if scalar @seqIds > 1;
 
@@ -569,6 +575,16 @@ sub parseManualAccessionFile {
     }
 
     print "There were ", scalar @manualAccessions, " manual accession IDs taken from ", scalar @lines, " lines in the accession file\n";
+}
+
+
+sub getExcludeIds {
+    open ACCLIST, $access or die "Unable to read input accession exclude list $access: $!";
+    while (<ACCLIST>) {
+        chomp;
+        $excludeIds{$_} = 1;
+    }
+    close ACCLIST;
 }
 
 
@@ -971,6 +987,11 @@ sub retrieveFamilyAccessions {
     $fullFamilyIdCount += $famAcc->[1];
     $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ssfs);
     $fullFamilyIdCount += $famAcc->[1];
+
+    # Exclude any IDs that are to be excluded
+    foreach my $xid (keys %excludeIds) {
+        delete $accessionhash{$xid};
+    }
     
     @accessions = uniq keys %accessionhash;
     $familyIdCount = scalar @accessions;
@@ -1000,6 +1021,7 @@ sub verifyArgs {
     $unirefExpand = 0               if not defined $unirefExpand or not $unirefVersion;
     $maxsequence = 0                unless(defined $maxsequence);
     $maxFullFam = 0                 unless(defined $maxFullFam);
+    $useOptionASettings = 0         if not defined $useOptionASettings;
     $errorFile = "$access.failed"   if not $errorFile;
     $isDomainOn = lc($domain) eq "on";
 
@@ -1017,7 +1039,6 @@ sub verifyArgs {
     $seqCountFile = "$pwd/getseq.default.seqcount"          if not $seqCountFile;
 
     if (not $ipro and not $pfam and not $gene3d and not $ssf and not $manualAccession and not $fastaFileIn and not $accessionFile) {
-        print "Nope\n";
         $access = $fastaFileOut = $metaFileOut = $noMatchFile = $seqCountFile = "";
     }
 }

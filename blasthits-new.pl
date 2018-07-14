@@ -496,7 +496,7 @@ $B = $S->getBuilder();
 $B->setScriptAbortOnError(0); # don't abort on error
 $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]); 
-$B->resource(1, 1, "20gb");
+$B->resource(1, 1, "100gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");

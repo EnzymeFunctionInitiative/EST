@@ -819,7 +819,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
     my $evalueFile = "$outputDir/evalue.tab";
-    $B->resource(1, 1, "250gb");
+    $B->resource(1, 1, "550gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
