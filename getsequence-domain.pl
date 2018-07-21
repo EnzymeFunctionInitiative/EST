@@ -723,7 +723,7 @@ sub writeAccessions {
         open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
     }
 
-    foreach my $accession (keys %accessionhash) {
+    foreach my $accession (sort keys %accessionhash) {
         my @domains = @{$accessionhash{$accession}};
         foreach my $piece (@domains) {
             if ($domain eq "off") {
@@ -751,6 +751,7 @@ sub retrieveSequences {
     }
 
     @origAccessions = @accessions;
+    @accessions = sort @accessions;
     while(scalar @accessions) {
         my @batch=splice(@accessions, 0, $perpass);
         my $batchline=join ',', @batch;
@@ -993,7 +994,7 @@ sub retrieveFamilyAccessions {
         delete $accessionhash{$xid};
     }
     
-    @accessions = uniq keys %accessionhash;
+    @accessions = sort keys %accessionhash;
     $familyIdCount = scalar @accessions;
     
     print "Done with family lookup. There are $familyIdCount IDs in the family(s) selected.\n";

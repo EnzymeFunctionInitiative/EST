@@ -17,28 +17,36 @@ BEGIN {
 #stats.pl            Displays number of edges and nodes in each xgmml
 
 
+use strict;
+use warnings;
+
 use FindBin;
 use Getopt::Long;
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm);
 
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
-    $customClusterFile, $customClusterDir, $scheduler, $dryrun, $config, $parentId, $parentDir);
+    $customClusterFile, $customClusterDir, $scheduler, $dryrun, $config, $parentId, $parentDir, $cdhitUseAccurateAlgo,
+    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
     "queue=s"               => \$queue,
     "tmp=s"                 => \$relativeGenerateDir,
-    "maxlen:i"              => \$maxlen,
-    "minlen:i"              => \$minlen,
-    "title:s"               => \$title,
-    "maxfull:i"             => \$maxfull,
+    "maxlen=i"              => \$maxlen,
+    "minlen=i"              => \$minlen,
+    "title=s"               => \$title,
+    "maxfull=i"             => \$maxfull,
     "job-id=i"              => \$jobId,
     "lengthdif=i"           => \$lengthOverlap,
     "custom-cluster-file=s" => \$customClusterFile,
     "custom-cluster-dir=s"  => \$customClusterDir,
     "parent-id=s"           => \$parentId,
     "parent-dir=s"          => \$parentDir,
+    "cdhit-high-accuracy"   => \$cdhitUseAccurateAlgo,  # Get rid of this?
+    "cdhit-bandwidth=i"     => \$cdhitBandwidth,        # Get rid of this?
+    "cdhit-default-word"    => \$cdhitDefaultWord,      # Get rid of this?
+    "cdhit-opt=s"           => \$cdhitOpt,
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$config,        # config file path, if not given will look for EFICONFIG env var
@@ -61,13 +69,18 @@ if (not $dbver) {
     ($dbver = $efiDbMod) =~ s/\D//g;
 }
 
-$minlen = 0             unless defined $minlen;
-$maxlen = 50000         unless defined $maxlen;
-$filter = "bit"         unless defined $filter;
-$minval = 0             unless defined $minval;
-$title = "Untitled"     unless defined $title;
-$queue = "efi"          unless defined $queue;
-$lengthOverlap = 1         unless (defined $lengthOverlap and $lengthOverlap);
+$minlen = 0                 unless defined $minlen;
+$maxlen = 50000             unless defined $maxlen;
+$filter = "bit"             unless defined $filter;
+$minval = 0                 unless defined $minval;
+$title = "Untitled"         unless defined $title;
+$queue = "efi"              unless defined $queue;
+$lengthOverlap = 1          unless (defined $lengthOverlap and $lengthOverlap);
+$cdhitBandwidth = ""        unless defined $cdhitBandwidth;
+$cdhitDefaultWord = 0       unless defined $cdhitDefaultWord;
+$cdhitOpt = ""              unless defined $cdhitOpt;
+
+$cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_";
@@ -106,12 +119,24 @@ my $analysisDir = "$baseAnalysisDir/$filter-$minval-$minlen-$maxlen";
 if ($customClusterDir and $customClusterFile and -f "$baseAnalysisDir/$customClusterDir/$customClusterFile") {
     $analysisDir = "$baseAnalysisDir/$customClusterDir";
 }
+if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
+    $analysisDir .= "-$cdhitOpt";
+}
 
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
 my $usesSlurm = $schedType eq "slurm";
 
-my $wordOption = $lengthOverlap < 1 ? "-n 2" : "";
+my $wordOption = ($lengthOverlap < 1 and not $cdhitDefaultWord) ? "-n 2" : "";
+my $bandwidthOption = ($cdhitBandwidth and $cdhitBandwidth > 1) ? "-b $cdhitBandwidth" : "";
+my $algoOption = $cdhitUseAccurateAlgo ? "-g 1" : "";
+if ($cdhitOpt eq "sb") {
+    $bandwidthOption = "-b 10";
+    $algoOption = "-g 1";
+    $wordOption = "";
+} elsif ($cdhitOpt eq "est+") {
+    $algoOption = "-g 1";
+}
 
 my $jobNamePrefix = (defined $jobId and $jobId) ? $jobId . "_" : ""; 
 
@@ -155,10 +180,10 @@ if ($customClusterDir and $customClusterFile) {
 
 $B->jobName("${jobNamePrefix}filterblast");
 $B->renderToFile("$analysisDir/filterblast.sh");
-$filterjob = $S->submit("$analysisDir/filterblast.sh", $dryrun);
+my $filterjob = $S->submit("$analysisDir/filterblast.sh", $dryrun);
 chomp $filterjob;
 print "Filterblast job is:\n $filterjob\n";
-@filterjobline = split /\./, $filterjob;
+my @filterjobline = split /\./, $filterjob;
 
 
 #submit the job for generating the full xgmml file
@@ -166,7 +191,7 @@ print "Filterblast job is:\n $filterjob\n";
 #depends on ffilterblast
 
 $B = $S->getBuilder();
-$B->dependency(0, @filterjobline[0]);
+$B->dependency(0, $filterjobline[0]);
 $B->resource(1, 1, "10gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
@@ -178,23 +203,31 @@ $B->renderToFile("$analysisDir/fullxgmml.sh");
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
 
-$fulljob = $S->submit("$analysisDir/fullxgmml.sh", $dryrun, $schedType);
+my $fulljob = $S->submit("$analysisDir/fullxgmml.sh", $dryrun, $schedType);
 chomp $fulljob;
 print "Full xgmml job is:\n $fulljob\n";
 
-@fulljobline = split /\./, $fulljob;
+my @fulljobline = split /\./, $fulljob;
 
 #submit series of repnode network calculations
 #depends on filterblast
 
 $B = $S->getBuilder();
 $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
-$B->dependency(0, @fulljobline[0]);
+$B->dependency(0, $fulljobline[0]);
 $B->resource(1, 1, "10gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
-$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -n 2 -c \$CDHIT -d 0");
+if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
+    $B->addAction("WORDOPT=5");
+    $B->addAction('if (( $(echo "$CDHIT < 0.81" | bc -l) )); then WORDOPT=5; fi');
+    $B->addAction('if (( $(echo "$CDHIT < 0.71" | bc -l) )); then WORDOPT=4; fi');
+    $B->addAction('if (( $(echo "$CDHIT < 0.61" | bc -l) )); then WORDOPT=3; fi');
+    $B->addAction('if (( $(echo "$CDHIT < 0.51" | bc -l) )); then WORDOPT=2; fi');
+    $wordOption = '-n $WORDOPT';
+}
+$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -c \$CDHIT -d 0 $algoOption $bandwidthOption");
 $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
 $B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/allsequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull");
 $B->addAction("zip -j $outFile.zip $outFile");
@@ -202,18 +235,18 @@ $B->jobName("${jobNamePrefix}cdhit");
 $B->renderToFile("$analysisDir/cdhit.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
-$repnodejob = $S->submit("$analysisDir/cdhit.sh", $dryrun, $schedType);
+my $repnodejob = $S->submit("$analysisDir/cdhit.sh", $dryrun, $schedType);
 chomp $repnodejob;
 print "Repnodes job is:\n $repnodejob\n";
 
 
-@repnodejobline = split /\./, $repnodejob;
+my @repnodejobline = split /\./, $repnodejob;
 
 #test to fix dependancies
 #depends on cdhit.sh
 $B = $S->getBuilder();
 $B->resource(1, 1, "1gb");
-$B->dependency(1, @repnodejobline[0]);
+$B->dependency(1, $repnodejobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("sleep 5");
 $B->jobName("${jobNamePrefix}fix");
@@ -221,17 +254,17 @@ $B->renderToFile("$analysisDir/fix.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 
-$fixjob = $S->submit("$analysisDir/fix.sh", $dryrun, $schedType);
+my $fixjob = $S->submit("$analysisDir/fix.sh", $dryrun, $schedType);
 chomp $fixjob;
 print "Fix job is:\n $fixjob\n";
-@fixjobline = split /\./, $fixjob;
+my @fixjobline = split /\./, $fixjob;
 
 #submit series of repnode network calculations
 #depends on filterblast
 $B = $S->getBuilder();
-$B->dependency(0, @fulljobline[0] . ":" . $fixjobline[0]);
+$B->dependency(0, $fulljobline[0] . ":" . $fixjobline[0]);
 $B->resource(1, 1, "5gb");
-#$B->dependency(0, @fulljobline[0]); 
+#$B->dependency(0, $fulljobline[0]); 
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("$toolpath/stats.pl -run-dir $analysisDir -out $analysisDir/stats.tab");
@@ -239,7 +272,7 @@ $B->jobName("${jobNamePrefix}stats");
 $B->renderToFile("$analysisDir/stats.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
-$statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
+my $statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
 chomp $statjob;
 print "Stats job is:\n $statjob\n";
 
