@@ -819,7 +819,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
     my $evalueFile = "$outputDir/evalue.tab";
-    $B->resource(1, 1, "550gb");
+    $B->resource(1, 1, "50gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
@@ -836,7 +836,8 @@ if (defined $LegacyGraphs) {
     $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
     $B->addAction("LAST=`head -1 \$LAST`");
     $B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
-    $B->addAction("Rscript $efiEstTools/quart-align.r $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN");
+    $B->addAction("Rscript $efiEstTools/quart-align-all.r legacy $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN $jobId");
+    $B->addAction("Rscript $efiEstTools/quart-align-all.r legacy $outputDir/rdata $outputDir/alignment_length_sm.png \$FIRST \$LAST \$MAXALIGN $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/quart-perid.r $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST");
     $B->addAction("Rscript $efiEstTools/hist-length.r  $outputDir/length.tab  $outputDir/length_histogram.png");
     $B->addAction("Rscript $efiEstTools/hist-edges.r $outputDir/edge.tab $outputDir/number_of_edges.png");
