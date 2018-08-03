@@ -27,7 +27,7 @@ use EFI::Util qw(usesSlurm);
 
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $config, $parentId, $parentDir, $cdhitUseAccurateAlgo,
-    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt);
+    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -47,6 +47,7 @@ my $result = GetOptions(
     "cdhit-bandwidth=i"     => \$cdhitBandwidth,        # Get rid of this?
     "cdhit-default-word"    => \$cdhitDefaultWord,      # Get rid of this?
     "cdhit-opt=s"           => \$cdhitOpt,
+    "include-sequences"     => \$includeSeqs,   # true to include sequences in the XGMML files
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$config,        # config file path, if not given will look for EFICONFIG env var
@@ -79,6 +80,7 @@ $lengthOverlap = 1          unless (defined $lengthOverlap and $lengthOverlap);
 $cdhitBandwidth = ""        unless defined $cdhitBandwidth;
 $cdhitDefaultWord = 0       unless defined $cdhitDefaultWord;
 $cdhitOpt = ""              unless defined $cdhitOpt;
+$includeSeqs = 0            unless defined $includeSeqs;
 
 $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 
@@ -108,10 +110,12 @@ if (not defined $config or not -f $config) {
     }
 }
 
+my $hasParent = defined $parentId and $parentId > 0 and defined $parentDir and -d $parentDir;
+
 my $baseOutputDir = $ENV{PWD};
 my $generateDir = "$baseOutputDir/$relativeGenerateDir";
 my $baseAnalysisDir = $generateDir;
-if (defined $parentId and $parentId > 0 and defined $parentDir and -d $parentDir) {
+if ($hasParent) {
     $generateDir = $parentDir;
 }
 
@@ -177,6 +181,9 @@ if ($customClusterDir and $customClusterFile) {
 } else {
     print "Using prior filter\n";
 }
+if ($hasParent) {
+    $B->addAction("cp $parentDir/*.png $baseAnalysisDir/");
+}
 
 $B->jobName("${jobNamePrefix}filterblast");
 $B->renderToFile("$analysisDir/filterblast.sh");
@@ -196,7 +203,8 @@ $B->resource(1, 1, "10gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver");
+my $seqsArg = $includeSeqs ? "-include-sequences" : "";
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");
 $B->renderToFile("$analysisDir/fullxgmml.sh");
@@ -225,11 +233,20 @@ if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
     $B->addAction('if (( $(echo "$CDHIT < 0.71" | bc -l) )); then WORDOPT=4; fi');
     $B->addAction('if (( $(echo "$CDHIT < 0.61" | bc -l) )); then WORDOPT=3; fi');
     $B->addAction('if (( $(echo "$CDHIT < 0.51" | bc -l) )); then WORDOPT=2; fi');
+    $B->addAction('echo $WORDOPT');
     $wordOption = '-n $WORDOPT';
+} else {
+    $wordOption = "-n 2"; # Default option
 }
-$B->addAction("cd-hit $wordOption -s $lengthOverlap -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -c \$CDHIT -d 0 $algoOption $bandwidthOption");
+
+my $lengthOverlapOption = "";
+if ($cdhitOpt ne "sb") {
+    $lengthOverlapOption = "-s $lengthOverlap";
+}
+
+$B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -c \$CDHIT -d 0 $algoOption $bandwidthOption");
 $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/allsequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull");
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}cdhit");
 $B->renderToFile("$analysisDir/cdhit.sh");
