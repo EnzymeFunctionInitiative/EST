@@ -69,8 +69,8 @@ my @gene3ds = ();
 my @ssfs = ();
 my @manualAccessions = ();
 my $isDomainOn;
+my %excludeIds; # A list of IDs that we exclude from database retrieval.
 
-print "DATA: $data_files\n";
 
 verifyArgs();
 
@@ -85,6 +85,10 @@ my $dbh = $db->getHandle();
 #
 if (defined $accessionFile and -f $accessionFile) {
     parseManualAccessionFile();
+}
+
+if ($useOptionASettings and defined $access and -f $access) {
+    getExcludeIds();
 }
 
 # Do reverse-id database lookup if we've been given manual accessions.
@@ -114,6 +118,8 @@ my $unirefData = {};
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S), AND/OR PFAM CLANS
 #
 
+# Map any UniRef cluster members to the UniRef seed sequence.  Used to avoid duplicates from Option C and Option D inputs.
+my %unirefMapping;
 my @accessions;
 my $FracCount = 0;
 my $FracFlag = 0;
@@ -261,7 +267,6 @@ sub parseFastaHeaders {
             elsif ($result->{state} eq EFI::Fasta::Headers::FLUSH) {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
-#                    print "ZZZ\n";
                     $id = makeSequenceId($seqCount);
                     $seqMeta->{$id}->{description} = $result->{raw_headers}; # substr($result->{raw_headers}, 0, 200);
                     $seqMeta->{$id}->{other_ids} = $result->{other_ids};
@@ -269,7 +274,6 @@ sub parseFastaHeaders {
                 } else {
                     foreach my $res (@{ $result->{uniprot_ids} }) {
                         $id = $res->{uniprot_id};
-#                        print "FASTA ID $id\n";
                         my $ss = $seqMeta->{$id};
                         push(@{ $ss->{query_ids} }, $res->{other_id});
                         foreach my $dupId (@{ $result->{duplicates}->{$id} }) {
@@ -282,8 +286,6 @@ sub parseFastaHeaders {
                     }
                 }
 
-#                print "END FLUSH\n";
-                
                 # Ensure that the first line of the sequence is written to the file.
                 $writeSeq = 1;
                 $seqCount++;
@@ -343,6 +345,12 @@ sub parseFastaHeaders {
         # as sepearate sequences which is what "Expanding" means.
         next if not exists $seq{$seqIdx}->{ids};
         my @seqIds = @{ $seq{$seqIdx}->{ids} };
+
+        if (grep { exists($unirefMapping{$_}) } @seqIds) {
+            print "found a sequence in the fasta file that maps to a uniref cluster: ", join(",", @seqIds), "\n";
+            continue;
+        }
+
         push(@seqToWrite, @seqIds);
         $numMultUniprotIdSeq++ if scalar @seqIds > 1;
 
@@ -416,19 +424,19 @@ sub getDomainFromDb {
     print "Accessions found in $table:\n";
     my %idsProcessed;
 
+    #@manualAccessions is a global variable
+
     my $unirefField = "";
     my $unirefCol = "";
-    my $unirefGroup = "";
     my $unirefJoin = "";
     if ($unirefVersion) {
         $unirefField = $unirefVersion eq "90" ? "uniref90_seed" : "uniref50_seed";
         $unirefCol = ", $unirefField";
-        #Don't do this!  $unirefGroup = "group by $unirefField";
         $unirefJoin = "left join uniref on $table.accession = uniref.accession";
     }
 
     foreach my $element (@elements) {
-        my $sql = "select $table.accession as accession, start, end $unirefCol from $table $unirefJoin where $table.id = '$element' $unirefGroup";
+        my $sql = "select $table.accession as accession, start, end $unirefCol from $table $unirefJoin where $table.id = '$element'";
         #my $sql = "select * from $table $joinClause where $table.id = '$element'";
         my $sth = $dbh->prepare($sql);
         $sth->execute;
@@ -453,6 +461,7 @@ sub getDomainFromDb {
                     $unirefFamSizeHelper{$unirefId} = 1;
                     $c++;
                 }
+                $unirefMapping{$uniprotId} = $unirefId;
             } else {
                 if (&$fractionFunc($c)) {
                     $ac++;
@@ -561,15 +570,21 @@ sub parseManualAccessionFile {
     $/ = $delim;
     
     my @lines = split /[\r\n\s]+/, $line;
-#    my $c = 1;
     foreach my $line (grep m/.+/, map { split(",", $_) } @lines) {
-#        if ($fraction == 1 or $c % $fraction == 0) {
-            push(@manualAccessions, $line);
-#        }
-#        $c++;
+        push(@manualAccessions, $line);
     }
 
     print "There were ", scalar @manualAccessions, " manual accession IDs taken from ", scalar @lines, " lines in the accession file\n";
+}
+
+
+sub getExcludeIds {
+    open ACCLIST, $access or die "Unable to read input accession exclude list $access: $!";
+    while (<ACCLIST>) {
+        chomp;
+        $excludeIds{$_} = 1;
+    }
+    close ACCLIST;
 }
 
 
@@ -633,6 +648,7 @@ sub verifyAccessions {
     
     my $noMatchCount = 0;
     my $numDuplicate = (scalar @accUniprotIds) - (scalar @uniqAccUniprotIds);
+    my $numUnirefOverlap = 0;
     
     # Lookup each manual accession ID to get the domain as well as verify that it exists.
     foreach my $element (@uniqAccUniprotIds) {
@@ -644,13 +660,19 @@ sub verifyAccessions {
             
             if (exists $accessionhash{$element}) {
                 $overlapCount++;
+                $accessionhash{$element} = [{}];
+                $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
             } else {
                 $addedFromFile++;
-                push(@accessions, $element);
+                # Only add to the list if it's not a UniRef seed sequence or part of a UniRef cluster.
+                if (not exists $unirefMapping{$element}) {
+                    push(@accessions, $element);
+                    $accessionhash{$element} = [{}];
+                    $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
+                } else {
+                    $numUnirefOverlap++;
+                }
             }
-    
-            $accessionhash{$element} = [{}];
-            $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
         } else {
             $noMatchCount++;
             print NOMATCH "$element\tNOT_FOUND_DATABASE\n";
@@ -661,6 +683,7 @@ sub verifyAccessions {
     print "The number of Uniprot IDs in the accession file that were already in the specified family is $overlapCount.\n";
     print "The number of Uniprot IDs in the accession file that were added to the retrieval list is $addedFromFile.\n";
     print "The number of Uniprot IDs in the accession file that didn't have a match in the annotations database is $noMatchCount\n";
+    print "The number of Uniprot IDs in the accession file that are excluded because they are part of a UniRef cluster in the specified family is $numUnirefOverlap.\n";
 }
 
 
@@ -700,7 +723,7 @@ sub writeAccessions {
         open GREP, ">$access" or die "Could not write to output accession ID file '$access': $!";
     }
 
-    foreach my $accession (keys %accessionhash) {
+    foreach my $accession (sort keys %accessionhash) {
         my @domains = @{$accessionhash{$accession}};
         foreach my $piece (@domains) {
             if ($domain eq "off") {
@@ -728,6 +751,7 @@ sub retrieveSequences {
     }
 
     @origAccessions = @accessions;
+    @accessions = sort @accessions;
     while(scalar @accessions) {
         my @batch=splice(@accessions, 0, $perpass);
         my $batchline=join ',', @batch;
@@ -964,8 +988,13 @@ sub retrieveFamilyAccessions {
     $fullFamilyIdCount += $famAcc->[1];
     $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ssfs);
     $fullFamilyIdCount += $famAcc->[1];
+
+    # Exclude any IDs that are to be excluded
+    foreach my $xid (keys %excludeIds) {
+        delete $accessionhash{$xid};
+    }
     
-    @accessions = uniq keys %accessionhash;
+    @accessions = sort keys %accessionhash;
     $familyIdCount = scalar @accessions;
     
     print "Done with family lookup. There are $familyIdCount IDs in the family(s) selected.\n";
@@ -993,6 +1022,7 @@ sub verifyArgs {
     $unirefExpand = 0               if not defined $unirefExpand or not $unirefVersion;
     $maxsequence = 0                unless(defined $maxsequence);
     $maxFullFam = 0                 unless(defined $maxFullFam);
+    $useOptionASettings = 0         if not defined $useOptionASettings;
     $errorFile = "$access.failed"   if not $errorFile;
     $isDomainOn = lc($domain) eq "on";
 
@@ -1010,7 +1040,6 @@ sub verifyArgs {
     $seqCountFile = "$pwd/getseq.default.seqcount"          if not $seqCountFile;
 
     if (not $ipro and not $pfam and not $gene3d and not $ssf and not $manualAccession and not $fastaFileIn and not $accessionFile) {
-        print "Nope\n";
         $access = $fastaFileOut = $metaFileOut = $noMatchFile = $seqCountFile = "";
     }
 }

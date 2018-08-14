@@ -53,7 +53,7 @@ sub saveFile {
         my $line = <FILE>;
         chomp $line;
         $line =~ s/^.*\((\d+)\).*$/$1/;
-        $edges = $line ? $line : 0;
+        $edges = ($line and $line !~ m/\D/) ? $line : 0;
         close FILE;
     }
 

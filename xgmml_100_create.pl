@@ -26,16 +26,21 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $fasta, $struct, $output, $title, $maxNumEdges, $dbver);
-my $result=GetOptions ("blast=s"	=> \$blast,
-    "fasta=s"	=> \$fasta,
-    "struct=s"	=> \$struct,
-    "output=s"	=> \$output,
-    "title=s"	=> \$title,
-    "maxfull=i"	=> \$maxNumEdges,
-    "dbver=s"	=> \$dbver);
+my ($blast, $fasta, $struct, $output, $title, $maxNumEdges, $dbver, $includeSeqs);
+my $result = GetOptions(
+    "blast=s"           => \$blast,
+    "fasta=s"           => \$fasta,
+    "struct=s"          => \$struct,
+    "output=s"          => \$output,
+    "title=s"           => \$title,
+    "maxfull=i"         => \$maxNumEdges,
+    "dbver=s"           => \$dbver,
+    "include-sequences" => \$includeSeqs,
+);
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver;
+
+$includeSeqs = 0 if not defined $includeSeqs;
 
 
 if(defined $maxNumEdges){
@@ -80,17 +85,29 @@ print time . " check length of 2.out file\n";
 
 print time . " Reading in uniprot numbers from fasta file\n";
 
+my %sequences;
+my $curSeqId = "";
 open(FASTA, $fasta) or die "could not open $fasta\n";
-foreach my $line (<FASTA>){
+while (my $line = <FASTA>) {
+    chomp $line;
     if($line=~/>([A-Za-z0-9:]+)/){
         push @uprotnumbers, $1;
+        if ($includeSeqs) {
+            $curSeqId = $1;
+            $sequences{$curSeqId} = "";
+        }
+    } elsif ($includeSeqs) {
+        $sequences{$curSeqId} .= $line;
     }
 }
 close FASTA;
 print time . " Finished reading in uniprot numbers\n";
 
+
 # Column headers and order in output file.
 my @metas;
+my %hasMetas;
+my $hasSeqs = 0;
 print time . " Read in annotation data\n";
 #if struct file (annotation information) exists, use that to generate annotation information
 if(-e $struct){
@@ -107,16 +124,28 @@ if(-e $struct){
                 $value='None';
             }
             next if not $key;
-            push(@metas, $key) if not grep { $_ eq $key } @metas;
+            if (not exists $hasMetas{$key}) {
+                push(@metas, $key);
+                $hasMetas{$key} = 1;
+            }
             if ($anno->is_list_attribute($key)) {
                 my @tmpline = grep /\S/, split(",", $value);
                 $uprot{$id}{$key} = \@tmpline;
             }else{
                 $uprot{$id}{$key} = $value; 
             }
+            if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
+                $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
+            {
+                $uprot{$id}{EFI::Annotations::FIELD_SEQ_KEY} = $sequences{$id};
+                $hasSeqs = 1;
+            }
         }
     }
     close STRUCT;
+}
+if ($hasSeqs) {
+    push(@metas, EFI::Annotations::FIELD_SEQ_KEY);
 }
 print time . " done reading in annotation data\n";
 

@@ -27,7 +27,7 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges);
+my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs);
 my $result = GetOptions(
     "blast=s"	        => \$blast,
     "cdhit=s"	        => \$cdhit,
@@ -37,6 +37,7 @@ my $result = GetOptions(
     "title=s"	        => \$title,
     "dbver=s"	        => \$dbver,
     "maxfull=i"	        => \$maxNumEdges,
+    "include-sequences" => \$includeSeqs,
 );
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $outputFile or not $title or not $dbver or not $cdhit;
@@ -49,6 +50,7 @@ if(defined $maxNumEdges){
     $maxNumEdges=10000000;
 }
 
+$includeSeqs = 0 if not defined $includeSeqs;
 
 my $anno = new EFI::Annotations;
 
@@ -62,12 +64,32 @@ my %headuprot=();
 
 my ($numEdges, $nodecount) = (0, 0);
 
+
+
+my %sequences;
+my $curSeqId = "";
+open(FASTA, $fasta) or die "could not open $fasta\n";
+while (my $line = <FASTA>) {
+    chomp $line;
+    if($line=~/>([A-Za-z0-9:]+)/){
+        if ($includeSeqs) {
+            $curSeqId = $1;
+            $sequences{$curSeqId} = "";
+        }
+    } elsif ($includeSeqs) {
+        $sequences{$curSeqId} .= $line;
+    }
+}
+close FASTA;
+
+
 my $parser = XML::LibXML->new();
 my $fh = new IO::File(">$outputFile");
 my $writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $fh);
 
 #if struct file (annotation information) exists, use that to generate annotation information
 my @metas;
+my $hasSeqs = 0;
 if(-e $struct){
     print "populating annotation structure from file\n";
     open STRUCT, $struct or die "could not open $struct\n";
@@ -88,10 +110,19 @@ if(-e $struct){
                 $uprot{$id}{$key} = \@tmpline;
             } else {
                 $uprot{$id}{$key} = $value;
+                if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
+                    $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
+                {
+                    $uprot{$id}{EFI::Annotations::FIELD_SEQ_KEY} = $sequences{$id};
+                    $hasSeqs = 1;
+                }
             }
         }
     }
     close STRUCT;
+}
+if ($hasSeqs) {
+    push(@metas, EFI::Annotations::FIELD_SEQ_KEY);
 }
 
 if ($#metas < 0) {
@@ -105,12 +136,13 @@ if ($#metas < 0) {
         chomp $line;
         if($line=~/^\s/){
             my @lineary=split /\t/, $line;
-            push @metas, @lineary[1];
+            push @metas, $lineary[1];
         }
     }
 }
 
 my $SizeKey = "Cluster Size";
+my $UniRefKey = "UniRef90_Cluster_Size";
 unshift @metas, "ACC";
 unshift @metas, $SizeKey;
 
@@ -155,7 +187,9 @@ while (<CDHIT>){
             if ($key eq $SizeKey) {
                 $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $count);
             } else {
-                @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
+                if ($key ne $UniRefKey and $key ne EFI::Annotations::FIELD_SEQ_KEY and $key ne EFI::Annotations::FIELD_SEQ_SRC_KEY) {
+                    @{$clusterdata{$key}} = uniq @{$clusterdata{$key}};
+                }
                 $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
                 foreach my $piece (@{$clusterdata{$key}}){
                     #remove illegal xml characters from annotation data
@@ -164,14 +198,9 @@ while (<CDHIT>){
                         $piece=$2-$1+1;
                     }
                     my $type = EFI::Annotations::get_attribute_type($key);
-                    if ($piece or $type ne "integer") {
+                    if ($piece or ($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY)) {
                         $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
                     }
-#                    unless($key eq "Sequence_Length"){
-#                        $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
-#                    }else{
-#                        $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $piece);
-#                    }
                 }
                 $writer->endTag();
             }
@@ -181,7 +210,7 @@ while (<CDHIT>){
         $count=0;
     }else{
         my @lineary=split /\s+/, $line;
-        if(@lineary[2]=~/^>(\w{6,10})\.\.\./ or @lineary[2]=~/^>([A-Za-z0-9:]+)\.\.\./){
+        if($lineary[2]=~/^>(\w{6,10})\.\.\./ or $lineary[2]=~/^>([A-Za-z0-9:]+)\.\.\./){
             $element=$1;
             $count++;
         }else{
@@ -234,14 +263,14 @@ while (<BLASTFILE>){
     my $line=$_;
     chomp $line;
     my @line=split /\t/, $line;
-    if(exists $headuprot{@line[0]} and exists $headuprot{@line[1]}){
-        #my $log=-(log(@line[3])/log(10))+@line[2]*log(2)/log(10);
-        my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
+    if(exists $headuprot{$line[0]} and exists $headuprot{$line[1]}){
+        #my $log=-(log($line[3])/log(10))+$line[2]*log(2)/log(10);
+        my $log=int(-(log($line[5]*$line[6])/log(10))+$line[4]*log(2)/log(10));
         $numEdges++;
-        $writer->startTag('edge', 'id' => "@line[0],@line[1]", 'label'=> "@line[0],@line[1]", 'source' => @line[0], 'target' => @line[1]);
-        $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[2]);
+        $writer->startTag('edge', 'id' => "$line[0],$line[1]", 'label'=> "$line[0],$line[1]", 'source' => $line[0], 'target' => $line[1]);
+        $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $line[2]);
         $writer->emptyTag('att', 'name' => 'alignment_score', 'type' => 'real', 'value' => $log);
-        $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => @line[3]);
+        $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $line[3]);
         $writer->endTag;
     }
 }
