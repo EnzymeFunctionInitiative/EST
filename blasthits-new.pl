@@ -311,7 +311,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("cat $queryFile >> $allSeqFile");
-$B->addAction("merge_sequece_source.pl -meta-file $metadataFile");
+$B->addAction("merge_sequence_source.pl -meta-file $metadataFile");
 $B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $allSeqFile -meta-file $metadataFile -config=$configFile");
 $B->jobName("${jobNamePrefix}blasthits_getannotations");
 $B->renderToFile("$scriptDir/blasthits_getannotations.sh");
@@ -496,7 +496,7 @@ $B = $S->getBuilder();
 $B->setScriptAbortOnError(0); # don't abort on error
 $B->queue($memqueue);
 $B->dependency(0, @demuxjobline[0]); 
-$B->resource(1, 1, "20gb");
+$B->resource(1, 1, "100gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");

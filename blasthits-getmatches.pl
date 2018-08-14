@@ -16,22 +16,29 @@ open(ACCESSIONS, ">$accessions") or die "Could not write accession list $accessi
 open(INITBLAST, $blastfile) or die "Cannot open sorted initial blast query $blastfile\n";
 
 my $count=0;
-my @accessions=();
+my %accessions=();
 
 while (<INITBLAST>){
-  my $line=$_;
-  my @parts = split /\s+/, $line;
-  $parts[1]=~/\|(\w+)\|/;
-  my $accession=$1;
-  if($count==0){
-    print "Top hit is $accession\n";
-  }
-  print ACCESSIONS "$accession\n";
-  push @accessions, $accession; 
-  $count++;
-  if($count>=$max){
-    last;
-  }
+    chomp;
+    my $line=$_;
+    my @parts = split /\s+/, $line;
+    $parts[1]=~/\|(\w+)\|/;
+    my $accession=$1;
+    if($count==0){
+        print "Top hit is $accession\n";
+    }
+
+    if (exists $accessions{$accession}) {
+        print "Found duplicate ID in blast file: $accession ($line)\n";
+    } else {
+        print ACCESSIONS "$accession\n";
+        $count++;
+    }
+
+    $accessions{$accession} = 1;
+    if($count>=$max){
+        last;
+    }
 }
 close INITBLAST;
 close ACCESSIONS;

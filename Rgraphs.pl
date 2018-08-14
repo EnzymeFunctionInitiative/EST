@@ -13,6 +13,12 @@ use Statistics::R;
 use Data::Dumper;
 #use FileCache;
 
+#DEBUG:
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use HandleCache;
+
+
 my ($blastfile, $edgesFile, $lenhist, $rdata, $fasta, $incfrac, $evalueFile);
 my $result = GetOptions(
     "blastout=s"    => \$blastfile,
@@ -40,6 +46,8 @@ my %metadata;
 my %evalueEdges;
 
 
+my $hc = new HandleCache(basedir => $rdata);;
+
 #my $LenHistFH = cacheout($lenhist) or die "could not write to length histogram file ($lenhist): $!\n";
 #my $EdgesFH = cacheout($edgesFile) or die "could not wirte to edges file ($edgesFile): $!\n";
 #open(my BLAST, $blastfile) or die "cannot open blast output file $blastfile\n";
@@ -60,24 +68,16 @@ while (<BLAST>){
     }
     if (defined $edges[$evalue]) {
         $edges[$evalue]++;
-        #$alignhandles{$evalue}->print("$align\n");
-        #$peridhandles{$evalue}->print("$pid\n");
-        push(@{ $alignData{$evalue} }, $align);
-        push(@{ $peridData{$evalue} }, $pid);
     } else {
         $edges[$evalue] = 1;
         my $lzeroevalue = sprintf("%5d", $evalue);
         $lzeroevalue =~ tr/ /0/;
-        #$alignhandles{$evalue} = cacheout("$rdata/align$lzeroevalue") or die "cannot open alignment file for $evalue\n";
-        #$peridhandles{$evalue} = cacheout("$rdata/perid$lzeroevalue") or die "cannot open perid file for $evalue ($rdata/perid$lzeroevalue): $!\n";
-        #open($alignhandles{$evalue}, ">$rdata/align$lzeroevalue") or die "cannot open alignment file for $evalue\n";
-        #open($peridhandles{$evalue}, ">$rdata/perid$lzeroevalue") or die "cannot open perid file for $evalue ($rdata/perid$lzeroevalue): $!\n";
-        #$alignhandles{$evalue}->print("$evalue\n$align\n");
-        #$peridhandles{$evalue}->print("$evalue\n$pid\n");
         $metadata{$evalue} = $lzeroevalue;
-        push(@{ $alignData{$evalue} }, $align);
-        push(@{ $peridData{$evalue} }, $pid);
+        $hc->print("align$metadata{$evalue}", "$evalue\n");
+        $hc->print("perid$metadata{$evalue}", "$evalue\n");
     }
+    $hc->print("align$metadata{$evalue}", "$align\n");
+    $hc->print("perid$metadata{$evalue}", "$pid\n");
     $evalueEdges{$evalue} = 0 if not exists $evalueEdges{$evalue};
     $evalueEdges{$evalue}++;
 }
@@ -94,27 +94,6 @@ foreach my $ev (sort { $b <=> $a } keys %metadata) {
 open(EVALUE, ">$evalueFile") or die "Unable to open evalue file $evalueFile for writing: $!" if $evalueFile;
 
 foreach my $ev (sort { $a <=> $b } keys %metadata) {
-    my $num = $metadata{$ev};
-    my $aFile = "$rdata/align$num";
-    my $pFile = "$rdata/perid$num";
-
-    my $aData = $alignData{$ev};
-    my $pData = $peridData{$ev};
-
-    open AFH, ">$aFile" or die "Unable to open alignment file for $ev ($aFile): $!";
-    open PFH, ">$pFile" or die "Unable to open alignment file for $ev ($aFile): $!";
-
-    print AFH "$ev\n";
-    print PFH "$ev\n";
-
-    for (my $i = 0; $i <= $#$aData; $i++) {
-        print AFH $aData->[$i], "\n";
-        print PFH $pData->[$i], "\n";
-    }
-
-    close AFH;
-    close PFH;
-
     print EVALUE join("\t", $ev, $evalueEdges{$ev}, $evFunc{$ev}), "\n" if $evalueFile;
 }
 
@@ -125,7 +104,6 @@ close(EVALUE) if $evalueFile;
 my @align = `wc -l $rdata/align*`;
 #last line is a summary, we dont need that so pop it off
 pop @align;
-
 
 
 open(my $EdgesFH, ">$edgesFile") or die "could not wirte to $edgesFile\n";
@@ -186,6 +164,7 @@ map { unlink($_); } @filesToDelete;
 print "$filekept results\n";
 
 print "1.out procession complete, now processing fasta\n";
+
 
 
 #processing data for the lentgh histogram
@@ -263,6 +242,7 @@ foreach my $file (grep {$_ =~ /^align/} readdir DIR){
     close FILE;
 }
 
+
 #$lastmax=0;
 #foreach $key (keys %maxalign){
 #  print "$key\t$lastmax\t$thisedge\t$maxalign{$key}\n";
@@ -276,4 +256,8 @@ print "Maxalign $lastmax\n";
 open(my $MaxAlignFH, ">$rdata/maxyal") or die "cannot write out maximium alignment length to $rdata/maxyal\n";
 print $MaxAlignFH "$lastmax\n";
 close $MaxAlignFH;
+
+
+
+
 
