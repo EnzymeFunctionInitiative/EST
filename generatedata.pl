@@ -807,7 +807,7 @@ print "Simplegraphs job is:\n $simplegraphjob\n";
 #
 $B = $S->getBuilder();
 
-my ($smallWidth, $smallHeight) = (700, 2000, 315, 900);
+my ($smallWidth, $smallHeight) = (700, 315);
 
 #create information for R to make graphs and then have R make them
 $B->queue($memqueue);
