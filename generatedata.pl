@@ -608,7 +608,7 @@ $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want 
 $B->jobArray("1-$np") if $blast eq "blast";
 $B->dependency(0, $prevJobId);
 $B->resource(1, 24, "14G") if $blast =~ /diamond/i;
-$B->resource(2, 24, "14G") if $blast =~ /blast\+/i;
+$B->resource(1, 24, "14G") if $blast =~ /blast\+/i;
 
 $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load oldapps") if $oldapps;
