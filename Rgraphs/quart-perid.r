@@ -77,7 +77,7 @@ for (i in bars_to_use) {
     key=i #i+start-1
     if (type == "hdf5") {
         print(paste0("/perid/",key))
-        newdata=t(h5read(hdffile,paste0("/perid/",key)))
+        newdata=t(h5read(data_file,paste0("/perid/",key)))
     } else {
         idx = i - start + 1
         full_path=paste(data_dir,"/",data_files[idx],sep='')

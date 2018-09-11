@@ -12,10 +12,10 @@ start = 0
 stop = 0
 
 if (type == "hdf5") {
-    plot_data = h5read(hdffile,"/lenhisto")
-    start <- h5read(hdffile,"/stats/lenstart")
-    stop <- h5read(hdffile,"/stats/lenstop")
-    maxy <- h5read(hdffile,"/stats/lenmax")
+    plot_data = h5read(data_file,"/lenhisto")
+    start <- h5read(data_file,"/stats/lenstart")
+    stop <- h5read(data_file,"/stats/lenstop")
+    maxy <- h5read(data_file,"/stats/lenmax")
 
     start = start[1][1]
     stop = stop[1][1]
