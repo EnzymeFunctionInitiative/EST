@@ -12,9 +12,9 @@ start = 0
 stop = 0
 
 if (type == "hdf5") {
-    plot_data = h5read(hdffile,"/edgehisto")
-    start <- h5read(hdffile,"/stats/start")
-    stop <- h5read(hdffile,"/stats/stop")
+    plot_data = h5read(data_file,"/edgehisto")
+    start <- h5read(data_file,"/stats/start")
+    stop <- h5read(data_file,"/stats/stop")
 
     start = start[1][1]
     stop = stop[1][1]

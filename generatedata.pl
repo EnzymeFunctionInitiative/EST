@@ -49,6 +49,9 @@ BEGIN {
 #           hist-edges.r        Makes edges bar graph (r_hist_edges.png) from tab file
 #
 
+use strict;
+use warnings;
+
 use FindBin;
 use Cwd qw(abs_path);
 use File::Basename;
@@ -59,10 +62,16 @@ use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
 
-$result = GetOptions(
+my ($np, $queue, $outputDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, $accessionFile, $taxid);
+my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
+my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
+my ($randomFraction, $blast, $jobId, $unirefVersion, $noDemuxArg, $convRatioFile, $cdHitOnly);
+my ($unirefExpand, $scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile);
+my ($minSeqLen, $maxSeqLen);
+my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
-    "tmp=s"             => \$tmpdir,
+    "tmp|dir-name=s"    => \$outputDirName,
     "evalue=s"          => \$evalue,
     "incfrac=f"         => \$incfrac,
     "ipro=s"            => \$ipro,
@@ -91,6 +100,8 @@ $result = GetOptions(
     "uniref-version=s"  => \$unirefVersion,
     "no-demux"          => \$noDemuxArg,
     "conv-ratio-file=s" => \$convRatioFile,
+    "min-seq-len=i"     => \$minSeqLen,
+    "max-seq-len=i"     => \$maxSeqLen,
     "cd-hit=s"          => \$cdHitOnly,     # specify this flag in order to run cd-hit only after getsequence-domain.pl then exit.
     "uniref-expand"     => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
@@ -128,9 +139,21 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
     $fraction=1;
 }
 
-if (not $cdHitOnly or not $lengthdif or not $sim) {
+if (not defined $cdHitOnly or not $lengthdif or not $sim) {
     # Defaults and error checking for multiplexing
-    if ($multiplexing eq "on") {
+    if (not $multiplexing) {
+        $multiplexing = "on";
+        if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
+            die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
+        } elsif (not defined $lengthdif) {
+            $lengthdif=1;
+        }
+        if (defined $sim and $sim !~ /\d(\.\d+)?/) {
+            die "sim must be in a format like 0.9\n";
+        } elsif (not defined $sim) {
+            $sim=1;
+        }
+    } elsif ($multiplexing eq "on") {
         if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
             die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
         } elsif (not defined $lengthdif) {
@@ -152,18 +175,6 @@ if (not $cdHitOnly or not $lengthdif or not $sim) {
         } elsif (not defined $sim) {
             $sim=1;
         } 
-    } elsif (!(defined $multiplexing)) {
-        $multiplexing = "on";
-        if (defined $lengthdif and $lengthdif !~ /\d(\.\d+)?/) {
-            die "lengthdif must be in a format like 0.9 |$lengthdif|\n";
-        } elsif (not defined $lengthdif) {
-            $lengthdif=1;
-        }
-        if (defined $sim and $sim !~ /\d(\.\d+)?/) {
-            die "sim must be in a format like 0.9\n";
-        } elsif (not defined $sim) {
-            $sim=1;
-        }
     } else {
         die "valid variables for multiplexing are either on or off\n";
     }
@@ -171,33 +182,31 @@ if (not $cdHitOnly or not $lengthdif or not $sim) {
 
 
 # At least one of tehse inputs are required to get sequences for the program
-unless (defined $fastaFile or defined $ipro or defined $pfam or defined $taxid or defined $ssf or defined $gene3d or
-        defined $accessionId or defined $accessionFile) {
+if (not (defined $fastaFile or defined $ipro or defined $pfam or defined $taxid or defined $ssf or defined $gene3d or
+        defined $accessionId or defined $accessionFile)) {
     die "You must spedify the -fasta, -ipro, -taxid, -pfam, -accession-id, or -useraccession arguments\n";
 }
 
 # You also have to specify the number of processors for blast
-unless (defined $np) {
+if (not defined $np) {
     die "You must spedify the -np variable\n";
 }
 
 # Default queues
-unless (defined $queue) {
-    print "-queue not specified, using default\n";
-    $queue = "efi";
+if (not defined $queue) {
+    die "-queue not specified\n";
 }
-unless (defined $memqueue) {
-    print "-memqueue not specifiied, using default\n";
-    $memqueue = $queue;
+if (not defined $memqueue) {
+    die "-memqueue not specifiied\n";
 }
 
 # Working directory must be defined
-unless (defined $tmpdir) {
-    die "You must spedify the -tmp variable\n";
+if (not defined $outputDirName) {
+    die "You must spedify the -dir-name variable\n";
 }
 
 # Default e value must also be set for blast, default set if not specified
-unless (defined $evalue) {
+if (not defined $evalue) {
     print "-evalue not specified, using default of 5\n";
     $evalue = "1e-5";
 } else {
@@ -215,37 +224,39 @@ if (not defined $configFile or not -f $configFile) {
 }
 
 my $manualCdHit = 0;
-$manualCdHit = 1 if (not $cdHitOnly and ($lengthdif < 1 or $sim < 1) and defined $noDemuxArg);
+$manualCdHit = 1 if (not defined $cdHitOnly and ($lengthdif < 1 or $sim < 1) and defined $noDemuxArg);
 
-$seqCountFile = ""  unless defined $seqCountFile;
+$seqCountFile = ""  if not defined $seqCountFile;
+$cdHitOnly = ""     if not defined $cdHitOnly;
 
 $np = ceil($np / 24) if ($blast=~/diamond/);
 
 # Max number of hits for an individual sequence, normally set ot max value
-$blasthits = 1000000 unless (defined $blasthits);
+$blasthits = 1000000 if not (defined $blasthits);
 
 # Wet input families to zero if they are not specified
-$pfam = 0           unless (defined $pfam);
-$ipro = 0           unless (defined $ipro);
-$taxid = 0          unless (defined $taxid);
-$gene3d = 0         unless (defined $gene3d);
-$ssf = 0            unless (defined $ssf);
-$accessionId = 0    unless (defined $accessionId);
-$randomFraction = 0 unless (defined $randomFraction);
+$pfam = 0           if not defined $pfam;
+$ipro = 0           if not defined $ipro;
+$taxid = 0          if not defined $taxid;
+$gene3d = 0         if not defined $gene3d;
+$ssf = 0            if not defined $ssf;
+$accessionId = 0    if not defined $accessionId;
+$randomFraction = 0 if not defined $randomFraction;
 
-# Default values for bandpass filter, 0,0 disables it, which is the default
-$maxlen = 0         unless (defined $maxlen);
-$minlen = 0         unless (defined $minlen);
-$unirefVersion = "" unless (defined $unirefVersion);
-$unirefExpand = 0   unless (defined $unirefExpand);
+$unirefVersion = "" if not defined $unirefVersion;
+$unirefExpand = 0   if not defined $unirefExpand;
 $domain = "off"     if $unirefVersion;
-$maxFullFam = 0     unless (defined $maxFullFam);
+$maxFullFam = 0     if not defined $maxFullFam;
+$fastaFile = ""     if not defined $fastaFile;
+$accessionFile = "" if not defined $accessionFile;
+$minSeqLen = 0      if not defined $minSeqLen;
+$maxSeqLen = 0      if not defined $maxSeqLen;
 
 # Maximum number of sequences to process, 0 disables it
-$maxsequence = 0    unless (defined $maxsequence);
+$maxsequence = 0    if not defined $maxsequence;
 
 # Fraction of sequences to include in graphs, reduces effects of outliers
-unless (defined $incfrac) {
+if (not defined $incfrac) {
     print "-incfrac not specified, using default of 0.99\n";
     $incfrac=0.99;
 }
@@ -253,10 +264,10 @@ unless (defined $incfrac) {
 ($jobId = $ENV{PWD}) =~ s%^.*/(\d+)/*$%$1% if not $jobId;
 $jobId = "" if $jobId =~ /\D/;
 
-$noMatchFile = ""   unless defined $noMatchFile;
+$noMatchFile = ""   if not defined $noMatchFile;
 
 my $baseOutputDir = $ENV{PWD};
-my $outputDir = "$baseOutputDir/$tmpdir";
+my $outputDir = "$baseOutputDir/$outputDirName";
 
 my $pythonMod = getLmod("Python/2", "Python");
 my $gdMod = getLmod("GD.*Perl", "GD");
@@ -282,21 +293,21 @@ print "no-match-file is $noMatchFile\n";
 print "np is $np\n";
 print "queue is $queue\n";
 print "memqueue is $memqueue\n";
-print "tmpdir is $tmpdir\n";
+print "tmpdir is $outputDir\n";
 print "evalue is $evalue\n";
 print "config is $configFile\n";
-print "maxlen is $maxlen\n";
-print "minlen is $minlen\n";
 print "maxsequence is $maxsequence\n";
 print "incfrac is $incfrac\n";
 print "seq-count-file is $seqCountFile\n";
 print "base output directory is $baseOutputDir\n";
-print "output directory is $outputDir\n";
+print "output directory is $outputDirName\n";
 print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
 print "uniref-expand is $unirefExpand\n";
 print "Python module is $pythonMod\n";
 print "max-full-family is $maxFullFam\n";
+print "cd-hit is $cdHitOnly\n";
+print 
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -312,16 +323,15 @@ $userHeaderFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 $userHeaderFileOption = "-meta-file $userHeaderFile";
 
 # Error checking for user supplied dat and fa files
+my $accessionFileOption = "";
 if (defined $accessionFile and -e $accessionFile) {
-    $accessionFile = $baseOutputDir . "/$accessionFile" unless ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
+    $accessionFile = $baseOutputDir . "/$accessionFile" if not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
     $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
-    $noMatchFile = $baseOutputDir . "/$noMatchFile" unless ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
+    $noMatchFile = $baseOutputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFile = "-no-match-file $noMatchFile";
 
-} elsif (defined $accessionFile) {
-    die "accession file $accessionFile does not exist\n";
 } else {
     $accessionFile = "";
 }
@@ -349,11 +359,9 @@ if ($seqCountFile) {
 
 my $fastaFileOption = "";
 if (defined $fastaFile and -e $fastaFile) {
-    $fastaFile = "$baseOutputDir/$fastaFile" unless ($fastaFile=~/^\// or $fastaFile=~/^~/);
+    $fastaFile = "$baseOutputDir/$fastaFile" if not ($fastaFile=~/^\// or $fastaFile=~/^~/);
     $fastaFileOption = "-fasta-file $fastaFile";
     $fastaFileOption = "-use-fasta-headers " . $fastaFileOption if defined $useFastaHeaders;
-} elsif (defined $fastaFile) {
-    die "$fastaFile does not exist\n";
 } else {
     $fastaFile = "";
 }
@@ -366,7 +374,6 @@ if ($fastaFileZip =~ /\.zip$/i) {
 
 
 # Create tmp directories
-#mkdir $tmpdir;
 mkdir $outputDir;
 
 # Write out the database version to a file
@@ -403,6 +410,7 @@ $scriptDir = $outputDir if not -d $scriptDir;
 #
 my $B = $S->getBuilder();
 $B->resource(1, 1, "5gb");
+my $prevJobId;
 
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
@@ -428,17 +436,20 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     # is checked below after cd-hit).
     my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
     my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption -config=$configFile");
+    my $minSeqLenOpt = $minSeqLen ? "-min-seq-len $minSeqLen" : "";
+    my $maxSeqLenOpt = $maxSeqLen ? "-max-seq-len $maxSeqLen" : "";
+
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption $minSeqLenOpt $maxSeqLenOpt -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
     # Submit and keep the job id for next dependancy
-    $importjob = $S->submit("$scriptDir/initial_import.sh");
+    my $importjob = $S->submit("$scriptDir/initial_import.sh");
     chomp $importjob;
 
     print "import job is:\n $importjob\n";
-    @importjobline=split /\./, $importjob;
+    ($prevJobId) = split(/\./, $importjob);
 
 # Tax id code is different, so it is exclusive
 } elsif ($taxid) {
@@ -460,13 +471,13 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
-    $importjob = $S->submit("$scriptDir/initial_import.sh");
+    my $importjob = $S->submit("$scriptDir/initial_import.sh");
     chomp $importjob;
 
     print "import job is:\n $importjob\n";
-    @importjobline=split /\./, $importjob;
+    ($prevJobId) = split /\./, $importjob;
 } else {
-    die "Error Submitting Import Job\n$importjob\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
+    die "Error Submitting Import Job\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
 }
 
 
@@ -476,7 +487,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 # If not, just copy allsequences.fa to sequences.fa so next part of program is set up right.
 #
 $B = $S->getBuilder();
-$B->dependency(0, @importjobline[0]);
+$B->dependency(0, $prevJobId);
 $B->mailEnd() if defined $cdHitOnly;
 
 # If we only want to do CD-HIT jobs then do that here.
@@ -502,7 +513,7 @@ if ($cdHitOnly) {
 
     $B->jobName("${jobNamePrefix}cdhit");
     $B->renderToFile("$scriptDir/cdhit.sh");
-    $cdhitjob = $S->submit("$scriptDir/cdhit.sh");
+    my $cdhitjob = $S->submit("$scriptDir/cdhit.sh");
     chomp $cdhitjob;
     print "CD-HIT job is:\n $cdhitjob\n";
     exit;
@@ -546,10 +557,10 @@ CMDS
 $B->jobName("${jobNamePrefix}multiplex");
 $B->renderToFile("$scriptDir/multiplex.sh");
 
-$muxjob = $S->submit("$scriptDir/multiplex.sh");
+my $muxjob = $S->submit("$scriptDir/multiplex.sh");
 chomp $muxjob;
 print "mux job is:\n $muxjob\n";
-@muxjobline=split /\./, $muxjob;
+($prevJobId) = split /\./, $muxjob;
 
 
 ########################################################################################################################
@@ -558,16 +569,16 @@ print "mux job is:\n $muxjob\n";
 $B = $S->getBuilder();
 $B->resource(1, 1, "5gb");
 
-$B->dependency(0, @muxjobline[0]);
+$B->dependency(0, $prevJobId);
 $B->addAction("mkdir -p $fracOutputDir");
 $B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source $outputDir/sequences.fa");
 $B->jobName("${jobNamePrefix}fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
-$fracfilejob = $S->submit("$scriptDir/fracfile.sh");
+my $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
 chomp $fracfilejob;
 print "fracfile job is:\n $fracfilejob\n";
-@fracfilejobline=split /\./, $fracfilejob;
+($prevJobId) = split /\./, $fracfilejob;
 
 
 ########################################################################################################################
@@ -575,7 +586,7 @@ print "fracfile job is:\n $fracfilejob\n";
 #
 $B = $S->getBuilder();
 
-$B->dependency(0, @fracfilejobline[0]);
+$B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
@@ -590,10 +601,10 @@ if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
 $B->jobName("${jobNamePrefix}createdb");
 $B->renderToFile("$scriptDir/createdb.sh");
 
-$createdbjob = $S->submit("$scriptDir/createdb.sh");
+my $createdbjob = $S->submit("$scriptDir/createdb.sh");
 chomp $createdbjob;
 print "createdb job is:\n $createdbjob\n";
-@createdbjobline=split /\./, $createdbjob;
+($prevJobId) = split /\./, $createdbjob;
 
 
 ########################################################################################################################
@@ -606,9 +617,9 @@ mkdir $blastOutputDir;
 
 $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
 $B->jobArray("1-$np") if $blast eq "blast";
-$B->dependency(0, @createdbjobline[0]);
+$B->dependency(0, $prevJobId);
 $B->resource(1, 24, "14G") if $blast =~ /diamond/i;
-$B->resource(2, 24, "14G") if $blast =~ /blast\+/i;
+$B->resource(1, 24, "14G") if $blast =~ /blast\+/i;
 
 $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load oldapps") if $oldapps;
@@ -644,17 +655,17 @@ if ($blast eq "blast") {
 $B->addAction("OUT=\$?");
 $B->addAction("if [ \$OUT -ne 0 ]; then");
 $B->addAction("    echo \"BLAST failed; likely due to file format.\"");
-$B->addAction("    echo $OUT > $outputDir/blast.failed");
+$B->addAction("    echo \$OUT > $outputDir/blast.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
 $B->jobName("${jobNamePrefix}blast-qsub");
 $B->renderToFile("$scriptDir/blast-qsub.sh");
 
 $B->jobArray("");
-$blastjob = $S->submit("$scriptDir/blast-qsub.sh");
+my $blastjob = $S->submit("$scriptDir/blast-qsub.sh");
 chomp $blastjob;
 print "blast job is:\n $blastjob\n";
-@blastjobline=split /\./, $blastjob;
+($prevJobId) = split /\./, $blastjob;
 
 
 ########################################################################################################################
@@ -663,7 +674,7 @@ print "blast job is:\n $blastjob\n";
 $B = $S->getBuilder();
 
 $B->resource(1, 1, "5gb");
-$B->dependency(1, @blastjobline[0]); 
+$B->dependency(1, $prevJobId);
 $B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile")
     if $blast eq "blast";
 $B->addAction("SZ=`stat -c%s $blastFinalFile`");
@@ -672,14 +683,12 @@ $B->addAction("    echo \"BLAST Failed. Check input file.\"");
 $B->addAction("    touch $outputDir/blast.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
-#$B->addAction("rm  $blastOutputDir/blastout-*.tab");
-#$B->addAction("rm  $fracOutputDir/fracfile-*.fa");
 $B->jobName("${jobNamePrefix}catjob");
 $B->renderToFile("$scriptDir/catjob.sh");
-$catjob = $S->submit("$scriptDir/catjob.sh");
+my $catjob = $S->submit("$scriptDir/catjob.sh");
 chomp $catjob;
 print "Cat job is:\n $catjob\n";
-@catjobline=split /\./, $catjob;
+($prevJobId) = split /\./, $catjob;
 
 
 ########################################################################################################################
@@ -689,7 +698,7 @@ $B = $S->getBuilder();
 
 $B->queue($memqueue);
 $B->resource(1, 1, "400gb");
-$B->dependency(0, @catjobline[0]); 
+$B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
@@ -698,12 +707,11 @@ $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 
-$blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
+my $blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
 chomp $blastreducejob;
 print "Blastreduce job is:\n $blastreducejob\n";
 
-@blastreducejobline=split /\./, $blastreducejob;
-my $depJob = @blastreducejobline[0];
+($prevJobId) = split /\./, $blastreducejob;
 
 
 ########################################################################################################################
@@ -711,7 +719,7 @@ my $depJob = @blastreducejobline[0];
 #
 $B = $S->getBuilder();
 
-$B->dependency(0, @blastreducejobline[0]); 
+$B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
 $B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
@@ -729,12 +737,11 @@ if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
 $B->jobName("${jobNamePrefix}demux");
 $B->renderToFile("$scriptDir/demux.sh");
 
-$demuxjob = $S->submit("$scriptDir/demux.sh");
+my $demuxjob = $S->submit("$scriptDir/demux.sh");
 chomp $demuxjob;
 print "Demux job is:\n $demuxjob\n";
-@demuxjobline=split /\./, $demuxjob;
+($prevJobId) = split /\./, $demuxjob;
 
-$depJob = @demuxjobline[0];
 
 
 ########################################################################################################################
@@ -742,7 +749,7 @@ $depJob = @demuxjobline[0];
 #
 if ($convRatioFile) {
     $B = $S->getBuilder();
-    $B->dependency(0, $depJob); 
+    $B->dependency(0, $prevJobId);
     $B->resource(1, 1, "5gb");
     $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
     $B->jobName("${jobNamePrefix}conv_ratio");
@@ -751,7 +758,6 @@ if ($convRatioFile) {
     chomp $convRatioJob;
     print "Convergence ratio job is:\n $convRatioJob\n";
     my @convRatioJobLine=split /\./, $convRatioJob;
-    $depJob = @convRatioJobLine[0];
 }
 
 
@@ -762,20 +768,20 @@ if ($convRatioFile) {
 #nothing else depends on this scipt
 
 $B->queue($memqueue);
-$B->dependency(0, @demuxjobline[0]); 
+$B->dependency(0, $prevJobId);
 $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-align.pl -blastout $outputDir/1.out -align $outputDir/alignment_length.png");
 $B->renderToFile("$scriptDir/quartalign.sh");
 
-$quartalignjob = $S->submit("$scriptDir/quartalign.sh");
+my $quartalignjob = $S->submit("$scriptDir/quartalign.sh");
 chomp $quartalignjob;
 print "Quartile Align job is:\n $quartalignjob\n";
 
 
 $B->queue($memqueue);
-$B->dependency(0, @demuxjobline[0]); 
+$B->dependency(0, $prevJobId);
 $B->addAction("#PBS -m e");
 $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
@@ -783,20 +789,20 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-perid.pl -blastout $outputDir/1.out -pid $outputDir/percent_identity.png");
 $B->renderToFile("$scriptDir/quartpid.sh");
 
-$quartpidjob = $S->submit("$scriptDir/quartpid.sh");
+my $quartpidjob = $S->submit("$scriptDir/quartpid.sh");
 chomp $quartpidjob;
 print "Quartiles Percent Identity job is:\n $quartpidjob\n";
 
 
 $B->queue($memqueue);
-$B->dependency(0, @demuxjobline[0]); 
+$B->dependency(0, $prevJobId);
 $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $outputDir/allsequences.fa -lengths $outputDir/length_histogram.png -incfrac $incfrac");
 $B->renderToFile("$scriptDir/simplegraphs.sh");
 
-$simplegraphjob = $S->submit("$scriptDir/simplegraphs.sh");
+my $simplegraphjob = $S->submit("$scriptDir/simplegraphs.sh");
 chomp $simplegraphjob;
 print "Simplegraphs job is:\n $simplegraphjob\n";
 =cut end comment
@@ -811,7 +817,7 @@ my ($smallWidth, $smallHeight) = (700, 315);
 
 #create information for R to make graphs and then have R make them
 $B->queue($memqueue);
-$B->dependency(0, $depJob);
+$B->dependency(0, $prevJobId);
 $B->mailEnd();
 $B->setScriptAbortOnError(0); # don't abort on error
 $B->addAction("module load oldapps") if $oldapps;
@@ -858,10 +864,12 @@ if (defined $LegacyGraphs) {
 }
 $B->addAction("touch  $outputDir/1.out.completed");
 $B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->addAction("rm $blastOutputDir/blastout-*.tab");
+$B->addAction("rm $fracOutputDir/fracfile-*.fa");
 $B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 
-$graphjob = $S->submit("$scriptDir/graphs.sh");
+my $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
 
