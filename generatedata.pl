@@ -67,6 +67,7 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($randomFraction, $blast, $jobId, $unirefVersion, $noDemuxArg, $convRatioFile, $cdHitOnly);
 my ($unirefExpand, $scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile);
+my ($minSeqLen, $maxSeqLen);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -99,6 +100,8 @@ my $result = GetOptions(
     "uniref-version=s"  => \$unirefVersion,
     "no-demux"          => \$noDemuxArg,
     "conv-ratio-file=s" => \$convRatioFile,
+    "min-seq-len=i"     => \$minSeqLen,
+    "max-seq-len=i"     => \$maxSeqLen,
     "cd-hit=s"          => \$cdHitOnly,     # specify this flag in order to run cd-hit only after getsequence-domain.pl then exit.
     "uniref-expand"     => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
@@ -136,7 +139,7 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
     $fraction=1;
 }
 
-if (not $cdHitOnly or not $lengthdif or not $sim) {
+if (not defined $cdHitOnly or not $lengthdif or not $sim) {
     # Defaults and error checking for multiplexing
     if (not $multiplexing) {
         $multiplexing = "on";
@@ -221,9 +224,10 @@ if (not defined $configFile or not -f $configFile) {
 }
 
 my $manualCdHit = 0;
-$manualCdHit = 1 if (not $cdHitOnly and ($lengthdif < 1 or $sim < 1) and defined $noDemuxArg);
+$manualCdHit = 1 if (not defined $cdHitOnly and ($lengthdif < 1 or $sim < 1) and defined $noDemuxArg);
 
 $seqCountFile = ""  if not defined $seqCountFile;
+$cdHitOnly = ""     if not defined $cdHitOnly;
 
 $np = ceil($np / 24) if ($blast=~/diamond/);
 
@@ -245,6 +249,8 @@ $domain = "off"     if $unirefVersion;
 $maxFullFam = 0     if not defined $maxFullFam;
 $fastaFile = ""     if not defined $fastaFile;
 $accessionFile = "" if not defined $accessionFile;
+$minSeqLen = 0      if not defined $minSeqLen;
+$maxSeqLen = 0      if not defined $maxSeqLen;
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    if not defined $maxsequence;
@@ -300,6 +306,8 @@ print "manualcdhit is $manualCdHit\n";
 print "uniref-expand is $unirefExpand\n";
 print "Python module is $pythonMod\n";
 print "max-full-family is $maxFullFam\n";
+print "cd-hit is $cdHitOnly\n";
+print 
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -428,7 +436,10 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     # is checked below after cd-hit).
     my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
     my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption -config=$configFile");
+    my $minSeqLenOpt = $minSeqLen ? "-min-seq-len $minSeqLen" : "";
+    my $maxSeqLenOpt = $maxSeqLen ? "-max-seq-len $maxSeqLen" : "";
+
+    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption $minSeqLenOpt $maxSeqLenOpt -config=$configFile");
     $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $userHeaderFileOption -config=$configFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
