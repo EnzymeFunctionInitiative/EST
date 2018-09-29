@@ -269,6 +269,8 @@ print "createfasta job is:\n $createfastajob\n";
 $depId = $createfastajobline[0];
 
 
+my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
+
 # Get IDs from the family if it is specified.
 if ($pfam or $ipro) {
 
@@ -281,7 +283,6 @@ if ($pfam or $ipro) {
         $seqCountFileOption = "-seq-count-file $seqCountFile";
     }
 
-    my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
     my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
 
     $B = $S->getBuilder();
@@ -312,7 +313,7 @@ $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("cat $queryFile >> $allSeqFile");
 $B->addAction("merge_sequence_source.pl -meta-file $metadataFile");
-$B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $allSeqFile -meta-file $metadataFile -config=$configFile");
+$B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $allSeqFile $unirefOption -meta-file $metadataFile -config=$configFile");
 $B->jobName("${jobNamePrefix}blasthits_getannotations");
 $B->renderToFile("$scriptDir/blasthits_getannotations.sh");
 
@@ -362,13 +363,14 @@ $B->addAction("if [ \$NSEQ -le 50 ]; then");
 $B->addAction("    NP=1");
 $B->addAction("elif [ \$NSEQ -le 200 ]; then");
 $B->addAction("    NP=4");
-$B->addAction("elif [ \$NSEQ -le 400]; then");
+$B->addAction("elif [ \$NSEQ -le 400 ]; then");
 $B->addAction("    NP=8");
-$B->addAction("elif [ \$NSEQ -le 800]; then");
+$B->addAction("elif [ \$NSEQ -le 800 ]; then");
 $B->addAction("    NP=12");
-$B->addAction("elif [ \$NSEQ -le 1200]; then");
+$B->addAction("elif [ \$NSEQ -le 1200 ]; then");
 $B->addAction("    NP=16");
 $B->addAction("fi");
+$B->addAction("echo \"Using \$NP parts with \$NSEQ sequences\"");
 $B->addAction("$efiEstTools/splitfasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
 $B->jobName("${jobNamePrefix}blasthits_fracfile");
 $B->renderToFile("$scriptDir/blasthits_fracfile.sh");
@@ -401,7 +403,7 @@ print "createdb job is:\n $createdbjob\n";
 #generate $np blast scripts for files from fracfile step
 $B = $S->getBuilder();
 $B->jobArray("1-$np"); # We reserve $np slots.  However, due to the new way that fracefile works, some of those may complete immediately.
-$B->resource(1, 1, "5gb");
+$B->resource(1, 1, "10gb");
 $B->dependency(0, @createdbjobline[0] . ":" . @fracfilejobline[0]);
 $B->addAction("module load $efiEstMod");
 $B->addAction("export BLASTDB=$outputDir");
@@ -446,7 +448,7 @@ print "Cat job is:\n $catjob\n";
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, @catjobline[0]); 
-$B->resource(1, 1, "35gb");
+$B->resource(1, 1, "350gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
