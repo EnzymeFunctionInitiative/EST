@@ -448,7 +448,7 @@ print "Cat job is:\n $catjob\n";
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, @catjobline[0]); 
-$B->resource(1, 1, "350gb");
+$B->resource(1, 1, "300gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");

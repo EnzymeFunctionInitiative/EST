@@ -106,15 +106,24 @@ if(-e $struct){
             next if not $key;
             push(@metas, $key) if not grep { $_ eq $key } @metas;
             if ($anno->is_list_attribute($key)) {
-                my @tmpline = grep /\S/, split(",", $value);
+                my @vals = uniq sort split(m/\^/, $value);
+                @vals = grep !m/^None$/, @vals if scalar @vals > 1;
+                my @tmpline = grep /\S/, map { split(m/,/, $_) } @vals;
                 $uprot{$id}{$key} = \@tmpline;
             } else {
-                $uprot{$id}{$key} = $value;
                 if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
                     $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
                 {
                     $uprot{$id}{EFI::Annotations::FIELD_SEQ_KEY} = $sequences{$id};
                     $hasSeqs = 1;
+                } else {
+                    my @vals = uniq sort split(m/\^/, $value);
+                    @vals = grep !m/^None$/, @vals if scalar @vals > 1;
+                    if (scalar @vals > 1) {
+                        $uprot{$id}{$key} = \@vals;
+                    } elsif (scalar @vals == 1) {
+                        $uprot{$id}{$key} = $vals[0];
+                    }
                 }
             }
         }

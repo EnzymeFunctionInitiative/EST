@@ -129,10 +129,18 @@ if(-e $struct){
                 $hasMetas{$key} = 1;
             }
             if ($anno->is_list_attribute($key)) {
-                my @tmpline = grep /\S/, split(",", $value);
+                my @vals = uniq sort split(m/\^/, $value);
+                @vals = grep !m/^None$/, @vals if scalar @vals > 1;
+                my @tmpline = grep /\S/, map { split(m/,/, $_) } @vals;
                 $uprot{$id}{$key} = \@tmpline;
             }else{
-                $uprot{$id}{$key} = $value; 
+                my @vals = uniq sort split(m/\^/, $value);
+                @vals = grep !m/^None$/, @vals if scalar @vals > 1;
+                if (scalar @vals > 1) {
+                    $uprot{$id}{$key} = \@vals;
+                } elsif (scalar @vals == 1) {
+                    $uprot{$id}{$key} = $vals[0];
+                }
             }
             if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
                 $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
@@ -186,7 +194,8 @@ foreach my $element (@uprotnumbers){
     foreach my $key (@metas){
         #print "\t$key\t$uprot{$element}{$key}\n";
         my $displayName = $annoData->{$key}->{display};
-         if ($anno->is_list_attribute($key)) {
+        if (ref $uprot{$element}{$key} eq "ARRAY") {
+        #if ($anno->is_list_attribute($key)) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
             foreach my $piece (@{$uprot{$element}{$key}}){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
@@ -204,13 +213,6 @@ foreach my $element (@uprotnumbers){
             if ($piece or $type ne "integer") {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
             }
-#            }else{
-#                if($key eq "Sequence_Length"){
-#                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $uprot{$element}{$key});
-#                }else{
-#                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'string', 'value' => $uprot{$element}{$key});
-#                }
-#            }
         }
     }
     $writer->endTag();
