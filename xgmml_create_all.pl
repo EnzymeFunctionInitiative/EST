@@ -106,15 +106,25 @@ if(-e $struct){
             next if not $key;
             push(@metas, $key) if not grep { $_ eq $key } @metas;
             if ($anno->is_list_attribute($key)) {
-                my @tmpline = grep /\S/, split(",", $value);
+                my @vals = uniq sort split(m/\^/, $value);
+                #@vals = grep !m/^None$/, @vals if scalar @vals > 1;
+                my @tmpline = grep !m/^None$/, grep(/\S/, map { split(m/,/, $_) } @vals);
+                @tmpline = "None" if not scalar @tmpline;
                 $uprot{$id}{$key} = \@tmpline;
             } else {
-                $uprot{$id}{$key} = $value;
                 if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
                     $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
                 {
                     $uprot{$id}{EFI::Annotations::FIELD_SEQ_KEY} = $sequences{$id};
                     $hasSeqs = 1;
+                } else {
+                    my @vals = uniq sort split(m/\^/, $value);
+                    @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if scalar @vals > 1;
+                    if (scalar @vals > 1) {
+                        $uprot{$id}{$key} = \@vals;
+                    } elsif (scalar @vals == 1) {
+                        $uprot{$id}{$key} = $vals[0];
+                    }
                 }
             }
         }
@@ -187,11 +197,13 @@ while (<CDHIT>){
             if ($key eq $SizeKey) {
                 $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $count);
             } else {
+                my @pieces = uniq grep !m/^None$/, @{$clusterdata{$key}};
                 if ($key ne $UniRefKey and $key ne EFI::Annotations::FIELD_SEQ_KEY and $key ne EFI::Annotations::FIELD_SEQ_SRC_KEY) {
                     @{$clusterdata{$key}} = uniq @{$clusterdata{$key}};
                 }
                 $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-                foreach my $piece (@{$clusterdata{$key}}){
+                @pieces = "None" if not scalar @pieces;
+                foreach my $piece (@pieces){
                     #remove illegal xml characters from annotation data
                     $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
                     if($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/){

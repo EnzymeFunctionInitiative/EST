@@ -56,7 +56,7 @@ foreach my $taxid (@taxids){
 
     $sth->execute;
     while ($row = $sth->fetchrow_hashref) {
-        print STRUCT EFI::Annotations::build_annotations($row);
+        print STRUCT EFI::Annotations::build_annotations($row->{accession}, $row);
         push @accessions,$row->{"accessions"};
         $count++;
     }
