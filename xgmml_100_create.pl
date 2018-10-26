@@ -107,6 +107,7 @@ print time . " Finished reading in uniprot numbers\n";
 # Column headers and order in output file.
 my @metas;
 my %hasMetas;
+my %isList;
 my $hasSeqs = 0;
 print time . " Read in annotation data\n";
 #if struct file (annotation information) exists, use that to generate annotation information
@@ -129,16 +130,19 @@ if(-e $struct){
                 $hasMetas{$key} = 1;
             }
             if ($anno->is_list_attribute($key)) {
+                $isList{$key} = 1;
                 my @vals = uniq sort split(m/\^/, $value);
                 @vals = grep !m/^None$/, @vals if scalar @vals > 1;
                 my @tmpline = grep /\S/, map { split(m/,/, $_) } @vals;
                 $uprot{$id}{$key} = \@tmpline;
             }else{
                 my @vals = uniq sort split(m/\^/, $value);
-                @vals = grep !m/^None$/, @vals if scalar @vals > 1;
+                @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if scalar @vals > 1;
                 if (scalar @vals > 1) {
+                    $isList{$key} = 1;
                     $uprot{$id}{$key} = \@vals;
                 } elsif (scalar @vals == 1) {
+                    $isList{$key} = 0 if not exists $isList{$key};
                     $uprot{$id}{$key} = $vals[0];
                 }
             }
@@ -194,10 +198,10 @@ foreach my $element (@uprotnumbers){
     foreach my $key (@metas){
         #print "\t$key\t$uprot{$element}{$key}\n";
         my $displayName = $annoData->{$key}->{display};
-        if (ref $uprot{$element}{$key} eq "ARRAY") {
-        #if ($anno->is_list_attribute($key)) {
+        if ($isList{$key}) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-            foreach my $piece (@{$uprot{$element}{$key}}){
+            my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
+            foreach my $piece (@pieces){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
                 $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
             }
@@ -212,6 +216,7 @@ foreach my $element (@uprotnumbers){
             my $type = EFI::Annotations::get_attribute_type($key);
             if ($piece or $type ne "integer") {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
+            } else {
             }
         }
     }

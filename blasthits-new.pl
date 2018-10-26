@@ -358,6 +358,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("mkdir $blastOutDir");
 $B->addAction("NP=$np");
+$B->addAction("sleep 10"); # Here to avoid a syncing issue we had with the grep on the next line.
 $B->addAction("NSEQ=`grep \\> $outputDir/sequences.fa | wc -l`");
 $B->addAction("if [ \$NSEQ -le 50 ]; then");
 $B->addAction("    NP=1");

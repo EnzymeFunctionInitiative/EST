@@ -58,11 +58,9 @@ foreach my $accession (@accessions){
         # sequence cluster.  This code does that.
         my $sql = "";
         if ($unirefVersion) {
-#            print "UNIREF: $unirefVersion\n";
             my @idList; # = ($accession);
 
             my $idSql = EFI::Annotations::build_uniref_id_query_string($accession, $unirefVersion);
-#            print "SQL: $idSql\n";
             my $sth = $dbh->prepare($idSql);
             $sth->execute;
             while (my $row = $sth->fetchrow_hashref) {
@@ -71,7 +69,6 @@ foreach my $accession (@accessions){
             $sth->finish;
 
             $sql = EFI::Annotations::build_query_string(\@idList);
-#            print "SQL: $sql\n";
         } else {
             $sql = EFI::Annotations::build_query_string($accession);
         }
@@ -96,7 +93,8 @@ foreach my $accession (@accessions){
             }
         }
         
-        print OUT EFI::Annotations::build_annotations(\@rows, \@ncbiIds);
+        my $data = EFI::Annotations::build_annotations($accession, \@rows, \@ncbiIds);
+        print OUT $data;
         $sth->finish();
     }
 }

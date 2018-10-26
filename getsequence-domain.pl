@@ -352,7 +352,7 @@ sub parseFastaHeaders {
 
         if (grep { exists($unirefMapping{$_}) } @seqIds) {
             print "found a sequence in the fasta file that maps to a uniref cluster: ", join(",", @seqIds), "\n";
-            continue;
+            next;
         }
 
         push(@seqToWrite, @seqIds);
