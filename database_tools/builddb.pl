@@ -118,6 +118,8 @@ if (not defined $sql and not defined $buildCountsOnly and (not defined $queue or
     exit(1);
 }
 
+$doPdbBlast = defined $doPdbBlast;
+
 # Various directories and files.
 my $DbSupport = $ENV{EFIDBHOME} . "/support";
 $WorkingDir = abs_path($WorkingDir);
@@ -134,6 +136,7 @@ my $EstMod = $ENV{EFIESTMOD};
 $Legacy = defined $Legacy ? 1 : 0;
 my $PerlMod = $Legacy ? "perl" : "Perl";
 my $BlastMod = $Legacy ? "blast" : "BLAST";
+my $DiamondMod = "DIAMOND";
 
 
 # Number of processors to use for the blast job.
@@ -275,9 +278,9 @@ if (defined $buildEna and $buildEna) {
     
     # We try to do this after everything else has completed so that we don't hog the queue.
     logprint "#FORMAT BLAST DATABASE\n";
-    my $splitJobId = submitFormatDbAndSplitFastaJob($S->getBuilder(), $structJobId, $np, $PdbBuildDir, $fileNum++);
+    my $splitJobId = submitFormatDbAndSplitFastaJob($S->getBuilder(), $structJobId, $np, $PdbBuildDir, $doPdbBlast, $fileNum++);
     
-    if (defined $doPdbBlast) {
+    if ($doPdbBlast) {
        logprint "#DO PDB BLAST\n";
        my $blastJobId = submitBlastJob($S->getBuilder(), [$splitJobId, $unirefJobId, $countJobId], $np, $PdbBuildDir, $fileNum++);
        
@@ -341,7 +344,7 @@ sub submitEnaJob {
 
     my $file = "$BuildDir/$fileNum-ena.sh";
     
-    $B->resource(1, 1, "150gb");
+    $B->resource(1, 1, "300gb");
     $B->addAction("module load $PerlMod");
     $B->addAction("module load $DbMod");
    
@@ -352,7 +355,7 @@ sub submitEnaJob {
         #my $release = $emblDirs[-1];
         #my $enaInputDir = "$ENV{EFIEMBL}/Release_$release";
         
-        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -idmapping $OutputDir/idmapping.tab -log $BuildDir/make_ena_table.log");
+        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -interpro $OutputDir/INTERPRO.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -idmapping $OutputDir/idmapping.tab -log $BuildDir/make_ena_table.log");
         $B->addAction("date > $CompletedFlagFile.make_ena_table\n");
         $B->addAction("cat $enaDir/env.tab $enaDir/fun.tab $enaDir/pro.tab > $OutputDir/ena.tab");
         $B->addAction("date > $CompletedFlagFile.cat_ena\n");
@@ -386,7 +389,7 @@ sub submitFinalFileJob {
     }
     # Build PFAM, SSF, INTERPRO, and GENE3D .tab files
     if (not $skipIfExists or not -f "$OutputDir/INTERPRO.tab") {
-        $B->addAction("$ScriptDir/make_family_tables.pl -outdir $OutputDir -indir $BuildDir/match_complete");
+        $B->addAction("$ScriptDir/make_family_tables.pl -outdir $OutputDir -indir $BuildDir/match_complete -types $InputDir/interpro_entry.list -tree $InputDir/interpro_ParentChildTreeFile.txt");
         $B->addAction("date > $CompletedFlagFile.make_family_tables\n");
     }
 
@@ -406,6 +409,7 @@ sub submitBuildCountsJob {
 
     my $file = "$BuildDir/$fileNum-buildCounts.sh";
     $B->dependency(0, $depId);
+    $B->resource(1, 1, "200gb");
     
     addLibxmlIfNecessary($B);
     $B->addAction("module load $PerlMod");
@@ -460,7 +464,7 @@ sub submitBuildUnirefJob {
             mkdir $outDir if not -d $outDir;
             $B->addAction("rm -rf $outDir/*");
             $B->addAction("$ScriptDir/chop_uniref_xml.pl -in $InputDir/uniref$ver.xml -outdir $outDir");
-            $B->addAction("$ScriptDir/make_uniref_table.pl -in-dir $outDir -out-list $BuildDir/uniref/uniref$ver.list -out-map $BuildDir/uniref/uniref$ver.tab");
+            $B->addAction("$ScriptDir/make_uniref_table.pl -in-dir $outDir -out-list $BuildDir/uniref/uniref$ver.list -out-map $BuildDir/uniref/uniref$ver.tab -out-seq $BuildDir/uniref/uniref$ver.fasta");
         }
         $B->addAction("$ScriptDir/merge_uniref_tables.pl $BuildDir/uniref/uniref50.tab $BuildDir/uniref/uniref90.tab $OutputDir/uniref.tab");
         $B->addAction("date > $CompletedFlagFile.make-merge_uniref\n");
@@ -476,41 +480,50 @@ sub submitBuildUnirefJob {
 
 
 sub submitFormatDbAndSplitFastaJob {
-    my ($B, $depId, $np, $pdbBuildDir, $fileNum) = @_;
+    my ($B, $depId, $np, $pdbBuildDir, $doPdbBlast, $fileNum) = @_;
 
-    my $file = "$BuildDir/$fileNum-splitfasta.sh";
+    my $file = "$BuildDir/$fileNum-processFasta.sh";
     $B->dependency(0, $depId);
 
     waitForInput();
 
     my $dbDir = "$WorkingDir/blastdb";
     mkdir $dbDir if not -d $dbDir;
+    my $diamondDbDir = "$WorkingDir/diamonddb";
+    mkdir $diamondDbDir if not -d $diamondDbDir;
 
     $B->workingDirectory($dbDir);
     
     $B->addAction("module load $BlastMod");
     $B->addAction("module load $EstMod");
     $B->addAction("module load $PerlMod");
+    $B->addAction("module load $DiamondMod");
     
     #build fasta database
     if (not $skipIfExists or not -f "$dbDir/formatdb.log") {
-        $B->addAction("cd $dbDir");
-        $B->addAction("mv $CombinedDir/combined.fasta $dbDir/");
-        $B->addAction("formatdb -i $dbDir/combined.fasta -p T -o T");
-        $B->addAction("mv $dbDir/combined.fasta $CombinedDir/");
-        $B->addAction("date > $CompletedFlagFile.formatdb\n");
+        my @dbs = ("combined.fasta", "uniref90.fasta", "uniref50.fasta");
+        foreach my $db (@dbs) {
+            #(my $diamondDbName = $db) =~ s/\.fasta$//;
+            my $diamondDbName = $db;
+            $B->addAction("cd $dbDir");
+            $B->addAction("mv $CombinedDir/$db $dbDir/");
+            $B->addAction("formatdb -i $dbDir/$db -p T -o T");
+            $B->addAction("mv $dbDir/$db $CombinedDir/");
+            $B->addAction("diamond makedb --in $CombinedDir/$db -d $diamondDbDir/$diamondDbName");
+            $B->addAction("date > $CompletedFlagFile.formatdb.$db\n");
+        }
     }
     
     my $fracDir = "$pdbBuildDir/fractions";
     mkdir $fracDir if not -d $fracDir;
 
-    if (not $skipIfExists or not -f "$fracDir/fracfile-1.fa") {
+    if ($doPdbBlast and not $skipIfExists or not -f "$fracDir/fracfile-1.fa") {
         $B->addAction("rm -rf $fracDir");
         $B->addAction("$ScriptDir/splitfasta.pl -parts $np -tmp $fracDir -source $CombinedDir/combined.fasta");
         $B->addAction("date > $CompletedFlagFile.splitfasta\n");
     }
 
-    $B->addAction("date > $CompletedFlagFile.$fileNum-splitfasta\n");
+    $B->addAction("date > $CompletedFlagFile.$fileNum-processFasta\n");
 
     $B->outputBaseFilepath($file);
     $B->renderToFile($file);
@@ -677,7 +690,9 @@ sub submitDownloadJob {
         $B->addAction("echo Downloading short_names.dat");
         $B->addAction("curl -sS $InterproLocation/short_names.dat > $InputDir/interpro_short_names.dat");
         $B->addAction("curl -sS $InterproLocation/names.dat > $InputDir/interpro_names.dat");
-        $B->addAction("date > $CompletedFlagFile.interpro_names.xml\n");
+        $B->addAction("curl -sS $InterproLocation/ParentChildTreeFile.txt > $InputDir/interpro_ParentChildTreeFile.txt");
+        $B->addAction("curl -sS $InterproLocation/entry.list > $InputDir/interpro_entry.list");
+        $B->addAction("date > $CompletedFlagFile.interpro_misc\n");
     }
 
     $B->addAction("echo To download the ENA files, run");
@@ -691,7 +706,7 @@ sub submitDownloadJob {
     logprint "#COMPLETED DOWNLOAD AT " . scalar localtime() . "\n"
         if $interactive;
 
-    return $doDownload and $DoSubmit ? $S->submit($file) : undef;
+    return ($doDownload and $DoSubmit) ? $S->submit($file) : undef;
 }
 
 
@@ -791,6 +806,7 @@ sub submitAnnotationsJob {
 
     my $file = "$BuildDir/$fileNum-annotations.sh";
 
+    $B->resource(1, 1, "150gb");
     $B->dependency(0, $depId);
     $B->addAction("module load $PerlMod");
 
@@ -829,6 +845,7 @@ sub writeSqlCommands {
 select 'CREATING family_info' as '';
 drop table if exists family_info;
 create table family_info(family varchar(10) primary key, short_name varchar(50), long_name varchar(255), num_members integer, num_uniref50_members integer, num_uniref90_members integer);
+/*create table family_info(family varchar(10) primary key, short_name varchar(50), long_name varchar(255), num_members integer, num_uniref50_members integer, num_uniref90_members integer, family_type varchar(22), parent varchar(10));*/
 create index family_Index on family_info (family);
 
 select 'LOADING family_info' as '';
@@ -889,9 +906,7 @@ create table annotations(accession varchar(10) primary key,
                          HMP_Oxygen varchar(50),
                          EFI_ID varchar(6),
                          EC varchar(185),
-                         Cazy varchar(30),
-                         UniRef50_Cluster varchar(10),
-                         UniRef90_Cluster varchar(10));
+                         Cazy varchar(30));
 create index TaxID_Index ON annotations (Taxonomy_ID);
 create index accession_Index ON annotations (accession);
 
@@ -925,14 +940,9 @@ create index SSF_ID_Index on SSF (id);
 
 select 'CREATING INTERPRO' as '';
 drop table if exists INTERPRO;
-create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer);
+create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer, family_type varchar(22), parent varchar(10));
 create index INTERPRO_ID_Index on INTERPRO (id);
 create index INTERPRO_Accession_Index on INTERPRO (accession);
-
-select 'CREATING pdbhits' as '';
-drop table if exists pdbhits;
-create table pdbhits(ACC varchar(10) primary key, PDB varchar(4), e varchar(20));
-create index pdbhits_ACC_Index on pdbhits (ACC);
 
 select 'CREATING colors' as '';
 drop table if exists colors;
@@ -969,9 +979,6 @@ load data local infile '$OutputDir/SSF.tab' into table SSF;
 select 'LOADING INTERPRO' as '';
 load data local infile '$OutputDir/INTERPRO.tab' into table INTERPRO;
 
-select 'LOADING pdbhits' as '';
-load data local infile '$OutputDir/pdb.tab' into table pdbhits;
-
 select 'LOADING idmapping' as '';
 load data local infile '$OutputDir/idmapping.tab' into table idmapping;
 
@@ -979,6 +986,18 @@ GRANT SELECT ON `$dbName`.* TO '$DbUser'\@'$IpRange';
 
 SQL
         ;
+        
+        if ($doPdbBlast) {
+            $sql .= <<SQL;
+select 'CREATING pdbhits' as '';
+drop table if exists pdbhits;
+create table pdbhits(ACC varchar(10) primary key, PDB varchar(4), e varchar(20));
+create index pdbhits_ACC_Index on pdbhits (ACC);
+
+select 'LOADING pdbhits' as '';
+load data local infile '$OutputDir/pdb.tab' into table pdbhits;
+SQL
+        }
     }
 
 

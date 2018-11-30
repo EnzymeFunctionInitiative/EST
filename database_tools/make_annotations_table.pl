@@ -123,18 +123,20 @@ if ($oldPhyloFile) {
 }
 
 my $uniref50 = {};
-if ($uniref50File) {
+if (-f $uniref50File) {
     print "Reading UniRef50 file\n";
     $uniref50 = getUnirefData($uniref50File);
     print "Done\n";
 }
 
 my $uniref90 = {};
-if ($uniref90File) {
+if (-f $uniref90File) {
     print "Reading UniRef90 file\n";
     $uniref90 = getUnirefData($uniref90File);
     print "Done\n";
 }
+
+my $hasUniref = -f $uniref50File and -f $uniref90File;
 
 my $PfamData = {};
 if (defined $pfamFile and -f $pfamFile) {
@@ -402,8 +404,10 @@ sub write_line {
         push @line, $hmpsite, $hmpoxygen, $efiTid, $EC;
         push @line, $cazy;
         push @line, $ncbiStr;
-        push @line, (exists $uniref50->{$element} ? $uniref50->{$element} : "");
-        push @line, (exists $uniref90->{$element} ? $uniref90->{$element} : "");
+        if ($hasUniref) {
+            push @line, (exists $uniref50->{$element} ? $uniref50->{$element} : "");
+            push @line, (exists $uniref90->{$element} ? $uniref90->{$element} : "");
+        }
 
         print STRUCT join("\t", @line), "\n";
     }
