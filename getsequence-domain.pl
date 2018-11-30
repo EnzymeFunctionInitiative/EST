@@ -84,6 +84,13 @@ my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
 
 
+#######################################################################################################################
+# DATA FOR MAPPING UNIREF50 AND UNIREF90 CLUSTER IDS TO ACCESSION IDS
+#
+my $unirefData = {};
+# If $unirefVersion is set, %accessionhash will contain the UniRef cluster IDs that are in the family.
+
+
 ######################################################################################################################
 # PARSE ANY MANUAL ACCESSION FILE FOR IDS
 #
@@ -111,12 +118,6 @@ my $fileUnmatchedIdCount = 0;
 my $fileTotalIdCount = 0;
 my $fileSequenceCount = 0; # The number of actual sequences in the FASTA file, not the number of IDs or headers.
 
-
-#######################################################################################################################
-# DATA FOR MAPPING UNIREF50 AND UNIREF90 CLUSTER IDS TO ACCESSION IDS
-#
-my $unirefData = {};
-# If $unirefVersion is set, %accessionhash will contain the UniRef cluster IDs that are in the family.
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S), AND/OR PFAM CLANS
@@ -152,10 +153,12 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
 my $accUniprotIdRevMap = {};
 my @accUniprotIds;
 my $noMatches;
-if ($#manualAccessions >= 0) { 
-    if ($unirefExpand) {
+if ($#manualAccessions >= 0) {
+    if ($unirefVersion) {
+        addUnirefData();
+    } elsif ($unirefExpand) {
         expandUnirefSequences();
-    }   
+    }
     reverseLookupManualAccessions();
 }
 
@@ -575,6 +578,10 @@ sub parseManualAccessionFile {
     
     my @lines = split /[\r\n\s]+/, $line;
     foreach my $line (grep m/.+/, map { split(",", $_) } @lines) {
+        if ($unirefVersion and not $unirefExpand) {
+            my $sql = "SELECT accession FROM uniref WHERE uniref${unirefVersion}_seed = '$line'";
+#            $dbh->
+        }
         push(@manualAccessions, $line);
     }
 
@@ -639,6 +646,25 @@ sub expandUnirefSequences {
         while ($row) {
             push @manualAccessions, $row->[0];
             $row = $sth->fetchrow_arrayref;
+        }
+
+        $sth->finish if $sth;
+    }
+}
+
+
+sub addUnirefData {
+    print "Adding UniRef accession data\n";
+
+    my $col = "uniref${unirefVersion}_seed";
+
+    foreach my $seed (@manualAccessions) {
+        my $sql = "SELECT accession FROM uniref WHERE $col = '$seed'";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute;
+        
+        while (my $row = $sth->fetchrow_arrayref) {
+            push @{$unirefData->{$seed}}, $row->[0];
         }
 
         $sth->finish if $sth;
