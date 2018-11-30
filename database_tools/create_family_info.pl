@@ -8,7 +8,7 @@
 use strict;
 use Getopt::Long;
 
-my ($shortFile, $longFile, $combinedFile, $outputFile, $countsFile, $useClans);
+my ($shortFile, $longFile, $combinedFile, $outputFile, $countsFile, $useClans, $familyTypesFile, $treeFile);
 
 my $result = GetOptions("short=s"           => \$shortFile,
                         "long=s"            => \$longFile,
@@ -16,6 +16,8 @@ my $result = GetOptions("short=s"           => \$shortFile,
                         "merge-counts=s"    => \$countsFile,
                         "out=s"             => \$outputFile,
                         "use-clans"         => \$useClans,
+                        "types=s"           => \$familyTypesFile,
+                        "tree=s"            => \$treeFile,
                     );
 
 $useClans = 0 if not defined $useClans;                    
@@ -23,9 +25,19 @@ $useClans = 0 if not defined $useClans;
 my %pfams;
 my %counts;
 my %clans;
+my %ipTypes; # InterPro family types
+my %tree; # InterPro family tree (maps IPR family to structure pointing to list of children and parents)
 
 if (defined $countsFile and -f $countsFile) {
     %counts = loadFamilySizes($countsFile);
+}
+
+if (defined $familyTypesFile and -f $familyTypesFile) {
+    %ipTypes = loadFamilyTypes($familyTypesFile);
+}
+
+if (defined $treeFile and -f $treeFile) {
+    %tree = loadFamilyTree($treeFile);
 }
 
 if (defined $combinedFile) {
@@ -74,6 +86,8 @@ foreach my $key (sort keys %pfams){
     if (exists $counts{$key}) {
         @data = @{ $counts{$key} };
     }
+    push @data, (exists $ipTypes{$key} ? $ipTypes{$key} : "");
+    push @data, (exists $tree{$key} ? $tree{$key}->{parent} : "");
     print OUT join("\t", $key, $pfams{$key}{short}, $pfams{$key}{long}, @data), "\n";
 }
 
@@ -120,6 +134,70 @@ sub loadFamilySizes {
     close FILE;
 
     return %counts;
+}
+
+
+sub loadFamilyTypes {
+    my $file = shift;
+
+    my %types;
+
+    open FILE, $file;
+    my $header = <FILE>;
+
+    while (<FILE>) {
+        chomp;
+        my ($fam, $type) = split m/\t/;
+        if ($fam and $type) {
+            $types{$fam} = $type;
+        }
+    }
+
+    close FILE;
+
+    return %types;
+}
+
+
+sub loadFamilyTree {
+    my $file = shift;
+
+    my %tree;
+
+    open FILE, $file;
+
+    my @hierarchy;
+    my $curDepth = 0;
+    my $lastFam = "";
+
+    while (<FILE>) {
+        chomp;
+        (my $fam = $_) =~ s/^\-*(IPR\d+)::.*$/$1/;
+        (my $depthDash = $_) =~ s/^(\-*)IPR.*$/$1/;
+        my $depth = length $depthDash;
+        if ($depth > $curDepth) {
+            push @hierarchy, $lastFam;
+        } elsif ($depth < $curDepth) {
+            for (my $i = 0; $i < ($curDepth - $depth) / 2; $i++) {
+                pop @hierarchy;
+            }
+        }
+
+        my $parent = scalar @hierarchy ? $hierarchy[$#hierarchy] : "";
+
+        $tree{$fam}->{parent} = $parent;
+        $tree{$fam}->{children} = [];
+        if ($parent) {
+            push @{$tree{$parent}->{children}}, $fam;
+        }
+
+        $curDepth = $depth;
+        $lastFam = $fam;
+    }
+
+    close FILE;
+
+    return %tree;
 }
 
 
