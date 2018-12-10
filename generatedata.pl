@@ -697,7 +697,7 @@ print "Cat job is:\n $catjob\n";
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-$B->resource(1, 1, "400gb");
+$B->resource(1, 1, "350gb");
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
