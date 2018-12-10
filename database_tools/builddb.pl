@@ -868,7 +868,8 @@ SQL
 
 select 'CREATING ena' as '';
 drop table if exists ena;
-create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain varchar(2000),pfam varchar(1800));
+create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int);
+/*create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain varchar(2000),pfam varchar(1800));*/
 create index ena_acnum_index on ena(AC, NUM);
 create index ena_ID_index on ena(id);
 
