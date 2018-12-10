@@ -18,7 +18,7 @@ use strict;
 
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
-use IO;
+use IO::File;
 use XML::Writer;
 use XML::LibXML;
 use Getopt::Long;
@@ -72,8 +72,8 @@ if(int($numEdges) > $maxNumEdges){
 
 
 my $parser=XML::LibXML->new();
-my $output=new IO::File(">$output");
-my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
+my $outputFh=new IO::File(">$output");
+my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
 
 my $anno = new EFI::Annotations;
 
@@ -203,7 +203,10 @@ foreach my $element (@uprotnumbers){
             my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
             foreach my $piece (@pieces){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
-                $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
+                my $type = EFI::Annotations::get_attribute_type($key);
+                if ($piece or $type ne "integer") {
+                    $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
+                }
             }
             $writer->endTag();
         }else{
@@ -216,7 +219,6 @@ foreach my $element (@uprotnumbers){
             my $type = EFI::Annotations::get_attribute_type($key);
             if ($piece or $type ne "integer") {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
-            } else {
             }
         }
     }
@@ -230,12 +232,12 @@ while (<BLASTFILE>){
     $edge++;
     chomp $line;
     my @line=split /\t/, $line;
-    #my $log=-(log(@line[3])/log(10))+@line[2]*log(2)/log(10);
-    my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
-    $writer->startTag('edge', 'id' => "@line[0],@line[1]", 'label' => "@line[0],@line[1]", 'source' => @line[0], 'target' => @line[1]);
-    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[2]);
+    #my $log=-(log($line[3])/log(10))+$line[2]*log(2)/log(10);
+    my $log=int(-(log($line[5]*$line[6])/log(10))+$line[4]*log(2)/log(10));
+    $writer->startTag('edge', 'id' => "$line[0],$line[1]", 'label' => "$line[0],$line[1]", 'source' => $line[0], 'target' => $line[1]);
+    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $line[2]);
     $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $log);
-    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => @line[3]);
+    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $line[3]);
 
     $writer->endTag();
 }
