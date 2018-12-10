@@ -259,7 +259,10 @@ foreach my $key (@metas){
         @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
         $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
         foreach my $piece (@{$clusterdata{$key}}){
-            $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
+            my $type = EFI::Annotations::get_attribute_type($key);
+            if ($piece or ($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY)) {
+                $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
+            }
         }
         $writer->endTag;
     }

@@ -131,7 +131,8 @@ sub process{
 
                 foreach $AC (@uniprotIds, @revUniprotIdsToAdd) {
                     #logprint "AC is $AC, orgs is ".$orgs{$AC}."";
-                    print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\t".$orgs{$AC}."\t".join(',',@{$accessions{$AC}})."\n";
+                    print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\n";
+                    #print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\t".$orgs{$AC}."\t".join(',',@{$accessions{$AC}})."\n"; # This line includes Pfams. We are going to join the ENA table to the PFAM and INTERPRO tables in SQL instead to get the families. It also includes organisms. We again will join to the annotations table to get the organism.
                 }
                 @uniprotIds=();
                 %processedAlready=();
