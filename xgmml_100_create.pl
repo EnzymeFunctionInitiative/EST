@@ -18,7 +18,7 @@ use strict;
 
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
-use IO;
+use IO::File;
 use XML::Writer;
 use XML::LibXML;
 use Getopt::Long;
@@ -72,8 +72,8 @@ if(int($numEdges) > $maxNumEdges){
 
 
 my $parser=XML::LibXML->new();
-my $output=new IO::File(">$output");
-my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $output);
+my $outputFh=new IO::File(">$output");
+my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
 
 my $anno = new EFI::Annotations;
 
@@ -107,6 +107,7 @@ print time . " Finished reading in uniprot numbers\n";
 # Column headers and order in output file.
 my @metas;
 my %hasMetas;
+my %isList;
 my $hasSeqs = 0;
 print time . " Read in annotation data\n";
 #if struct file (annotation information) exists, use that to generate annotation information
@@ -129,10 +130,21 @@ if(-e $struct){
                 $hasMetas{$key} = 1;
             }
             if ($anno->is_list_attribute($key)) {
-                my @tmpline = grep /\S/, split(",", $value);
+                $isList{$key} = 1;
+                my @vals = uniq sort split(m/\^/, $value);
+                @vals = grep !m/^None$/, @vals if scalar @vals > 1;
+                my @tmpline = grep /\S/, map { split(m/,/, $_) } @vals;
                 $uprot{$id}{$key} = \@tmpline;
             }else{
-                $uprot{$id}{$key} = $value; 
+                my @vals = uniq sort split(m/\^/, $value);
+                @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if scalar @vals > 1;
+                if (scalar @vals > 1) {
+                    $isList{$key} = 1;
+                    $uprot{$id}{$key} = \@vals;
+                } elsif (scalar @vals == 1) {
+                    $isList{$key} = 0 if not exists $isList{$key};
+                    $uprot{$id}{$key} = $vals[0];
+                }
             }
             if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
                 $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
@@ -186,11 +198,15 @@ foreach my $element (@uprotnumbers){
     foreach my $key (@metas){
         #print "\t$key\t$uprot{$element}{$key}\n";
         my $displayName = $annoData->{$key}->{display};
-         if ($anno->is_list_attribute($key)) {
+        if ($isList{$key}) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-            foreach my $piece (@{$uprot{$element}{$key}}){
+            my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
+            foreach my $piece (@pieces){
                 $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
-                $writer->emptyTag('att', 'type' => 'string', 'name' => $displayName, 'value' => $piece);
+                my $type = EFI::Annotations::get_attribute_type($key);
+                if ($piece or $type ne "integer") {
+                    $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
+                }
             }
             $writer->endTag();
         }else{
@@ -204,13 +220,6 @@ foreach my $element (@uprotnumbers){
             if ($piece or $type ne "integer") {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
             }
-#            }else{
-#                if($key eq "Sequence_Length"){
-#                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'integer', 'value' => $uprot{$element}{$key});
-#                }else{
-#                    $writer->emptyTag('att', 'name' => $displayName, 'type' => 'string', 'value' => $uprot{$element}{$key});
-#                }
-#            }
         }
     }
     $writer->endTag();
@@ -223,12 +232,12 @@ while (<BLASTFILE>){
     $edge++;
     chomp $line;
     my @line=split /\t/, $line;
-    #my $log=-(log(@line[3])/log(10))+@line[2]*log(2)/log(10);
-    my $log=int(-(log(@line[5]*@line[6])/log(10))+@line[4]*log(2)/log(10));
-    $writer->startTag('edge', 'id' => "@line[0],@line[1]", 'label' => "@line[0],@line[1]", 'source' => @line[0], 'target' => @line[1]);
-    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => @line[2]);
+    #my $log=-(log($line[3])/log(10))+$line[2]*log(2)/log(10);
+    my $log=int(-(log($line[5]*$line[6])/log(10))+$line[4]*log(2)/log(10));
+    $writer->startTag('edge', 'id' => "$line[0],$line[1]", 'label' => "$line[0],$line[1]", 'source' => $line[0], 'target' => $line[1]);
+    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $line[2]);
     $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $log);
-    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => @line[3]);
+    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $line[3]);
 
     $writer->endTag();
 }

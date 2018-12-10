@@ -93,7 +93,7 @@ if (defined $jobId and $jobId) {
 
 if (defined $maxfull and $maxfull !~ /^\d+$/) {
     die "maxfull must be an integer\n";
-} else {
+} elsif (not defined $maxfull) {
     $maxfull = 10000000;
 }
 

@@ -88,12 +88,16 @@ while (<INPUT>) {
     chomp;
     my ($family, $accId, $startDomain, $endDomain) = split(m/\t/);
     if (exists $counts{$family}) {
+        print "$family $accId $startDomain $endDomain $counts{$family} 1" if ($family eq "IPR000015");
         if (not $mergeDomain or not exists $merges{"$family-$accId"}) {
             $counts{$family}++;
             $merges{"$family-$accId"} = 1;
+            print "  2" if ($family eq "IPR000015");
         }
+        print "\n" if ($family eq "IPR000015");
     } else {
-        $counts{$family} = 1;
+        print "$family $counts{$family} 0\n" if ($family eq "IPR000015");
+        $counts{$family} = 0;
     }
 
     if ($unirefFile and exists $unirefData{$accId}) {
@@ -123,7 +127,6 @@ while (<INPUT>) {
 print "\n" if $showProgress;
 
 close INPUT;
-
 
 $append = defined $append ? ">>" : ">";
 open OUTPUT, "$append $outputFile" or die "Unable to open the output file '$outputFile' for writing ($append): $!";

@@ -26,9 +26,11 @@ use EFI::Database;
 
 
 
-my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $useOptionASettings,
-    $fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile,
-    $seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile, $randomFraction, $maxFullFam);
+my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $useOptionASettings);
+my ($fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile);
+my ($seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile, $randomFraction, $maxFullFam);
+my ($minSeqLen, $maxSeqLen);
+
 my $result = GetOptions(
     "ipro=s"                => \$ipro,
     "pfam=s"                => \$pfam,
@@ -50,6 +52,8 @@ my $result = GetOptions(
     "random-fraction"       => \$randomFraction,
     "no-match-file=s"       => \$noMatchFile,
     "seq-count-file=s"      => \$seqCountFile,
+    "min-seq-len=i"         => \$minSeqLen,
+    "max-seq-len=i"         => \$maxSeqLen,
     "uniref-version=s"      => \$unirefVersion,
     "uniref-expand"         => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
     "config=s"              => \$configFile,
@@ -80,6 +84,13 @@ my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
 
 
+#######################################################################################################################
+# DATA FOR MAPPING UNIREF50 AND UNIREF90 CLUSTER IDS TO ACCESSION IDS
+#
+my $unirefData = {};
+# If $unirefVersion is set, %accessionhash will contain the UniRef cluster IDs that are in the family.
+
+
 ######################################################################################################################
 # PARSE ANY MANUAL ACCESSION FILE FOR IDS
 #
@@ -107,12 +118,6 @@ my $fileUnmatchedIdCount = 0;
 my $fileTotalIdCount = 0;
 my $fileSequenceCount = 0; # The number of actual sequences in the FASTA file, not the number of IDs or headers.
 
-
-#######################################################################################################################
-# DATA FOR MAPPING UNIREF50 AND UNIREF90 CLUSTER IDS TO ACCESSION IDS
-#
-my $unirefData = {};
-# If $unirefVersion is set, %accessionhash will contain the UniRef cluster IDs that are in the family.
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S), AND/OR PFAM CLANS
@@ -148,10 +153,12 @@ if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
 my $accUniprotIdRevMap = {};
 my @accUniprotIds;
 my $noMatches;
-if ($#manualAccessions >= 0) { 
-    if ($unirefExpand) {
+if ($#manualAccessions >= 0) {
+    if ($unirefVersion) {
+        addUnirefData();
+    } elsif ($unirefExpand) {
         expandUnirefSequences();
-    }   
+    }
     reverseLookupManualAccessions();
 }
 
@@ -348,7 +355,7 @@ sub parseFastaHeaders {
 
         if (grep { exists($unirefMapping{$_}) } @seqIds) {
             print "found a sequence in the fasta file that maps to a uniref cluster: ", join(",", @seqIds), "\n";
-            continue;
+            next;
         }
 
         push(@seqToWrite, @seqIds);
@@ -571,6 +578,10 @@ sub parseManualAccessionFile {
     
     my @lines = split /[\r\n\s]+/, $line;
     foreach my $line (grep m/.+/, map { split(",", $_) } @lines) {
+        if ($unirefVersion and not $unirefExpand) {
+            my $sql = "SELECT accession FROM uniref WHERE uniref${unirefVersion}_seed = '$line'";
+#            $dbh->
+        }
         push(@manualAccessions, $line);
     }
 
@@ -635,6 +646,25 @@ sub expandUnirefSequences {
         while ($row) {
             push @manualAccessions, $row->[0];
             $row = $sth->fetchrow_arrayref;
+        }
+
+        $sth->finish if $sth;
+    }
+}
+
+
+sub addUnirefData {
+    print "Adding UniRef accession data\n";
+
+    my $col = "uniref${unirefVersion}_seed";
+
+    foreach my $seed (@manualAccessions) {
+        my $sql = "SELECT accession FROM uniref WHERE $col = '$seed'";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute;
+        
+        while (my $row = $sth->fetchrow_arrayref) {
+            push @{$unirefData->{$seed}}, $row->[0];
         }
 
         $sth->finish if $sth;
@@ -770,23 +800,24 @@ sub retrieveSequences {
             } else {
                 $accession="";
             }
-            if ($domain eq "off" and $accession ne "") {
-                print OUT ">$accession$sequence\n\n";
-            } elsif ($domain eq "on" and $accession ne "") {
-                $sequence =~ s/\s+//g;
-                my @domains = @{$accessionhash{$accession}};
-                if (scalar @domains) {
-                    foreach my $piece (@domains) {
-                        my $thissequence=join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
-                        print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n\n";
-                    }
-                } else {
+            # This length filter is only valid for Option E jobs (CD-HIT only). It will run for other jobs
+            # but will give bogus results because it will exclude sequences from the fasta file but not
+            # from the other metadata files.
+            if (length($sequence) >= $minSeqLen and length($sequence) <= $maxSeqLen) {
+                if ($domain eq "off" and $accession ne "") {
                     print OUT ">$accession$sequence\n\n";
+                } elsif ($domain eq "on" and $accession ne "") {
+                    $sequence =~ s/\s+//g;
+                    my @domains = @{$accessionhash{$accession}};
+                    if (scalar @domains) {
+                        foreach my $piece (@domains) {
+                            my $thissequence=join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
+                            print OUT ">$accession:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n\n";
+                        }
+                    } else {
+                        print OUT ">$accession$sequence\n\n";
+                    }
                 }
-            } elsif ($accession eq "") {
-                #do nothing
-            } else {
-                die "Domain must be either on or off\n";
             }
         }
     }
@@ -1020,9 +1051,11 @@ sub verifyArgs {
    
     $unirefVersion = ""             if not defined $unirefVersion;
     $unirefExpand = 0               if not defined $unirefExpand or not $unirefVersion;
-    $maxsequence = 0                unless(defined $maxsequence);
-    $maxFullFam = 0                 unless(defined $maxFullFam);
+    $maxsequence = 0                if not defined $maxsequence;
+    $maxFullFam = 0                 if not defined $maxFullFam;
     $useOptionASettings = 0         if not defined $useOptionASettings;
+    $minSeqLen = 0                  if not defined $minSeqLen;
+    $maxSeqLen = 1000000            if not defined $maxSeqLen;
     $errorFile = "$access.failed"   if not $errorFile;
     $isDomainOn = lc($domain) eq "on";
 

@@ -111,6 +111,7 @@ open(my $EdgesFH, ">$edgesFile") or die "could not wirte to $edgesFile\n";
 #also populates .tab file for edges histogram at the same time
 my $removefile = 0;
 my $filekept = 0;
+my $streakCount = 0; # number of consecutive files that are below the threshold.
 my @filesToDelete;
 foreach my $file (@align) {
     chomp $file;
@@ -130,6 +131,7 @@ foreach my $file (@align) {
             $file =~ /(\d+)$/;
             my $thisedge = int $1;
             $EdgesFH->print("$thisedge\t$edgecount\n");
+            $streakCount = 0;
         } else {
             #unlink $file or die "could not remove $file\n";
             push(@filesToDelete, $file);
@@ -138,9 +140,11 @@ foreach my $file (@align) {
             #unlink $file or die "could not remove $file\n";
             push(@filesToDelete, $file);
             #if we have already saved some data, do not save any more (sets right side of graph)
-            if ($filekept > 0) {
+            #if ($filekept > 0) {
+            if ($streakCount > 5) {
                 $removefile = 1;
             }
+            $streakCount++;
         }
     } else {
         $file =~ /\s*(\d+)\s+([\w-\/.]+)/; 

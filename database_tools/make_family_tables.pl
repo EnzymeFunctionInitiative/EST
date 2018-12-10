@@ -5,21 +5,25 @@ use Getopt::Long;
 use strict;
 
 my ($outputDir, $inputDir, $uniref50File, $uniref90File, $gene3dFile, $pfamFile, $ssfFile, $interproFile, $debugCount);
+my ($familyTypesFile, $treeFile, $interproInfoFile);
 
 my $result = GetOptions(
-    "outdir=s"      => \$outputDir,
-    "indir=s"       => \$inputDir,
-    "uniref50=s"    => \$uniref50File,  # tab file that maps clustered UniProt IDs to representative UniRef ID
-    "uniref90=s"    => \$uniref90File,  # tab file that maps clustered UniProt IDs to representative UniRef ID
-    "gene3d=s"      => \$gene3dFile,    # GENE3D output file
-    "pfam=s"        => \$pfamFile,      # PFAM output file
-    "ssf=s"         => \$ssfFile,       # SSF output file
-    "interpro=s"    => \$interproFile,  # INTERPRO output file
-    "debug=i"       => \$debugCount,    # number of iterations to perform for debugging purposes
+    "outdir=s"          => \$outputDir,
+    "indir=s"           => \$inputDir,
+    "uniref50=s"        => \$uniref50File,      # tab file that maps clustered UniProt IDs to representative UniRef ID
+    "uniref90=s"        => \$uniref90File,      # tab file that maps clustered UniProt IDs to representative UniRef ID
+    "gene3d=s"          => \$gene3dFile,        # GENE3D output file
+    "pfam=s"            => \$pfamFile,          # PFAM output file
+    "ssf=s"             => \$ssfFile,           # SSF output file
+    "interpro=s"        => \$interproFile,      # INTERPRO output file
+    "debug=i"           => \$debugCount,        # number of iterations to perform for debugging purposes
+    "interpro-info=s"   => \$interproInfoFile,  # INTERPRO info output file
+    "types=s"           => \$familyTypesFile,
+    "tree=s"            => \$treeFile,
 );
 
-die "No output directory provided" if not $outputDir and not -d $outputDir;
-die "No input directory provided" if not $inputDir and not -d $inputDir;
+die "No output directory provided" if not defined $outputDir or not -d $outputDir;
+die "No input directory provided" if not defined $inputDir or not -d $inputDir;
 
 my %files;
 $files{GENE3D} = $gene3dFile if $gene3dFile;
@@ -31,7 +35,7 @@ $files{INTERPRO} = $interproFile if $interproFile;
 my $verbose=0;
 
 my %databases = ();
-if (not $gene3dFile and not $pfamFile and not $ssfFile and not $interproFile) {
+if (not $gene3dFile and not $pfamFile and not $ssfFile and not $interproFile and not $interproInfoFile) {
     %databases = (
         GENE3D      => 1,
         PFAM        => 1,
@@ -55,6 +59,25 @@ foreach my $database (keys %databases){
     $filehandles{$database} = *FILE;
 }
 
+
+# InterPro family types
+my $ipTypes = loadFamilyTypes($familyTypesFile) if (defined $familyTypesFile and -f $familyTypesFile);
+# InterPro family tree (maps IPR family to structure pointing to list of children and parents)
+my $tree = loadFamilyTree($treeFile) if (defined $treeFile and -f $treeFile);
+if ($familyTypesFile and $treeFile and $interproInfoFile) {
+    open IPINFO, ">", $interproInfoFile or die "Unable to open $interproInfoFile for writing: $!";
+    foreach my $fam (sort keys %$ipTypes) {
+        my @parts = ($fam, $ipTypes->{$fam}, "", 1);
+        if (exists $tree->{$fam}) {
+            $parts[2] = $tree->{$fam}->{parent};
+            $parts[3] = (scalar @{$tree->{$fam}->{children}}) ? 0 : 1;
+        }
+        print IPINFO join("\t", @parts), "\n";
+    }
+    close IPINFO;
+}
+
+exit(0) if not scalar keys %databases;
 
 
 my $uniref50 = {};
@@ -114,8 +137,14 @@ foreach my $xmlfile (glob("$inputDir/*.xml")){
                             push(@parts, $ur50);
                             push(@parts, $ur90);
                         }
+                        my @famInfo;
+                        if ($familyTypesFile and $treeFile) {
+                            push @famInfo, (exists $ipTypes->{$interpro} ? $ipTypes->{$interpro} : "") ;
+                            push @famInfo, (exists $tree->{$interpro} ? $tree->{$interpro}->{parent} : "");
+                            push @famInfo, ((exists $tree->{$interpro} and scalar @{$tree->{$interpro}->{children}}) ? 0 : 1); # 1 if it's a leaf node (e.g. it has no interpro parent family)
+                        }
                 
-                        print {$filehandles{INTERPRO}} join("\t", @parts), "\n";
+                        print {$filehandles{INTERPRO}} join("\t", @parts, @famInfo), "\n";
                         if($verbose>0){
                             print "\t$accession\tInterpro,$interpro start $start end $end\n";
                         }
@@ -182,5 +211,68 @@ sub loadUniRefFile {
     return \%data;
 }
 
+
+sub loadFamilyTypes {
+    my $file = shift;
+
+    my %types;
+
+    open FILE, $file;
+    my $header = <FILE>;
+
+    while (<FILE>) {
+        chomp;
+        my ($fam, $type) = split m/\t/;
+        if ($fam and $type) {
+            $types{$fam} = $type;
+        }
+    }
+
+    close FILE;
+
+    return \%types;
+}
+
+
+sub loadFamilyTree {
+    my $file = shift;
+
+    my %tree;
+
+    open FILE, $file;
+
+    my @hierarchy;
+    my $curDepth = 0;
+    my $lastFam = "";
+
+    while (<FILE>) {
+        chomp;
+        (my $fam = $_) =~ s/^\-*(IPR\d+)::.*$/$1/;
+        (my $depthDash = $_) =~ s/^(\-*)IPR.*$/$1/;
+        my $depth = length $depthDash;
+        if ($depth > $curDepth) {
+            push @hierarchy, $lastFam;
+        } elsif ($depth < $curDepth) {
+            for (my $i = 0; $i < ($curDepth - $depth) / 2; $i++) {
+                pop @hierarchy;
+            }
+        }
+
+        my $parent = scalar @hierarchy ? $hierarchy[$#hierarchy] : "";
+
+        $tree{$fam}->{parent} = $parent;
+        $tree{$fam}->{children} = [];
+        if ($parent) {
+            push @{$tree{$parent}->{children}}, $fam;
+        }
+
+        $curDepth = $depth;
+        $lastFam = $fam;
+    }
+
+    close FILE;
+
+    return \%tree;
+}
 
 

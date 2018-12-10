@@ -131,7 +131,8 @@ sub process{
 
                 foreach $AC (@uniprotIds, @revUniprotIdsToAdd) {
                     #logprint "AC is $AC, orgs is ".$orgs{$AC}."";
-                    print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\t".$orgs{$AC}."\t".join(',',@{$accessions{$AC}})."\n";
+                    print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\n";
+                    #print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\t".$orgs{$AC}."\t".join(',',@{$accessions{$AC}})."\n"; # This line includes Pfams. We are going to join the ENA table to the PFAM and INTERPRO tables in SQL instead to get the families. It also includes organisms. We again will join to the annotations table to get the organism.
                 }
                 @uniprotIds=();
                 %processedAlready=();
@@ -150,23 +151,21 @@ sub process{
 
 sub tabletohashary {
     #keys are uniprot accessions
-    #values are an array of pfam numbers
-    $table=shift @_;
-    %hash=();
+    #values are an array of pfam/interpro numbers
+    my $table = shift;
+    my $data = shift;
     open TABLE, $table or die "cannot open $table";
-    while(<TABLE>){
-        $line=$_;
-        @line=split /\s+/, $line;
-        push @{$hash{@line[1]}}, @line[0];
+    while (my $line = <TABLE>){
+        my @line = split /\s+/, $line;
+        push @{$data{$line[1]}}, $line[0];
     }
     close TABLE;
-    return \%hash;
 }
 
 sub tabletohash {
     #keys are uniprot accessions
     #values are an array of pfam numbers
-    $table=shift @_;
+    my $table=shift @_;
     %hash=();
     open TABLE, $table or die "cannot open $table";
     while(<TABLE>){
@@ -216,7 +215,8 @@ $result = GetOptions(
     "env=s"         => \$env,
     "fun=s"         => \$fun,
     "com=s"         => \$com,
-    "pfam=s"        => \$table,
+    "pfam=s"        => \$pfamTable,
+    "interpro=s"    => \$iprTable,
     "idmapping=s"   => \$idMappingFile,
     "org=s"         => \$orgtable,
     "v"             => \$verbose,
@@ -249,7 +249,7 @@ die "Invalid arguments specified" if not -f $debugParseFile and not defined $emb
 #(
 #                                         not defined $embl or not defined $pro or not defined $env or not defined $fun or
 #                                         not defined $com
-#                                             or not defined $table or not defined $orgtable
+#                                             or not defined $pfamTable or not defined $orgtable
 #                                     );
 
 $pro = "$baseDir/pro.tab" if not defined $pro or not $pro;
@@ -273,10 +273,15 @@ $log = "$baseDir/$logName" unless defined $log;
 open LOG, "> $log";
 
 
-if (defined $table and -f $table) {
+my %accessions;
+if (defined $pfamTable and -f $pfamTable) {
     logprint "read in accession to pfam table";
-    %accessions=%{tabletohashary($table)};
+    tabletohashary($pfamTable, \%accessions);
 }
+#if (defined $iprTable and -f $iprTable) {
+#    logprint "read in accession to interpro table";
+#    tabletohashary($iprTable, \%accessions);
+#}
 if (defined $orgtable and -f $orgtable) {
     logprint "read in accession to organism table";
     %organisms=%{tabletohash($orgtable)};
