@@ -10,6 +10,7 @@ png_file = args[3]
 data_dir = ""
 start = 0
 stop = 0
+a_scores = vector()
 
 if (type == "hdf5") {
     start <- h5read(data_file,"/stats/start")
@@ -24,12 +25,12 @@ if (type == "hdf5") {
 } else {
 
     data_dir = data_file
-    data_files=list.files(path = data_dir, pattern = "perid")
+    data_files = list.files(path = data_dir, pattern = "perid")
+    a_scores = sapply(data_files, function(x) { as.numeric(substr(x, nchar(x)-5+1, nchar(x))) }, USE.NAMES = FALSE)
 
     start = as.integer(args[4])
     stop = as.integer(args[5])
 
-    print(paste("range",start,stop))
     newdata = t(rep(NA,length(data_files)))
 
     arg_offset = 5
@@ -51,17 +52,21 @@ if (length(args) > arg_offset+2) {
 
 png(png_file, width=im_width, height=im_height, type="cairo")
 
+num_boxes <- stop - start
+if (length(a_scores) > 0) {
+    num_boxes <- length(a_scores)
+}
+step_size <- ceiling(10 / (im_width / num_boxes))
+
 bar_step_size <- 1
 whisk_color <- "gray40"
-if (im_width < 1000) {
+if (im_width < 1000 && step_size > 1) {
     bar_step_size = 3
     whisk_color <- "gray60"
 }
 
-num_boxes <- stop - start + 1
-step_size <- ceiling(10 / (im_width / num_boxes))
-box_range <- seq(start, num_boxes + step_size, step_size)
-bars_to_use <- seq(start, num_boxes, bar_step_size)
+box_range <- seq(start, start + num_boxes + step_size, step_size)
+bars_to_use <- seq(start, start + num_boxes, bar_step_size)
 
 boxplot(newdata,
         main = paste("Percent Identity vs Alignment Score", jobnum),
@@ -70,11 +75,12 @@ boxplot(newdata,
         ylab = "Percent Identity",
         xlab = "Alignment Score",
         ylim = range(0,100),
+        xlim = range(bars_to_use[0], bars_to_use[-1]),
         xaxt = "n",
         frame = F)
 
 for (i in bars_to_use) {
-    key=i #i+start-1
+    key = i
     if (type == "hdf5") {
         print(paste0("/perid/",key))
         newdata=t(h5read(data_file,paste0("/perid/",key)))
@@ -82,7 +88,11 @@ for (i in bars_to_use) {
         idx = i - start + 1
         full_path=paste(data_dir,"/",data_files[idx],sep='')
         print(full_path)
-        newdata = read.table(full_path, header=TRUE, sep="\t", check.names = FALSE)
+        if (!file.exists(full_path)) {
+            newdata = vector()
+        } else {
+            newdata = read.table(full_path, header=TRUE, sep="\t", check.names = FALSE)
+        }
     }
     if (length(newdata) == 0) next
     boxplot(newdata,
