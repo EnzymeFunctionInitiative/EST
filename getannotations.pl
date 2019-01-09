@@ -52,7 +52,7 @@ open OUT, ">$annoOut" or die "cannot write struct.out file $annoOut\n";
 my $dbh = $db->getHandle();
 
 foreach my $accession (@accessions){
-    unless($accession=~/^z/){
+    if ($accession !~ /^z/) {
 
         # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
         # sequence cluster.  This code does that.
@@ -67,6 +67,8 @@ foreach my $accession (@accessions){
                 push @idList, $row->{ID};
             }
             $sth->finish;
+
+            @idList = $accession if not scalar @idList;
 
             $sql = EFI::Annotations::build_query_string(\@idList);
         } else {
