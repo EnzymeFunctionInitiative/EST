@@ -56,7 +56,7 @@ foreach my $accession (@accessions){
 
         # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
         # sequence cluster.  This code does that.
-        my $sql = "";
+        my @sql_parts;
         if ($unirefVersion) {
             my @idList; # = ($accession);
 
@@ -70,23 +70,30 @@ foreach my $accession (@accessions){
 
             @idList = $accession if not scalar @idList;
 
-            $sql = EFI::Annotations::build_query_string(\@idList);
+            while (my @chunk = splice(@idList, 0, 200)) {
+                my $sql = EFI::Annotations::build_query_string(\@chunk);
+                push @sql_parts, $sql;
+            }
         } else {
-            $sql = EFI::Annotations::build_query_string($accession);
+            @sql_parts = (EFI::Annotations::build_query_string($accession));
         }
 
-        #$sql = "select * from annotations as A join taxonomy as T on A.Taxonomy_ID = T.Taxonomy_ID where accession = '$accession'";
-        my $sth = $dbh->prepare($sql);
-        $sth->execute;
         my @rows;
-        while (my $row = $sth->fetchrow_hashref) {
-            push @rows, $row;
+
+        #$sql = "select * from annotations as A join taxonomy as T on A.Taxonomy_ID = T.Taxonomy_ID where accession = '$accession'";
+        foreach my $sql (@sql_parts) {
+            my $sth = $dbh->prepare($sql);
+            $sth->execute;
+            while (my $row = $sth->fetchrow_hashref) {
+                push @rows, $row;
+            }
+            $sth->finish;
         }
-        $sth->finish;
+
  #TODO: handle uniref cluster seqeuences ncbi ids
         # Now get a list of NCBI IDs
-        $sql = EFI::Annotations::build_id_mapping_query_string($accession);
-        $sth = $dbh->prepare($sql);
+        my $sql = EFI::Annotations::build_id_mapping_query_string($accession);
+        my $sth = $dbh->prepare($sql);
         $sth->execute;
         my @ncbiIds;
         while (my $idRow = $sth->fetchrow_hashref) {
