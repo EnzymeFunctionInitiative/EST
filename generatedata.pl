@@ -67,7 +67,7 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($randomFraction, $blast, $jobId, $unirefVersion, $noDemuxArg, $convRatioFile, $cdHitOnly);
 my ($unirefExpand, $scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile);
-my ($minSeqLen, $maxSeqLen);
+my ($minSeqLen, $maxSeqLen, $forceDomain);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -93,6 +93,7 @@ my $result = GetOptions(
     "sim=s"             => \$sim,
     "multiplex=s"       => \$multiplexing,
     "domain=s"          => \$domain,
+    "force-domain=i"    => \$forceDomain,
     "fraction=i"        => \$fraction,
     "random-fraction"   => \$randomFraction,
     "blast=s"           => \$blast,
@@ -245,12 +246,12 @@ $randomFraction = 0 if not defined $randomFraction;
 
 $unirefVersion = "" if not defined $unirefVersion;
 $unirefExpand = 0   if not defined $unirefExpand;
-$domain = "off"     if $unirefVersion;
 $maxFullFam = 0     if not defined $maxFullFam;
 $fastaFile = ""     if not defined $fastaFile;
 $accessionFile = "" if not defined $accessionFile;
 $minSeqLen = 0      if not defined $minSeqLen;
 $maxSeqLen = 0      if not defined $maxSeqLen;
+$forceDomain = 0    if not defined $forceDomain;
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    if not defined $maxsequence;
@@ -260,6 +261,8 @@ if (not defined $incfrac) {
     print "-incfrac not specified, using default of 0.99\n";
     $incfrac=0.99;
 }
+
+$domain = "off"     if $unirefVersion and not $forceDomain;
 
 ($jobId = $ENV{PWD}) =~ s%^.*/(\d+)/*$%$1% if not $jobId;
 $jobId = "" if $jobId =~ /\D/;
@@ -307,7 +310,7 @@ print "uniref-expand is $unirefExpand\n";
 print "Python module is $pythonMod\n";
 print "max-full-family is $maxFullFam\n";
 print "cd-hit is $cdHitOnly\n";
-print 
+print "force-domain is $forceDomain\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -316,6 +319,7 @@ my $errorFile = "$accOutFile.failed";
 
 my $fracOutputDir = "$outputDir/fractions";
 my $blastOutputDir = "$outputDir/blastout";
+my $structFile = "$outputDir/struct.out";
 
 my $userHeaderFile = "";
 my $userHeaderFileOption = "";
@@ -440,7 +444,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $maxSeqLenOpt = $maxSeqLen ? "-max-seq-len $maxSeqLen" : "";
 
     $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption $minSeqLenOpt $maxSeqLenOpt -config=$configFile");
-    $B->addAction("$efiEstTools/getannotations.pl -out $outputDir/struct.out -fasta $outputDir/allsequences.fa $unirefOption $userHeaderFileOption -config=$configFile");
+    $B->addAction("$efiEstTools/getannotations.pl -out $structFile -fasta $outputDir/allsequences.fa $unirefOption $userHeaderFileOption -config=$configFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
@@ -458,7 +462,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("cd $outputDir");
-    $B->addAction("$efiEstTools/getseqtaxid.pl -fasta allsequences.fa -struct struct.out -taxid $taxid -config=$configFile");
+    $B->addAction("$efiEstTools/getseqtaxid.pl -fasta allsequences.fa -struct $structFile -taxid $taxid -config=$configFile");
     if ($fastaFile=~/\w+/) {
         $fastaFile=~s/^-userfasta //;
         $B->addAction("cat $fastaFile >> allsequences.fa");
@@ -466,7 +470,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     #TODO: handle the header file for this case....
     if ($userHeaderFile=~/\w+/) {
         $userHeaderFile=~s/^-userdat //;
-        $B->addAction("cat $userHeaderFile >> struct.out");
+        $B->addAction("cat $userHeaderFile >> $structFile");
     }
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
@@ -542,14 +546,14 @@ else
 fi
 CMDS
             );
-        $B->addAction("mv $outputDir/struct.out $outputDir/struct.demux.out");
-        $B->addAction("$efiEstTools/remove_demuxed_nodes.pl -in $outputDir/struct.demux.out -out $outputDir/struct.out -cluster $outputDir/sequences.fa.clstr");
+        $B->addAction("mv $structFile $outputDir/struct.demux.out");
+        $B->addAction("$efiEstTools/remove_demuxed_nodes.pl -in $outputDir/struct.demux.out -out $structFile -cluster $outputDir/sequences.fa.clstr");
         $B->addAction("mv $outputDir/allsequences.fa $outputDir/allsequences.fa.before_demux");
         $B->addAction("cp $outputDir/sequences.fa $outputDir/allsequences.fa");
     }
     # Add in CD-HIT attributes to SSN
     if ($noDemuxArg) {
-        $B->addAction("$efiEstTools/get_demux_ids.pl -struct $outputDir/struct.out -cluster $outputDir/sequences.fa.clstr -domain $domain");
+        $B->addAction("$efiEstTools/get_demux_ids.pl -struct $structFile -cluster $outputDir/sequences.fa.clstr -domain $domain");
     }
 } else {
     $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
@@ -847,10 +851,18 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length_sm.png \$FIRST \$LAST \$MAXALIGN $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST $jobId");
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+    my $lenHistText = "";
+    if ($unirefVersion) {
+        my $fullLenHistText = "\"(Full UniProt)\"";
+        $B->addAction("$efiEstTools/get_lengths_from_anno.pl -struct $structFile -length $outputDir/uniprot_length.tab -incfrac 0.999");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot.png $jobId $fullLenHistText");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot_sm.png $jobId $fullLenHistText $smallWidth $smallHeight");
+        $lenHistText = "\"(UniRef$unirefVersion)\"";
+    }
+    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId $lenHistText");
+    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 } else {
     $B->addAction("module load $pythonMod");
     $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");

@@ -8,6 +8,9 @@ BEGIN {
 #version 0.9.2 no changes to this file
 #version 0.9.5 fixed a bug in creating struct.out file where not all annotation information was being written
 
+use warnings;
+use strict;
+
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::SQLite;
@@ -17,13 +20,7 @@ use FindBin;
 use EFI::Database;
 use EFI::Annotations;
 
-#removed in favor of cfg file
-#$db=$ENV{'EFIEST'}."/data_files/uniprot_combined.db";
-#my $dbh = DBI->connect("dbi:SQLite:$db","","");
-#$configfile=read_file($ENV{'EFICFG'}) or die "could not open $ENV{'EFICFG'}\n";
-#eval $configfile;
 
-#$db="/quest_data/";
 my ($fasta, $struct, $taxid, $configFile);
 my $result = GetOptions(
     "fasta=s"       => \$fasta,
@@ -34,6 +31,10 @@ my $result = GetOptions(
 
 die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
+die "Missing database directory EFI_DB_DIR" if not exists $ENV{EFI_DB_DIR} or not -d $ENV{EFI_DB_DIR};
+
+my $dbDir = $ENV{EFI_DB_DIR};
+my $dbName = $ENV{EFI_UNIPROT_DB} ? $ENV{EFI_UNIPROT_DB} : "combined";
 
 my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
@@ -55,9 +56,9 @@ foreach my $taxid (@taxids){
     my $sth = $dbh->prepare($sql);
 
     $sth->execute;
-    while ($row = $sth->fetchrow_hashref) {
+    while (my $row = $sth->fetchrow_hashref) {
         print STRUCT EFI::Annotations::build_annotations($row->{accession}, $row);
-        push @accessions,$row->{"accessions"};
+        push @accessions, $row->{"accession"};
         $count++;
     }
     print "$taxid has $count matches\n";
@@ -66,10 +67,10 @@ close STRUCT;
 
 open FASTA, ">$fasta" or die "Cannot write to output fasta $fasta\n";
 while (scalar @accessions) {
-    @batch = splice(@accessions, 0, $perpass);
-    $batchline = join ',', @batch;
-    @sequences = split /\n/, `fastacmd -d $data_files/combined.fasta -s $batchline`;
-    foreach $sequence (@sequences) {
+    my @batch = splice(@accessions, 0, $perpass);
+    my $batchline = join ',', @batch;
+    my @sequences = split /\n/, `fastacmd -d $dbDir/$dbName.fasta -s $batchline`;
+    foreach my $sequence (@sequences) {
         $sequence =~ s/^>\w\w\|(\w{6,10})\|.*/>$1/;
         print FASTA "$sequence\n";
     }

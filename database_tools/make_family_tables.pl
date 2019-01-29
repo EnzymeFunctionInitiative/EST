@@ -141,7 +141,7 @@ foreach my $xmlfile (glob("$inputDir/*.xml")){
                         if ($familyTypesFile and $treeFile) {
                             push @famInfo, (exists $ipTypes->{$interpro} ? $ipTypes->{$interpro} : "") ;
                             push @famInfo, (exists $tree->{$interpro} ? $tree->{$interpro}->{parent} : "");
-                            push @famInfo, ((exists $tree->{$interpro} and scalar @{$tree->{$interpro}->{children}}) ? 0 : 1); # 1 if it's a leaf node (e.g. it has no interpro parent family)
+                            push @famInfo, ((not exists $tree->{$interpro} or not scalar @{$tree->{$interpro}->{children}}) ? 1 : 0); # 1 if it's a leaf node (e.g. it has no interpro parent family)
                         }
                 
                         print {$filehandles{INTERPRO}} join("\t", @parts, @famInfo), "\n";
