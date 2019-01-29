@@ -24,7 +24,6 @@ if($filter=~/^eval$/){
   $bitscore=1;
   $evalue=$pid=0;
 }elsif($filter=~/^pid$/){
-  $minval=$minval/100;
   $pid=1;
   $evalue=$bitscore=0;
 }
