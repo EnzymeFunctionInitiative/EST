@@ -459,7 +459,9 @@ sub getDomainFromDb {
                     push @{$unirefData->{$unirefId}}, $uniprotId;
                     # The accessionHash element will be overwritten multiple times, once for each accession ID 
                     # in the UniRef cluster that corresponds to the UniRef cluster ID.
-                    $accessionHash->{$unirefId} = [{}]; 
+                    if ($unirefId eq $uniprotId) {
+                        push @{$accessionHash->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
+                    }
                 }
                 # Only increment the family size if the uniref cluster ID hasn't yet been encountered.  This
                 # is because the select query above retrieves all accessions in the family based on UniProt

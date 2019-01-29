@@ -910,6 +910,8 @@ create table annotations(accession varchar(10) primary key,
                          Cazy varchar(30));
 create index TaxID_Index ON annotations (Taxonomy_ID);
 create index accession_Index ON annotations (accession);
+create index PFAM_Index ON annotations(PFAM);
+create index INTERPRO_Index on annotations(INTERPRO);
 
 select 'CREATING TAXONOMY' as '';
 drop table if exists taxonomy;
@@ -941,9 +943,10 @@ create index SSF_ID_Index on SSF (id);
 
 select 'CREATING INTERPRO' as '';
 drop table if exists INTERPRO;
-create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer, family_type varchar(22), parent varchar(10));
+create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer, family_type varchar(22), parent varchar(10), is_leaf boolean);
 create index INTERPRO_ID_Index on INTERPRO (id);
 create index INTERPRO_Accession_Index on INTERPRO (accession);
+
 
 select 'CREATING colors' as '';
 drop table if exists colors;
