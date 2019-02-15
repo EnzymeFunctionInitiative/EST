@@ -43,7 +43,10 @@ sub parse_line {
 
 sub trim_name {
     my $name = shift;
-    return substr($name, 0, 19);
+    return $name;
+    # At one point we were truncating the name. I have no idea why this was happeneing, and it caused
+    # problems later -- the node IDs for edges were truncated in some cases when the domain option was.
+    #return substr($name, 0, 19);
 }
 
 sub finish {

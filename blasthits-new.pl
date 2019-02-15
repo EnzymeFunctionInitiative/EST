@@ -334,7 +334,7 @@ $B->addAction("module load $efiDbMod");
 #  $B->addAction("module load blast");
 $B->addAction("cd $outputDir");
 if($multiplexing eq "on"){
-    $B->addAction("cd-hit -c $sim -s $lengthdif -i $allSeqFile -o $outputDir/sequences.fa");
+    $B->addAction("cd-hit -d 0 -c $sim -s $lengthdif -i $allSeqFile -o $outputDir/sequences.fa");
 }else{
     $B->addAction("cp $allSeqFile $outputDir/sequences.fa");
 }

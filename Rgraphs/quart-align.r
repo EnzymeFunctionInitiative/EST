@@ -65,7 +65,7 @@ step_size <- ceiling(10 / (im_width / num_boxes))
 bar_step_size <- 1
 whisk_color <- "gray40"
 if (im_width < 1000 && step_size > 1) {
-    bar_step_size = 3
+    bar_step_size = 1 # Was 3 at one point to make it less dense, but didn't convey enough info.
     whisk_color <- "gray60"
 }
 
