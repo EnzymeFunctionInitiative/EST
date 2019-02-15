@@ -510,7 +510,7 @@ if ($cdHitOnly) {
         my $sLen = $#seqId == $#seqLength ? $seqLength[$i] : $seqLength[0];
         my $sId = $seqId[$i];
         my $nParm = ($sId < 1 and $sLen < 1) ? "-n 2" : "";
-        $B->addAction("cd-hit $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2");
+        $B->addAction("cd-hit -d 0 $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2");
         $B->addAction("$efiEstTools/get_cluster_count.pl -id $sId -len $sLen -cluster $outputDir/sequences-$sId-$sLen.fa.clstr >> $cdHitOnly");
     }
     $B->addAction("touch  $outputDir/1.out.completed");
@@ -533,7 +533,7 @@ $B->addAction("cd $outputDir");
 
 if ($multiplexing eq "on") {
     my $nParm = ($sim < 1 and $lengthdif < 1) ? "-n 2" : "";
-    $B->addAction("cd-hit $nParm -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa -M 10000");
+    $B->addAction("cd-hit -d 0 $nParm -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa -M 10000");
 
     if ($manualCdHit) {
         $B->addAction(<<CMDS
