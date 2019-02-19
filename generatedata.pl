@@ -853,7 +853,7 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-    my $lenHistText = "";
+    my $lenHistText = "\" \"";
     if ($unirefVersion) {
         my $fullLenHistText = "\"(Full UniProt)\"";
         $B->addAction("$efiEstTools/get_lengths_from_anno.pl -struct $structFile -length $outputDir/uniprot_length.tab -incfrac 0.999");
