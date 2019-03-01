@@ -518,12 +518,13 @@ $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdat
 $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length_sm.png \$FIRST \$LAST \$MAXALIGN $jobId $smallWidth $smallHeight");
 $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST $jobId");
 $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
-$B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId");
-$B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
 $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
 $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+my $lenHistText = "\" \"";
+$B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId $lenHistText");
+$B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 $B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->jobName("${jobNamePrefix}blasthits_graphs");
 $B->renderToFile("$scriptDir/blasthits_graphs.sh");
 
