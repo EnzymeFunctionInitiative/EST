@@ -33,7 +33,7 @@ my $result = GetOptions(
 
 $evalueFile = (defined $evalueFile and $evalueFile) ? $evalueFile : "";
 
-my $edgelimit = 10;
+my $minNumEdges = 10;
 my @evalues;
 my %alignhandles;
 my %peridhandles;
@@ -83,7 +83,6 @@ while (<BLAST>){
 }
 close(BLAST);
 
-
 my $evSum = 0;
 my %evFunc;
 foreach my $ev (sort { $b <=> $a } keys %metadata) {
@@ -106,66 +105,58 @@ my @align = `wc -l $rdata/align*`;
 pop @align;
 
 
-open(my $EdgesFH, ">$edgesFile") or die "could not wirte to $edgesFile\n";
-#remove files that represent e-values that are cut off (keeps x axis from being crazy long)
-#also populates .tab file for edges histogram at the same time
-my $removefile = 0;
-my $filekept = 0;
-my $streakCount = 0; # number of consecutive files that are below the threshold.
+# Remove files that represent e-values that are cut off (keeps x axis from being crazy long)
+# Also populates .tab file for edges histogram at the same time
+my @fileInfo;
+foreach my $wcLine (@align) {
+    chomp $wcLine;
+    unless ($wcLine =~ /align/) {
+        die "something is wrong, file does not have align in name $wcLine\n";
+    }
+
+    (my $file = $wcLine) =~ s/^\s*(\d+)\s+([\w-\/.]+)$/$2/;
+    my $edgeCount = $1;
+    (my $edgeNum = $file) =~ s/^.*?(\d+)$/$1/;
+    (my $peridFile = $file) =~ s/align(\d+)/perid$1/;
+
+    push @fileInfo, [$file, $peridFile, $edgeCount, $edgeNum];
+}
+
 my @filesToDelete;
-foreach my $file (@align) {
-    chomp $file;
-    unless ($file =~ /align/) {
-        die "something is wrong, file does not have align in name\n";
-    }
-    # Why is this here?  -NO 1/12/2018
-    #unless($file=~/home/){
-    #  die "something is wrong, file does not have home in name\n";
-    #}
-    if ($removefile == 0) {
-        $file =~ /\s*(\d+)\s+([\w-\/.]+)/;
-        $file = $2;
-        my $edgecount = $1;
-        if ($1 > $edgelimit) {
-            $filekept++;
-            $file =~ /(\d+)$/;
-            my $thisedge = int $1;
-            $EdgesFH->print("$thisedge\t$edgecount\n");
-            $streakCount = 0;
-        } else {
-            #unlink $file or die "could not remove $file\n";
-            push(@filesToDelete, $file);
-            #although we are only looking at align files, the perid ones have to go as well
-            $file =~ s/align(\d+)$/perid$1/;
-            #unlink $file or die "could not remove $file\n";
-            push(@filesToDelete, $file);
-            #if we have already saved some data, do not save any more (sets right side of graph)
-            #if ($filekept > 0) {
-            if ($streakCount > 5) {
-                $removefile = 1;
-            }
-            $streakCount++;
-        }
-    } else {
-        $file =~ /\s*(\d+)\s+([\w-\/.]+)/; 
-        $file = $2;
-        #once we find one value at the end of the graph to remove, we remove the rest
-        #unlink $file or die "could not remove $file\n";
-        push(@filesToDelete, $file);
-        #although we are only looking at align files, the perid ones have to go as well
-        $file =~ s/align(\d+)$/perid$1/;
-        #unlink $file or die "could not remove $file\n";
-        push(@filesToDelete, $file);
-    }
+# Keep at least this many files
+my $minNumFiles = 30;
+my $numFiles = scalar @fileInfo;
+my ($startIdx, $endIdx) = (0, $numFiles-1);
+
+# Remove any files at the start of the graph that have fewer than $minNumEdges lines in them.
+for (my $i = 0; $i < $numFiles; $i++) {
+    $startIdx = $i;
+    my ($edgeCount, $edgeIdx) = ($fileInfo[$i]->[2], $fileInfo[$i]->[3]);
+    last if ($edgeCount >= $minNumEdges or $numFiles - $i <= $minNumFiles);
+    push @filesToDelete, $fileInfo[$i]->[0], $fileInfo[$i]->[1] if $edgeCount < $minNumEdges;
+}
+my $numRemoved = scalar @filesToDelete;
+
+# Remove any files at the end of the graph that have fewer than $minNumEdges lines in them.
+for (my $i = $numFiles - 1; $i >= 0; $i--) {
+    $endIdx = $i;
+    my ($edgeCount, $edgeIdx) = ($fileInfo[$i]->[2], $fileInfo[$i]->[3]);
+    last if ($edgeCount >= $minNumEdges or $numFiles - ($numRemoved + $numFiles - $i) <= $minNumFiles);
+    push @filesToDelete, $fileInfo[$i]->[0], $fileInfo[$i]->[1] if $edgeCount < $minNumEdges;
+}
+
+
+open(my $EdgesFH, ">$edgesFile") or die "could not wirte to $edgesFile\n";
+for (my $i = $startIdx; $i <= $endIdx; $i++) {
+    my ($edgeCount, $edgeIdx) = ($fileInfo[$i]->[2], $fileInfo[$i]->[3]);
+    $EdgesFH->print("$edgeIdx\t$edgeCount\n");
 }
 close($EdgesFH);
 
-# Eventually we want to do something different if all of the files are to be deleted so that there is
-# at least something to graph.
-#if (scalar(@filesToDelete)/2 >= scalar(@align) + 10) {}
-map { unlink($_); } @filesToDelete;
+map { unlink($_); print "Deleting\t$_\n"; } @filesToDelete;
 
-print "$filekept results\n";
+my $numFilesKept = 2*$numFiles - scalar @filesToDelete;
+print "Kept $numFilesKept results\n";
 
 print "1.out procession complete, now processing fasta\n";
 
