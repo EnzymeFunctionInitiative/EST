@@ -50,5 +50,5 @@ colnames(plot_data) = cols
 png(png_file, width=im_width, height=im_height, type="cairo");
 par(mar=c(4,4,4,4))
 
-barplot(plot_data, main = paste("Number of Edges at Score", jobnum), ylab = "Number of Edges", xlab = "Alignment Score", col = "red", border = "blue")
+barplot(plot_data, main = paste("Number of Edges at Alignment Score", jobnum), ylab = "Number of Edges", xlab = "Alignment Score", col = "red", border = "blue")
 dev.off()

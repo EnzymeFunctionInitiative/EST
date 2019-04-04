@@ -27,9 +27,9 @@ use EFI::Database;
 
 
 my ($ipro, $pfam, $gene3d, $ssf, $access, $maxsequence, $manualAccession, $accessionFile, $useOptionASettings);
-my ($fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $domain, $fraction, $noMatchFile);
+my ($fastaFileOut, $fastaFileIn, $metaFileOut, $useFastaHeaders, $useDomain, $domainFamily, $fraction, $noMatchFile);
 my ($seqCountFile, $unirefVersion, $unirefExpand, $configFile, $errorFile, $randomFraction, $maxFullFam);
-my ($minSeqLen, $maxSeqLen);
+my ($minSeqLen, $maxSeqLen, $mapUniref50to90);
 
 my $result = GetOptions(
     "ipro=s"                => \$ipro,
@@ -47,7 +47,8 @@ my $result = GetOptions(
     "fasta-file=s"          => \$fastaFileIn,
     "meta-file=s"           => \$metaFileOut,
     "use-fasta-headers"     => \$useFastaHeaders,
-    "domain=s"              => \$domain,
+    "domain=s"              => \$useDomain,
+    "domain-family=s"       => \$domainFamily, # domainFamily is for option D
     "fraction=i"            => \$fraction,
     "random-fraction"       => \$randomFraction,
     "no-match-file=s"       => \$noMatchFile,
@@ -56,23 +57,23 @@ my $result = GetOptions(
     "max-seq-len=i"         => \$maxSeqLen,
     "uniref-version=s"      => \$unirefVersion,
     "uniref-expand"         => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
+    "map-uniref-50-to-90"   => \$mapUniref50to90, # expand the uniref50 seed sequence clusters to uniref90 and then continue
     "config=s"              => \$configFile,
 );
 
 #die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
-my @accessions = ();
+my @accessions;
 my $perpass = (exists $ENV{EFIPASS} and $ENV{EFIPASS}) ? $ENV{EFIPASS} : 1000;
 my $data_files = $ENV{EFIDBPATH};
-my %ids = ();
-my %accessionhash = ();
-my @ipros = ();
-my @pfams = ();
-my @gene3ds = ();
-my @ssfs = ();
-my @manualAccessions = ();
-my $isDomainOn;
+my %ids;
+my %accessionhash;
+my @ipros;
+my @pfams;
+my @gene3ds;
+my @ssfs;
+my @manualAccessions;
 my %excludeIds; # A list of IDs that we exclude from database retrieval.
 
 
@@ -154,9 +155,12 @@ my $accUniprotIdRevMap = {};
 my @accUniprotIds;
 my $noMatches;
 if ($#manualAccessions >= 0) {
-    if ($unirefVersion) {
+    if ($mapUniref50to90) {
+        expandUnirefSequences();
+    }
+    if ($unirefVersion and not $unirefExpand) {
         addUnirefData();
-    } elsif ($unirefExpand) {
+    } elsif ($unirefExpand and not $mapUniref50to90) {
         expandUnirefSequences();
     }
     reverseLookupManualAccessions();
@@ -425,13 +429,11 @@ sub makeSequenceId {
 
 
 sub getDomainFromDb {
-    my ($dbh, $table, $accessionHash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @elements) = @_;
+    my ($dbh, $table, $accessionHash, $fractionFunc, $unirefData, $unirefVersion, @elements) = @_;
     my $c = 1;
     my %unirefFamSizeHelper;
     print "Accessions found in $table:\n";
     my %idsProcessed;
-
-    #@manualAccessions is a global variable
 
     my $unirefField = "";
     my $unirefCol = "";
@@ -439,23 +441,24 @@ sub getDomainFromDb {
     if ($unirefVersion) {
         $unirefField = $unirefVersion eq "90" ? "uniref90_seed" : "uniref50_seed";
         $unirefCol = ", $unirefField";
-        $unirefJoin = "left join uniref on $table.accession = uniref.accession";
+        $unirefJoin = "LEFT JOIN uniref ON $table.accession = uniref.accession";
     }
 
     foreach my $element (@elements) {
-        my $sql = "select $table.accession as accession, start, end $unirefCol from $table $unirefJoin where $table.id = '$element'";
+        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol FROM $table $unirefJoin WHERE $table.id = '$element'";
         #my $sql = "select * from $table $joinClause where $table.id = '$element'";
         my $sth = $dbh->prepare($sql);
         $sth->execute;
         my $ac = 1;
         while (my $row = $sth->fetchrow_hashref) {
             (my $uniprotId = $row->{accession}) =~ s/\-\d+$//;
-            next if (not $isDomainOn and exists $idsProcessed{$uniprotId});
+            next if (not $useDomain and exists $idsProcessed{$uniprotId});
             $idsProcessed{$uniprotId} = 1;
 
             if ($unirefVersion) {
                 my $unirefId = $row->{$unirefField};
                 if (&$fractionFunc($c)) {
+                    $ac++;
                     push @{$unirefData->{$unirefId}}, $uniprotId;
                     # The accessionHash element will be overwritten multiple times, once for each accession ID 
                     # in the UniRef cluster that corresponds to the UniRef cluster ID.
@@ -572,19 +575,15 @@ sub parseManualAccessionFile {
     print ":accessionFile $accessionFile:\n";
     open ACCFILE, $accessionFile or die "Unable to open user accession file $accessionFile: $!";
     
-    # Read the case where we have a mac file (CR \r only)
+    # Read the case where we have a mac file (CR \r only); we read in the entire file and then split.
     my $delim = $/;
     $/ = undef;
     my $line = <ACCFILE>;
     $/ = $delim;
-    
+
     my @lines = split /[\r\n\s]+/, $line;
-    foreach my $line (grep m/.+/, map { split(",", $_) } @lines) {
-        if ($unirefVersion and not $unirefExpand) {
-            my $sql = "SELECT accession FROM uniref WHERE uniref${unirefVersion}_seed = '$line'";
-#            $dbh->
-        }
-        push(@manualAccessions, $line);
+    foreach my $accId (grep m/.+/, map { split(",", $_) } @lines) {
+        push(@manualAccessions, $accId);
     }
 
     print "There were ", scalar @manualAccessions, " manual accession IDs taken from ", scalar @lines, " lines in the accession file\n";
@@ -628,30 +627,33 @@ sub reverseLookupManualAccessions {
 sub expandUnirefSequences {
     print "Expanding UniRef seed sequences\n";
 
-    my $col = "uniref${unirefVersion}_seed";
+    my $selClause = "";
+    if ($mapUniref50to90) {
+        $selClause = "select distinct(uniref90_seed) from uniref where uniref50_seed = '<SEED>'";
+    } else {
+        $selClause = "select accession from uniref where uniref${unirefVersion}_seed = '<SEED>'";
+    }
 
-    my @origIds = @manualAccessions;
-    @manualAccessions= ();
-    foreach my $id (@origIds) {
-        my $sql = "select $col from uniref where accession = '$id'";
+    my @seeds;
+    foreach my $seedId (@manualAccessions) {
+        (my $sql = $selClause) =~ s/<SEED>/$seedId/;
         my $sth = $dbh->prepare($sql);
         $sth->execute;
         my $row = $sth->fetchrow_arrayref;
-        next if not $row;
-        
-        my $seed = $row->[0];
-        $sql = "select accession from uniref where $col = '$seed'";
-        $sth = $dbh->prepare($sql);
-        $sth->execute;
-        $row = $sth->fetchrow_arrayref;
-        
-        while ($row) {
-            push @manualAccessions, $row->[0];
-            $row = $sth->fetchrow_arrayref;
+
+        if (not $row) {
+            push @seeds, $seedId;
+        } else {
+            while ($row) {
+                push @seeds, $row->[0];
+                $row = $sth->fetchrow_arrayref;
+            }
         }
 
         $sth->finish if $sth;
     }
+
+    @manualAccessions = uniq @seeds;
 }
 
 
@@ -681,25 +683,55 @@ sub verifyAccessions {
     my $noMatchCount = 0;
     my $numDuplicate = (scalar @accUniprotIds) - (scalar @uniqAccUniprotIds);
     my $numUnirefOverlap = 0;
+
+    my $domJoin = "";
+    my $domSel = "";
+    my $domWhere = "";
+    my $domProcessed = {};
+    if ($useDomain and $domainFamily) {
+        my $famTable = $domainFamily =~ m/^PF/ ? "PFAM" : "INTERPRO";
+        $domJoin = "LEFT JOIN $famTable ON $famTable.accession = annotations.accession";
+        $domSel = ", $famTable.start AS start, $famTable.end AS end";
+        $domWhere = "AND $famTable.id = '$domainFamily'";
+    }
     
     # Lookup each manual accession ID to get the domain as well as verify that it exists.
     foreach my $element (@uniqAccUniprotIds) {
-        my $sql = "select accession from annotations where accession = '$element'";
+        my $sql = "SELECT annotations.accession $domSel FROM annotations $domJoin WHERE annotations.accession = '$element' $domWhere";
         $sth = $dbh->prepare($sql);
         $sth->execute;
-        if ($sth->fetch) {
+        if (my $row = $sth->fetchrow_hashref) {
             $inUserIds{$element} = 1;
+
+            # If we are putting accession IDs in manually and specifying a domain family, then we
+            # need to get the domain extents.
+            my $extHash = {};
+            my $domExists = 0;
+            if ($useDomain and $domainFamily) {
+                $extHash->{start} = $row->{start};
+                $extHash->{end} = $row->{end};
+                $domExists = exists $domProcessed->{$element}; # This allows us to handle the case where multiple instances of the family occur.
+                $domProcessed->{$element} = 1;
+            }
             
             if (exists $accessionhash{$element}) {
                 $overlapCount++;
-                $accessionhash{$element} = [{}];
+                if ($domExists) {
+                    push @{$accessionhash{$element}}, $extHash;
+                } else {
+                    $accessionhash{$element} = [$extHash];
+                }
                 $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
             } else {
                 $addedFromFile++;
                 # Only add to the list if it's not a UniRef seed sequence or part of a UniRef cluster.
                 if (not exists $unirefMapping{$element}) {
                     push(@accessions, $element);
-                    $accessionhash{$element} = [{}];
+                    if ($domExists) {
+                        push @{$accessionhash{$element}}, $extHash;
+                    } else {
+                        $accessionhash{$element} = [$extHash];
+                    }
                     $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
                 } else {
                     $numUnirefOverlap++;
@@ -710,6 +742,8 @@ sub verifyAccessions {
             print NOMATCH "$element\tNOT_FOUND_DATABASE\n";
         }
     }
+
+    $fileUnmatchedIdCount += $noMatchCount;
     
     print "There were $numDuplicate duplicate IDs in the Uniprot IDs that were idenfied from the accession file.\n";
     print "The number of Uniprot IDs in the accession file that were already in the specified family is $overlapCount.\n";
@@ -758,12 +792,10 @@ sub writeAccessions {
     foreach my $accession (sort keys %accessionhash) {
         my @domains = @{$accessionhash{$accession}};
         foreach my $piece (@domains) {
-            if ($domain eq "off") {
+            if (not $useDomain) {
                 print GREP "$accession\n";
-            } elsif ($domain eq "on") {
-                print GREP "$accession:${$piece}{'start'}:${$piece}{'end'}\n"
             } else {
-                die "domain must be set to either on or off\n";
+                print GREP "$accession:${$piece}{'start'}:${$piece}{'end'}\n"
             }
         }
     }
@@ -806,9 +838,9 @@ sub retrieveSequences {
             # but will give bogus results because it will exclude sequences from the fasta file but not
             # from the other metadata files.
             if (length($sequence) >= $minSeqLen and length($sequence) <= $maxSeqLen) {
-                if ($domain eq "off" and $accession ne "") {
+                if (not $useDomain and $accession ne "") {
                     print OUT ">$accession$sequence\n\n";
-                } elsif ($domain eq "on" and $accession ne "") {
+                } elsif ($useDomain and $accession ne "") {
                     $sequence =~ s/\s+//g;
                     my @domains = @{$accessionhash{$accession}};
                     if (scalar @domains) {
@@ -1013,13 +1045,13 @@ sub retrieveFamilyAccessions {
     }
 
     print "Getting Acession Numbers in specified Families\n";
-    my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ipros);
+    my $famAcc = getDomainFromDb($dbh, "INTERPRO", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, @ipros);
     $fullFamilyIdCount += $famAcc->[1];
-    $famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @pfams);
+    $famAcc = getDomainFromDb($dbh, "PFAM", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, @pfams);
     $fullFamilyIdCount += $famAcc->[1];
-    $famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @gene3ds);
+    $famAcc = getDomainFromDb($dbh, "GENE3D", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, @gene3ds);
     $fullFamilyIdCount += $famAcc->[1];
-    $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, $isDomainOn, @ssfs);
+    $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, @ssfs);
     $fullFamilyIdCount += $famAcc->[1];
 
     # Exclude any IDs that are to be excluded
@@ -1035,31 +1067,20 @@ sub retrieveFamilyAccessions {
 
 
 sub verifyArgs {
-    if (defined $domain) {
-        unless($domain eq "off" or $domain eq "on") {
-            die "domain value must be either on or off\n";
-        }
-    } else {
-        $domain="off";
-    }
+    $useDomain = (defined $useDomain and $useDomain eq "on");
+    $domainFamily = ($useDomain and $domainFamily) ? uc($domainFamily) : "";
+    $fraction = (defined $fraction and $fraction !~ m/\D/ and $fraction > 0) ? $fraction : 1;
     
-    if (defined $fraction) {
-        unless($fraction =~ /^\d+$/ and $fraction >0) {
-            die "if fraction is defined, it must be greater than zero\n";
-        }
-    } else {
-        $fraction=1;
-    }
-   
     $unirefVersion = ""             if not defined $unirefVersion;
     $unirefExpand = 0               if not defined $unirefExpand or not $unirefVersion;
+    $mapUniref50to90 = 0            if not defined $mapUniref50to90;
     $maxsequence = 0                if not defined $maxsequence;
     $maxFullFam = 0                 if not defined $maxFullFam;
     $useOptionASettings = 0         if not defined $useOptionASettings;
     $minSeqLen = 0                  if not defined $minSeqLen;
     $maxSeqLen = 1000000            if not defined $maxSeqLen;
     $errorFile = "$access.failed"   if not $errorFile;
-    $isDomainOn = lc($domain) eq "on";
+    $domainFamily = ""              if not $domainFamily =~ m/^(PF|IPR)/; # domainFamily is for option D
 
     if ((not $configFile or not -f $configFile) and exists $ENV{EFICONFIG}) {
         $configFile = $ENV{EFICONFIG};
@@ -1081,24 +1102,24 @@ sub verifyArgs {
 
 
 sub parseFamilyArgs {
-    if (defined $ipro and $ipro ne 0) {
+    if (defined $ipro and $ipro) {
         print ":$ipro:\n";
-        @ipros=split /,/, $ipro;
+        @ipros = split /,/, $ipro;
     }
     
-    if (defined $pfam and $pfam ne 0) {
+    if (defined $pfam and $pfam) {
         print ":$pfam:\n";
-        @pfams=split /,/, $pfam;
+        @pfams = split /,/, $pfam;
     }
     
-    if (defined $gene3d and $gene3d ne 0) {
+    if (defined $gene3d and $gene3d) {
         print ":$gene3d:\n";
-        @gene3ds=split /,/, $gene3d;
+        @gene3ds = split /,/, $gene3d;
     }
     
-    if (defined $ssf and $ssf ne 0) {
+    if (defined $ssf and $ssf) {
         print ":$ssf:\n";
-        @ssfs=split /,/, $ssf;
+        @ssfs = split /,/, $ssf;
     }
     
     if (defined $manualAccession and $manualAccession ne 0) {

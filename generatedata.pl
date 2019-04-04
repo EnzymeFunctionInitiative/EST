@@ -67,7 +67,7 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($randomFraction, $blast, $jobId, $unirefVersion, $noDemuxArg, $convRatioFile, $cdHitOnly);
 my ($unirefExpand, $scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile);
-my ($minSeqLen, $maxSeqLen, $forceDomain);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $mapUniref50to90);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -93,20 +93,23 @@ my $result = GetOptions(
     "sim=s"             => \$sim,
     "multiplex=s"       => \$multiplexing,
     "domain=s"          => \$domain,
+    "domain-family=s"   => \$domainFamily,
     "force-domain=i"    => \$forceDomain,
     "fraction=i"        => \$fraction,
     "random-fraction"   => \$randomFraction,
     "blast=s"           => \$blast,
     "job-id=i"          => \$jobId,
-    "uniref-version=s"  => \$unirefVersion,
     "no-demux"          => \$noDemuxArg,
     "conv-ratio-file=s" => \$convRatioFile,
     "min-seq-len=i"     => \$minSeqLen,
     "max-seq-len=i"     => \$maxSeqLen,
     "cd-hit=s"          => \$cdHitOnly,     # specify this flag in order to run cd-hit only after getsequence-domain.pl then exit.
+    "uniref-version=s"  => \$unirefVersion,
     "uniref-expand"     => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
+    "map-uniref-50-to-90"   => \$mapUniref50to90, # expand the uniref50 seed sequence clusters to uniref90 and then continue
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
+    "cluster-node=s"    => \$clusterNode,
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
     "config=s"          => \$configFile,    # new-style config file
@@ -131,6 +134,7 @@ if (defined $domain and $domain ne "off" and $domain ne "on") {
     die "domain value of $domain is not valid, must be either on or off\n";
 } elsif (not defined $domain) {
     $domain = "off";
+    $domainFamily = "";
 }
 
 # Defaults for fraction of sequences to fetch
@@ -252,6 +256,7 @@ $accessionFile = "" if not defined $accessionFile;
 $minSeqLen = 0      if not defined $minSeqLen;
 $maxSeqLen = 0      if not defined $maxSeqLen;
 $forceDomain = 0    if not defined $forceDomain;
+$domainFamily = ""  if not defined $domainFamily;
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    if not defined $maxsequence;
@@ -279,6 +284,7 @@ my $rMod = "R";
 
 print "Blast is $blast\n";
 print "domain is $domain\n";
+print "domain-family is $domainFamily\n";
 print "fraction is $fraction\n";
 print "random fraction is $randomFraction\n";
 print "multiplexing is $multiplexing\n";
@@ -401,6 +407,7 @@ mkdir $logDir;
 $logDir = "" if not -d $logDir;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
+$schedArgs{node} = $clusterNode if $clusterNode;
 my $S = new EFI::SchedulerApi(%schedArgs);
 my $jobNamePrefix = $jobId ? $jobId . "_" : ""; 
 
@@ -420,6 +427,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
     my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
+    my $mapUniref50to90Option = $mapUniref50to90 ? "-map-uniref-50-to-90" : "";
     my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
@@ -443,7 +451,18 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $minSeqLenOpt = $minSeqLen ? "-min-seq-len $minSeqLen" : "";
     my $maxSeqLenOpt = $maxSeqLen ? "-max-seq-len $maxSeqLen" : "";
 
-    $B->addAction("$efiEstTools/getsequence-domain.pl -domain $domain $fastaFileOption $userHeaderFileOption -ipro $ipro -pfam $pfam -ssf $ssf -gene3d $gene3d -accession-id $accessionId $accessionFileOption $noMatchFile -out $outputDir/allsequences.fa $maxSeqOpt -fraction $fraction $randomFractionOpt -accession-output $accOutFile -error-file $errorFile $seqCountFileOption $unirefOption $unirefExpandOption $maxFullFamOption $minSeqLenOpt $maxSeqLenOpt -config=$configFile");
+    my $domFamArg = $domainFamily ? "-domain-family $domainFamily" : "";
+
+    my @getSeqArgs = ("-domain $domain", $domFamArg, $fastaFileOption, $userHeaderFileOption,
+        "-ipro $ipro", "-pfam $pfam", "-ssf $ssf", "-gene3d $gene3d",
+        "-accession-id $accessionId", $accessionFileOption,
+        $noMatchFile, "-out $outputDir/allsequences.fa", "-accession-output $accOutFile",
+        "-error-file $errorFile", $seqCountFileOption,
+        $unirefOption, $unirefExpandOption, $mapUniref50to90Option,
+        "-fraction $fraction", $randomFractionOpt, $maxFullFamOption, $minSeqLenOpt, $maxSeqLenOpt, $maxSeqOpt,
+        "-config=$configFile");
+
+    $B->addAction("$efiEstTools/getsequence-domain.pl " . join(" ", @getSeqArgs));
     $B->addAction("$efiEstTools/getannotations.pl -out $structFile -fasta $outputDir/allsequences.fa $unirefOption $userHeaderFileOption -config=$configFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
@@ -876,7 +895,7 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
 }
 $B->addAction("touch  $outputDir/1.out.completed");
-$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
+#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
 $B->addAction("rm $blastOutputDir/blastout-*.tab");
 $B->addAction("rm $fracOutputDir/fracfile-*.fa");
 $B->jobName("${jobNamePrefix}graphs");
