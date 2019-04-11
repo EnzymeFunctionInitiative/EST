@@ -222,7 +222,7 @@ my @fulljobline = split /\./, $fulljob;
 
 $B = $S->getBuilder();
 $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
-$B->dependency(0, $fulljobline[0]);
+$B->dependency(0, $filterjobline[0]);
 $B->resource(1, 1, "10gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load cd-hit");
