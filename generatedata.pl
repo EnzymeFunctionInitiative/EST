@@ -61,6 +61,9 @@ use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
+use lib "$FindBin::Bin/lib";
+use Constants;
+
 
 my ($np, $queue, $outputDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, $accessionFile, $taxid);
 my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
@@ -194,20 +197,32 @@ if (not (defined $fastaFile or defined $ipro or defined $pfam or defined $taxid 
 
 # You also have to specify the number of processors for blast
 if (not defined $np) {
-    die "You must spedify the -np variable\n";
+    if (exists $ENV{EFI_NP}) {
+        $np = $ENV{EFI_NP};
+    } else {
+        die "You must spedify the -np variable\n";
+    }
 }
 
 # Default queues
 if (not defined $queue) {
-    die "-queue not specified\n";
+    if (exists $ENV{EFI_QUEUE}) {
+        $queue = $ENV{EFI_QUEUE};
+    } else {
+        die "-queue not specified\n";
+    }
 }
 if (not defined $memqueue) {
-    die "-memqueue not specifiied\n";
+    if (exists $ENV{EFI_MEMQUEUE}) {
+        $memqueue = $ENV{EFI_MEMQUEUE};
+    } else {
+        die "-memqueue not specifiied\n";
+    }
 }
 
 # Working directory must be defined
 if (not defined $outputDirName) {
-    die "You must spedify the -dir-name variable\n";
+    $outputDirName = "output";
 }
 
 # Default e value must also be set for blast, default set if not specified
@@ -221,11 +236,15 @@ if (not defined $evalue) {
 }
 
 if (not defined $configFile or not -f $configFile) {
-    if (exists $ENV{EFICONFIG}) {
-        $configFile = $ENV{EFICONFIG};
+    if (exists $ENV{EFI_CONFIG}) {
+        $configFile = $ENV{EFI_CONFIG};
     } else {
         die "--config file parameter is not specified.  module load efiest_v2 should take care of this.";
     }
+}
+
+if (exists $ENV{EFI_LEGACY_GRAPHS}) {
+    $LegacyGraphs = 1;
 }
 
 my $manualCdHit = 0;
@@ -326,6 +345,7 @@ my $errorFile = "$accOutFile.failed";
 my $fracOutputDir = "$outputDir/fractions";
 my $blastOutputDir = "$outputDir/blastout";
 my $structFile = "$outputDir/struct.out";
+my $unirefSeqLenFile = "$outputDir/" . EFI("uniref_seq_length_file");
 
 my $userHeaderFile = "";
 my $userHeaderFileOption = "";
@@ -429,6 +449,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
     my $mapUniref50to90Option = $mapUniref50to90 ? "-map-uniref-50-to-90" : "";
     my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
+    my $unirefSeqLenFileOption = $unirefVersion ? "-sequence-length $unirefSeqLenFile" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
@@ -463,7 +484,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         "-config=$configFile");
 
     $B->addAction("$efiEstTools/getsequence-domain.pl " . join(" ", @getSeqArgs));
-    $B->addAction("$efiEstTools/getannotations.pl -out $structFile -fasta $outputDir/allsequences.fa $unirefOption $userHeaderFileOption -config=$configFile");
+#    $B->addAction("$efiEstTools/getannotations.pl -out $structFile -fasta $outputDir/allsequences.fa $unirefOption $userHeaderFileOption $unirefSeqLenFileOption -config=$configFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
@@ -565,8 +586,8 @@ else
 fi
 CMDS
             );
-        $B->addAction("mv $structFile $outputDir/struct.demux.out");
-        $B->addAction("$efiEstTools/remove_demuxed_nodes.pl -in $outputDir/struct.demux.out -out $structFile -cluster $outputDir/sequences.fa.clstr");
+#        $B->addAction("mv $structFile $outputDir/struct.demux.out");
+#        $B->addAction("$efiEstTools/remove_demuxed_nodes.pl -in $outputDir/struct.demux.out -out $structFile -cluster $outputDir/sequences.fa.clstr");
         $B->addAction("mv $outputDir/allsequences.fa $outputDir/allsequences.fa.before_demux");
         $B->addAction("cp $outputDir/sequences.fa $outputDir/allsequences.fa");
     }
@@ -875,7 +896,7 @@ if (defined $LegacyGraphs) {
     my $lenHistText = "\" \"";
     if ($unirefVersion) {
         my $fullLenHistText = "\"(Full UniProt)\"";
-        $B->addAction("$efiEstTools/get_lengths_from_anno.pl -struct $structFile -length $outputDir/uniprot_length.tab -incfrac 0.999");
+        $B->addAction("$efiEstTools/get_lengths_from_anno.pl -lenghts $unirefSeqLenFile -out-histo $outputDir/uniprot_length.tab");
         $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot.png $jobId $fullLenHistText");
         $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot_sm.png $jobId $fullLenHistText $smallWidth $smallHeight");
         $lenHistText = "\"(UniRef$unirefVersion)\"";

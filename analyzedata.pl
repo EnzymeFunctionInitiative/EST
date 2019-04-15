@@ -24,10 +24,15 @@ use FindBin;
 use Getopt::Long;
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm);
+use EFI::Config;
+
+use lib "$FindBin::Bin/lib";
+use Constants;
+
 
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $config, $parentId, $parentDir, $cdhitUseAccurateAlgo,
-    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs);
+    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $unirefVersion);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -48,6 +53,7 @@ my $result = GetOptions(
     "cdhit-default-word"    => \$cdhitDefaultWord,      # Get rid of this?
     "cdhit-opt=s"           => \$cdhitOpt,
     "include-sequences"     => \$includeSeqs,   # true to include sequences in the XGMML files
+    "uniref-version=s"      => \$unirefVersion,
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$config,        # config file path, if not given will look for EFICONFIG env var
@@ -145,14 +151,10 @@ if ($cdhitOpt eq "sb") {
 my $jobNamePrefix = (defined $jobId and $jobId) ? $jobId . "_" : ""; 
 
 
-
-#quit if the xgmml files have been created in this directory
-#testing with fullxgmml because I am lazy
-if (-s "$analysisDir/${safeTitle}full.xgmml") {
-    print "This run appears to have already been completed, exiting\n";
-    exit;
+my $unirefOption = "";
+if ($unirefVersion) {
+    $unirefOption = "-uniref-version $unirefVersion";
 }
-
 
 my $logDir = "$baseOutputDir/log";
 mkdir $logDir;
@@ -161,25 +163,63 @@ $logDir = "" if not -d $logDir;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 my $S = new EFI::SchedulerApi(%schedArgs);
-my $B = $S->getBuilder();
-$B->resource(1, 1, "5gb");
+my $B;
 
 print "Data from runs will be saved to $analysisDir\n";
 
 my $filteredBlastFile = "$analysisDir/2.out";
-#dont refilter if it has already been done
+my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
 
+####################################################################################################
+# RETRIEVE ANNOTATIONS (STRUCT.OUT) FOR SSN
+# And for UniRef inputs, filter out UniRef cluster members that are outside the input length
+# thresholds.
+#
+
+my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
+my $userHeaderFileOption = "-meta-file $userHeaderFile";
+my $lenArgs = "-min-len $minlen -max-len $maxlen";
+my $annoDep = 0;
+mkdir $analysisDir or die "could not make analysis folder $analysisDir\n";
+$B = $S->getBuilder();
+$B->resource(1, 1, "5gb");
+$B->addAction("module load $perlMod");
+$B->addAction("module load $efiEstMod");
+$B->addAction("module load $efiDbMod");
+$B->addAction("$toolpath/getannotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption -config=$config");
+$B->jobName("${jobNamePrefix}getannotations");
+$B->renderToFile("$analysisDir/getannotations.sh");
+my $annojob = $S->submit("$analysisDir/getannotations.sh", $dryrun);
+chomp $annojob;
+print "Annotations job is:\n $annojob\n";
+my @parts = split /\./, $annojob;
+$annoDep = $parts[0];
+
+
+
+####################################################################################################
+# FILTER MAIN SEQUENCES
+#
+
+$B = $S->getBuilder();
+$B->dependency(0, $annoDep) if $annoDep;
+$B->resource(1, 1, "5gb");
 $B->addAction("module load $perlMod");
 if ($customClusterDir and $customClusterFile) {
-    #TODO: implement custom clustering
     $B->addAction("$toolpath/filter_custom.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -custom-cluster-file $analysisDir/$customClusterFile");
     $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
-} elsif (not -d $analysisDir){
-    mkdir $analysisDir or die "could not make analysis folder $analysisDir\n";
-    #submit the job for filtering out extraneous edges
-    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
 } else {
-    print "Using prior filter\n";
+    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
+#my $inputAnnoFile = "$generateDir/struct.out";
+#    my $unirefLenFile = "$generateDir/" . EFI("uniref_seq_length_file");
+#    $B->addAction("if [ -e \"$unirefLenFile\" ]; then");
+#    $B->addAction("    $toolpath/filter_uniref.pl -lengths $unirefLenFile -anno-in $inputAnnoFile -anno-out $filteredAnnoFile");
+#    $B->addAction("else");
+#    $B->addAction("    cp $inputAnnoFile $filteredAnnoFile");
+#    $B->addAction("fi");
+#    #TODO: remove this. debugging
+#} else {
+#    print "Using prior filter\n";
 }
 if ($hasParent) {
     $B->addAction("cp $parentDir/*.png $baseAnalysisDir/");
@@ -204,7 +244,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg");
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");
 $B->renderToFile("$analysisDir/fullxgmml.sh");
@@ -246,7 +286,7 @@ if ($cdhitOpt ne "sb") {
 
 $B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -c \$CDHIT -d 0 $algoOption $bandwidthOption");
 $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $generateDir/struct.out -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg");
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}cdhit");
 $B->renderToFile("$analysisDir/cdhit.sh");

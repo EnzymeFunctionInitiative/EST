@@ -451,7 +451,7 @@ sub getDomainFromDb {
         $sth->execute;
         my $ac = 1;
         while (my $row = $sth->fetchrow_hashref) {
-            (my $uniprotId = $row->{accession}) =~ s/\-\d+$//;
+            (my $uniprotId = $row->{accession}) =~ s/\-\d+$//; #remove homologues
             next if (not $useDomain and exists $idsProcessed{$uniprotId});
             $idsProcessed{$uniprotId} = 1;
 
