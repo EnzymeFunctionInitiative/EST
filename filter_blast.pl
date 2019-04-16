@@ -32,7 +32,7 @@ $maxLen = 0 if not defined $maxLen;
 if (not $filter) {
     die "you must specify the filter parameter";
 }
-if (not $minVal) {
+if (not defined $minVal) {
     die "you must specify a minimum value to filter that is >= zero";
 }
 if (not $outputBlast) {
