@@ -970,7 +970,10 @@ sub writeSequenceCountFile {
         }
         
         open SEQCOUNT, "> $seqCountFile" or die "Unable to write to sequence count file $seqCountFile: $!";
-    
+   
+        if ($blastTotal) {
+            print SEQCOUNT "BLAST\t$blastTotal\n";
+        }
         print SEQCOUNT "FileTotal\t$fileTotalIdCount\n";
         print SEQCOUNT "FileMatched\t$fileMatchedIdCount\n";
         print SEQCOUNT "FileUnmatched\t$fileUnmatchedIdCount\n";

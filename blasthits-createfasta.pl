@@ -40,10 +40,10 @@ while(<ACC>){
 close ACC;
 close FASTA;
 
-$accCount++; # to account for the input sequence.
 
 open COUNT, ">$countFile";
-print COUNT "Total\t$accCount\n";
+print COUNT "BLAST\t$accCount\n";
+print COUNT "Total\t" . ($accCount + 1) . "\n";
 close COUNT;
 
 
