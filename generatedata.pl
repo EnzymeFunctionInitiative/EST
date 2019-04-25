@@ -345,7 +345,7 @@ my $errorFile = "$accOutFile.failed";
 my $fracOutputDir = "$outputDir/fractions";
 my $blastOutputDir = "$outputDir/blastout";
 my $structFile = "$outputDir/struct.out";
-my $unirefSeqLenFile = "$outputDir/" . EFI("uniref_seq_length_file");
+my $uniprotSeqLenFile = "$outputDir/uniprot_length.tab"; # For UniRef option, this the lengths of all the sequences in the family not just the seed sequences
 
 my $userHeaderFile = "";
 my $userHeaderFileOption = "";
@@ -449,7 +449,6 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
     my $mapUniref50to90Option = $mapUniref50to90 ? "-map-uniref-50-to-90" : "";
     my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
-    my $unirefSeqLenFileOption = $unirefVersion ? "-sequence-length $unirefSeqLenFile" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
@@ -479,12 +478,16 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         "-accession-id $accessionId", $accessionFileOption,
         $noMatchFile, "-out $outputDir/allsequences.fa", "-accession-output $accOutFile",
         "-error-file $errorFile", $seqCountFileOption,
-        $unirefOption, $unirefExpandOption, $mapUniref50to90Option,
+        $unirefOption, $unirefExpandOption, $mapUniref50to90Option,, 
         "-fraction $fraction", $randomFractionOpt, $maxFullFamOption, $minSeqLenOpt, $maxSeqLenOpt, $maxSeqOpt,
         "-config=$configFile");
 
     $B->addAction("$efiEstTools/getsequence-domain.pl " . join(" ", @getSeqArgs));
-#    $B->addAction("$efiEstTools/getannotations.pl -out $structFile -fasta $outputDir/allsequences.fa $unirefOption $userHeaderFileOption $unirefSeqLenFileOption -config=$configFile");
+    # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
+    if ($unirefVersion) {
+        # Get the lengths of the full UniProt sequences not just the UniRef seed sequences.
+        $B->addAction("$efiEstTools/get_lengths_from_anno.pl -struct $userHeaderFile -lengths $uniprotSeqLenFile -config $configFile");
+    }
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
@@ -870,12 +873,15 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
     my $evalueFile = "$outputDir/evalue.tab";
+    my $defaultLengthFile = "$outputDir/length.tab";
+    my $lengthFile = $unirefVersion ? "$outputDir/uniref_seed_length.tab" : $defaultLengthFile;
     $B->resource(1, 1, "50gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
     $B->addAction("mkdir -p $outputDir/rdata");
-    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
+    # Retrieves the lengths for the UniProt sequences (non-UniRef jobs) or UniRef seed sequences (UniRef jobs)
+    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length $lengthFile -incfrac $incfrac -evalue-file $evalueFile");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
     $B->addAction("if [ -z \"\$FIRST\" ]; then");
     $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
@@ -893,16 +899,16 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-    my $lenHistText = "\" \"";
     if ($unirefVersion) {
-        my $fullLenHistText = "\"(Full UniProt)\"";
-        $B->addAction("$efiEstTools/get_lengths_from_anno.pl -lenghts $unirefSeqLenFile -out-histo $outputDir/uniprot_length.tab");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot.png $jobId $fullLenHistText");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot_sm.png $jobId $fullLenHistText $smallWidth $smallHeight");
-        $lenHistText = "\"(UniRef$unirefVersion)\"";
+        my $unirefLenHistText = "\"(UniRef$unirefVersion Cluster IDs)\"";
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram_uniref.png $jobId $unirefLenHistText");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram_uniref_sm.png $jobId $unirefLenHistText $smallWidth $smallHeight");
+        # Always want the regular histogram to show the full UniProt set of seq. lengths.
+        $lengthFile = $uniprotSeqLenFile;
     }
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId $lenHistText");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
+    my $lenHistText = "\" \"";
+    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram.png $jobId $lenHistText");
+    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 } else {
     $B->addAction("module load $pythonMod");
     $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
