@@ -23,7 +23,7 @@ use FindBin;
 use Cwd qw(abs_path);
 
 use EFI::SchedulerApi;
-use EFI::Util qw(getSchedulerType);
+use EFI::Util qw(getSchedulerType usesSlurm);
 use EFI::Util::FileHandle;
 use EFI::Database;
 use EFI::Config qw(biocluster_configure);
@@ -38,7 +38,7 @@ my $interactive = 0;
 my $logFile = "";
 my $dryRun = 0;
 my $skipIfExists = 0;
-my $scheduler = "torque";
+my $scheduler = "";
 my $queue;
 my $configFile;
 my $sql;
@@ -104,19 +104,26 @@ USAGE
 
 
 if (not $WorkingDir) {
-    print "The -dir (build directory) parameter must be specified.\n$usage\n";
-    exit(1);
+    print "Do you want to use the current dir $ENV{PWD} as the build directory? [y/n] ";
+    my $resp = <STDIN>;
+    if ($resp !~ m/^y/) {
+        print "The -dir (build directory) parameter must be specified.\n$usage\n";
+        exit(1);
+    } else {
+        $WorkingDir = $ENV{PWD};
+    }
 }
 
-if (not $dbName and not $buildEna and not $doDownload and not $buildCountsOnly) {
+if (not $dbName and not ($buildEna or $doDownload or $buildCountsOnly)) {
     print "The -db-name parameter is required.\n";
     exit(1);
 }
 
-if (not defined $sql and not defined $buildCountsOnly and (not defined $queue or length $queue == 0)) {
+if (not $queue and not ($sql or $doDownload or $buildCountsOnly)) {
     print "The -queue parameter is required.\n";
     exit(1);
 }
+
 
 $doPdbBlast = defined $doPdbBlast;
 
@@ -199,6 +206,8 @@ my $IpRange = $config->{db}->{ip_range};
 my $DbUser = $config->{db}->{user};
 
 # Set up the scheduler API.
+
+$scheduler = "slurm" if not $scheduler and usesSlurm();
 my $schedType = getSchedulerType($scheduler);
 my $S = new EFI::SchedulerApi('type' => $schedType, 'queue' => $queue, 'resource' => [1, 1, '100gb'],
     'default_working_dir' => $BuildDir, 'dryrun' => $dryRun, 'abort_script_on_action_fail' => 0);
@@ -501,15 +510,14 @@ sub submitFormatDbAndSplitFastaJob {
     
     #build fasta database
     if (not $skipIfExists or not -f "$dbDir/formatdb.log") {
-        my @dbs = ("combined.fasta", "uniref90.fasta", "uniref50.fasta");
+        my @dbs = ("combined/combined.fasta", "uniref/uniref90.fasta", "uniref/uniref50.fasta");
         foreach my $db (@dbs) {
-            #(my $diamondDbName = $db) =~ s/\.fasta$//;
-            my $diamondDbName = $db;
+            (my $target = $db) =~ s%^.*?([^/]+)$%$1%;
             $B->addAction("cd $dbDir");
-            $B->addAction("mv $CombinedDir/$db $dbDir/");
-            $B->addAction("formatdb -i $dbDir/$db -p T -o T");
-            $B->addAction("mv $dbDir/$db $CombinedDir/");
-            $B->addAction("diamond makedb --in $CombinedDir/$db -d $diamondDbDir/$diamondDbName");
+            $B->addAction("mv $BuildDir/$db $dbDir/$target");
+            $B->addAction("formatdb -i $dbDir/$target -p T -o T");
+            $B->addAction("mv $dbDir/$target $BuildDir/$db");
+            $B->addAction("diamond makedb --in $BuildDir/$db -d $diamondDbDir/$target");
             $B->addAction("date > $CompletedFlagFile.formatdb.$db\n");
         }
     }
@@ -895,9 +903,7 @@ create table annotations(accession varchar(10) primary key,
                          SwissProt_Description varchar(255),
                          Organism varchar(150),
                          GN varchar(40),
-                         PFAM varchar(300),
                          pdb varchar(3000),
-                         IPRO varchar(700),
                          GO varchar(1300),
                          KEGG varchar(100),
                          STRING varchar(100),
@@ -910,8 +916,6 @@ create table annotations(accession varchar(10) primary key,
                          Cazy varchar(30));
 create index TaxID_Index ON annotations (Taxonomy_ID);
 create index accession_Index ON annotations (accession);
-create index PFAM_Index ON annotations(PFAM);
-create index INTERPRO_Index on annotations(INTERPRO);
 
 select 'CREATING TAXONOMY' as '';
 drop table if exists taxonomy;
@@ -1023,6 +1027,7 @@ SQL
 
 
     my $mysqlCmd = $DB->getCommandLineConnString();
+    (my $mysqlCmdAdmin = $mysqlCmd) =~ s/mysql /mysqladmin /g;
     my $batchFile = "$BuildDir/$fileNum-runDatabaseActions.sh";
 
     if (not ($buildOptions & BUILD_COUNTS)) {
@@ -1099,7 +1104,12 @@ if [ -f $CompletedFlagFile.mysql_import-base ]; then
     echo "It looks like the data has already been imported. You'll have to manually import if you want"
     echo "to override this check.";
 else
+
+    mysql: grant select on `efi_201903`.* to 'efidevel'@'172.16.28.0/255.255.252.0';
+    mysql: grant select on `efi_201903`.* to 'efignn'@'172.16.28.0/255.255.252.0';
+    $mysqlCmdAdmin create $dbName
     $mysqlCmd $dbName < $sqlFile > $BuildDir/mysqlOutput-base.txt
+
     date > $CompletedFlagFile.mysql_import-base
 fi
 
