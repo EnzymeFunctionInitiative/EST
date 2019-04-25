@@ -210,16 +210,6 @@ if ($customClusterDir and $customClusterFile) {
     $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
 } else {
     $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
-#my $inputAnnoFile = "$generateDir/struct.out";
-#    my $unirefLenFile = "$generateDir/" . EFI("uniref_seq_length_file");
-#    $B->addAction("if [ -e \"$unirefLenFile\" ]; then");
-#    $B->addAction("    $toolpath/filter_uniref.pl -lengths $unirefLenFile -anno-in $inputAnnoFile -anno-out $filteredAnnoFile");
-#    $B->addAction("else");
-#    $B->addAction("    cp $inputAnnoFile $filteredAnnoFile");
-#    $B->addAction("fi");
-#    #TODO: remove this. debugging
-#} else {
-#    print "Using prior filter\n";
 }
 if ($hasParent) {
     $B->addAction("cp $parentDir/*.png $baseAnalysisDir/");
