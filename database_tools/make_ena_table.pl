@@ -37,8 +37,6 @@ sub logwarn { print LOG "WARN: ", @_, "\n"; print STDERR @_, "\n"; }
 
 sub process{
     my @files=@{shift @_};
-    my %accessions=%{shift @_};
-    my %orgs=%{shift @_};
     my $out=shift @_;
     my $idMapper=shift @_;
     my $count=1;
@@ -121,6 +119,8 @@ sub process{
                     @revUniprotIdsToAdd = grep { not exists $processedAlready{$_} } @$revUniprotIds;
                     if (scalar @revUniprotIdsToAdd) {
                         logprint "Found a mapping of protein ID ", join(",", @proteinIds), " to UniProt ID ", join(",", @revUniprotIdsToAdd);
+                    } else {
+                        logprint "Couldn't find mappings for ", join(",", @proteinIds);
                     }
 #                    logprint "REV\t" . (scalar @$revUniprotIds) . "\t" . (scalar @$noMatch) . "\t" . (scalar @revUniprotIdsToAdd);
 #                    logprint "Found " .
@@ -130,9 +130,7 @@ sub process{
                 }
 
                 foreach $AC (@uniprotIds, @revUniprotIdsToAdd) {
-                    #logprint "AC is $AC, orgs is ".$orgs{$AC}."";
                     print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\n";
-                    #print OUT "$ID\t$AC\t$count\t$CHR\t$DIR\t$START\t$END\t".$orgs{$AC}."\t".join(',',@{$accessions{$AC}})."\n"; # This line includes Pfams. We are going to join the ENA table to the PFAM and INTERPRO tables in SQL instead to get the families. It also includes organisms. We again will join to the annotations table to get the organism.
                 }
                 @uniprotIds=();
                 %processedAlready=();
@@ -204,10 +202,7 @@ sub makechooser {
 }
 #end functions
 
-print "using new version\n";
-open NEW, ">/home/groups/efi/databases/20171005/build/make.new";
-print NEW "using new version\n";
-close NEW;
+
 
 $result = GetOptions(
     "embl=s"        => \$embl,
@@ -215,10 +210,7 @@ $result = GetOptions(
     "env=s"         => \$env,
     "fun=s"         => \$fun,
     "com=s"         => \$com,
-    "pfam=s"        => \$pfamTable,
-    "interpro=s"    => \$iprTable,
     "idmapping=s"   => \$idMappingFile,
-    "org=s"         => \$orgtable,
     "v"             => \$verbose,
     "log=s"         => \$log,
     "config=s"      => \$configFile,
@@ -237,20 +229,12 @@ my $baseDir = $ENV{PWD};
 #my $idMapper = new EFI::IdMapping(config_file_path => $configFile);
 
 my $idMapper = new IdMappingFile(); #Same signature as EFI::IdMapping
-$idMapper->parseTable($idMappingFile) if $idMappingFile and -f $idMappingFile and not -f $debugParseFile;
+$idMapper->parseTable($idMappingFile) if $idMappingFile and -f $idMappingFile;# and not -f $debugParseFile;
 
-
-my %accessions;
-my %organisms;
 
 
 
 die "Invalid arguments specified" if not -f $debugParseFile and not defined $embl;
-#(
-#                                         not defined $embl or not defined $pro or not defined $env or not defined $fun or
-#                                         not defined $com
-#                                             or not defined $pfamTable or not defined $orgtable
-#                                     );
 
 $pro = "$baseDir/pro.tab" if not defined $pro or not $pro;
 $fun = "$baseDir/fun.tab" if not defined $fun or not $fun;
@@ -263,7 +247,13 @@ $legacyWgs = defined $legacyWgs ? 1 : 0;
 # Parse the specified file and output it to the console in debug mode, and then exit.
 if (-f $debugParseFile) {
     my @files = ($debugParseFile);
-    process(\@files, \%accessions, \%organisms, undef, $idMapper);
+    while (scalar @files) {
+        my $file = shift @files;
+        process([$file], undef, $idMapper);
+        print STDERR "Input another path to contine debugging: ";
+        $file = <STDIN>;
+        push @files, $file if $file and -f $file;
+    }
     exit;
 }
 
@@ -272,20 +262,6 @@ $logName = defined $LIST_FILES_ONLY ? "$0.debug.log" : "$0.log";
 $log = "$baseDir/$logName" unless defined $log;
 open LOG, "> $log";
 
-
-my %accessions;
-if (defined $pfamTable and -f $pfamTable) {
-    logprint "read in accession to pfam table";
-    tabletohashary($pfamTable, \%accessions);
-}
-#if (defined $iprTable and -f $iprTable) {
-#    logprint "read in accession to interpro table";
-#    tabletohashary($iprTable, \%accessions);
-#}
-if (defined $orgtable and -f $orgtable) {
-    logprint "read in accession to organism table";
-    %organisms=%{tabletohash($orgtable)};
-}
 
 opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std";
 @pro=apply {$_="$embl/std/".$_} grep {$_=~/.*_pro.*/} readdir DIR;
@@ -350,9 +326,9 @@ foreach $dir (@wgsdirs){
 
 logprint "processing tab files";
 logprint "\tbase files";
-process \@pro, \%accessions, \%organisms, $pro, $idMapper;
-process \@fun, \%accessions, \%organisms, $fun, $idMapper;
-process \@env, \%accessions, \%organisms, $env, $idMapper;
+process \@pro, $pro, $idMapper;
+process \@fun, $fun, $idMapper;
+process \@env, $env, $idMapper;
 
 $idMapper->finish();
 

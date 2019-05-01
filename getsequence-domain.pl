@@ -118,6 +118,7 @@ my $fileMatchedIdCount = 0;
 my $fileUnmatchedIdCount = 0;
 my $fileTotalIdCount = 0;
 my $fileSequenceCount = 0; # The number of actual sequences in the FASTA file, not the number of IDs or headers.
+my $fastaNumHeaders = 0;
 
 
 #######################################################################################################################
@@ -279,7 +280,7 @@ sub parseFastaHeaders {
                 
                 if (not scalar @{ $result->{uniprot_ids} }) {
                     $id = makeSequenceId($seqCount);
-                    $seqMeta->{$id}->{description} = $result->{raw_headers}; # substr($result->{raw_headers}, 0, 200);
+                    push(@{$seqMeta->{$id}->{description}}, $result->{raw_headers}); # substr($result->{raw_headers}, 0, 200);
                     $seqMeta->{$id}->{other_ids} = $result->{other_ids};
                     push(@{ $seq{$seqCount}->{ids} }, $id);
                 } else {
@@ -317,7 +318,7 @@ sub parseFastaHeaders {
                 my $ss = exists $seqMeta->{$id} ? $seqMeta->{$id} : {};
                 push(@{ $seq{$seqCount}->{ids} }, $id);
                 
-                $ss->{description} = $line;
+                push(@{$ss->{description}}, $line);
 
                 $seqCount++;
                 $headerLine = 1;
@@ -325,6 +326,10 @@ sub parseFastaHeaders {
 
                 $seqMeta->{$id} = $ss;
                 $lastLineIsHeader = 1;
+            } elsif ($line =~ /^>/ and $lastLineIsHeader) {
+                $line =~ s/^>//;
+                push(@{$seqMeta->{$id}->{description}}, $line);
+                $headerCount++;
             } elsif ($line =~ /\S/ and $line !~ /^>/) {
                 $writeSeq = 1;
                 $lastLineIsHeader = 0;
@@ -408,9 +413,10 @@ sub writeSeqData {
     my ($id, $seqMeta, $mfh) = @_;
 
     my $desc = "";
-    if ($seqMeta->{description}) {
+    if (exists $seqMeta->{description}) {
         # Get rid of commas, since they are used to transform the multiple headers into lists
-        ($desc = $seqMeta->{description}) =~ s/,//g;
+        $desc = join("; ", @{$seqMeta->{description}});
+        $desc =~ s/,//g;
         $desc =~ s/>/,/g;
     }
     print $mfh "\tDescription\t" . $desc . "\n"                                                 if $desc;
@@ -451,7 +457,7 @@ sub getDomainFromDb {
         $sth->execute;
         my $ac = 1;
         while (my $row = $sth->fetchrow_hashref) {
-            (my $uniprotId = $row->{accession}) =~ s/\-\d+$//;
+            (my $uniprotId = $row->{accession}) =~ s/\-\d+$//; #remove homologues
             next if (not $useDomain and exists $idsProcessed{$uniprotId});
             $idsProcessed{$uniprotId} = 1;
 
@@ -553,12 +559,12 @@ sub parseFastaFile {
     # Returns the Uniprot IDs that were found in the file.  All sequences found in the file are written directly
     # to the output FASTA file.
     # The '1' parameter tells the function not to apply any fraction computation.
-    my ($fastaNumHeaders, $fastaNumUnmatched, $numMultUniprotIdSeq) = (0, 0, 0);
+    my ($fastaNumUnmatched, $numMultUniprotIdSeq) = (0, 0, 0);
     ($fileSequenceCount, $fastaNumHeaders, $numMultUniprotIdSeq, @fastaUniprotIds) = 
         parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $headerData, $configFile, 1);
 
     my $fastaNumUniprotIdsInDb = scalar @fastaUniprotIds;
-    $fastaNumUnmatched = $fastaNumHeaders - $fastaNumUniprotIdsInDb;
+    $fastaNumUnmatched = $fileSequenceCount - $fastaNumUniprotIdsInDb;
     
     print "There were $fastaNumHeaders headers, $fastaNumUniprotIdsInDb IDs with matching UniProt IDs, ";
     print "$fastaNumUnmatched IDs that weren't found in idmapping, and $fileSequenceCount sequences in the FASTA file.\n";
@@ -603,6 +609,7 @@ sub getExcludeIds {
 sub reverseLookupManualAccessions {
 
     print "Parsing the accession ID file.\n";
+    print join(",", @manualAccessions), "\n\n\n";
 
     my $upIds = [];
     ($upIds, $noMatches, $accUniprotIdRevMap) = $idMapper->reverseLookup(EFI::IdMapping::Util::AUTO, @manualAccessions);
@@ -970,7 +977,10 @@ sub writeSequenceCountFile {
         }
         
         open SEQCOUNT, "> $seqCountFile" or die "Unable to write to sequence count file $seqCountFile: $!";
-    
+   
+        if ($blastTotal) {
+            print SEQCOUNT "BLAST\t$blastTotal\n";
+        }
         print SEQCOUNT "FileTotal\t$fileTotalIdCount\n";
         print SEQCOUNT "FileMatched\t$fileMatchedIdCount\n";
         print SEQCOUNT "FileUnmatched\t$fileUnmatchedIdCount\n";

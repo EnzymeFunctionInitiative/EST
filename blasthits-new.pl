@@ -489,11 +489,28 @@ $demuxjob = $S->submit("$scriptDir/blasthits_demux.sh");
 chomp $demuxjob;
 print "Demux job is:\n $demuxjob\n";
 @demuxjobline=split /\./, $demuxjob;
+my $prevJobId = $demuxjobline[0];
 
+
+########################################################################################################################
+# Compute convergence ratio, before demultiplex
+#
+if ($convRatioFile) {
+    $B = $S->getBuilder();
+    $B->dependency(0, $prevJobId);
+    $B->resource(1, 1, "5gb");
+    $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
+    $B->jobName("${jobNamePrefix}conv_ratio");
+    $B->renderToFile("$scriptDir/conv_ratio.sh");
+    my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
+    chomp $convRatioJob;
+    print "Convergence ratio job is:\n $convRatioJob\n";
+    my @convRatioJobLine=split /\./, $convRatioJob;
+    $prevJobId = $confRatioJobLine[0];
+}
 
 
 my ($smallWidth, $smallHeight) = (700, 315);
-
 my $evalueFile = "$outputDir/evalue.tab";
 #create information for R to make graphs and then have R make them
 $B = $S->getBuilder();
