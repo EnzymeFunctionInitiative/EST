@@ -12,17 +12,22 @@ BEGIN {
 #version 0.9.4 change way cfg file used to load database location
 #version 1.0.0 added fasta parsing and manual accessions
 
+use warnings;
 use strict;
 
 use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use FindBin;
+use Data::Dumper;
 use Capture::Tiny ':all';
 use EFI::IdMapping;
-use EFI::Config;
 use EFI::IdMapping::Util;
 use EFI::Fasta::Headers;
 use EFI::Database;
+use EFI::Annotations;
+
+use lib "$FindBin::Bin/lib";
+use FileUtil;
 
 
 
@@ -64,7 +69,6 @@ my $result = GetOptions(
 #die "Command-line arguments are not valid: missing -config=config_file_path argument" if not defined $configFile or not -f $configFile;
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
 
-my @accessions;
 my $perpass = (exists $ENV{EFIPASS} and $ENV{EFIPASS}) ? $ENV{EFIPASS} : 1000;
 my $data_files = $ENV{EFIDBPATH};
 my %ids;
@@ -74,7 +78,9 @@ my @pfams;
 my @gene3ds;
 my @ssfs;
 my @manualAccessions;
-my %excludeIds; # A list of IDs that we exclude from database retrieval.
+my %blastHitsIds; # A list of IDs that we exclude from database retrieval.
+my $headerData = {}; # Header data for fasta and accession file inputs.
+my @accessions; # accessions from the input family
 
 
 verifyArgs();
@@ -90,6 +96,28 @@ my $dbh = $db->getHandle();
 #
 my $unirefData = {};
 # If $unirefVersion is set, %accessionhash will contain the UniRef cluster IDs that are in the family.
+
+
+######################################################################################################################
+# COUNTS FOR KEEPING TRACK OF THE VARIOUS TYPES OF IDS
+my $familyIdCount = 0; # This is the number of IDs that came from the family, accounting for UniRef.
+my $fullFamilyIdCount = 0; # This is the full family size
+my $fileFastaUnmatchedIdCount = 0;
+my $fileFastaReplSeqCount = 0;     # The number of sequences that were duplicated due to multiple IDs in the FASTA file.
+
+my $fileAccOrigIdCount = 0;        # The number of raw IDs in the accession input file.
+my $fileAccMatchedIdCount = 0;      # The number of UniProt IDs in the accession input file.
+my $fileAccUnmatchedIdCount = 0;    # The number of unmatched IDs in the accession input file.
+my $fileAccDupCount = 0;            # The number of accession IDs in the input file that are duplicates of each other.
+my $fileAccOverlapCount = 0;        # The number of sequences in the file that overlap the input family (accession).
+my $fileAccAdded = 0;               # The number of sequences in the file that were actually added.
+my $fileAccUnirefOverlapCount = 0;  # The number of IDs that are members of UniRef clusters (not included since we're already including the cluster ID).
+
+my $fileFastaOrigSeqCount = 0;      # The number of actual sequences in the FASTA file, not the number of IDs or headers.
+my $fileFastaMatchedIdCount = 0;
+my $fileFastaTotalIdCount = 0;
+my $fileFastaOverlapCount = 0;      # The number of sequences in the file that overlap the input family (FASTA).
+my $fileFastaNumHeaders = 0;        # The number of headers in the FASTA file.
 
 
 ######################################################################################################################
@@ -110,16 +138,15 @@ if ($#manualAccessions >= 0) {
 }
 
 
-######################################################################################################################
-# COUNTS FOR KEEPING TRACK OF THE VARIOUS TYPES OF IDS
-my $familyIdCount = 0; # This is the number of IDs that came from the family, accounting for UniRef.
-my $fullFamilyIdCount = 0; # This is the full family size
-my $fileMatchedIdCount = 0;
-my $fileUnmatchedIdCount = 0;
-my $fileTotalIdCount = 0;
-my $fileSequenceCount = 0; # The number of actual sequences in the FASTA file, not the number of IDs or headers.
-my $fastaNumHeaders = 0;
-
+#######################################################################################################################
+# PARSE FASTA FILE FOR HEADER IDS (IF ANY)
+#
+my @fastaUniprotIds;
+if ($fastaFileIn and $fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
+    parseFastaFile();
+} else {
+    $fastaFileIn = "";
+}
 
 #######################################################################################################################
 # GETTING ACCESSIONS FROM INTERPRO, PFAM, GENE3D, AND SSF FAMILY(S), AND/OR PFAM CLANS
@@ -127,26 +154,11 @@ my $fastaNumHeaders = 0;
 
 # Map any UniRef cluster members to the UniRef seed sequence.  Used to avoid duplicates from Option C and Option D inputs.
 my %unirefMapping;
-my @accessions;
+my %inFamilyIds;
 my $FracCount = 0;
 my $FracFlag = 0;
 retrieveFamilyAccessions();
 
-# Header data for fasta and accession file inputs.
-my $headerData = {};
-
-# Save the accessions that are specified through a family.
-my %inFamilyIds = map { ($_, 1) } @accessions;
-
-
-#######################################################################################################################
-# PARSE FASTA FILE FOR HEADER IDS (IF ANY)
-#
-my @fastaUniprotIds;
-my $numFastaSequences = 0;
-if ($fastaFileIn =~ /\w+/ and -s $fastaFileIn) {
-    parseFastaFile();
-}
 
 #######################################################################################################################
 # ADDING MANUAL ACCESSION IDS FROM FILE OR ARGUMENT
@@ -171,7 +183,7 @@ $idMapper->finish() if defined $idMapper;
 print "Done with rev lookup\n";
 
 
-my $showNoMatches = $#manualAccessions >= 0 ? 1 : 0 and defined $noMatchFile;
+my $showNoMatches = (($#manualAccessions >= 0 ? 1 : 0) and defined $noMatchFile);
 # Write out the no matches to a file.
 if ($showNoMatches) {
     openNoMatchesFile();
@@ -187,19 +199,11 @@ if ($showNoMatches) {
 # VERIFY THAT THE ACCESSIONS ARE IN THE DATABASE AND RETRIEVE THE DOMAIN
 #
 my %inUserIds;
-my $overlapCount = 0;  # Number of IDs in the input file(s) that overlap with IDs from any family(s) specified.
-my $addedFromFile = 0; # Number of IDs that were added to the list of accession IDs to retrieve FASTA sequences for.
 
 my $sth;
 if (scalar @accUniprotIds) {
     verifyAccessions();
 }
-
-
-# For the fasta sequences, we use the sequence so we don't look it up below.  They have been already
-# written to the output file in a prior step.  Here we are setting a flag for the metadata process
-# below.
-setMetadataFlag();
 
 $sth->finish if $sth;
 $dbh->disconnect();
@@ -216,7 +220,6 @@ my @err;
 my @origAccessions;
 retrieveSequences();
 
-my $totalIdCount;
 writeMetadata();
 
 writeErrors();
@@ -362,13 +365,17 @@ sub parseFastaHeaders {
         next if not exists $seq{$seqIdx}->{ids};
         my @seqIds = @{ $seq{$seqIdx}->{ids} };
 
-        if (grep { exists($unirefMapping{$_}) } @seqIds) {
-            print "found a sequence in the fasta file that maps to a uniref cluster: ", join(",", @seqIds), "\n";
-            next;
-        }
+#        # If the FASTA sequence is present in a UniRef cluster, then we write out the UniRef
+#        # cluster ID sequence instead of the FASTA sequence.
+#        if (grep { exists($unirefMapping{$_}) } @seqIds) {
+#            print "found a sequence in the fasta file that maps to a uniref cluster: ", join(",", @seqIds), "\n";
+#            push(@fastaUniref, @seqIds);
+#            next;
+#        }
 
         push(@seqToWrite, @seqIds);
-        $numMultUniprotIdSeq++ if scalar @seqIds > 1;
+        $numMultUniprotIdSeq += scalar @seqIds - 1 if scalar @seqIds > 1; # minus one because we only want to count the number of sequences that were *added*
+        print "MULT ", join(",", @seqIds), "\n" if scalar @seqIds > 1;
 
         # Since the same sequence may be pointed to by multiple uniprot IDs, we need to copy that sequence
         # because it won't by default be saved for all sequences above.
@@ -377,7 +384,7 @@ sub parseFastaHeaders {
             $sequence = $seq{$seqIdx}->{seq};
         }
 
-        foreach my $id (@{ $seq{$seqIdx}->{ids} }) {
+        foreach my $id (@seqIds) {
             if ($sequence) { #$seqIdx =~ /^z/) {
                 print FASTAOUT ">$id\n";
                 print FASTAOUT $sequence;
@@ -389,12 +396,14 @@ sub parseFastaHeaders {
         }
     }
 
+    my @fastaUniprotMatch = grep !/^z/, @seqToWrite;
+
     close FASTAOUT;
     close INFASTA;
 
     $parser->finish();
 
-    return ($seqCount, $headerCount, $numMultUniprotIdSeq, grep !/^z/, @seqToWrite);
+    return ($seqCount, $headerCount, $numMultUniprotIdSeq, \@fastaUniprotMatch);
 }
 
 
@@ -491,7 +500,7 @@ sub getDomainFromDb {
         print "Family $element had $ac elements that were added\n";
         $sth->finish;
     }
-    my @accessions = keys %$accessionHash;
+    @accessions = keys %$accessionHash;
     print "Initial " . scalar @accessions . " sequences after $table\n";
 
     # Get actual family count
@@ -559,21 +568,23 @@ sub parseFastaFile {
     # Returns the Uniprot IDs that were found in the file.  All sequences found in the file are written directly
     # to the output FASTA file.
     # The '1' parameter tells the function not to apply any fraction computation.
-    my ($fastaNumUnmatched, $numMultUniprotIdSeq) = (0, 0, 0);
-    ($fileSequenceCount, $fastaNumHeaders, $numMultUniprotIdSeq, @fastaUniprotIds) = 
+    my ($fastaNumUnmatched, $numMultUniprotIdSeq, $fastaUniprotIds) = (0, 0, 0);
+    ($fileFastaOrigSeqCount, $fileFastaNumHeaders, $numMultUniprotIdSeq, $fastaUniprotIds) = 
         parseFastaHeaders($fastaFileIn, $fastaFileOut, $useFastaHeaders, $idMapper, $headerData, $configFile, 1);
 
-    my $fastaNumUniprotIdsInDb = scalar @fastaUniprotIds;
-    $fastaNumUnmatched = $fileSequenceCount - $fastaNumUniprotIdsInDb;
+    @fastaUniprotIds = @$fastaUniprotIds;
+    my $fastaNumUniprotIdsInDb = scalar @$fastaUniprotIds;
+    $fastaNumUnmatched = $fileFastaOrigSeqCount + $numMultUniprotIdSeq - $fastaNumUniprotIdsInDb;
     
-    print "There were $fastaNumHeaders headers, $fastaNumUniprotIdsInDb IDs with matching UniProt IDs, ";
-    print "$fastaNumUnmatched IDs that weren't found in idmapping, and $fileSequenceCount sequences in the FASTA file.\n";
+    print "There were $fileFastaNumHeaders headers, $fastaNumUniprotIdsInDb IDs with matching UniProt IDs, ";
+    print "$fastaNumUnmatched IDs that weren't found in idmapping, and $fileFastaOrigSeqCount sequences in the FASTA file.\n";
     print "There were $numMultUniprotIdSeq sequences that were replicated because they had multiple Uniprot IDs in the headers.\n";
 #    print "The uniprot ids that were found in the FASTA file:", "\t", join(",", @fastaUniprotIds), "\n";
 
-    $fileMatchedIdCount += $fastaNumUniprotIdsInDb;
-    $fileTotalIdCount = $fileSequenceCount;
-    $fileUnmatchedIdCount += $fastaNumUnmatched;
+    $fileFastaMatchedIdCount = $fastaNumUniprotIdsInDb - $numMultUniprotIdSeq;
+    $fileFastaTotalIdCount = $fileFastaOrigSeqCount + $numMultUniprotIdSeq;
+    $fileFastaReplSeqCount = $numMultUniprotIdSeq;
+    $fileFastaUnmatchedIdCount = $fastaNumUnmatched;
 }
 
 
@@ -592,7 +603,8 @@ sub parseManualAccessionFile {
         push(@manualAccessions, $accId);
     }
 
-    print "There were ", scalar @manualAccessions, " manual accession IDs taken from ", scalar @lines, " lines in the accession file\n";
+    $fileAccOrigIdCount = scalar @manualAccessions;
+    print "There were $fileAccOrigIdCount manual accession IDs taken from ", scalar @lines, " lines in the accession file\n";
 }
 
 
@@ -600,7 +612,7 @@ sub getExcludeIds {
     open ACCLIST, $access or die "Unable to read input accession exclude list $access: $!";
     while (<ACCLIST>) {
         chomp;
-        $excludeIds{$_} = 1;
+        $blastHitsIds{$_} = 1;
     }
     close ACCLIST;
 }
@@ -609,7 +621,6 @@ sub getExcludeIds {
 sub reverseLookupManualAccessions {
 
     print "Parsing the accession ID file.\n";
-    print join(",", @manualAccessions), "\n\n\n";
 
     my $upIds = [];
     ($upIds, $noMatches, $accUniprotIdRevMap) = $idMapper->reverseLookup(EFI::IdMapping::Util::AUTO, @manualAccessions);
@@ -622,12 +633,11 @@ sub reverseLookupManualAccessions {
     my $numUniprotIds = scalar @accUniprotIds;
     my $numNoMatches = scalar @$noMatches;
 
-    print "There were $numUniprotIds Uniprot ID matches and $numNoMatches no matches in the input accession ID file.\n";
+    print "There were $numUniprotIds Uniprot ID matches and $numNoMatches no-matches in the input accession ID file.\n";
 #    print "The uniprot ids that were found in the accession file:", "\t", join(",", @accUniprotIds), "\n";
 
-    $fileMatchedIdCount += $numUniprotIds;
-    $fileUnmatchedIdCount += $numNoMatches;
-    $fileTotalIdCount += $numUniprotIds + $numNoMatches;
+    $fileAccMatchedIdCount = $numUniprotIds;
+    $fileAccUnmatchedIdCount = $numNoMatches;
 }
 
 
@@ -688,8 +698,7 @@ sub verifyAccessions {
     my @uniqAccUniprotIds = uniq @accUniprotIds;
     
     my $noMatchCount = 0;
-    my $numDuplicate = (scalar @accUniprotIds) - (scalar @uniqAccUniprotIds);
-    my $numUnirefOverlap = 0;
+    $fileAccDupCount = $fileAccMatchedIdCount - (scalar @uniqAccUniprotIds);
 
     my $domJoin = "";
     my $domSel = "";
@@ -722,7 +731,7 @@ sub verifyAccessions {
             }
             
             if (exists $accessionhash{$element}) {
-                $overlapCount++;
+                $fileAccOverlapCount++;
                 if ($domExists) {
                     push @{$accessionhash{$element}}, $extHash;
                 } else {
@@ -730,9 +739,9 @@ sub verifyAccessions {
                 }
                 $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
             } else {
-                $addedFromFile++;
                 # Only add to the list if it's not a UniRef seed sequence or part of a UniRef cluster.
                 if (not exists $unirefMapping{$element}) {
+                    $fileAccAdded++;
                     push(@accessions, $element);
                     if ($domExists) {
                         push @{$accessionhash{$element}}, $extHash;
@@ -741,7 +750,7 @@ sub verifyAccessions {
                     }
                     $headerData->{$element}->{query_ids} = $accUniprotIdRevMap->{$element};
                 } else {
-                    $numUnirefOverlap++;
+                    $fileAccUnirefOverlapCount++;
                 }
             }
         } else {
@@ -750,13 +759,18 @@ sub verifyAccessions {
         }
     }
 
-    $fileUnmatchedIdCount += $noMatchCount;
+    $fileAccUnmatchedIdCount += $noMatchCount;
+    # Subtract the no matches here from the match count; the id may be in the
+    # id mapping table but not in the uniprot table (e.g. redundant or
+    # archived, since the idmapping is occasionally out of sync with uniprot)
+    $fileAccMatchedIdCount -= $noMatchCount;    
+    $fileAccMatchedIdCount -= $fileAccDupCount;
     
-    print "There were $numDuplicate duplicate IDs in the Uniprot IDs that were idenfied from the accession file.\n";
-    print "The number of Uniprot IDs in the accession file that were already in the specified family is $overlapCount.\n";
-    print "The number of Uniprot IDs in the accession file that were added to the retrieval list is $addedFromFile.\n";
+    print "There were $fileAccDupCount duplicate IDs in the Uniprot IDs that were idenfied from the accession file.\n";
+    print "The number of Uniprot IDs in the accession file that were already in the specified family is $fileAccOverlapCount.\n";
+    print "The number of Uniprot IDs in the accession file that were added to the retrieval list is $fileAccAdded.\n";
     print "The number of Uniprot IDs in the accession file that didn't have a match in the annotations database is $noMatchCount\n";
-    print "The number of Uniprot IDs in the accession file that are excluded because they are part of a UniRef cluster in the specified family is $numUnirefOverlap.\n";
+    print "The number of Uniprot IDs in the accession file that are excluded because they are part of a UniRef cluster in the specified family is $fileAccUnirefOverlapCount.\n";
 }
 
 
@@ -772,21 +786,8 @@ sub openNoMatchesFile {
 }
 
 
-sub setMetadataFlag {
-    foreach my $element (@fastaUniprotIds) {
-        if (exists $accessionhash{$element}) {
-            $overlapCount++;
-        } else {
-            $addedFromFile++;
-        }
-    
-        $inUserIds{$element} = 1;
-    }
-}
-
-
 sub writeAccessions {
-    print "Final accession count $numIdsToRetrieve\n";
+    print "Final retrieved accession count $numIdsToRetrieve\n";
     print "Print out accessions\n";
 
     return if not $access;
@@ -872,29 +873,52 @@ sub writeMetadata {
 
     return if not $metaFileOut;
 
+    my $optaData = {};
     if ($useOptionASettings) {
-        open META, ">>$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
-    } else {
-        open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+        $optaData = FileUtil::read_struct_file($metaFileOut);
+        rename($metaFileOut, "$metaFileOut.orig");
+    }
+    open META, ">$metaFileOut" or die "Unable to open user fasta ID file '$metaFileOut' for writing: $!";
+
+    print Dumper(\%inFamilyIds);
+
+    if ($useOptionASettings) {
+        foreach my $acc (sort keys %$optaData) {
+            my $src = $optaData->{$acc}->{EFI::Annotations::FIELD_SEQ_SRC_KEY};
+            print META "$acc\n";
+            print META "\t", EFI::Annotations::FIELD_SEQ_SRC_KEY, "\t";
+            if (exists $inFamilyIds{$acc}) {
+                print META EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY;
+            } else {
+                print META $src;
+            }
+            print META "\n";
+            print META "\tDescription\t" . $optaData->{$acc}->{Description}. "\n" if exists $optaData->{$acc}->{Description};
+            print META "\tSequence_Length\t" . $optaData->{$acc}->{Sequence_Length} . "\n" if exists $optaData->{$acc}->{Sequence_Length};
+        }
     }
     
     my @metaAcc = @origAccessions;
-    # Add in the sequences that were in the fasta file (which we didn't retrieve from the fasta database).
+    # Add in the sequences that were in the fasta file (which we didn't retrieve from the BLAST database).
     push(@metaAcc, @fastaUniprotIds);
     foreach my $acc (sort sortFn @metaAcc) {
         print META "$acc\n";
-    
-        print META "\t", EFI::Config::FIELD_SEQ_SRC_KEY, "\t";
-        if (exists $inUserIds{$acc} and exists $inFamilyIds{$acc}) {
-            print META EFI::Config::FIELD_SEQ_SRC_VALUE_BOTH;
-        } elsif (exists $inUserIds{$acc}) {
-            print META EFI::Config::FIELD_SEQ_SRC_VALUE_FASTA;
-        } else {
-            print META EFI::Config::FIELD_SEQ_SRC_VALUE_FAMILY;
-            # Don't write the query ID for ones that are family-only
-            delete $headerData->{$acc}->{query_ids};
+
+        # If the sequence exists in the BLAST results (only for Option A), then don't write
+        # out the sequence source, since it's already been done.
+        if (not exists $optaData->{$acc}) { 
+            print META "\t", EFI::Annotations::FIELD_SEQ_SRC_KEY, "\t";
+            if (exists $inUserIds{$acc} and exists $inFamilyIds{$acc}) {
+                print META EFI::Annotations::FIELD_SEQ_SRC_VALUE_BOTH;
+            } elsif (exists $inUserIds{$acc}) {
+                print META EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA;
+            } else {
+                print META EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY;
+                # Don't write the query ID for ones that are family-only
+                delete $headerData->{$acc}->{query_ids};
+            }
+            print META "\n";
         }
-        print META "\n";
         if (exists $unirefData->{$acc} and $unirefVersion) {
             my @urIds = uniq @{ $unirefData->{$acc} };
             print META "\tUniRef${unirefVersion}_IDs\t", join(",", @urIds), "\n";
@@ -909,17 +933,18 @@ sub writeMetadata {
         }
     }
     
-    # Add up all of the IDs that were identified (or retrieved in previous steps) with the number of sequences
-    # in the FASTA file that did not have matching entries in our database.
-    $totalIdCount = scalar @fastaUniprotIds + $numIdsToRetrieve;
-    
+#    # Add up all of the IDs that were identified (or retrieved in previous steps) with the number of sequences
+#    # in the FASTA file that did not have matching entries in our database.
+#    # Don't include the fasta UniRef IDs since they are included in $numIdsToRetrieve.
+#    $totalIdCount = scalar @fastaUniprotIds + $numIdsToRetrieve;
+
     # Write out the remaining zzz headers
     foreach my $acc (sort sortFn keys %$headerData) {
-        $totalIdCount++;
+#        $totalIdCount++;
         print META "$acc\n";
         writeSeqData($acc, $headerData->{$acc}, \*META);
-        print META "\t", EFI::Config::FIELD_SEQ_SRC_KEY, "\t";
-        print META EFI::Config::FIELD_SEQ_SRC_VALUE_FASTA;
+        print META "\t", EFI::Annotations::FIELD_SEQ_SRC_KEY, "\t";
+        print META EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA;
         print META "\n";
     }
     
@@ -968,31 +993,62 @@ sub writeSequenceCountFile {
             open SEQCOUNT, "$seqCountFile" or die "Unable to read sequence count file $seqCountFile: $!";
             while (<SEQCOUNT>) {
                 chomp;
-                if (m/Total.*\t(\d+)/) {
-                    $blastTotal = $1;
+                if (m/Blast.*\t(\d+)/) {
+                    $blastTotal = $1; # minus one because we need to subtract one for the query sequence
                     last;
                 }
             }
             close SEQCOUNT;
         }
+
+        my $accTotal = $fileAccMatchedIdCount;  # the actual number of valid IDs in the file (no matches and duplicates removed)
+        my $fastaTotal = $fileFastaOrigSeqCount + $fileFastaReplSeqCount; # the actual number of sequences in the file, replicated as necessary
+        my $fileTotal = $fileAccOrigIdCount + $fileFastaOrigSeqCount;  # raw count
+
+        my $matchedCount = $fileAccMatchedIdCount + $fileFastaMatchedIdCount;
+        my $unmatchedCount = $fileAccUnmatchedIdCount + $fileFastaUnmatchedIdCount;
         
+        # For accessions (Opt D) the accessions in the file are included in numIdsToRetrieve.
+        
+        my $totalIdCount = $numIdsToRetrieve + $blastTotal + $fastaTotal;
+        my $familyOverlap = 0;
+
         open SEQCOUNT, "> $seqCountFile" or die "Unable to write to sequence count file $seqCountFile: $!";
    
         if ($blastTotal) {
-            print SEQCOUNT "BLAST\t$blastTotal\n";
+            $familyOverlap = $familyIdCount - $numIdsToRetrieve;
+            $totalIdCount++; # to account for input seq
+            print SEQCOUNT "Blast\t$blastTotal\n";
         }
-        print SEQCOUNT "FileTotal\t$fileTotalIdCount\n";
-        print SEQCOUNT "FileMatched\t$fileMatchedIdCount\n";
-        print SEQCOUNT "FileUnmatched\t$fileUnmatchedIdCount\n";
+        print SEQCOUNT "FileTotal\t$fileTotal\n";           # raw number of sequences, only what's in the file
+        print SEQCOUNT "FileMatched\t$matchedCount\n";      # number of uniprot sequences in the input file, including any that were replicated
+        print SEQCOUNT "FileUnmatched\t$unmatchedCount\n";  # number of sequences that had no match (for FASTA written as zzz)
         
-        # The FASTA sequences are always written in addition to any sequences found in families, even
-        # if they are duplicate IDs, resulting in a different number of sequences than the total number
-        # of IDs found in the families and file.
-        print SEQCOUNT "FastaFileSeqTotal\t$fileSequenceCount\n";
-    
-        print SEQCOUNT "Family\t$familyIdCount\n";
+        # We used to include both the fasta sequence and the family sequence, but to
+        # make things consistent with the other parts of the app only write out family
+        # sequences that aren't in the input filea.
+
+        if ($fastaFileIn) {
+            $familyOverlap = $fileFastaOverlapCount;
+            #my $fastaUnique = $fastaTotal - $fileFastaOverlapCount;
+            #print SEQCOUNT "FamilyOverlap\t$fileFastaOverlapCount\n";
+            # number of sequences that were added to the input sequence due to multiple UniProt IDs in the header
+            print SEQCOUNT "FastaFileReplSeq\t$fileFastaReplSeqCount\n";
+        }
+        if ($accessionFile) {
+            $familyOverlap = $fileAccOverlapCount;
+            #my $accUnique = $fileAccMatchedIdCount - $fileAccOverlapCount;
+            #print SEQCOUNT "Unique\t$accUnique\n";
+            print SEQCOUNT "AccUniRefOverlap\t$fileAccUnirefOverlapCount\n";
+            # number of sequences that were in the input file that were not in the included family
+            print SEQCOUNT "AccFileDuplicate\t$fileAccDupCount\n";
+        }
+
+        # number of sequences that were in the input file that were not in the included family
+        print SEQCOUNT "FamilyOverlap\t$familyOverlap\n";
+        print SEQCOUNT "Family\t$familyIdCount\n";  # the number of IDs in the family (raw, not including any excluded due to file matches)
         print SEQCOUNT "FullFamily\t$fullFamilyIdCount\n";
-        print SEQCOUNT "Total\t" . ($totalIdCount + int($blastTotal)) . "\n";
+        print SEQCOUNT "Total\t$totalIdCount\n";
     
         close SEQCOUNT;
     }
@@ -1064,15 +1120,30 @@ sub retrieveFamilyAccessions {
     $famAcc = getDomainFromDb($dbh, "SSF", \%accessionhash, $fractionFunc, $unirefData, $unirefVersion, @ssfs);
     $fullFamilyIdCount += $famAcc->[1];
 
-    # Exclude any IDs that are to be excluded
-    foreach my $xid (keys %excludeIds) {
-        delete $accessionhash{$xid};
-    }
-    
-    @accessions = sort keys %accessionhash;
+    # For Option A. Do proper family count, before we remove the IDs we don't retrieve (due to them being
+    # already retreived).
+    @accessions = keys %accessionhash;
     $familyIdCount = scalar @accessions;
     
-    print "Done with family lookup. There are $familyIdCount IDs in the family(s) selected.\n";
+    # Save the accessions that are specified through a family.
+    %inFamilyIds = map { ($_, 1) } @accessions;
+
+    # Exclude any IDs that are to be excluded.  These are the ones we have sequences for already (Option C or A).
+    map { delete $accessionhash{$_} if exists $accessionhash{$_}; } keys %blastHitsIds;
+    foreach my $xid (@fastaUniprotIds) {
+        if (exists $accessionhash{$xid}) {
+            delete $accessionhash{$xid};
+            $fileFastaOverlapCount++; 
+        } else {
+            $inUserIds{$xid} = 1;
+        }
+    }
+    
+    # Get the uniqued list of family accessions THAT WILL BE RETREIVED FROM THE BLAST DATABASE.
+    @accessions = sort keys %accessionhash;
+    my $retrCount = scalar @accessions;
+    
+    print "Done with family lookup. There are $familyIdCount IDs in the family(s) selected (retrieving $retrCount).\n";
 }
 
 

@@ -69,7 +69,7 @@ my ($np, $queue, $outputDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, 
 my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($randomFraction, $blast, $jobId, $unirefVersion, $noDemuxArg, $convRatioFile, $cdHitOnly);
-my ($unirefExpand, $scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile);
+my ($unirefExpand, $scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $mapUniref50to90);
 my $result = GetOptions(
     "np=i"              => \$np,
@@ -115,6 +115,7 @@ my $result = GetOptions(
     "cluster-node=s"    => \$clusterNode,
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
+    "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "config=s"          => \$configFile,    # new-style config file
 );
 
@@ -922,9 +923,11 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
 }
 $B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
-$B->addAction("rm $blastOutputDir/blastout-*.tab");
-$B->addAction("rm $fracOutputDir/fracfile-*.fa");
+if ($removeTempFiles) {
+    $B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
+    $B->addAction("rm $blastOutputDir/blastout-*.tab");
+    $B->addAction("rm $fracOutputDir/fracfile-*.fa");
+}
 $B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 

@@ -19,11 +19,12 @@ use BlastUtil;
 
 
 
-my ($idListFile, $metaFile, $sequence);
+my ($idListFile, $metaFile, $sequence, $inputId);
 my $result = GetOptions(
     "accessions=s"          => \$idListFile,
     "meta-file=s"           => \$metaFile,
     "sequence=s"            => \$sequence,
+    "input-id=s"            => \$inputId,
 );
 
 
@@ -48,7 +49,7 @@ foreach my $id (@ids) {
     print METAFILE "\t" . EFI::Annotations::FIELD_SEQ_SRC_KEY . "\t" . EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT . "\n";
 }
 
-BlastUtil::write_input_sequence_metadata($sequence, \*METAFILE);
+BlastUtil::write_input_sequence_metadata(\*METAFILE, $sequence, $inputId);
 
 close METAFILE;
 

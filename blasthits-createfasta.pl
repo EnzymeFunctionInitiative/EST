@@ -42,7 +42,7 @@ close FASTA;
 
 
 open COUNT, ">$countFile";
-print COUNT "BLAST\t$accCount\n";
+print COUNT "Blast\t$accCount\n";
 print COUNT "Total\t" . ($accCount + 1) . "\n";
 close COUNT;
 

@@ -16,6 +16,8 @@ use lib $FindBin::Bin . "/lib";
 use BlastUtil;
 
 
+my $inputId = "";
+
 $result = GetOptions(
     "seq=s"             => \$seq,
     "tmp|tmpdir=s"      => \$tmpdir,
@@ -39,6 +41,7 @@ $result = GetOptions(
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
     "conv-ratio-file=s" => \$convRatioFile,
     "job-id=i"          => \$jobId,
+    "blast-input-id=s"  => \$inputId,
     "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
@@ -194,7 +197,7 @@ my $allSeqFilename = "allsequences.fa";
 my $allSeqFile = "$outputDir/$allSeqFilename";
 my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 
-BlastUtil::save_input_sequence($queryFile, $seq);
+BlastUtil::save_input_sequence($queryFile, $seq, $inputId);
 
 print "\nBlast for similar sequences and sort based off bitscore\n";
 
@@ -222,9 +225,9 @@ $B->addAction("fi");
 #$B->addAction("rm $outputDir/initblast.out");
 #$B->addAction("$efiEstTools/getannotations.pl $userdat -out $outputDir/struct.out -fasta $allSeqFile");
 $B->jobName("${jobNamePrefix}blasthits_initial_blast");
-$B->renderToFile("$scriptDir/blasthits_initial_blast.sh");
+$B->renderToFile("$scriptDir/initial_blast.sh");
 
-$initblastjob = $S->submit("$scriptDir/blasthits_initial_blast.sh");
+$initblastjob = $S->submit("$scriptDir/initial_blast.sh");
 chomp $initblastjob;
 print "initial blast job is:\n $initblastjob\n";
 @initblastjobline=split /\./, $initblastjob;
@@ -240,9 +243,9 @@ $B->addAction("cd $outputDir");
 $B->addAction("$efiEstTools/blasthits-getmatches.pl -blastfile $outputDir/blastfinal.tab -accessions $outputDir/accessions.txt -max $nresults");
 $B->addAction("$efiEstTools/blasthits-write-metadata.pl -accession $outputDir/accessions.txt -meta-file $metadataFile -sequence \"$seq\"");
 $B->jobName("${jobNamePrefix}blasthits_getmatches");
-$B->renderToFile("$scriptDir/blasthits_getmatches.sh");
+$B->renderToFile("$scriptDir/getmatches.sh");
 
-$getmatchesjob = $S->submit("$scriptDir/blasthits_getmatches.sh");
+$getmatchesjob = $S->submit("$scriptDir/getmatches.sh");
 chomp $getmatchesjob;
 print "getmatches job is:\n $getmatchesjob\n";
 @getmatchesjobline=split /\./, $getmatchesjob;
@@ -259,9 +262,9 @@ $B->addAction("cd $outputDir");
 $B->addAction("blasthits-createfasta.pl -fasta allsequences.fa -accessions accessions.txt -seq-count-file $seqCountFile");
 
 $B->jobName("${jobNamePrefix}blasthits_createfasta");
-$B->renderToFile("$scriptDir/blasthits_createfasta.sh");
+$B->renderToFile("$scriptDir/createfasta.sh");
 
-$createfastajob = $S->submit("$scriptDir/blasthits_createfasta.sh");
+$createfastajob = $S->submit("$scriptDir/createfasta.sh");
 chomp $createfastajob;
 print "createfasta job is:\n $createfastajob\n";
 @createfastajobline=split /\./, $createfastajob;
@@ -293,9 +296,9 @@ if ($pfam or $ipro) {
     $B->addAction("cd $outputDir");
     $B->addAction("$efiEstTools/getsequence-domain.pl -domain off $famOpt -out allsequences.fa -fraction $fraction $seqCountFileOption $unirefOption $unirefExpandOption -accession-output $outputDir/accessions.txt -maxsequence $maxsequence -config=$configFile -use-option-a-settings -meta-file $metadataFile");
     $B->jobName("${jobNamePrefix}blasthits_getfamilyids");
-    $B->renderToFile("$scriptDir/blasthits_getfamilyids.sh");
+    $B->renderToFile("$scriptDir/getfamilyids.sh");
     
-    my $getFamJob = $S->submit("$scriptDir/blasthits_getfamilyids.sh");
+    my $getFamJob = $S->submit("$scriptDir/getfamilyids.sh");
     chomp $getFamJob;
     print "getfamilyids job is:\n $getFamJob\n";
     my @getFamJobLine =split /\./, $getFamJob;
@@ -315,9 +318,9 @@ $B->addAction("cat $queryFile >> $allSeqFile");
 $B->addAction("merge_sequence_source.pl -meta-file $metadataFile");
 $B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $allSeqFile $unirefOption -meta-file $metadataFile -config=$configFile");
 $B->jobName("${jobNamePrefix}blasthits_getannotations");
-$B->renderToFile("$scriptDir/blasthits_getannotations.sh");
+$B->renderToFile("$scriptDir/getannotations.sh");
 
-$annotationjob = $S->submit("$scriptDir/blasthits_getannotations.sh");
+$annotationjob = $S->submit("$scriptDir/getannotations.sh");
 chomp $annotationjob;
 print "annotation job is:\n $annotationjob\n";
 @annotationjobline=split /\./, $annotationjob;
@@ -339,9 +342,9 @@ if($multiplexing eq "on"){
     $B->addAction("cp $allSeqFile $outputDir/sequences.fa");
 }
 $B->jobName("${jobNamePrefix}blasthits_multiplex");
-$B->renderToFile("$scriptDir/blasthits_multiplex.sh");
+$B->renderToFile("$scriptDir/multiplex.sh");
 
-$muxjob = $S->submit("$scriptDir/blasthits_multiplex.sh");
+$muxjob = $S->submit("$scriptDir/multiplex.sh");
 chomp $muxjob;
 print "multiplex job is:\n $muxjob\n";
 @muxjobline=split /\./, $muxjob;
@@ -374,9 +377,9 @@ $B->addAction("fi");
 $B->addAction("echo \"Using \$NP parts with \$NSEQ sequences\"");
 $B->addAction("$efiEstTools/splitfasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
 $B->jobName("${jobNamePrefix}blasthits_fracfile");
-$B->renderToFile("$scriptDir/blasthits_fracfile.sh");
+$B->renderToFile("$scriptDir/fracfile.sh");
 
-$fracfilejob = $S->submit("$scriptDir/blasthits_fracfile.sh");
+$fracfilejob = $S->submit("$scriptDir/fracfile.sh");
 chomp $fracfilejob;
 print "fracfile job is: $fracfilejob\n";
 @fracfilejobline=split /\./, $fracfilejob;
@@ -392,9 +395,9 @@ $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
 $B->jobName("${jobNamePrefix}blasthits_createdb");
-$B->renderToFile("$scriptDir/blasthits_createdb.sh");
+$B->renderToFile("$scriptDir/createdb.sh");
 
-$createdbjob = $S->submit("$scriptDir/blasthits_createdb.sh");
+$createdbjob = $S->submit("$scriptDir/createdb.sh");
 chomp $createdbjob;
 print "createdb job is:\n $createdbjob\n";
 @createdbjobline=split /\./, $createdbjob;
@@ -416,10 +419,10 @@ $B->addAction("if [[ -f \$INFILE && -s \$INFILE ]]; then");
 $B->addAction("    blastall -p blastp -i \$INFILE -d $outputDir/database -m 8 -e $famEvalue -b $blasthits -o $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab");
 $B->addAction("fi");
 $B->jobName("${jobNamePrefix}blasthits_blast-qsub");
-$B->renderToFile("$scriptDir/blasthits_blast-qsub.sh");
+$B->renderToFile("$scriptDir/blast-qsub.sh");
 
 
-$blastjob = $S->submit("$scriptDir/blasthits_blast-qsub.sh");
+$blastjob = $S->submit("$scriptDir/blast-qsub.sh");
 chomp $blastjob;
 print "blast job is:\n $blastjob\n";
 @blastjobline=split /\./, $blastjob;
@@ -435,9 +438,9 @@ $B->addAction("cat $blastOutDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$
 $B->addAction("rm  $blastOutDir/blastout-*.tab");
 $B->addAction("rm  $blastOutDir/fracfile-*.fa");
 $B->jobName("${jobNamePrefix}blasthits_catjob");
-$B->renderToFile("$scriptDir/blasthits_catjob.sh");
+$B->renderToFile("$scriptDir/catjob.sh");
 
-$catjob = $S->submit("$scriptDir/blasthits_catjob.sh");
+$catjob = $S->submit("$scriptDir/catjob.sh");
 chomp $catjob;
 print "Cat job is:\n $catjob\n";
 @catjobline=split /\./, $catjob;
@@ -457,9 +460,9 @@ $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alpha
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->jobName("${jobNamePrefix}blasthits_blastreduce");
-$B->renderToFile("$scriptDir/blasthits_blastreduce.sh");
+$B->renderToFile("$scriptDir/blastreduce.sh");
 
-$blastreducejob = $S->submit("$scriptDir/blasthits_blastreduce.sh");
+$blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
 chomp $blastreducejob;
 print "Blastreduce job is:\n $blastreducejob\n";
 @blastreducejobline=split /\./, $blastreducejob;
@@ -483,9 +486,9 @@ if($multiplexing eq "on"){
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
 $B->jobName("${jobNamePrefix}blasthits_demux");
-$B->renderToFile("$scriptDir/blasthits_demux.sh");
+$B->renderToFile("$scriptDir/demux.sh");
 
-$demuxjob = $S->submit("$scriptDir/blasthits_demux.sh");
+$demuxjob = $S->submit("$scriptDir/demux.sh");
 chomp $demuxjob;
 print "Demux job is:\n $demuxjob\n";
 @demuxjobline=split /\./, $demuxjob;
@@ -541,11 +544,10 @@ my $lenHistText = "\" \"";
 $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId $lenHistText");
 $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 $B->addAction("touch  $outputDir/1.out.completed");
-$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $outputDir/blastfinal.tab $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out");
 $B->jobName("${jobNamePrefix}blasthits_graphs");
-$B->renderToFile("$scriptDir/blasthits_graphs.sh");
+$B->renderToFile("$scriptDir/graphs.sh");
 
-$graphjob = $S->submit("$scriptDir/blasthits_graphs.sh");
+$graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n";
 
@@ -561,13 +563,13 @@ if ($removeTempFiles) {
     $B->addAction("rm -f $outputDir/initblast.out");
     $B->addAction("rm -f $outputDir/sorted.alphabetized.blastfinal.tab");
     $B->addAction("rm -f $outputDir/unsorted.1.out");
-    $B->addAction("rm -f $outputDir/struct.out");
+    #$B->addAction("rm -f $outputDir/struct.out");
     $B->addAction("rm -f $outputDir/formatdb.log");
     $B->addAction("rm -f $outputDir/mux.out");
     $B->addAction("rm -f $outputDir/sequences.fa.*");
     $B->jobName("${jobNamePrefix}blasthits_cleanup");
-    $B->renderToFile("$scriptDir/blasthits_cleanup.sh");
-    my $cleanupJob = $S->submit("$scriptDir/blasthits_cleanup.sh");
+    $B->renderToFile("$scriptDir/cleanup.sh");
+    my $cleanupJob = $S->submit("$scriptDir/cleanup.sh");
 }
 
 
