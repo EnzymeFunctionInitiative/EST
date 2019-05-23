@@ -71,7 +71,6 @@ my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $frac
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode);
-my ($useLegacySeq);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -112,7 +111,6 @@ my $result = GetOptions(
     "cluster-node=s"    => \$clusterNode,
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
-    "oldseq=i"          => \$useLegacySeq,  # use old sequence retrieval code
     "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "config=s"          => \$configFile,    # new-style config file
 );
@@ -273,7 +271,6 @@ $minSeqLen = 0      if not defined $minSeqLen;
 $maxSeqLen = 0      if not defined $maxSeqLen;
 $forceDomain = 0    if not defined $forceDomain;
 $domainFamily = ""  if not defined $domainFamily;
-$useLegacySeq = 1   if not defined $useLegacySeq; #TODO: when we finalize the new code, then default this to zero
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    if not defined $maxsequence;
@@ -462,52 +459,39 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     my $domFamArg = $domainFamily ? "-domain-family $domainFamily" : "";
 
-    if (not $useLegacySeq) {
-        my @args = (
-            "-config=$configFile", "-error-file $errorFile",
-            "-seq-count-output $seqCountFile", "-sequence-output $allSeqFile", "-accession-output $accOutFile",
-            "-meta-file $metadataFile",
-        );
-        
-        push @args, "-pfam $pfam" if $pfam;
-        push @args, "-ipro $ipro" if $ipro;
-        push @args, "-ssf $ssf" if $ssf;
-        push @args, "-gene3d $gene3d" if $gene3d;
-        if ($pfam or $ipro or $ssf or $gene3d) {
-            push @args, "-uniref-version $unirefVersion" if $unirefVersion;
-            push @args, "-max-full-fam-ur90 $maxFullFam" if $maxFullFam;
-            push @args, "-fraction $fraction" if $fraction;
-            push @args, "-domain $domain" if $domain;
-        }
-        if ($accessionFile and $domainFamily and $domain) {
-            push @args, $domFamArg;
-            push @args, "-domain $domain";
-        }
-
-        my $retrScript = "get_sequences_option_";
-        if (not $fastaFile and not $accessionFile) {
-            $retrScript .= "b.pl";
-        } elsif ($fastaFile and $fastaFileOption) {
-            $retrScript .= "c.pl";
-            push @args, $fastaFileOption;
-        } elsif ($accessionFile) {
-            $retrScript .= "d.pl";
-            push @args, $accessionFileOption;
-        }
-
-        $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
-    } else {
-        my $metadataFileOption = "-meta-file $metadataFile";
-        my @getSeqArgs = ("-domain $domain", $domFamArg, $fastaFileOption, $metadataFileOption,
-            "-ipro $ipro", "-pfam $pfam", "-ssf $ssf", "-gene3d $gene3d",
-            "-accession-id $accessionId", $accessionFileOption,
-            $noMatchFile, "-out $outputDir/allsequences.fa", "-accession-output $accOutFile",
-            "-error-file $errorFile", "-seq-count-output $seqCountFile",
-            $unirefOption,
-            "-fraction $fraction", $maxFullFamOption, $minSeqLenOpt, $maxSeqLenOpt, $maxSeqOpt,
-            "-config=$configFile");
-        $B->addAction("$efiEstTools/getsequence-domain.pl " . join(" ", @getSeqArgs));
+    my @args = (
+        "-config=$configFile", "-error-file $errorFile",
+        "-seq-count-output $seqCountFile", "-sequence-output $allSeqFile", "-accession-output $accOutFile",
+        "-meta-file $metadataFile",
+    );
+    
+    push @args, "-pfam $pfam" if $pfam;
+    push @args, "-ipro $ipro" if $ipro;
+    push @args, "-ssf $ssf" if $ssf;
+    push @args, "-gene3d $gene3d" if $gene3d;
+    if ($pfam or $ipro or $ssf or $gene3d) {
+        push @args, "-uniref-version $unirefVersion" if $unirefVersion;
+        push @args, "-max-full-fam-ur90 $maxFullFam" if $maxFullFam;
+        push @args, "-fraction $fraction" if $fraction;
+        push @args, "-domain $domain" if $domain;
     }
+    if ($accessionFile and $domainFamily and $domain) {
+        push @args, $domFamArg;
+        push @args, "-domain $domain";
+    }
+
+    my $retrScript = "get_sequences_option_";
+    if (not $fastaFile and not $accessionFile) {
+        $retrScript .= "b.pl";
+    } elsif ($fastaFile and $fastaFileOption) {
+        $retrScript .= "c.pl";
+        push @args, $fastaFileOption;
+    } elsif ($accessionFile) {
+        $retrScript .= "d.pl";
+        push @args, $accessionFileOption;
+    }
+
+    $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
 
     # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
     if ($unirefVersion) {
