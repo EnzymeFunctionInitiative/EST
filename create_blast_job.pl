@@ -21,7 +21,7 @@ use BlastUtil;
 
 my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $useLegacySeq, $dryrun, $oldapps, $configFile);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $oldapps, $configFile);
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "tmp|tmpdir=s"      => \$tmpdir,
@@ -47,7 +47,6 @@ my $result = GetOptions(
     "blast-input-id=s"  => \$inputId,
     "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm
-    "oldseq=i"          => \$useLegacySeq,  # use old sequence retrieval code
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
     "config=s"          => \$configFile,    # new-style config file
@@ -81,7 +80,6 @@ my $perpass = 1000;
 my $incfrac = 0.95;
 my $maxhits = 5000;
 my $sortdir = '/scratch';
-$useLegacySeq = 1 if not defined $useLegacySeq;
 
 if (not defined $evalue and defined $famEvalue) {
     $evalue = $famEvalue;
@@ -230,9 +228,7 @@ $B->addAction("    echo \"BLAST Failed. Check input sequence.\"");
 $B->addAction("    touch $outputDir/1.out.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
-#$B->addAction("rm $outputDir/initblast.out");
-#$B->addAction("$efiEstTools/getannotations.pl $userdat -out $outputDir/struct.out -fasta $allSeqFile");
-$B->jobName("${jobNamePrefix}blasthits_initial_blast");
+$B->jobName("${jobNamePrefix}initial_blast");
 $B->renderToFile("$scriptDir/initial_blast.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/initial_blast.sh"));
@@ -241,102 +237,37 @@ $dependencyId = getJobId($submitResult);
 
 
 
-my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
+my @args = (
+    "-config=$configFile",
+    "-seq-count-output $seqCountFile", "-sequence-output $allSeqFile", "-accession-output $accOutFile",
+    "-meta-file $metadataFile",
+);
 
-if (not $useLegacySeq) {
-    my @args = (
-        "-config=$configFile",
-        "-seq-count-output $seqCountFile", "-sequence-output $allSeqFile", "-accession-output $accOutFile",
-        "-meta-file $metadataFile",
-    );
-    
-    push @args, "-pfam $pfam" if $pfam;
-    push @args, "-ipro $ipro" if $ipro;
-    if ($pfam or $ipro) {
-        push @args, "-uniref-version $unirefVersion" if $unirefVersion;
-        push @args, "-max-sequence $maxFullFamily" if $maxFullFamily;
-        push @args, "-fraction $fraction" if $fraction;
-    }
-
-    push @args, "-blast-file $outputDir/blastfinal.tab";
-    push @args, "-query-file $queryFile";
-    push @args, "-max-results $maxBlastResults" if $maxBlastResults;
-
-    $B = $S->getBuilder();
-    $B->dependency(0, $dependencyId); 
-    $B->resource(1, 1, "5gb");
-    $B->addAction("module load $efiEstMod");
-    $B->addAction("module load $efiDbMod");
-    $B->addAction("cd $outputDir");
-    $B->addAction("$efiEstTools/get_sequences_option_a.pl " . join(" ", @args));
-    $B->jobName("${jobNamePrefix}blasthits_get_seq_meta");
-    $B->renderToFile("$scriptDir/get_sequences.sh");
-
-    chomp($submitResult = $S->submit("$scriptDir/get_sequences.sh"));
-    print "get_sequences job is:\n $submitResult\n";
-    $dependencyId = getJobId($submitResult);
-
-} else {
-    $B = $S->getBuilder();
-    $B->dependency(0, $dependencyId); 
-    $B->resource(1, 1, "5gb");
-    $B->addAction("module load $efiEstMod");
-    $B->addAction("module load $efiDbMod");
-    $B->addAction("cd $outputDir");
-    $B->addAction("$efiEstTools/blasthits-getmatches.pl -blastfile $outputDir/blastfinal.tab -accessions $accOutFile -max $maxBlastResults");
-    $B->addAction("$efiEstTools/blasthits-write-metadata.pl -accession $accOutFile -meta-file $metadataFile -sequence \"$seq\"");
-    $B->jobName("${jobNamePrefix}blasthits_getmatches");
-    $B->renderToFile("$scriptDir/getmatches.sh");
-    
-    chomp($submitResult = $S->submit("$scriptDir/getmatches.sh"));
-    print "getmatches job is:\n $submitResult\n";
-    $dependencyId = getJobId($submitResult);
-    
-    
-    
-    $B = $S->getBuilder();
-    $B->dependency(0, $dependencyId);
-    $B->resource(1, 1, "5gb");
-    $B->addAction("module load $efiEstMod");
-    $B->addAction("module load $efiDbMod");
-    $B->addAction("cd $outputDir");
-    $B->addAction("blasthits-createfasta.pl -fasta allsequences.fa -accessions accessions.txt -seq-count-file $seqCountFile");
-    
-    $B->jobName("${jobNamePrefix}blasthits_createfasta");
-    $B->renderToFile("$scriptDir/createfasta.sh");
-    
-    chomp($submitResult = $S->submit("$scriptDir/createfasta.sh"));
-    print "createfasta job is:\n $submitResult\n";
-    $dependencyId = getJobId($submitResult);
-    
-    
-    # Get IDs from the family if it is specified.
-    if ($pfam or $ipro) {
-    
-        my $famOpt = "";
-        $famOpt .= " -pfam $pfam" if $pfam;
-        $famOpt .= " -ipro $ipro" if $ipro;
-    
-        my $seqCountFileOption = "";
-        if ($seqCountFile) {
-            $seqCountFileOption = "-seq-count-file $seqCountFile";
-        }
-    
-        $B = $S->getBuilder();
-        $B->resource(1, 1, "5gb");
-        $B->dependency(0, $dependencyId);
-        $B->addAction("module load $efiEstMod");
-        $B->addAction("module load $efiDbMod");
-        $B->addAction("cd $outputDir");
-        $B->addAction("$efiEstTools/getsequence-domain.pl -domain off $famOpt -out allsequences.fa -fraction $fraction $seqCountFileOption $unirefOption -accession-output $accOutFile -maxsequence $maxFullFamily -config=$configFile -use-option-a-settings -meta-file $metadataFile");
-        $B->jobName("${jobNamePrefix}blasthits_getfamilyids");
-        $B->renderToFile("$scriptDir/getfamilyids.sh");
-        
-        chomp(my $getFamJob = $S->submit("$scriptDir/getfamilyids.sh"));
-        print "getfamilyids job is:\n $getFamJob\n";
-        $dependencyId = getJobId($getFamJob);
-    }
+push @args, "-pfam $pfam" if $pfam;
+push @args, "-ipro $ipro" if $ipro;
+if ($pfam or $ipro) {
+    push @args, "-uniref-version $unirefVersion" if $unirefVersion;
+    push @args, "-max-sequence $maxFullFamily" if $maxFullFamily;
+    push @args, "-fraction $fraction" if $fraction;
 }
+
+push @args, "-blast-file $outputDir/blastfinal.tab";
+push @args, "-query-file $queryFile";
+push @args, "-max-results $maxBlastResults" if $maxBlastResults;
+
+$B = $S->getBuilder();
+$B->dependency(0, $dependencyId); 
+$B->resource(1, 1, "5gb");
+$B->addAction("module load $efiEstMod");
+$B->addAction("module load $efiDbMod");
+$B->addAction("cd $outputDir");
+$B->addAction("$efiEstTools/get_sequences_option_a.pl " . join(" ", @args));
+$B->jobName("${jobNamePrefix}get_seq_meta");
+$B->renderToFile("$scriptDir/get_sequences.sh");
+
+chomp($submitResult = $S->submit("$scriptDir/get_sequences.sh"));
+print "get_sequences job is:\n $submitResult\n";
+$dependencyId = getJobId($submitResult);
 
 
 
@@ -354,7 +285,7 @@ if($multiplexing eq "on"){
 }else{
     $B->addAction("cp $allSeqFile $outputDir/sequences.fa");
 }
-$B->jobName("${jobNamePrefix}blasthits_multiplex");
+$B->jobName("${jobNamePrefix}multiplex");
 $B->renderToFile("$scriptDir/multiplex.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/multiplex.sh"));
@@ -387,8 +318,8 @@ $B->addAction("elif [ \$NSEQ -le 1200 ]; then");
 $B->addAction("    NP=16");
 $B->addAction("fi");
 $B->addAction("echo \"Using \$NP parts with \$NSEQ sequences\"");
-$B->addAction("$efiEstTools/splitfasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
-$B->jobName("${jobNamePrefix}blasthits_fracfile");
+$B->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
+$B->jobName("${jobNamePrefix}fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/fracfile.sh"));
@@ -405,7 +336,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
-$B->jobName("${jobNamePrefix}blasthits_createdb");
+$B->jobName("${jobNamePrefix}createdb");
 $B->renderToFile("$scriptDir/createdb.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/createdb.sh"));
@@ -428,7 +359,7 @@ $B->addAction("INFILE=\"$blastOutDir/fracfile-{JOB_ARRAYID}.fa\"");
 $B->addAction("if [[ -f \$INFILE && -s \$INFILE ]]; then");
 $B->addAction("    blastall -p blastp -i \$INFILE -d $outputDir/database -m 8 -e $famEvalue -b $blasthits -o $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab");
 $B->addAction("fi");
-$B->jobName("${jobNamePrefix}blasthits_blast-qsub");
+$B->jobName("${jobNamePrefix}blast-qsub");
 $B->renderToFile("$scriptDir/blast-qsub.sh");
 
 
@@ -446,7 +377,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("cat $blastOutDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
 $B->addAction("rm  $blastOutDir/blastout-*.tab");
 $B->addAction("rm  $blastOutDir/fracfile-*.fa");
-$B->jobName("${jobNamePrefix}blasthits_catjob");
+$B->jobName("${jobNamePrefix}catjob");
 $B->renderToFile("$scriptDir/catjob.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/catjob.sh"));
@@ -467,7 +398,7 @@ $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $o
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
-$B->jobName("${jobNamePrefix}blasthits_blastreduce");
+$B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/blastreduce.sh"));
@@ -492,7 +423,7 @@ if($multiplexing eq "on"){
 }
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
-$B->jobName("${jobNamePrefix}blasthits_demux");
+$B->jobName("${jobNamePrefix}demux");
 $B->renderToFile("$scriptDir/demux.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/demux.sh"));
@@ -546,7 +477,7 @@ my $lenHistText = "\" \"";
 $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId $lenHistText");
 $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 $B->addAction("touch  $outputDir/1.out.completed");
-$B->jobName("${jobNamePrefix}blasthits_graphs");
+$B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/graphs.sh"));
@@ -568,7 +499,7 @@ if ($removeTempFiles) {
     $B->addAction("rm -f $outputDir/formatdb.log");
     $B->addAction("rm -f $outputDir/mux.out");
     $B->addAction("rm -f $outputDir/sequences.fa.*");
-    $B->jobName("${jobNamePrefix}blasthits_cleanup");
+    $B->jobName("${jobNamePrefix}cleanup");
     $B->renderToFile("$scriptDir/cleanup.sh");
     my $cleanupJob = $S->submit("$scriptDir/cleanup.sh");
 }

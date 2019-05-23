@@ -22,7 +22,7 @@ use EST::Family;
 
 my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = setupConfig();
 
-if (exists $familyConfig->{data}) {
+if (not exists $familyConfig->{data}) {
     print "ERROR: No family provided.\n";
     exit(1);
 }

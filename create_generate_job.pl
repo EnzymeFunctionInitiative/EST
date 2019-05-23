@@ -515,7 +515,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("cd $outputDir");
-    $B->addAction("$efiEstTools/getseqtaxid.pl -fasta allsequences.fa -struct $structFile -taxid $taxid -config=$configFile");
+    $B->addAction("$efiEstTools/get_sequences_by_tax_id.pl -fasta allsequences.fa -struct $structFile -taxid $taxid -config=$configFile");
     if ($fastaFile=~/\w+/) {
         $fastaFile=~s/^-userfasta //;
         $B->addAction("cat $fastaFile >> allsequences.fa");
@@ -626,7 +626,7 @@ $B->resource(1, 1, "5gb");
 
 $B->dependency(0, $prevJobId);
 $B->addAction("mkdir -p $fracOutputDir");
-$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source $filtSeqFile");
+$B->addAction("$efiEstTools/split_fasta.pl -parts $np -tmp $fracOutputDir -source $filtSeqFile");
 $B->jobName("${jobNamePrefix}fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
