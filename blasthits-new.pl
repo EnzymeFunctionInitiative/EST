@@ -338,22 +338,6 @@ if (not $useLegacySeq) {
     }
 }
 
-#$B = $S->getBuilder();
-#$B->dependency(0, $dependencyId);
-#$B->resource(1, 1, "5gb");
-#$B->addAction("module load $efiEstMod");
-#$B->addAction("module load $efiDbMod");
-#$B->addAction("cd $outputDir");
-#$B->addAction("cat $queryFile >> $allSeqFile");
-#$B->addAction("merge_sequence_source.pl -meta-file $metadataFile");
-#$B->addAction("getannotations.pl -out $outputDir/struct.out -fasta $allSeqFile $unirefOption -meta-file $metadataFile -config=$configFile");
-#$B->jobName("${jobNamePrefix}blasthits_getannotations");
-#$B->renderToFile("$scriptDir/getannotations.sh");
-#
-#chomp($submitResult = $S->submit("$scriptDir/getannotations.sh"));
-#print "annotation job is:\n $submitResult\n";
-##$dependencyId = getJobId($submitResult);
-
 
 
 #if multiplexing is on, run an initial cdhit to get a reduced set of "more" unique sequences

@@ -615,8 +615,6 @@ else
 fi
 CMDS
             );
-#        $B->addAction("mv $structFile $outputDir/struct.demux.out");
-#        $B->addAction("$efiEstTools/remove_demuxed_nodes.pl -in $outputDir/struct.demux.out -out $structFile -cluster $filtSeqFile.clstr");
         $B->addAction("mv $allSeqFile $allSeqFile.before_demux");
         $B->addAction("cp $filtSeqFile $allSeqFile");
     }
