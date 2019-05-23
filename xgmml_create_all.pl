@@ -76,7 +76,7 @@ while (my $line = <FASTA>) {
             $curSeqId = $1;
             $sequences{$curSeqId} = "";
         }
-    } elsif ($includeSeqs) {
+    } elsif ($includeSeqs and $curSeqId =~ m/^z/) {
         $sequences{$curSeqId} .= $line;
     }
 }
@@ -210,7 +210,7 @@ while (<CDHIT>){
                         $piece=$2-$1+1;
                     }
                     my $type = EFI::Annotations::get_attribute_type($key);
-                    if ($piece or ($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY)) {
+                    if (($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY) or ($piece and $piece ne "None")) {
                         $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
                     }
                 }
@@ -260,7 +260,7 @@ foreach my $key (@metas){
         $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
         foreach my $piece (@{$clusterdata{$key}}){
             my $type = EFI::Annotations::get_attribute_type($key);
-            if ($piece or ($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY)) {
+            if (($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY) or ($piece and $piece ne "None")) {
                 $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
             }
         }
