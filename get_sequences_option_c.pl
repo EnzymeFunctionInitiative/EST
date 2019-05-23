@@ -39,7 +39,7 @@ my $familyMetadata = {};
 my $familyStats = {};
 my $unirefMap = {};
 
-if ($familyConfig) {
+if (exists $familyConfig->{data}) {
     my $famData = new EST::Family(dbh => $dbh);
     $famData->configure($familyConfig);
     $famData->retrieveFamilyAccessions();
@@ -61,9 +61,8 @@ my $userMetadata = $fastaData->getMetadata();
 my $userStats = $fastaData->getStatistics();
 my $userSeq = $fastaData->getUnmatchedSequences();
 
-
-$seqObj->retrieveAndSaveSequences($familyIds, $userIds, $userSeq); # file path is configured by setupConfig
-$accObj->saveSequenceIds($familyIds, $userIds); # file path is configured by setupConfig
-my $metadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
-$statsObj->saveSequenceStatistics($metadata, $familyStats, $userStats);
+$seqObj->retrieveAndSaveSequences($familyIds, $userIds, $userSeq, $unirefMap); # file path is configured by setupConfig
+$accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
+my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
+$statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, $userStats);
 

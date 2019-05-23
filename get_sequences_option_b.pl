@@ -22,7 +22,7 @@ use EST::Family;
 
 my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = setupConfig();
 
-if (not $familyConfig) {
+if (exists $familyConfig->{data}) {
     print "ERROR: No family provided.\n";
     exit(1);
 }
@@ -50,6 +50,6 @@ my $unirefMap = $famData->getUniRefMapping();
 
 $seqObj->retrieveAndSaveSequences($familyIds); # file path is configured by setupConfig
 $accObj->saveSequenceIds($familyIds); # file path is configured by setupConfig
-my $metadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
-$statsObj->saveSequenceStatistics($metadata, $familyStats);
+my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
+$statsObj->saveSequenceStatistics($mergedMetadata, {}, $familyStats, {});
 

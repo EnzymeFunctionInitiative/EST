@@ -25,13 +25,13 @@ my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = s
 
 $metaObj->configureSourceTypes(
     EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BOTH,
 );
 $statsObj->configureSourceTypes(
     EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BOTH,
 );
 
 my $familyIds = {};
@@ -39,7 +39,7 @@ my $familyMetadata = {};
 my $familyStats = {};
 my $unirefMap = {};
 
-if ($familyConfig) {
+if (exists $familyConfig->{data}) {
     my $famData = new EST::Family(dbh => $dbh);
     $famData->configure($familyConfig);
     $famData->retrieveFamilyAccessions();
@@ -51,6 +51,7 @@ if ($familyConfig) {
 
 
 my %accessionArgs = getAccessionCmdLineArgs();
+$accessionArgs{domain_family} = $familyConfig->{config}->{domain_family};
 my $accessionData = new EST::Accession(dbh => $dbh, config_file_path => $configFile);
 $accessionData->configure(%accessionArgs);
 $accessionData->parseFile();
@@ -60,8 +61,8 @@ my $userIds = $accessionData->getSequenceIds();
 my $userMetadata = $accessionData->getMetadata();
 my $userStats = $accessionData->getStatistics();
 
-$seqObj->retrieveAndSaveSequences($familyIds, $userIds); # file path is configured by setupConfig
-$accObj->saveSequenceIds($familyIds, $userIds); # file path is configured by setupConfig
-my $metadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
-$statsObj->saveSequenceStatistics($metadata, $familyStats, $userStats);
+$seqObj->retrieveAndSaveSequences($familyIds, $userIds, {}, $unirefMap); # file path is configured by setupConfig
+$accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
+my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
+$statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, $userStats);
 

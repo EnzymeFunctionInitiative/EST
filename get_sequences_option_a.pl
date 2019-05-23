@@ -25,13 +25,13 @@ my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = s
 
 $metaObj->configureSourceTypes(
     EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BOTH,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY,
 );
 $statsObj->configureSourceTypes(
     EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA,
-    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BOTH,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT,
+    EFI::Annotations::FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY,
 );
 
 my $familyIds = {};
@@ -39,7 +39,7 @@ my $familyMetadata = {};
 my $familyStats = {};
 my $unirefMap = {};
 
-if ($familyConfig) {
+if (exists $familyConfig->{data}) {
     my $famData = new EST::Family(dbh => $dbh);
     $famData->configure($familyConfig);
     $famData->retrieveFamilyAccessions();
@@ -61,9 +61,14 @@ my $userMetadata = $blastData->getMetadata();
 my $userStats = $blastData->getStatistics();
 my $userSeq = $blastData->getQuerySequence();
 
+my $inputIdSource = {};
+$inputIdSource->{$EST::BLAST::INPUT_SEQ_ID} = $EST::BLAST::INPUT_SEQ_TYPE;
 
-$seqObj->retrieveAndSaveSequences($familyIds, $userIds, $userSeq); # file path is configured by setupConfig
-$accObj->saveSequenceIds($familyIds, $userIds); # file path is configured by setupConfig
-my $metadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
-$statsObj->saveSequenceStatistics($metadata, $familyStats, $userStats);
+
+#map { print "B\t$_\n"; } keys %$userIds;
+#map { print "F\t$_\n"; } keys %$familyIds;
+$seqObj->retrieveAndSaveSequences($familyIds, $userIds, $userSeq, $unirefMap); # file path is configured by setupConfig
+$accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
+my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap, $inputIdSource);
+$statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, $userStats);
 
