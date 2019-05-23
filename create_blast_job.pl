@@ -318,7 +318,7 @@ $B->addAction("elif [ \$NSEQ -le 1200 ]; then");
 $B->addAction("    NP=16");
 $B->addAction("fi");
 $B->addAction("echo \"Using \$NP parts with \$NSEQ sequences\"");
-$B->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
+eB->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
 $B->jobName("${jobNamePrefix}fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
@@ -419,7 +419,7 @@ if($multiplexing eq "on"){
     $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
 }else{
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
-    $B->addAction("$efiEstTools/removedups.pl -in $outputDir/mux.out -out $outputDir/1.out");
+    $B->addAction("$efiEstTools/remove_dups.pl -in $outputDir/mux.out -out $outputDir/1.out");
 }
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");

@@ -785,7 +785,7 @@ if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
     $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $filtSeqFile.clstr");
 } else {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
-    $B->addAction("$efiEstTools/removedups.pl -in $outputDir/mux.out -out $outputDir/1.out");
+    $B->addAction("$efiEstTools/remove_dups.pl -in $outputDir/mux.out -out $outputDir/1.out");
 }
 
 #$B->addAction("rm $outputDir/*blastfinal.tab");
