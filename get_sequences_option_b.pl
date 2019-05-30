@@ -20,7 +20,7 @@ use EST::Setup;
 use EST::Family;
 
 
-my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = setupConfig();
+my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj, $otherConfig) = setupConfig();
 
 if (not exists $familyConfig->{data}) {
     print "ERROR: No family provided.\n";
@@ -46,10 +46,17 @@ my $familyStats = $famData->getStatistics();
 my $userIds = {};
 my $userMetadata = {};
 my $unirefMap = $famData->getUniRefMapping();
+my $familyFullDomainIds = $famData->getFullFamilyDomain();
 
 
 $seqObj->retrieveAndSaveSequences($familyIds); # file path is configured by setupConfig
 $accObj->saveSequenceIds($familyIds); # file path is configured by setupConfig
 my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
 $statsObj->saveSequenceStatistics($mergedMetadata, {}, $familyStats, {});
+
+if ($otherConfig->{uniprot_domain_length_file}) {
+    my $histo = new EST::LengthHistogram;
+    $histo->addData($familyFullDomainIds);
+    $histo->saveToFile($otherConfig->{uniprot_domain_length_file});
+}
 

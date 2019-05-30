@@ -133,6 +133,12 @@ sub retrieveFamilyAccessions {
     $self->{data}->{uniprot_ids} = {};
     $self->{data}->{uniref_data} = {}; # Maps UniRef cluster ID to the list of IDs that are members of the cluster.
     $self->{data}->{uniref_mapping} = {}; # Maps UniProt ID to the UniRef cluster ID that it belongs to.
+    
+    # This is the full list of IDs in the given family, not just the UniRef
+    # cluster IDs.  We need this when using domain options, so we can write out
+    # a histogram of the entire family, not just the UniRef sequences.
+    # Only used when domains are enabled.
+    $self->{data}->{full_dom_uniprot_ids} = $self->{config}->{use_domain} ? {} : undef;
 
     my ($actualI, $fullFamSizeI) = $self->getDomainFromDb("INTERPRO", $fractionFunc, $self->{family}->{interpro});
     my ($actualP, $fullFamSizeP) = $self->getDomainFromDb("PFAM", $fractionFunc, $self->{family}->{pfam});
@@ -168,8 +174,10 @@ sub getDomainFromDb {
     my ($table, $fractionFunc, $families) = @_;
     my @families = @$families;
     my $unirefVersion = $self->{config}->{uniref_version};
+    my $useDomain = $self->{config}->{use_domain};
 
     my $ids = $self->{data}->{uniprot_ids};
+    my $fullFamIds = $useDomain ? $self->{data}->{full_dom_uniprot_ids} : {};
     my $unirefData = $self->{data}->{uniref_data};
     my $unirefMapping = $self->{data}->{uniref_mapping};
 
@@ -194,19 +202,20 @@ sub getDomainFromDb {
         my $ac = 1;
         while (my $row = $sth->fetchrow_hashref) {
             (my $uniprotId = $row->{accession}) =~ s/\-\d+$//; #remove homologues
-            next if (not $self->{config}->{use_domain} and exists $idsProcessed{$uniprotId});
+            next if (not $useDomain and exists $idsProcessed{$uniprotId});
             $idsProcessed{$uniprotId} = 1;
 
             if ($unirefVersion) {
                 my $unirefId = $row->{$unirefField};
-                if (&$fractionFunc($count)) {
-                    $ac++;
-                    push @{$unirefData->{$unirefId}}, $uniprotId;
-                    # The accession element will be overwritten multiple times, once for each accession ID 
-                    # in the UniRef cluster that corresponds to the UniRef cluster ID.
-                    if ($unirefId eq $uniprotId) {
-                        push @{$ids->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
-                    }
+                $ac++;
+                push @{$unirefData->{$unirefId}}, $uniprotId;
+                # The accession element will be overwritten multiple times, once for each accession ID 
+                # in the UniRef cluster that corresponds to the UniRef cluster ID.
+                if ($unirefId eq $uniprotId) {
+                    push @{$ids->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
+                    push @{$fullFamIds->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}} if $useDomain;
+                } elsif ($useDomain) {
+                    push @{$fullFamIds->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
                 }
                 # Only increment the family size if the uniref cluster ID hasn't yet been encountered.  This
                 # is because the select query above retrieves all accessions in the family based on UniProt
@@ -268,6 +277,13 @@ sub getUniRefMapping {
     my $self = shift;
 
     return $self->{data}->{uniref_mapping};
+}
+
+
+sub getFullFamilyDomain {
+    my $self = shift;
+    
+    return $self->{data}->{full_dom_uniprot_ids};
 }
 
 

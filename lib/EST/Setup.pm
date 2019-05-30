@@ -38,6 +38,7 @@ sub setupConfig {
     my ($blastIds, $pfam, $interpro);
     my ($accOutput, $seqOutput, $metaOutput, $statsOutput);
     my ($minSeqLen, $maxSeqLen, $batchSize);
+    my ($unirefDomLenOutput, $uniprotDomLenOutput);
     my $result = GetOptions(
         "config=s"                          => \$configFile,
         "accession-output=s"                => \$accOutput,
@@ -47,6 +48,8 @@ sub setupConfig {
         "seq-retr-batch-size=i"             => \$batchSize,  # Optional.
         "meta-file|metadata-output=s"       => \$metaOutput,
         "seq-count-file|seq-count-output=s" => \$statsOutput,
+        "uniprot-dom-len-output=s"          => \$uniprotDomLenOutput,
+        "uniref-dom-len-output=s"           => \$unirefDomLenOutput,
     );
     
     if ((not $configFile or not -f $configFile) and exists $ENV{EFI_CONFIG} and -f $ENV{EFI_CONFIG}) {
@@ -89,6 +92,8 @@ sub setupConfig {
         batch_size => $batchSize,
         use_user_domain => ($familyConfig->{config}->{use_domain} and $familyConfig->{config}->{domain_family}) ? 1 : 0,
     );
+    $seqArgs{domain_length_file} = $unirefDomLenOutput if $unirefDomLenOutput;
+    $seqArgs{domain_length_file} = $uniprotDomLenOutput if $uniprotDomLenOutput and not $unirefDomLenOutput;
 
     my %accArgs = (
         seq_id_output_file => $accOutput,
@@ -102,12 +107,15 @@ sub setupConfig {
         stats_output_file => $statsOutput,
     );
 
+    my %otherConfig;
+    $otherConfig{uniprot_domain_length_file} = $uniprotDomLenOutput if $uniprotDomLenOutput and $unirefDomLenOutput;
+
     my $accObj = new EST::IdList(%accArgs);
     my $seqObj = new EST::Sequence(%seqArgs);
     my $metaObj = new EST::Metadata(%metaArgs);
     my $statsObj = new EST::Statistics(%statsArgs);
 
-    return ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj);
+    return ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj, \%otherConfig);
 }
 
 

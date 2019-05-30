@@ -6,7 +6,11 @@ use warnings;
 use strict;
 
 use Capture::Tiny qw(capture);
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../";
 
+use EST::LengthHistogram;
 
 
 sub new {
@@ -23,6 +27,7 @@ sub new {
     $self->{max_seq_len} = $args{max_seq_len} || 1000000;
     $self->{use_domain} = $args{use_domain} || 0;
     $self->{use_user_domain} = $args{use_user_domain} || 0;
+    $self->{domain_length_file} = $args{domain_length_file} || "";
 
     return bless($self, $class);
 }
@@ -35,11 +40,13 @@ sub retrieveAndSaveSequences {
     my $userSeq = shift;
     my $unirefMap = shift || {};
 
+    my $histo = new EST::LengthHistogram;
+
     my @ids = keys %$ids;
     map { push(@ids, $_) if not exists $ids->{$_} and not exists $unirefMap->{$_}; } keys %$userIds;
     @ids = sort @ids;
 
-    open SEQOUTPUT, ">", $self->{output_file} or die "Unable to open sequence file $self->{output_file} for writing: $!";
+    open SEQ_OUTPUT, ">", $self->{output_file} or die "Unable to open sequence file $self->{output_file} for writing: $!";
 
     my @err;
     while (scalar @ids) {
@@ -65,7 +72,7 @@ sub retrieveAndSaveSequences {
             # from the other metadata files.
             if (length($sequence) >= $self->{min_seq_len} and length($sequence) <= $self->{max_seq_len}) {
                 if (not $self->{use_domain} and not $self->{use_user_domain} and $id ne "") {
-                    print SEQOUTPUT ">$id$sequence\n\n";
+                    print SEQ_OUTPUT ">$id$sequence\n\n";
                 } elsif (($self->{use_domain} or $self->{use_user_domain}) and $id ne "") {
                     $sequence =~ s/\s+//g;
                     my $refVal;
@@ -77,24 +84,27 @@ sub retrieveAndSaveSequences {
                     my @domains = @$refVal;
                     if (scalar @domains) {
                         foreach my $piece (@domains) {
-                            my $thissequence = join("\n", unpack("(A80)*", substr $sequence,${$piece}{'start'}-1,${$piece}{'end'}-${$piece}{'start'}+1));
-                            print SEQOUTPUT ">$id:${$piece}{'start'}:${$piece}{'end'}\n$thissequence\n\n";
+                            my $theSeq = join("\n", unpack("(A80)*", substr $sequence, ${$piece}{'start'}-1, ${$piece}{'end'}-${$piece}{'start'}+1));
+                            print SEQ_OUTPUT ">$id:${$piece}{'start'}:${$piece}{'end'}\n$theSeq\n\n";
+                            (my $lenSeq = $theSeq) =~ s/[^A-Z]//g;
+                            $histo->addData(length($lenSeq));
                         }
                     } else {
-                        print SEQOUTPUT ">$id\n$sequence\n\n";
+                        print SEQ_OUTPUT ">$id\n$sequence\n\n";
                     }
                 }
             }
         }
     }
-    
+
+    $histo->saveToFile($self->{domain_length_file}) if $self->{domain_length_file};
 
     @ids = sort keys %$userSeq;
     foreach my $id (@ids) {
-        print SEQOUTPUT ">$id\n$userSeq->{$id}\n";
+        print SEQ_OUTPUT ">$id\n$userSeq->{$id}\n";
     }
 
-    close SEQOUTPUT;
+    close SEQ_OUTPUT;
 }
 
 

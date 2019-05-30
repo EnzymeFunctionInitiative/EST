@@ -19,9 +19,10 @@ use lib "$FindBin::Bin/lib";
 use EST::Setup;
 use EST::Family;
 use EST::Accession;
+use EST::LengthHistogram;
 
 
-my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = setupConfig();
+my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj, $otherConfig) = setupConfig();
 
 $metaObj->configureSourceTypes(
     EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY,
@@ -38,6 +39,7 @@ my $familyIds = {};
 my $familyMetadata = {};
 my $familyStats = {};
 my $unirefMap = {};
+my $familyFullDomainIds = undef; # Used when domain and uniref are enabled
 
 if (exists $familyConfig->{data}) {
     my $famData = new EST::Family(dbh => $dbh);
@@ -47,6 +49,7 @@ if (exists $familyConfig->{data}) {
     $familyMetadata = $famData->getMetadata();
     $familyStats = $famData->getStatistics();
     $unirefMap = $famData->getUniRefMapping();
+    $familyFullDomainIds = $famData->getFullFamilyDomain();
 }
 
 
@@ -61,8 +64,16 @@ my $userIds = $accessionData->getSequenceIds();
 my $userMetadata = $accessionData->getMetadata();
 my $userStats = $accessionData->getStatistics();
 
-$seqObj->retrieveAndSaveSequences($familyIds, $userIds, {}, $unirefMap); # file path is configured by setupConfig
+$seqObj->retrieveAndSaveSequences($familyIds, $userIds, {}, $unirefMap, $familyFullDomainIds); # file path is configured by setupConfig
 $accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
 my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
 $statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, $userStats);
+
+if ($otherConfig->{uniprot_domain_length_file}) {
+    my $histo = new EST::LengthHistogram;
+    my $ids = EST::IdList::mergeIds($familyFullDomainIds, $userIds);
+    $histo->addData($ids);
+    $histo->saveToFile($otherConfig->{uniprot_domain_length_file});
+}
+
 

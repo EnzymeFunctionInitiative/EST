@@ -78,6 +78,8 @@ while (<BLAST>){
     }
     $hc->print("align$metadata{$evalue}", "$align\n");
     $hc->print("perid$metadata{$evalue}", "$pid\n");
+    $hc->print("dat.pid", "$evalue\t$pid\n");
+    $hc->print("dat.aln", "$evalue\t$align\n");
     $evalueEdges{$evalue} = 0 if not exists $evalueEdges{$evalue};
     $evalueEdges{$evalue}++;
 }
@@ -162,64 +164,66 @@ print "1.out procession complete, now processing fasta\n";
 
 
 
-#processing data for the lentgh histogram
-#if this script takes too long, we can make this run at same time as above commands.
-@evalues = @edges = ();
-open(my $FastaFH, $fasta) or die "could not open fastafile $fasta\n";
-
-my ($sequences, $length) = (1, 0);
-my $smalllen = 50000;
-my @data;
-
-foreach my $line (<$FastaFH>){
-    chomp $line;
-    if ($line =~ /^>/ and $length > 0) {
-        #unless first time, add to count of @data for the sequence length
-        $sequences++;
-        if (defined $data[$length]) {
-            $data[$length]++;
+if ($lenhist) {
+    #processing data for the lentgh histogram
+    #if this script takes too long, we can make this run at same time as above commands.
+    open(my $FastaFH, $fasta) or die "could not open fastafile $fasta\n";
+    
+    my ($sequences, $length) = (1, 0);
+    my @data;
+    
+    foreach my $line (<$FastaFH>){
+        chomp $line;
+        if ($line =~ /^>/ and $length > 0) {
+            #unless first time, add to count of @data for the sequence length
+            $sequences++;
+            if (defined $data[$length]) {
+                $data[$length]++;
+            } else {
+                $data[$length]=1;
+            }
+            $length = 0;
         } else {
-            $data[$length]=1;
-        }
-        $length = 0;
-    } else {
-        $length += length $line;
-    }
-}
-
-#save the last one in the file
-if (defined $data[$length]) {
-    $data[$length]++;
-} else {
-    $data[$length]=1;
-}
-
-
-#figure number of sequences to cut off each end
-my $endtrim = $sequences * (1 - $incfrac) / 2;
-$endtrim = int $endtrim;
-
-my ($sequencesum, $minCount, $count) = (0, 0, 0);
-foreach my $piece (@data){
-    if ($sequencesum <= ($sequences - $endtrim)) {
-        $count++;
-        $sequencesum += $piece;
-        if ($sequencesum < $endtrim) {
-            $minCount++;
+            $length += length $line;
         }
     }
+    
+    #save the last one in the file
+    if (defined $data[$length]) {
+        $data[$length]++;
+    } else {
+        $data[$length]=1;
+    }
+    
+    
+    #figure number of sequences to cut off each end
+    my $endtrim = $sequences * (1 - $incfrac) / 2;
+    $endtrim = int $endtrim;
+    
+    my ($sequencesum, $minCount, $count) = (0, 0, 0);
+    foreach my $piece (@data){
+        if ($sequencesum <= ($sequences - $endtrim)) {
+            $count++;
+            $sequencesum += $piece;
+            if ($sequencesum < $endtrim) {
+                $minCount++;
+            }
+        }
+    }
+    
+    open(my $LenHistFH, ">$lenhist") or die "could not write to $lenhist\n";
+    #print out the area of the array that we want to keep
+    for (my $i = $minCount; $i <= $count; $i++) {
+        if (defined $data[$i]) {
+            $LenHistFH->print("$i\t$data[$i]\n");
+        } else {
+            $LenHistFH->print("$i\t0\n");
+        }
+    }
+    close($LenHistFH);
 }
 
-open(my $LenHistFH, ">$lenhist") or die "could not write to $lenhist\n";
-#print out the area of the array that we want to keep
-for (my $i = $minCount; $i <= $count; $i++) {
-    if (defined $data[$i]) {
-        $LenHistFH->print("$i\t$data[$i]\n");
-    } else {
-        $LenHistFH->print("$i\t0\n");
-    }
-}
-close($LenHistFH);
+
 
 $lastmax=0;
 opendir(DIR, $rdata) or die "cannot open directory $rdata\n";

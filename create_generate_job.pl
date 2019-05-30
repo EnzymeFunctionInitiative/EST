@@ -281,7 +281,8 @@ if (not defined $incfrac) {
     $incfrac=0.99;
 }
 
-$domain = "off"     if $unirefVersion and not $forceDomain;
+# We will keep the domain option on
+#$domain = "off"     if $unirefVersion and not $forceDomain;
 
 ($jobId = $ENV{PWD}) =~ s%^.*/(\d+)/*$%$1% if not $jobId;
 $jobId = "" if $jobId =~ /\D/;
@@ -338,9 +339,15 @@ my $errorFile = "$accOutFile.failed";
 my $fracOutputDir = "$outputDir/fractions";
 my $blastOutputDir = "$outputDir/blastout";
 my $structFile = "$outputDir/struct.out";
-my $uniprotSeqLenFile = "$outputDir/uniprot_length.tab"; # For UniRef option, this the lengths of all the sequences in the family not just the seed sequences
 my $allSeqFile = "$outputDir/allsequences.fa";
 my $filtSeqFile = "$outputDir/sequences.fa";
+
+my $lenUniprotFile = "$outputDir/length_uniprot.tab"; # full lengths of all UniProt sequences (expanded from UniRef if necessary)
+my $lenUniprotDomFile = "$outputDir/length_uniprot_domain.tab"; # domain lengths of all UniProt sequences (expanded from UniRef if necessary)
+my $lenUnirefFile = "$outputDir/length_uniref.tab"; # full lengths of UR cluster ID sequences
+my $lenUnirefDomFile = "$outputDir/length_uniref_domain.tab"; # domain lengths of UR cluster ID sequences
+#my $uniprotSeqLenFile = "$outputDir/uniprot_length.tab"; # For UniRef option, this is the lengths of all the sequences in the family not just the seed sequences
+#my $unirefClusterSeqLenFile = "$outputDir/uniref_cluster_length.tab"; # For UniRef + Domain option, this is the full lengths of the cluster ID sequences, not accounting for domain.
 
 my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 
@@ -434,7 +441,6 @@ my $prevJobId;
 
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
-    my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
     my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
@@ -473,11 +479,12 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         push @args, "-uniref-version $unirefVersion" if $unirefVersion;
         push @args, "-max-full-fam-ur90 $maxFullFam" if $maxFullFam;
         push @args, "-fraction $fraction" if $fraction;
-        push @args, "-domain $domain" if $domain;
     }
-    if ($accessionFile and $domainFamily and $domain) {
-        push @args, $domFamArg;
+    if ($domain eq "on") {
         push @args, "-domain $domain";
+        push @args, "-uniprot-dom-len-output $lenUniprotDomFile";
+        push @args, "-uniref-dom-len-output $lenUnirefDomFile" if $unirefVersion;
+        push @args, $domFamArg if $domFamArg;
     }
 
     my $retrScript = "get_sequences_option_";
@@ -493,11 +500,19 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
 
-    # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
+    my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
+    push @lenUniprotArgs, "-output $lenUniprotFile";
+    push @lenUniprotArgs, "-expand-uniref" if $unirefVersion;
+    $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUniprotArgs));
+    
     if ($unirefVersion) {
-        # Get the lengths of the full UniProt sequences not just the UniRef seed sequences.
-        $B->addAction("$efiEstTools/get_lengths_from_anno.pl -struct $metadataFile -lengths $uniprotSeqLenFile -config $configFile");
+        my @lenUnirefArgs = ("-struct $metadataFile", "-config $configFile");
+        push @lenUnirefArgs, "-output $lenUnirefFile";
+        $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUnirefArgs));
     }
+
+    # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
+
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
@@ -882,14 +897,13 @@ $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
     my $evalueFile = "$outputDir/evalue.tab";
     my $defaultLengthFile = "$outputDir/length.tab";
-    my $lengthFile = $unirefVersion ? "$outputDir/uniref_seed_length.tab" : $defaultLengthFile;
     $B->resource(1, 1, "50gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
     $B->addAction("mkdir -p $outputDir/rdata");
-    # Retrieves the lengths for the UniProt sequences (non-UniRef jobs) or UniRef seed sequences (UniRef jobs)
-    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -length $lengthFile -incfrac $incfrac -evalue-file $evalueFile");
+    # Lengths are retrieved in a previous step.
+    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -incfrac $incfrac -evalue-file $evalueFile");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
     $B->addAction("if [ -z \"\$FIRST\" ]; then");
     $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
@@ -907,16 +921,16 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-    if ($unirefVersion) {
-        my $unirefLenHistText = "\"(UniRef$unirefVersion Cluster IDs)\"";
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram_uniref.png $jobId $unirefLenHistText");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram_uniref_sm.png $jobId $unirefLenHistText $smallWidth $smallHeight");
-        # Always want the regular histogram to show the full UniProt set of seq. lengths.
-        $lengthFile = $uniprotSeqLenFile;
+    my %lenFiles = ($lenUniprotFile => {title => "", file => "length_histogram_uniprot"});
+    $lenFiles{$lenUniprotFile}->{title} = "UniProt, Full Length" if $unirefVersion or $domain eq "on";
+    $lenFiles{$lenUniprotDomFile} = {title => "UniProt, Domain", file => "length_histogram_uniprot_domain"} if $domain eq "on";
+    $lenFiles{$lenUnirefFile} = {title => "UniRef$unirefVersion Cluster IDs, Full Length", file => "length_histogram_uniref"} if $unirefVersion;
+    $lenFiles{$lenUnirefDomFile} = {title => "UniRef$unirefVersion Cluster IDs, Domain", file => "length_histogram_uniref_domain"} if $unirefVersion and $domain eq "on";
+    foreach my $file (keys %lenFiles) {
+        my $title = "\"(" . $lenFiles{$file}->{title} . ")\"";
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}.png $jobId $title");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}_sm.png $jobId $title $smallWidth $smallHeight");
     }
-    my $lenHistText = "\" \"";
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram.png $jobId $lenHistText");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $lengthFile $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 } else {
     $B->addAction("module load $pythonMod");
     $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $allSeqFile -i $incfrac");

@@ -31,5 +31,17 @@ sub saveSequenceIds {
 }
 
 
+sub mergeIds {
+    my $a = shift;
+    my $b = shift;
+
+    my $ids = {};
+    map { $ids->{$_} = $a->{$_}; } keys %$a;
+    map { $ids->{$_} = $b->{$_}; } keys %$b;
+
+    return $ids;
+}
+
+
 1;
 
