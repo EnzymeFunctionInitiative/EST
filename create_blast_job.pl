@@ -21,7 +21,7 @@ use BlastUtil;
 
 my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $oldapps, $configFile);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile);
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "tmp|tmpdir=s"      => \$tmpdir,
@@ -48,7 +48,6 @@ my $result = GetOptions(
     "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
-    "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
     "config=s"          => \$configFile,    # new-style config file
 );
 
@@ -64,7 +63,7 @@ if (not $configFile or not -f $configFile) {
     $configFile = $ENV{EFICONFIG};
 }
 
-die "-config file argument is required" if not -f $configFile;
+die "-config file argument is required" if not $configFile or not -f $configFile;
 
 
 die "-tmpdir argument is required" if not $tmpdir;
@@ -83,13 +82,11 @@ my $sortdir = '/scratch';
 
 if (not defined $evalue and defined $famEvalue) {
     $evalue = $famEvalue;
-}
-
-unless(defined $evalue){
+} elsif (not defined $evalue) {
     print "-evalue not specified, using default of 5\n";
     $evalue="1e-5";
-}else{
-    if( $evalue =~ /^\d+$/ ) {
+} else {
+    if ($evalue =~ /^\d+$/) {
         $evalue="1e-$evalue";
     }
 }
@@ -100,58 +97,45 @@ if (not defined $famEvalue) {
 $famEvalue = "1e-$famEvalue" if $famEvalue =~ /^\d+$/;
 
 #defaults and error checking for multiplexing
-if($multiplexing eq "on"){
-    if(defined $lengthdif){
-        unless($lengthdif=~/\d+(\.\d)?/){
-            die "lengthdif must be in a format like 0.9d\n";
-        }
-    }else{
-        $lengthdif=1;
-    }
-    if(defined $sim){
-        unless($sim=~/\d+(\.\d)?/){
-            die "sim must be in a format like 0.9c\n";
-        }   
-    }else{
-        $sim=1;
-    }
-}elsif(!(defined $multiplexing)){
-    $multiplexing="on";
-    if(defined $lengthdif){
-        unless($lengthdif=~/\d+(\.\d)?/){
-            die "lengthdif must be in a format like 0.9a\n";
-        }
-    }else{
-        $lengthdif=1;
-    }
-    if(defined $sim){
-        unless($sim=~/\d+(\.\d)?/){
-            die "sim must be in a format like 0.9b\n";
-        }   
-    }else{
-        $sim=1;
-    }
-}else{
+if (not defined $multiplexing) {
+    $multiplexing = "on";
+} elsif ($multiplexing ne "on" and $multiplexing ne "off") {
     die "valid variables for multiplexing are either on or off\n";
 }
 
+if (defined $lengthdif) {
+    if (not $lengthdif=~/\d+(\.\d)?/) {
+        die "lengthdif must be in a format like 0.9d\n";
+    }
+} else {
+    $lengthdif = 1;
+}
+
+if (defined $sim) {
+    if (not $sim=~/\d+(\.\d)?/) {
+        die "sim must be in a format like 0.9c\n";
+    }   
+} else {
+    $sim = 1;
+}
+
 #you also have to specify the number of processors for blast
-unless(defined $np){
+if (not defined $np) {
     die "You must spedify the -np variable\n";
 }
 
-unless(defined $blasthits){
+if (not defined $blasthits) {
     $blasthits=1000000;  
 }
 
 #default queues
-unless(defined $queue){
+if (not defined $queue) {
     print "-queue not specified, using default\n";
-    $queue="efi";
+    $queue = "efi";
 }
-unless(defined $memqueue){
+if (not defined $memqueue) {
     print "-memqueue not specifiied, using default\n";
-    $memqueue="efi";
+    $memqueue = "efi";
 }
 
 $seqCountFile = "$outputDir/acc_counts.txt" if not $seqCountFile;
@@ -161,11 +145,6 @@ $seqCountFile = "$outputDir/acc_counts.txt" if not $seqCountFile;
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
 my $usesSlurm = $schedType eq "slurm";
-if (defined($oldapps)) {
-    $oldapps = $usesSlurm;
-} else {
-    $oldapps = 0;
-}
 
 # Defaults for fraction of sequences to fetch
 if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
@@ -280,9 +259,9 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 #  $B->addAction("module load blast");
 $B->addAction("cd $outputDir");
-if($multiplexing eq "on"){
+if ($multiplexing eq "on") {
     $B->addAction("cd-hit -d 0 -c $sim -s $lengthdif -i $allSeqFile -o $outputDir/sequences.fa");
-}else{
+} else {
     $B->addAction("cp $allSeqFile $outputDir/sequences.fa");
 }
 $B->jobName("${jobNamePrefix}multiplex");
@@ -318,7 +297,7 @@ $B->addAction("elif [ \$NSEQ -le 1200 ]; then");
 $B->addAction("    NP=16");
 $B->addAction("fi");
 $B->addAction("echo \"Using \$NP parts with \$NSEQ sequences\"");
-eB->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
+$B->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
 $B->jobName("${jobNamePrefix}fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
@@ -414,10 +393,10 @@ $B->queue($memqueue);
 $B->dependency(0, $dependencyId); 
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
-if($multiplexing eq "on"){
+if ($multiplexing eq "on") {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
-}else{
+} else {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/remove_dups.pl -in $outputDir/mux.out -out $outputDir/1.out");
 }
