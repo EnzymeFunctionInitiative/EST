@@ -14,6 +14,7 @@ my $unirefFile = "";
 my $append = undef;
 my $mergeDomain = undef;
 my $showProgress = undef;
+my $v2 = undef;
 
 my $result = GetOptions(
     "input=s"       => \$inputFile,
@@ -24,6 +25,7 @@ my $result = GetOptions(
     "progress"      => \$showProgress,
     "clans=s"       => \$clanFile,
     "uniref=s"      => \$unirefFile,
+    "v2"            => \$v2,
 );
 
 
@@ -40,6 +42,7 @@ Count the number of elements in the families in the input file.
     -clans          if present and family type is PFAM, the clan sizes are also output
     -uniref         if present, the file is parsed for UniRef seed sequences and those are output with the
                     families as separate fields.
+    -v2             if present, will use the new method of computing UniRef family sizes
 
 The output format is as follows:
 
@@ -78,6 +81,8 @@ if (-f $unirefFile) {
     getUnirefData($unirefFile, \%unirefData);
 }
 
+my %familyMap; # map acc id to family id, for use in UniRef family size computation
+
 
 open INPUT, $inputFile or die "Unable to open the input file '$inputFile': $!";
 
@@ -88,22 +93,19 @@ while (<INPUT>) {
     chomp;
     my ($family, $accId, $startDomain, $endDomain) = split(m/\t/);
     if (exists $counts{$family}) {
-        print "$family $accId $startDomain $endDomain $counts{$family} 1" if ($family eq "IPR000015");
         if (not $mergeDomain or not exists $merges{"$family-$accId"}) {
             $counts{$family}++;
             $merges{"$family-$accId"} = 1;
-            print "  2" if ($family eq "IPR000015");
         }
-        print "\n" if ($family eq "IPR000015");
     } else {
-        print "$family $counts{$family} 0\n" if ($family eq "IPR000015");
         $counts{$family} = 0;
     }
 
-    if ($unirefFile and exists $unirefData{$accId}) {
+    if (not $v2 and $unirefFile and exists $unirefData{$accId}) {
         $ur50Sizes{$family}->{ $unirefData{$accId}->{ur50} } = 1;
         $ur90Sizes{$family}->{ $unirefData{$accId}->{ur90} } = 1;
     }
+    $familyMap{$accId} = $family;
 
     if (exists $famToClan{$family}) {
         my $clan = $famToClan{$family};
@@ -124,6 +126,21 @@ while (<INPUT>) {
     }
 }
 
+
+if ($v2) {
+    # Compute UniRef size for families.
+    if ($unirefFile) {
+        foreach my $accId (keys %familyMap) {
+            my $family = $familyMap{$accId};
+            my $ur50id = $unirefData{$accId}->{ur50};
+            my $ur90id = $unirefData{$accId}->{ur90};
+            $ur50Sizes{$family}->{$ur50id} = 1 if $familyMap{$ur50id} eq $family;
+            $ur90Sizes{$family}->{$ur90id} = 1 if $familyMap{$ur90id} eq $family;
+        }
+    }
+}
+
+
 print "\n" if $showProgress;
 
 close INPUT;
@@ -136,10 +153,9 @@ my @families = sort keys %counts;
 my $c = 0;
 my $progress = 0;
 foreach my $family (@families) {
-    my @outCounts = ($counts{$family});
-    push @outCounts, scalar(keys(%{ $ur50Sizes{$family} })) if exists $ur50Sizes{$family};
-    push @outCounts, scalar(keys(%{ $ur90Sizes{$family} })) if exists $ur90Sizes{$family};
-    print OUTPUT join("\t", $tableType, $family, @outCounts), "\n";
+    my $ur50size = exists $ur50Sizes{$family} ? scalar(keys(%{ $ur50Sizes{$family} })) : 0;
+    my $ur90size = exists $ur90Sizes{$family} ? scalar(keys(%{ $ur90Sizes{$family} })) : 0;
+    print OUTPUT join("\t", $tableType, $family, $counts{$family}, $ur50size, $ur90size), "\n";
 
     if ($showProgress) {
         my $pos = int($c++ * 100 / ($#families + 1));
@@ -155,11 +171,11 @@ print "\nWriting clan data\n";
 foreach my $clan (sort keys %clanData) {
     my @allIds = @{ $clanData{$clan}->{ids} };
     my @ids = uniq @allIds;
-    my @outCounts = scalar @ids;
-    push @outCounts, scalar(keys(%{ $ur50ClanSizes{$clan} })) if exists $ur50ClanSizes{$clan};
-    push @outCounts, scalar(keys(%{ $ur90ClanSizes{$clan} })) if exists $ur90ClanSizes{$clan};
+    my $outCounts = scalar @ids;
+    my $ur50size = exists $ur50ClanSizes{$clan} ? scalar(keys(%{ $ur50ClanSizes{$clan} })) : 0;
+    my $ur90size = exists $ur90ClanSizes{$clan} ? scalar(keys(%{ $ur90ClanSizes{$clan} })) : 0;
     #my @fams = @{ $clanData{$clan}->{fams} };
-    print OUTPUT join("\t", "CLAN", $clan, @outCounts), "\n";
+    print OUTPUT join("\t", "CLAN", $clan, $outCounts, $ur50size, $ur90size), "\n";
 }
 
 

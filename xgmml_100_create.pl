@@ -101,7 +101,7 @@ while (my $line = <FASTA>) {
             $curSeqId = $1;
             $sequences{$curSeqId} = "";
         }
-    } elsif ($includeSeqs) {
+    } elsif ($includeSeqs and $curSeqId =~ m/^z/) {
         $sequences{$curSeqId} .= $line;
     }
 }
@@ -206,22 +206,24 @@ foreach my $element (@uprotnumbers) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
             my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
             foreach my $piece (@pieces) {
-                $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+                $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
                 my $type = EFI::Annotations::get_attribute_type($key);
-                if ($piece or $type ne "integer") {
+                #if ($piece or $type ne "integer") {
+                if ($type ne "integer" or ($piece and $piece ne "None")) {
                     $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
                 }
             }
             $writer->endTag();
         } else {
-            $uprot{$element}{$key} =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
             my $piece = $uprot{$element}{$key};
+            $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
             if ($key eq "Sequence_Length" and $origelement =~ /\w{6,10}:(\d+):(\d+)/) {
                 $piece = $2 - $1 + 1;
                 print "start:$1\tend$2\ttotal:$piece\n";
             }
             my $type = EFI::Annotations::get_attribute_type($key);
-            if ($piece or $type ne "integer") {
+            #if ($piece or $type ne "integer") {
+            if ($type ne "integer" or ($piece and $piece ne "None")) {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
             }
         }

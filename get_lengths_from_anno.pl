@@ -18,20 +18,23 @@ use lib "$FindBin::Bin/lib";
 
 use FileUtil;
 use EFI::Database;
+use EST::LengthHistogram;
 
 
 
-my ($annoFile, $lengthFile, $configFile, $incfrac);
+my ($annoFile, $configFile, $incfrac);
+my ($outputFile, $expandUniref);
 my $result = GetOptions(
-    "struct=s"      => \$annoFile,
-    "lengths=s"     => \$lengthFile, # Output
-    "config=s"      => \$configFile,
-    "incfrac=f"     => \$incfrac,
+    "struct=s"              => \$annoFile,
+    "config=s"              => \$configFile,
+    "incfrac=f"             => \$incfrac,
+    "output=s"              => \$outputFile,
+    "expand-uniref"         => \$expandUniref,
 );
 
 
 die "Requires input -struct argument for annotation IDs" if not $annoFile or not -f $annoFile;
-die "Requires output -lengths argument for length file" if not $lengthFile;
+die "Requires output length file argument" if not $outputFile;
 
 
 if (not defined $configFile or not -f $configFile) {
@@ -51,58 +54,36 @@ my $dbh = $db->getHandle();
 
 # Contains the attributes for each UniRef cluster ID
 my $annoMap = FileUtil::read_struct_file($annoFile);
+my @metaIds = keys %$annoMap;
 
-my @uniprotIds;
-foreach my $clId (keys %$annoMap) {
-    my $ids = exists $annoMap->{$clId}->{UniRef90_IDs} ? $annoMap->{$clId}->{UniRef90_IDs} :
-              exists $annoMap->{$clId}->{UniRef50_IDs} ? $annoMap->{$clId}->{UniRef50_IDs} : "";
-    my @ids = split(m/,/, $ids);
-    push @uniprotIds, @ids;
+if ($expandUniref) {
+    my @uniprotIds;
+    foreach my $clId (@metaIds) {
+        my $ids = exists $annoMap->{$clId}->{UniRef90_IDs} ? $annoMap->{$clId}->{UniRef90_IDs} :
+                  exists $annoMap->{$clId}->{UniRef50_IDs} ? $annoMap->{$clId}->{UniRef50_IDs} : "";
+        my @ids = split(m/,/, $ids);
+        push @uniprotIds, @ids;
+        push @uniprotIds, $clId if not scalar @ids;
+    }
+    @metaIds = @uniprotIds;
 }
 
 
-my $numSequences = 0;
-my @lengths;
-while (@uniprotIds) {
-    my @batch = splice(@uniprotIds, 0, 50);
+my $histo = new EST::LengthHistogram;
+
+while (@metaIds) {
+    my @batch = splice(@metaIds, 0, 50);
     my $queryIds = join("','", @batch);
     my $sql = "SELECT accession, Sequence_Length FROM annotations WHERE accession IN ('$queryIds')";
     my $sth = $dbh->prepare($sql);
     $sth->execute;
     while (my $row = $sth->fetchrow_arrayref) {
         my $len = $row->[1];
-        $lengths[$len] = 0 if not defined $lengths[$len];
-        $lengths[$len]++;
-        $numSequences++;
+        $histo->addData($len);
     }
 }
 
 
-my $endTrim = $numSequences * (1 - $incfrac) / 2;
-$endTrim = int $endTrim;
-
-my ($sequenceSum, $minCount, $count) = (0, 0, 0);
-foreach my $len (@lengths) {
-    if ($sequenceSum <= ($numSequences - $endTrim)) {
-        $count++;
-        $sequenceSum += $len if defined $len;
-        if ($sequenceSum < $endTrim) {
-            $minCount++;
-        }
-    }
-}
-
-
-open OUT, ">", $lengthFile or die "Unable to open length file $lengthFile for writing: $!";
-
-for (my $i = $minCount; $i <= $count; $i++) {
-    if (defined $lengths[$i]) {
-        print OUT "$i\t$lengths[$i]\n";
-    } else {
-        print OUT "$i\t0\n";
-    }
-}
-
-close OUT;
+$histo->saveToFile($outputFile);
 
 

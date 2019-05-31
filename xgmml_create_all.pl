@@ -15,6 +15,7 @@ BEGIN {
 
 #this program is used to create repnode networks using information from cd-hit
 
+use warnings;
 use strict;
 
 use Getopt::Long;
@@ -42,11 +43,11 @@ my $result = GetOptions(
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $outputFile or not $title or not $dbver or not $cdhit;
 
-if(defined $maxNumEdges){
-    unless($maxNumEdges=~/^\d+$/){
+if (defined $maxNumEdges) {
+    unless($maxNumEdges=~/^\d+$/) {
         die "maxfull must be an integer\n";
     }
-}else{
+} else {
     $maxNumEdges=10000000;
 }
 
@@ -71,12 +72,12 @@ my $curSeqId = "";
 open(FASTA, $fasta) or die "could not open $fasta\n";
 while (my $line = <FASTA>) {
     chomp $line;
-    if($line=~/>([A-Za-z0-9:]+)/){
+    if ($line=~/>([A-Za-z0-9:]+)/) {
         if ($includeSeqs) {
             $curSeqId = $1;
             $sequences{$curSeqId} = "";
         }
-    } elsif ($includeSeqs) {
+    } elsif ($includeSeqs and $curSeqId =~ m/^z/) {
         $sequences{$curSeqId} .= $line;
     }
 }
@@ -90,17 +91,17 @@ my $writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $f
 #if struct file (annotation information) exists, use that to generate annotation information
 my @metas;
 my $hasSeqs = 0;
-if(-e $struct){
+if (-e $struct) {
     print "populating annotation structure from file\n";
     open STRUCT, $struct or die "could not open $struct\n";
     my $id;
-    foreach my $line (<STRUCT>){
+    foreach my $line (<STRUCT>) {
         chomp $line;
-        if($line=~/^([A-Za-z0-9:]+)/){
+        if ($line=~/^([A-Za-z0-9:]+)/) {
             $id=$1;
-        }else{
+        } else {
             my ($junk, $key, $value) = split "\t",$line;
-            unless($value){
+            unless($value) {
                 $value='None';
             }
             next if not $key;
@@ -140,11 +141,11 @@ if ($#metas < 0) {
     open STRUCT, $struct or die "could not open $struct\n";
     <STRUCT>;
     @metas=();
-    while (<STRUCT>){
+    while (<STRUCT>) {
         last if /^\w/;
         my $line=$_;
         chomp $line;
-        if($line=~/^\s/){
+        if ($line=~/^\s/) {
             my @lineary=split /\t/, $line;
             push @metas, $lineary[1];
         }
@@ -166,10 +167,10 @@ print "Metadata keys are $metaline\n";
 
 
 my $similarity;
-if($cdhit=~/cdhit\.*([\d\.]+)\.clstr$/){
+if ($cdhit=~/cdhit\.*([\d\.]+)\.clstr$/) {
     $similarity=$1;
     $similarity=~s/\.//g;
-}else{
+} else {
     die "Title Broken\n";
 }
 
@@ -186,13 +187,13 @@ my $element;
 open CDHIT, $cdhit or die "could not open cdhit file $cdhit\n";
 print "parsing cdhit file, this creates the nodes\n";
 <CDHIT>;
-while (<CDHIT>){
+while (<CDHIT>) {
     my $line=$_;
     chomp $line;
-    if($line=~/^>/){
+    if ($line=~/^>/) {
         $nodecount++;
         $writer->startTag('node', 'id' => $head, 'label' => $head);
-        foreach my $key (@metas){
+        foreach my $key (@metas) {
             my $displayName = $annoData->{$key}->{display};
             if ($key eq $SizeKey) {
                 $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $count);
@@ -201,16 +202,18 @@ while (<CDHIT>){
                 if ($key ne $UniRefKey and $key ne EFI::Annotations::FIELD_SEQ_KEY and $key ne EFI::Annotations::FIELD_SEQ_SRC_KEY) {
                     @{$clusterdata{$key}} = uniq @{$clusterdata{$key}};
                 }
+#                print "$head $key ", join(",", @pieces), "\n" if $key eq "User_IDs_in_Cluster";
                 $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
                 @pieces = "None" if not scalar @pieces;
-                foreach my $piece (@pieces){
+                foreach my $piece (@pieces) {
                     #remove illegal xml characters from annotation data
-                    $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
-                    if($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/){
+                    $piece = "" if not $piece;
+                    $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+                    if ($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/) {
                         $piece=$2-$1+1;
                     }
                     my $type = EFI::Annotations::get_attribute_type($key);
-                    if ($piece or ($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY)) {
+                    if (($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY) or ($piece and $piece ne "None")) {
                         $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
                     }
                 }
@@ -220,27 +223,27 @@ while (<CDHIT>){
         $writer->endTag();
         %clusterdata=();
         $count=0;
-    }else{
+    } else {
         my @lineary=split /\s+/, $line;
-        if($lineary[2]=~/^>(\w{6,10})\.\.\./ or $lineary[2]=~/^>([A-Za-z0-9:]+)\.\.\./){
+        if ($lineary[2]=~/^>(\w{6,10})\.\.\./ or $lineary[2]=~/^>([A-Za-z0-9:]+)\.\.\./) {
             $element=$1;
             $count++;
-        }else{
+        } else {
             die "malformed line $line in cdhit file\n";
         }
-        if($line=~/\*$/){
+        if ($line=~/\*$/) {
             $head=$element;
             $headuprot{$head}=1;
         }
-        foreach my $key (@metas){
-            if($element=~/(\w{6,10}):/){
+        foreach my $key (@metas) {
+            if ($element=~/(\w{6,10}):/) {
                 $element=$1;
             }
-            if($key eq "ACC"){
+            if ($key eq "ACC") {
                 push @{$clusterdata{$key}}, $element;
-            }elsif(is_array($uprot{$element}{$key})){
+            } elsif (is_array($uprot{$element}{$key})) {
                 push @{$clusterdata{$key}}, @{$uprot{$element}{$key}};
-            }else{
+            } elsif ($uprot{$element}{$key}) {
                 push @{$clusterdata{$key}}, $uprot{$element}{$key};
             }
         }
@@ -251,16 +254,16 @@ print "Last Node\n";
 #print out prior node
 $nodecount++;
 $writer->startTag('node', 'id' => $head, 'label' => $head);
-foreach my $key (@metas){
+foreach my $key (@metas) {
     my $displayName = $annoData->{$key}->{display};
     if ($key eq $SizeKey) {
         $writer->emptyTag('att', 'type' => 'integer', 'name' => $displayName, 'value' => $count);
     } else {
         @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
         $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-        foreach my $piece (@{$clusterdata{$key}}){
+        foreach my $piece (@{$clusterdata{$key}}) {
             my $type = EFI::Annotations::get_attribute_type($key);
-            if ($piece or ($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY)) {
+            if (($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY) or ($piece and $piece ne "None")) {
                 $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
             }
         }
@@ -274,11 +277,11 @@ $writer->endTag();
 print "Writing Edges\n";
 
 open BLASTFILE, $blast or die "could not open blast file $blast\n";
-while (<BLASTFILE>){
+while (<BLASTFILE>) {
     my $line=$_;
     chomp $line;
     my @line=split /\t/, $line;
-    if(exists $headuprot{$line[0]} and exists $headuprot{$line[1]}){
+    if (exists $headuprot{$line[0]} and exists $headuprot{$line[1]}) {
         #my $log=-(log($line[3])/log(10))+$line[2]*log(2)/log(10);
         my $log=int(-(log($line[5]*$line[6])/log(10))+$line[4]*log(2)/log(10));
         $numEdges++;
