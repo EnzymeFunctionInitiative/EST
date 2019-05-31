@@ -61,13 +61,16 @@ use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config;
 
+use lib "$FindBin::Bin/lib";
+use Constants;
+
 
 my ($np, $queue, $outputDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, $accessionFile, $taxid);
 my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
-my ($randomFraction, $blast, $jobId, $unirefVersion, $noDemuxArg, $convRatioFile, $cdHitOnly);
-my ($unirefExpand, $scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $mapUniref50to90);
+my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
+my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -96,22 +99,19 @@ my $result = GetOptions(
     "domain-family=s"   => \$domainFamily,
     "force-domain=i"    => \$forceDomain,
     "fraction=i"        => \$fraction,
-    "random-fraction"   => \$randomFraction,
     "blast=s"           => \$blast,
     "job-id=i"          => \$jobId,
     "no-demux"          => \$noDemuxArg,
-    "conv-ratio-file=s" => \$convRatioFile,
     "min-seq-len=i"     => \$minSeqLen,
     "max-seq-len=i"     => \$maxSeqLen,
     "cd-hit=s"          => \$cdHitOnly,     # specify this flag in order to run cd-hit only after getsequence-domain.pl then exit.
     "uniref-version=s"  => \$unirefVersion,
-    "uniref-expand"     => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
-    "map-uniref-50-to-90"   => \$mapUniref50to90, # expand the uniref50 seed sequence clusters to uniref90 and then continue
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "cluster-node=s"    => \$clusterNode,
     "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
+    "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "config=s"          => \$configFile,    # new-style config file
 );
 
@@ -194,20 +194,32 @@ if (not (defined $fastaFile or defined $ipro or defined $pfam or defined $taxid 
 
 # You also have to specify the number of processors for blast
 if (not defined $np) {
-    die "You must spedify the -np variable\n";
+    if (exists $ENV{EFI_NP}) {
+        $np = $ENV{EFI_NP};
+    } else {
+        die "You must spedify the -np variable\n";
+    }
 }
 
 # Default queues
 if (not defined $queue) {
-    die "-queue not specified\n";
+    if (exists $ENV{EFI_QUEUE}) {
+        $queue = $ENV{EFI_QUEUE};
+    } else {
+        die "-queue not specified\n";
+    }
 }
 if (not defined $memqueue) {
-    die "-memqueue not specifiied\n";
+    if (exists $ENV{EFI_MEMQUEUE}) {
+        $memqueue = $ENV{EFI_MEMQUEUE};
+    } else {
+        die "-memqueue not specifiied\n";
+    }
 }
 
 # Working directory must be defined
 if (not defined $outputDirName) {
-    die "You must spedify the -dir-name variable\n";
+    $outputDirName = "output";
 }
 
 # Default e value must also be set for blast, default set if not specified
@@ -221,11 +233,15 @@ if (not defined $evalue) {
 }
 
 if (not defined $configFile or not -f $configFile) {
-    if (exists $ENV{EFICONFIG}) {
-        $configFile = $ENV{EFICONFIG};
+    if (exists $ENV{EFI_CONFIG}) {
+        $configFile = $ENV{EFI_CONFIG};
     } else {
         die "--config file parameter is not specified.  module load efiest_v2 should take care of this.";
     }
+}
+
+if (exists $ENV{EFI_LEGACY_GRAPHS}) {
+    $LegacyGraphs = 1;
 }
 
 my $manualCdHit = 0;
@@ -246,10 +262,8 @@ $taxid = 0          if not defined $taxid;
 $gene3d = 0         if not defined $gene3d;
 $ssf = 0            if not defined $ssf;
 $accessionId = 0    if not defined $accessionId;
-$randomFraction = 0 if not defined $randomFraction;
 
 $unirefVersion = "" if not defined $unirefVersion;
-$unirefExpand = 0   if not defined $unirefExpand;
 $maxFullFam = 0     if not defined $maxFullFam;
 $fastaFile = ""     if not defined $fastaFile;
 $accessionFile = "" if not defined $accessionFile;
@@ -267,7 +281,8 @@ if (not defined $incfrac) {
     $incfrac=0.99;
 }
 
-$domain = "off"     if $unirefVersion and not $forceDomain;
+# We will keep the domain option on
+#$domain = "off"     if $unirefVersion and not $forceDomain;
 
 ($jobId = $ENV{PWD}) =~ s%^.*/(\d+)/*$%$1% if not $jobId;
 $jobId = "" if $jobId =~ /\D/;
@@ -286,7 +301,6 @@ print "Blast is $blast\n";
 print "domain is $domain\n";
 print "domain-family is $domainFamily\n";
 print "fraction is $fraction\n";
-print "random fraction is $randomFraction\n";
 print "multiplexing is $multiplexing\n";
 print "lengthdif is $lengthdif\n";
 print "sim is $sim\n";
@@ -312,7 +326,6 @@ print "base output directory is $baseOutputDir\n";
 print "output directory is $outputDirName\n";
 print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
-print "uniref-expand is $unirefExpand\n";
 print "Python module is $pythonMod\n";
 print "max-full-family is $maxFullFam\n";
 print "cd-hit is $cdHitOnly\n";
@@ -326,11 +339,19 @@ my $errorFile = "$accOutFile.failed";
 my $fracOutputDir = "$outputDir/fractions";
 my $blastOutputDir = "$outputDir/blastout";
 my $structFile = "$outputDir/struct.out";
+my $allSeqFile = "$outputDir/allsequences.fa";
+my $filtSeqFile = "$outputDir/sequences.fa";
 
-my $userHeaderFile = "";
-my $userHeaderFileOption = "";
-$userHeaderFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
-$userHeaderFileOption = "-meta-file $userHeaderFile";
+my $lenUniprotFile = "$outputDir/length_uniprot.tab"; # full lengths of all UniProt sequences (expanded from UniRef if necessary)
+my $lenUniprotDomFile = "$outputDir/length_uniprot_domain.tab"; # domain lengths of all UniProt sequences (expanded from UniRef if necessary)
+my $lenUnirefFile = "$outputDir/length_uniref.tab"; # full lengths of UR cluster ID sequences
+my $lenUnirefDomFile = "$outputDir/length_uniref_domain.tab"; # domain lengths of UR cluster ID sequences
+#my $uniprotSeqLenFile = "$outputDir/uniprot_length.tab"; # For UniRef option, this is the lengths of all the sequences in the family not just the seed sequences
+#my $unirefClusterSeqLenFile = "$outputDir/uniref_cluster_length.tab"; # For UniRef + Domain option, this is the full lengths of the cluster ID sequences, not accounting for domain.
+
+my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
+
+$seqCountFile = "$outputDir/acc_counts" if not $seqCountFile;
 
 # Error checking for user supplied dat and fa files
 my $accessionFileOption = "";
@@ -352,19 +373,14 @@ if ($accessionFileZip =~ /\.zip$/i) {
     $accessionFileOption =~ s/\.zip$/.txt/i;
 }
 
-my $seqCountFileOption = "";
-if ($seqCountFile) {
-    $seqCountFileOption = "-seq-count-file $seqCountFile";
-}
 
-
-#if (defined $fastaFile and -e $fastaFile) { # and -e $userHeaderFile) {
-##} elsif (defined $userHeaderFile) {
+#if (defined $fastaFile and -e $fastaFile) { # and -e $metadataFile) {
+##} elsif (defined $metadataFile) {
 #} else {
-#    die "$userHeaderFile does not exist\n";
+#    die "$metadataFile does not exist\n";
 ##} else {
-##    print "this is userdat:$userHeaderFile:\n";
-##    $userHeaderFile = "";
+##    print "this is userdat:$metadataFile:\n";
+##    $metadataFile = "";
 #}
 
 my $fastaFileOption = "";
@@ -425,9 +441,6 @@ my $prevJobId;
 
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
 
-    my $unirefOption = $unirefVersion ? "-uniref-version $unirefVersion" : "";
-    my $unirefExpandOption = $unirefExpand ? "-uniref-expand" : "";
-    my $mapUniref50to90Option = $mapUniref50to90 ? "-map-uniref-50-to-90" : "";
     my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
 
     $B->addAction("module load oldapps") if $oldapps;
@@ -447,23 +460,60 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     # Don't enforce the limit here if we are using manual cd-hit parameters below (the limit
     # is checked below after cd-hit).
     my $maxSeqOpt = $manualCdHit ? "" : "-maxsequence $maxsequence";
-    my $randomFractionOpt = $randomFraction ? "-random-fraction" : "";
     my $minSeqLenOpt = $minSeqLen ? "-min-seq-len $minSeqLen" : "";
     my $maxSeqLenOpt = $maxSeqLen ? "-max-seq-len $maxSeqLen" : "";
 
     my $domFamArg = $domainFamily ? "-domain-family $domainFamily" : "";
 
-    my @getSeqArgs = ("-domain $domain", $domFamArg, $fastaFileOption, $userHeaderFileOption,
-        "-ipro $ipro", "-pfam $pfam", "-ssf $ssf", "-gene3d $gene3d",
-        "-accession-id $accessionId", $accessionFileOption,
-        $noMatchFile, "-out $outputDir/allsequences.fa", "-accession-output $accOutFile",
-        "-error-file $errorFile", $seqCountFileOption,
-        $unirefOption, $unirefExpandOption, $mapUniref50to90Option,
-        "-fraction $fraction", $randomFractionOpt, $maxFullFamOption, $minSeqLenOpt, $maxSeqLenOpt, $maxSeqOpt,
-        "-config=$configFile");
+    my @args = (
+        "-config=$configFile", "-error-file $errorFile",
+        "-seq-count-output $seqCountFile", "-sequence-output $allSeqFile", "-accession-output $accOutFile",
+        "-meta-file $metadataFile",
+    );
+    
+    push @args, "-pfam $pfam" if $pfam;
+    push @args, "-ipro $ipro" if $ipro;
+    push @args, "-ssf $ssf" if $ssf;
+    push @args, "-gene3d $gene3d" if $gene3d;
+    if ($pfam or $ipro or $ssf or $gene3d) {
+        push @args, "-uniref-version $unirefVersion" if $unirefVersion;
+        push @args, "-max-full-fam-ur90 $maxFullFam" if $maxFullFam;
+        push @args, "-fraction $fraction" if $fraction;
+    }
+    if ($domain eq "on") {
+        push @args, "-domain $domain";
+        push @args, "-uniprot-dom-len-output $lenUniprotDomFile";
+        push @args, "-uniref-dom-len-output $lenUnirefDomFile" if $unirefVersion;
+        push @args, $domFamArg if $domFamArg;
+    }
 
-    $B->addAction("$efiEstTools/getsequence-domain.pl " . join(" ", @getSeqArgs));
-    $B->addAction("$efiEstTools/getannotations.pl -out $structFile -fasta $outputDir/allsequences.fa $unirefOption $userHeaderFileOption -config=$configFile");
+    my $retrScript = "get_sequences_option_";
+    if (not $fastaFile and not $accessionFile) {
+        $retrScript .= "b.pl";
+    } elsif ($fastaFile and $fastaFileOption) {
+        $retrScript .= "c.pl";
+        push @args, $fastaFileOption;
+    } elsif ($accessionFile) {
+        $retrScript .= "d.pl";
+        push @args, "-uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
+        push @args, $accessionFileOption;
+    }
+
+    $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
+
+    my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
+    push @lenUniprotArgs, "-output $lenUniprotFile";
+    push @lenUniprotArgs, "-expand-uniref" if $unirefVersion;
+    $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUniprotArgs));
+    
+    if ($unirefVersion) {
+        my @lenUnirefArgs = ("-struct $metadataFile", "-config $configFile");
+        push @lenUnirefArgs, "-output $lenUnirefFile";
+        $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUnirefArgs));
+    }
+
+    # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
+
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
@@ -481,15 +531,15 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("cd $outputDir");
-    $B->addAction("$efiEstTools/getseqtaxid.pl -fasta allsequences.fa -struct $structFile -taxid $taxid -config=$configFile");
+    $B->addAction("$efiEstTools/get_sequences_by_tax_id.pl -fasta allsequences.fa -struct $structFile -taxid $taxid -config=$configFile");
     if ($fastaFile=~/\w+/) {
         $fastaFile=~s/^-userfasta //;
         $B->addAction("cat $fastaFile >> allsequences.fa");
     }
     #TODO: handle the header file for this case....
-    if ($userHeaderFile=~/\w+/) {
-        $userHeaderFile=~s/^-userdat //;
-        $B->addAction("cat $userHeaderFile >> $structFile");
+    if ($metadataFile=~/\w+/) {
+        $metadataFile=~s/^-userdat //;
+        $B->addAction("cat $metadataFile >> $structFile");
     }
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
@@ -529,7 +579,7 @@ if ($cdHitOnly) {
         my $sLen = $#seqId == $#seqLength ? $seqLength[$i] : $seqLength[0];
         my $sId = $seqId[$i];
         my $nParm = ($sId < 1 and $sLen < 1) ? "-n 2" : "";
-        $B->addAction("cd-hit -d 0 $nParm -c $sId -s $sLen -i $outputDir/allsequences.fa -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2");
+        $B->addAction("cd-hit -d 0 $nParm -c $sId -s $sLen -i $allSeqFile -o $outputDir/sequences-$sId-$sLen.fa -M 20000 -n 2");
         $B->addAction("$efiEstTools/get_cluster_count.pl -id $sId -len $sLen -cluster $outputDir/sequences-$sId-$sLen.fa.clstr >> $cdHitOnly");
     }
     $B->addAction("touch  $outputDir/1.out.completed");
@@ -552,11 +602,11 @@ $B->addAction("cd $outputDir");
 
 if ($multiplexing eq "on") {
     my $nParm = ($sim < 1 and $lengthdif < 1) ? "-n 2" : "";
-    $B->addAction("cd-hit -d 0 $nParm -c $sim -s $lengthdif -i $outputDir/allsequences.fa -o $outputDir/sequences.fa -M 10000");
+    $B->addAction("cd-hit -d 0 $nParm -c $sim -s $lengthdif -i $allSeqFile -o $filtSeqFile -M 10000");
 
     if ($manualCdHit) {
         $B->addAction(<<CMDS
-if $efiEstTools/check_seq_count.pl -max-seq $maxsequence -error-file $errorFile -cluster $outputDir/sequences.fa.clstr
+if $efiEstTools/check_seq_count.pl -max-seq $maxsequence -error-file $errorFile -cluster $filtSeqFile.clstr
 then
     echo "Sequence count OK"
 else
@@ -565,17 +615,15 @@ else
 fi
 CMDS
             );
-        $B->addAction("mv $structFile $outputDir/struct.demux.out");
-        $B->addAction("$efiEstTools/remove_demuxed_nodes.pl -in $outputDir/struct.demux.out -out $structFile -cluster $outputDir/sequences.fa.clstr");
-        $B->addAction("mv $outputDir/allsequences.fa $outputDir/allsequences.fa.before_demux");
-        $B->addAction("cp $outputDir/sequences.fa $outputDir/allsequences.fa");
+        $B->addAction("mv $allSeqFile $allSeqFile.before_demux");
+        $B->addAction("cp $filtSeqFile $allSeqFile");
     }
     # Add in CD-HIT attributes to SSN
     if ($noDemuxArg) {
-        $B->addAction("$efiEstTools/get_demux_ids.pl -struct $structFile -cluster $outputDir/sequences.fa.clstr -domain $domain");
+        $B->addAction("$efiEstTools/get_demux_ids.pl -struct $structFile -cluster $filtSeqFile.clstr -domain $domain");
     }
 } else {
-    $B->addAction("cp $outputDir/allsequences.fa $outputDir/sequences.fa");
+    $B->addAction("cp $allSeqFile $filtSeqFile");
 }
 $B->jobName("${jobNamePrefix}multiplex");
 $B->renderToFile("$scriptDir/multiplex.sh");
@@ -594,7 +642,7 @@ $B->resource(1, 1, "5gb");
 
 $B->dependency(0, $prevJobId);
 $B->addAction("mkdir -p $fracOutputDir");
-$B->addAction("$efiEstTools/splitfasta.pl -parts $np -tmp $fracOutputDir -source $outputDir/sequences.fa");
+$B->addAction("$efiEstTools/split_fasta.pl -parts $np -tmp $fracOutputDir -source $filtSeqFile");
 $B->jobName("${jobNamePrefix}fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
@@ -658,15 +706,15 @@ if ($blast eq "blast") {
 } elsif ($blast eq "blast+") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load BLAST+");
-    $B->addAction("blastp -query $outputDir/sequences.fa -num_threads $np -db $outputDir/database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
+    $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
 } elsif ($blast eq "blast+simple") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load BLAST+");
-    $B->addAction("blastp -query $outputDir/sequences.fa -num_threads $np -db $outputDir/database -outfmt \"6\" -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
+    $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -outfmt \"6\" -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
 } elsif ($blast eq "diamond") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load DIAMOND");
-    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $outputDir/sequences.fa -d $outputDir/database -a $blastOutputDir/blastout.daa");
+    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $filtSeqFile -d $outputDir/database -a $blastOutputDir/blastout.daa");
     $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
 } elsif ($blast eq "diamondsensitive") {
     $B->addAction("module load oldapps") if $oldapps;
@@ -724,7 +772,7 @@ $B->queue($memqueue);
 $B->resource(1, 1, "350gb");
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
-$B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
+$B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
@@ -750,10 +798,10 @@ $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
-    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
+    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $filtSeqFile.clstr");
 } else {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
-    $B->addAction("$efiEstTools/removedups.pl -in $outputDir/mux.out -out $outputDir/1.out");
+    $B->addAction("$efiEstTools/remove_dups.pl -in $outputDir/mux.out -out $outputDir/1.out");
 }
 
 #$B->addAction("rm $outputDir/*blastfinal.tab");
@@ -769,20 +817,20 @@ print "Demux job is:\n $demuxjob\n";
 
 
 ########################################################################################################################
-# Compute convergence ratio, before demultiplex
+# Compute convergence ratio
 #
-if ($convRatioFile) {
-    $B = $S->getBuilder();
-    $B->dependency(0, $prevJobId);
-    $B->resource(1, 1, "5gb");
-    $B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $outputDir/allsequences.fa > $outputDir/$convRatioFile");
-    $B->jobName("${jobNamePrefix}conv_ratio");
-    $B->renderToFile("$scriptDir/conv_ratio.sh");
-    my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
-    chomp $convRatioJob;
-    print "Convergence ratio job is:\n $convRatioJob\n";
-    my @convRatioJobLine=split /\./, $convRatioJob;
-}
+$B = $S->getBuilder();
+$B->dependency(0, $prevJobId);
+$B->resource(1, 1, "5gb");
+        
+$B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -seq-count-output $seqCountFile");
+$B->jobName("${jobNamePrefix}conv_ratio");
+$B->renderToFile("$scriptDir/conv_ratio.sh");
+my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
+chomp $convRatioJob;
+print "Convergence ratio job is:\n $convRatioJob\n";
+my @convRatioJobLine=split /\./, $convRatioJob;
+
 
 
 ########################################################################################################################
@@ -823,7 +871,7 @@ $B->dependency(0, $prevJobId);
 $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
-$B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $outputDir/allsequences.fa -lengths $outputDir/length_histogram.png -incfrac $incfrac");
+$B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $allSeqFile -lengths $outputDir/length_histogram.png -incfrac $incfrac");
 $B->renderToFile("$scriptDir/simplegraphs.sh");
 
 my $simplegraphjob = $S->submit("$scriptDir/simplegraphs.sh");
@@ -849,12 +897,14 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 if (defined $LegacyGraphs) {
     my $evalueFile = "$outputDir/evalue.tab";
+    my $defaultLengthFile = "$outputDir/length.tab";
     $B->resource(1, 1, "50gb");
     $B->addAction("module load $gdMod");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
     $B->addAction("mkdir -p $outputDir/rdata");
-    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $outputDir/allsequences.fa -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
+    # Lengths are retrieved in a previous step.
+    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -incfrac $incfrac -evalue-file $evalueFile");
     $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
     $B->addAction("if [ -z \"\$FIRST\" ]; then");
     $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
@@ -872,19 +922,19 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-    my $lenHistText = "\" \"";
-    if ($unirefVersion) {
-        my $fullLenHistText = "\"(Full UniProt)\"";
-        $B->addAction("$efiEstTools/get_lengths_from_anno.pl -struct $structFile -length $outputDir/uniprot_length.tab -incfrac 0.999");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot.png $jobId $fullLenHistText");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/uniprot_length.tab $outputDir/length_histogram_uniprot_sm.png $jobId $fullLenHistText $smallWidth $smallHeight");
-        $lenHistText = "\"(UniRef$unirefVersion)\"";
+    my %lenFiles = ($lenUniprotFile => {title => "", file => "length_histogram_uniprot"});
+    $lenFiles{$lenUniprotFile}->{title} = "UniProt, Full Length" if $unirefVersion or $domain eq "on";
+    $lenFiles{$lenUniprotDomFile} = {title => "UniProt, Domain", file => "length_histogram_uniprot_domain"} if $domain eq "on";
+    $lenFiles{$lenUnirefFile} = {title => "UniRef$unirefVersion Cluster IDs, Full Length", file => "length_histogram_uniref"} if $unirefVersion;
+    $lenFiles{$lenUnirefDomFile} = {title => "UniRef$unirefVersion Cluster IDs, Domain", file => "length_histogram_uniref_domain"} if $unirefVersion and $domain eq "on";
+    foreach my $file (keys %lenFiles) {
+        my $title = $lenFiles{$file}->{title} ? "\"(" . $lenFiles{$file}->{title} . ")\"" : "\"\"";
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}.png $jobId $title");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}_sm.png $jobId $title $smallWidth $smallHeight");
     }
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId $lenHistText");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 } else {
     $B->addAction("module load $pythonMod");
-    $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $outputDir/allsequences.fa -i $incfrac");
+    $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $allSeqFile -i $incfrac");
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId");
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
     $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r hdf5 $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId");
@@ -895,9 +945,11 @@ if (defined $LegacyGraphs) {
     $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
 }
 $B->addAction("touch  $outputDir/1.out.completed");
-#$B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
-$B->addAction("rm $blastOutputDir/blastout-*.tab");
-$B->addAction("rm $fracOutputDir/fracfile-*.fa");
+if ($removeTempFiles) {
+    $B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
+    $B->addAction("rm $blastOutputDir/blastout-*.tab");
+    $B->addAction("rm $fracOutputDir/fracfile-*.fa");
+}
 $B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 

@@ -9,24 +9,37 @@
 #version 0.9.4 Modified to remove a line if the first two columns are the same as the prior line, this allows removing dups through sorting
 
 use Getopt::Long;
+use strict;
+use warnings;
 
 
-$result=GetOptions ("blast=s"  => \$blast,
-		    "out=s" => \$out);
+my ($blast, $out);
+my $result = GetOptions(
+    "blast=s"   => \$blast,
+    "out=s"     => \$out,
+);
 
-open(BLASTFILE, $blast) or die "cannot open blastfile $blastfile for writing\n";
-open(OUT, ">$out") or die "cannot write to output file $out\n";
 
-while (<BLASTFILE>){
-  $line=$_;
-  chomp $line;
+if (not $blast or not -f $blast) {
+    die "-blast blast file input must be specified";
+}
+if (not $out) {
+    die "-out output file must be specified";
+}
 
-  $line=~/^([a-zA-Z0-9\:]+)\t([a-zA-Z0-9\:]+)/;
-  unless($1 eq $first and $2 eq $second){
-    print OUT "$line\n";
-    $first=$1;
-    $second=$2;
-  }
+
+open (BLASTFILE, $blast) or die "cannot open blastfile $blast for reading: $!";
+open (OUT, ">$out") or die "cannot write to output file $out: $!";
+
+my ($first, $second) = ("", "");
+while (my $line = <BLASTFILE>) {
+    chomp $line;
+    $line =~ /^([a-zA-Z0-9\:]+)\t([a-zA-Z0-9\:]+)/;
+    unless ($1 eq $first and $2 eq $second) {
+        print OUT "$line\n";
+        $first = $1;
+        $second = $2;
+    }
 }
 
 close BLASTFILE;

@@ -16,22 +16,16 @@ use IdMappingFile;
 use EFI::IdMapping::Util;
 
 
-my ($inputFile, $outputFile, $giFile, $uniprotref, $efiTidFile, $gdnaFile, $hmpFile, $oldPhyloFile, $debug, $idMappingFile);
-my ($uniref50File, $uniref90File, $pfamFile, $ipFile);
+my ($inputFile, $outputFile, $giFile, $efiTidFile, $gdnaFile, $hmpFile, $oldPhyloFile, $debug, $idMappingFile);
 my $result = GetOptions(
     "dat=s"         => \$inputFile,
     "annotations=s" => \$outputFile,
     "uniprotgi=s"   => \$giFile,
-    #"uniprotref=s"  => \$uniprotref,
     "efitid=s"      => \$efiTidFile,
     "gdna=s"        => \$gdnaFile,
     "hmp=s"         => \$hmpFile,
     "phylo=s"       => \$oldPhyloFile,
     "idmapping=s"   => \$idMappingFile,
-    "uniref50=s"    => \$uniref50File,
-    "uniref90=s"    => \$uniref90File,
-    "pfam=s"        => \$pfamFile,
-    "interpro=s"    => \$ipFile,
     "debug=i"       => \$debug,  #TODO: debug
 );
 
@@ -48,12 +42,6 @@ Usage: $0 -dat combined_dat_input_file -annotations output_annotations_tab_file
         -uniprotgi  will include GI numbers, otherwise they are left out
         -idmapping  use the idmapping.tab file output by the import_id_mapping.pl script to obtain the
                     refseq, embl-cds, and gi numbers 
-        -uniref50   use the given tab file to add the UniRef50 cluster ID field
-        -uniref90   use the given tab file to add the UniRef90 cluster ID field
-        -pfam       use the Pfam families from the given tab file to fill the Pfam field; if not given
-                    the families from the input file will be used
-        -interpro   use the InterPro families from the given tab file to fill the Pfam field; if not given
-                    the families from the input file will be used
 
 USAGE
 
@@ -77,14 +65,6 @@ my $includeNcbi = 0;
 my (%efiTidData, %hmpData, %gdnaData, %refseq, %GI, %phylo);
 
 
-#print "Read in RefSeq Table\n";
-#open REFSEQ, $uniprotref or die "could not open $uniprotref for REFSEQ\n";
-#while (<REFSEQ>){
-#  @line=split /\s/, $_;
-#  push @{$refseq{@line[0]}}, @line[2];
-#}
-#close REFSEQ;
-#print "RefSeq Finished\n";
 
 
 my $useGiNums = 0;
@@ -122,39 +102,6 @@ if ($oldPhyloFile) {
     print "Done\n";
 }
 
-my $uniref50 = {};
-if (-f $uniref50File) {
-    print "Reading UniRef50 file\n";
-    $uniref50 = getUnirefData($uniref50File);
-    print "Done\n";
-}
-
-my $uniref90 = {};
-if (-f $uniref90File) {
-    print "Reading UniRef90 file\n";
-    $uniref90 = getUnirefData($uniref90File);
-    print "Done\n";
-}
-
-my $hasUniref = -f $uniref50File and -f $uniref90File;
-
-my $PfamData = {};
-if (defined $pfamFile and -f $pfamFile) {
-    print "Using Pfam families from pfam file\n";
-    $PfamData = getFamilyData($pfamFile);
-    print "Done\n";
-}
-
-my $IproData = {};
-if (defined $ipFile and -f $ipFile) {
-    print "Using Pfam families from pfam file\n";
-    $IproData = getFamilyData($ipFile);
-    print "Done\n";
-}
-
-
-
-
 
 
 
@@ -165,7 +112,7 @@ if (defined $ipFile and -f $ipFile) {
 
 $debug = 2**50 if not defined $debug; #TODO: debug
 
-my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PFAM, $PDB, $IPRO, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy);
+my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy);
 my (@BRENDA, @CAZY, @GO, @INTERPRO, @KEGG, $lastline, @OC_domain_array, @PATRIC, @PDB, @PFAM, $refseqline, @STRING, @NCBI);
 
 print "Parsing DAT Annotation Information\n";
@@ -253,7 +200,7 @@ close STRUCT;
 
 print "Wrote the following columns to the annotations table:\n    ";
 print join("\n    ", "element", "id", "status", "size", "OX_tax_id", "GDNA", "DE_desc",
-                 "RDE_reviewed_desc", "OS_organism", "GN_gene", "PFAM", "PDB", "IPRO",
+                 "RDE_reviewed_desc", "OS_organism", "GN_gene", "PDB",
                  "GO", "kegg", "string", "brenda", "patric", "hmpsite", "hmpoxygen",
                  "efiTid", "EC", "cazy", "ncbiStr", "uniref50", "uniref90");
 print "\n";
@@ -268,24 +215,10 @@ sub write_line {
         my $ncbiStr = "None";
         $ncbiStr = join(",", @NCBI) if scalar @NCBI;
 
-        if (exists $PfamData->{$element}) {
-            $PFAM = join(',', @{ $PfamData->{$element} });
-        } elsif (scalar @PFAM) {
-            $PFAM=join ',', @PFAM;
-        }else{
-            $PFAM="None";
-        }
         if(scalar @PDB){
             $PDB=join ',', @PDB;
         }else{
             $PDB="None";
-        }
-        if(exists $IproData->{$element}) {
-            $IPRO = join(',', @{ $IproData->{$element} });
-        } elsif (scalar @INTERPRO){
-            $IPRO=join ',', @INTERPRO;
-        }else{
-            $IPRO="None";
         }
         if(scalar @GO){
             $GO=join ',', @GO;
@@ -400,14 +333,10 @@ sub write_line {
         }
 
         my @line = ($element, $id, $status, $size, $OX_tax_id, $GDNA, $DE_desc, $RDE_reviewed_desc, $OS_organism); 
-        push @line, $GN_gene, $PFAM, $PDB, $IPRO, $GO, $kegg, $string, $brenda, $patric;
+        push @line, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric;
         push @line, $hmpsite, $hmpoxygen, $efiTid, $EC;
         push @line, $cazy;
         push @line, $ncbiStr;
-        if ($hasUniref) {
-            push @line, (exists $uniref50->{$element} ? $uniref50->{$element} : "");
-            push @line, (exists $uniref90->{$element} ? $uniref90->{$element} : "");
-        }
 
         print STRUCT join("\t", @line), "\n";
     }

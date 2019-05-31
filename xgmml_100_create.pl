@@ -15,6 +15,7 @@ BEGIN {
 #this program creates an xgmml with all nodes and edges
 
 use strict;
+use warnings;
 
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
@@ -26,54 +27,58 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $fasta, $struct, $output, $title, $maxNumEdges, $dbver, $includeSeqs);
+use lib "$FindBin::Bin/lib";
+use AlignmentScore;
+
+
+my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs);
 my $result = GetOptions(
-    "blast=s"           => \$blast,
-    "fasta=s"           => \$fasta,
-    "struct=s"          => \$struct,
-    "output=s"          => \$output,
-    "title=s"           => \$title,
-    "maxfull=i"         => \$maxNumEdges,
-    "dbver=s"           => \$dbver,
-    "include-sequences" => \$includeSeqs,
+    "blast=s"               => \$inputBlast,
+    "fasta=s"               => \$inputFasta,
+    "struct=s"              => \$annoFile,
+    "output=s"              => \$outputSsn,
+    "title=s"               => \$title,
+    "maxfull|max-edges=i"   => \$maxNumEdges,
+    "dbver=s"               => \$dbver,
+    "include-sequences"     => \$includeSeqs,
 );
 
-die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $output or not $title or not $dbver;
+die "Missing -blast command line argument" if not $inputBlast;
+die "Missing -fasta command line argument" if not $inputFasta;
+die "Missing -struct command line argument" if not $annoFile;
+die "Missing -output command line argument" if not $outputSsn;
+die "Missing -title command line argument" if not $title;
+die "Missing -dbver command line argument" if not $dbver;
+die "-max-edges must be an integer" if defined $maxNumEdges and $maxNumEdges =~ /\D/;
 
-$includeSeqs = 0 if not defined $includeSeqs;
+
+$includeSeqs = 0            if not defined $includeSeqs;
+$maxNumEdges = 10000000     if not defined $maxNumEdges;
 
 
-if(defined $maxNumEdges){
-    unless($maxNumEdges=~/^\d+$/){
-        die "maxNumEdges must be an integer\n";
-    }
-}else{
-    $maxNumEdges=10000000;
-}
 
 
 my ($edge, $node) = (0, 0);
 
-my %sequence=();
-my %uprot=();
+my %sequence;
+my %uprot;
+my @uprotnumbers;
 
-my @uprotnumbers=();
-
-my $blastlength=`wc -l $blast`;
-my @blastlength=split(/\s+/, $blastlength);
+my $blastlength=`wc -l $inputBlast`;
+my @blastlength = split(/\s+/, $blastlength);
 my $numEdges = $blastlength[0];
 chomp($numEdges);
-if(int($numEdges) > $maxNumEdges){
-    open(OUTPUT, ">$output") or die "cannot write to $output\n";
+if (int($numEdges) > $maxNumEdges) {
+    open(OUTPUT, ">$outputSsn") or die "cannot write to $outputSsn: $!";
     print OUTPUT "Too many edges ($numEdges) not creating file\n";
     print OUTPUT "Maximum edges is $maxNumEdges\n";
     exit;
 }
 
 
-my $parser=XML::LibXML->new();
-my $outputFh=new IO::File(">$output");
-my $writer=new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
+my $parser = XML::LibXML->new();
+my $outputFh = new IO::File(">$outputSsn");
+my $writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
 
 my $anno = new EFI::Annotations;
 
@@ -87,16 +92,16 @@ print time . " Reading in uniprot numbers from fasta file\n";
 
 my %sequences;
 my $curSeqId = "";
-open(FASTA, $fasta) or die "could not open $fasta\n";
+open(FASTA, $inputFasta) or die "could not open $inputFasta: $!";
 while (my $line = <FASTA>) {
     chomp $line;
-    if($line=~/>([A-Za-z0-9:]+)/){
+    if ($line =~ />([A-Za-z0-9:]+)/) {
         push @uprotnumbers, $1;
         if ($includeSeqs) {
             $curSeqId = $1;
             $sequences{$curSeqId} = "";
         }
-    } elsif ($includeSeqs) {
+    } elsif ($includeSeqs and $curSeqId =~ m/^z/) {
         $sequences{$curSeqId} .= $line;
     }
 }
@@ -111,18 +116,18 @@ my %isList;
 my $hasSeqs = 0;
 print time . " Read in annotation data\n";
 #if struct file (annotation information) exists, use that to generate annotation information
-if(-e $struct){
+if (-e $annoFile) {
     print "populating annotation structure from file\n";
-    open STRUCT, $struct or die "could not open $struct\n";
+    open STRUCT, $annoFile or die "could not open $annoFile: $!";
     my $id;
-    foreach my $line (<STRUCT>){
+    while (my $line = <STRUCT>) {
         chomp $line;
-        if($line=~/^([A-Za-z0-9\:]+)/){
-            $id=$1;
-        }else{
-            my ($junk, $key, $value) = split "\t",$line;
-            unless($value){
-                $value='None';
+        if ($line =~ /^([A-Za-z0-9\:]+)/) {
+            $id = $1;
+        } else {
+            my ($junk, $key, $value) = split "\t", $line;
+            unless($value) {
+                $value = 'None';
             }
             next if not $key;
             if (not exists $hasMetas{$key}) {
@@ -135,7 +140,7 @@ if(-e $struct){
                 @vals = grep !m/^None$/, @vals if scalar @vals > 1;
                 my @tmpline = grep /\S/, map { split(m/,/, $_) } @vals;
                 $uprot{$id}{$key} = \@tmpline;
-            }else{
+            } else {
                 my @vals = uniq sort split(m/\^/, $value);
                 @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if scalar @vals > 1;
                 if (scalar @vals > 1) {
@@ -164,14 +169,13 @@ print time . " done reading in annotation data\n";
 
 if ($#metas < 0) {
     print time . " Open struct file and get a annotation keys\n";
-    open STRUCT, $struct or die "could not open $struct\n";
-    <STRUCT>;
-    @metas=();
-    while (<STRUCT>){
-        last if /^\w/;
-        my $line=$_;
+    open STRUCT, $annoFile or die "could not open $annoFile: $!";
+    my $line = <STRUCT>;
+    @metas = ();
+    while ($line = <STRUCT>) {
+        last if $line =~ /^\w/;
         chomp $line;
-        if($line=~/^\s/){
+        if ($line =~ /^\s/) {
             my @parts = split /\t/, $line;
             push @metas, $parts[1];
         }
@@ -181,43 +185,45 @@ if ($#metas < 0) {
 my $annoData = EFI::Annotations::get_annotation_data();
 @metas = EFI::Annotations::sort_annotations($annoData, @metas);
 
-my $metaline=join ',', @metas;
+my $metaline = join ',', @metas;
 
 print time ." Metadata keys are $metaline\n";
 print time ." Start nodes\n";
 $writer->comment("Database: $dbver");
 $writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
-foreach my $element (@uprotnumbers){
+foreach my $element (@uprotnumbers) {
     #print "$element\n";;
-    my $origelement=$element;
+    my $origelement = $element;
     $node++;
     $writer->startTag('node', 'id' => $element, 'label' => $element);
-    if($element=~/(\w{6,10}):/){
-        $element=$1;
+    if ($element =~ /(\w{6,10}):/) {
+        $element = $1;
     }
-    foreach my $key (@metas){
+    foreach my $key (@metas) {
         #print "\t$key\t$uprot{$element}{$key}\n";
         my $displayName = $annoData->{$key}->{display};
         if ($isList{$key}) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
             my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
-            foreach my $piece (@pieces){
-                $piece=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+            foreach my $piece (@pieces) {
+                $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
                 my $type = EFI::Annotations::get_attribute_type($key);
-                if ($piece or $type ne "integer") {
+                #if ($piece or $type ne "integer") {
+                if ($type ne "integer" or ($piece and $piece ne "None")) {
                     $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
                 }
             }
             $writer->endTag();
-        }else{
-            $uprot{$element}{$key}=~s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
+        } else {
             my $piece = $uprot{$element}{$key};
-            if($key eq "Sequence_Length" and $origelement=~/\w{6,10}:(\d+):(\d+)/){
-                $piece=$2-$1+1;
+            $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
+            if ($key eq "Sequence_Length" and $origelement =~ /\w{6,10}:(\d+):(\d+)/) {
+                $piece = $2 - $1 + 1;
                 print "start:$1\tend$2\ttotal:$piece\n";
             }
             my $type = EFI::Annotations::get_attribute_type($key);
-            if ($piece or $type ne "integer") {
+            #if ($piece or $type ne "integer") {
+            if ($type ne "integer" or ($piece and $piece ne "None")) {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
             }
         }
@@ -226,18 +232,21 @@ foreach my $element (@uprotnumbers){
 }
 
 print time . " Writing Edges\n";
-open BLASTFILE, $blast or die "could not open blast file $blast\n";
-while (<BLASTFILE>){
+open BLASTFILE, $inputBlast or die "could not open blast file $inputBlast: $!";
+while (<BLASTFILE>) {
     my $line=$_;
     $edge++;
     chomp $line;
-    my @line=split /\t/, $line;
-    #my $log=-(log($line[3])/log(10))+$line[2]*log(2)/log(10);
-    my $log=int(-(log($line[5]*$line[6])/log(10))+$line[4]*log(2)/log(10));
-    $writer->startTag('edge', 'id' => "$line[0],$line[1]", 'label' => "$line[0],$line[1]", 'source' => $line[0], 'target' => $line[1]);
-    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $line[2]);
-    $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $log);
-    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $line[3]);
+    
+    my @parts = split /\t/, $line;
+    #   0     1     2     3      4          5      6
+    my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen) = @parts;
+
+    my $alignmentScore = compute_ascore(@parts);
+    $writer->startTag('edge', 'id' => "$qid,$sid", 'label' => "$qid,$sid", 'source' => $qid, 'target' => $sid);
+    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $pid);
+    $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $alignmentScore);
+    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $alen);
 
     $writer->endTag();
 }

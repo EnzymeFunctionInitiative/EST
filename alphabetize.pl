@@ -1,48 +1,81 @@
 #!/usr/bin/env perl
 
-#this program takes the two accessions from a blast entry an then puts them back in alphabetical order
-#this is done because otherwise we have to create a potentially huge hash that uses a lot of RAM
-#essentially puts forward and reverse matches to the accessions are in the same order
-#later sorted with linux sort and then filtered so we do not have to do a lot of in memory sorting
-#this was a significant problem, especially with larger datasets
-#version 0.9.4  program created
+# This program takes the two accessions from a blast entry an then puts them back in alphabetical order
+# This is done because otherwise we have to create a potentially huge hash that uses a lot of RAM
+# Essentially puts forward and reverse matches to the accessions are in the same order
+# Later sorted with linux sort and then filtered so we do not have to do a lot of in memory sorting
+# This was a significant problem, especially with larger datasets
+#
+# The input to this program is the following (columns from the BLAST output):
+#
+# SUBJECT QUERY PCT_ID ALIGNMENT_LEN BIT_SCORE
+#
+# This program also adds the sequence lengths to the output lines.  The output columns from this file
+# are as follows:
+#
+# SUBJECT QUERY PCT_ID ALIGNMENT_LEN BIT_SCORE SUBJECT_LEN QUERY_LEN
+#
 
 use Getopt::Long;
+use strict;
+use warnings;
 
 
-$result=GetOptions ("in=s" => \$in,
-		    "fasta=s" => \$fasta,
-		    "out=s"  => \$out);
+my ($inputBlast, $inputFasta, $outputBlast);
+my $result = GetOptions(
+    "in=s"      => \$inputBlast,
+    "fasta=s"   => \$inputFasta,
+    "out=s"     => \$outputBlast,
+);
 
-open IN, $in or die "cannot open alphabetize input file\n";
-open OUT, ">$out" or die "cannot write to output file\n";
 
-open FASTA, $fasta or die "Could not open fasta $fasta\n";
-
-$sequence="";
-while (<FASTA>){
-  $line=$_;
-  chomp $line;
-  if($line=~/^>(\w{6,10})$/  or $line=~/^>(\w{6,10}\:\d+\:\d+)$/){
-    $seqlengths{$key}=length $sequence;
-    $sequence="";
-    $key=$1;
-  }else{
-    $sequence.=$line;
-  }
+if (not $inputBlast or not -f $inputBlast) {
+    die "-in input blast file must be specified";
 }
-$seqlengths{$key}=length $sequence;
+if (not $inputFasta or not -f $inputFasta) {
+    die "-fasta input FASTA sequence file must be specified";
+}
+if (not $outputBlast) {
+    die "-out output file parameter must be specified";
+}
+
+
+open IN, $inputBlast or die "cannot open alphabetize input file $inputBlast: $!";
+open OUT, ">$outputBlast" or die "cannot write to output file $outputBlast: $!";
+open FASTA, $inputFasta or die "Could not open fasta $inputFasta for reading: $!";
+
+my %seqLen;
+my $key = "";
+my $sequence = "";
+while (my $line = <FASTA>) {
+    chomp $line;
+    if ($line =~ /^>(\w{6,10})$/ or $line =~ /^>(\w{6,10}\:\d+\:\d+)$/) {
+        if ($key) {
+            $seqLen{$key} = length $sequence;
+        }
+        $sequence = "";
+        $key = $1;
+    } else {
+        $sequence .= $line;
+    }
+}
+$seqLen{$key} = length $sequence;
 close FASTA;
 
-while(<IN>){
-  $line=$_;
-  chomp $line;
-  $line=~/^([A-Za-z0-9:]+)\t([A-Za-z0-9:]+)\t(.*)$/;
-  if($1 lt $2){
-    print OUT "$line\t$seqlengths{$1}\t$seqlengths{$2}\n";
-    #print "forward\n";
-  }else{
-    print OUT "$2\t$1\t$3\t$seqlengths{$2}\t$seqlengths{$1}\n";
-    #print "reverse\n";
-  }
+while (my $line = <IN>) {
+    chomp $line;
+    $line =~ /^([A-Za-z0-9:]+)\t([A-Za-z0-9:]+)\t(.*)$/;
+    my ($query, $subject, $values) = ($1, $2, $3);
+    # Compare the IDs. We sort them.
+    if ($1 lt $2) {
+        # Forward
+        print OUT "$query\t$subject\t$values\t$seqLen{$1}\t$seqLen{$2}\n";
+    } else {
+        # Reverse
+        print OUT "$subject\t$query\t$values\t$seqLen{$2}\t$seqLen{$1}\n";
+    }
 }
+
+close OUT;
+close IN;
+

@@ -69,7 +69,7 @@ open FASTA, ">$fasta" or die "Cannot write to output fasta $fasta\n";
 while (scalar @accessions) {
     my @batch = splice(@accessions, 0, $perpass);
     my $batchline = join ',', @batch;
-    my @sequences = split /\n/, `fastacmd -d $dbDir/$dbName.fasta -s $batchline`;
+    my @sequences = split /\n/, `fastacmd -d $dbDir/$dbName -s $batchline`;
     foreach my $sequence (@sequences) {
         $sequence =~ s/^>\w\w\|(\w{6,10})\|.*/>$1/;
         print FASTA "$sequence\n";
