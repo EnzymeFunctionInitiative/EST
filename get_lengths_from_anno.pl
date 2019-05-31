@@ -54,24 +54,25 @@ my $dbh = $db->getHandle();
 
 # Contains the attributes for each UniRef cluster ID
 my $annoMap = FileUtil::read_struct_file($annoFile);
-my @ids = keys %$annoMap;
+my @metaIds = keys %$annoMap;
 
 if ($expandUniref) {
     my @uniprotIds;
-    foreach my $clId (@ids) {
+    foreach my $clId (@metaIds) {
         my $ids = exists $annoMap->{$clId}->{UniRef90_IDs} ? $annoMap->{$clId}->{UniRef90_IDs} :
                   exists $annoMap->{$clId}->{UniRef50_IDs} ? $annoMap->{$clId}->{UniRef50_IDs} : "";
         my @ids = split(m/,/, $ids);
         push @uniprotIds, @ids;
+        push @uniprotIds, $clId if not scalar @ids;
     }
-    @ids = @uniprotIds;
+    @metaIds = @uniprotIds;
 }
 
 
 my $histo = new EST::LengthHistogram;
 
-while (@ids) {
-    my @batch = splice(@ids, 0, 50);
+while (@metaIds) {
+    my @batch = splice(@metaIds, 0, 50);
     my $queryIds = join("','", @batch);
     my $sql = "SELECT accession, Sequence_Length FROM annotations WHERE accession IN ('$queryIds')";
     my $sth = $dbh->prepare($sql);

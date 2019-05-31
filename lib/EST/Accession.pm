@@ -52,6 +52,7 @@ sub configure {
 
     $self->{config}->{id_file} = $args{id_file};
     $self->{config}->{domain_family} = $args{domain_family};
+    $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
 }
 
 
@@ -102,12 +103,32 @@ sub parseFile {
     my $idMapper = new EFI::IdMapping(config_file_path => $self->{config_file_path});
     $self->reverseLookupManualAccessions($idMapper);
 
-    print "DOMAIN : $self->{config}->{domain_family}\n";
+    if ($self->{config}->{uniref_version}) {
+        $self->retrieveUniRefMetadata();
+    }
+
     if ($self->{config}->{domain_family}) {
         $self->retrieveDomains();
     }
 
     $self->{stats}->{num_ids} = scalar keys %rawIds;
+}
+
+
+sub retrieveUniRefMetadata {
+    my $self = shift;
+
+    my $version = $self->{config}->{uniref_version};
+
+    my $metaKey = "UniRef${version}_IDs";
+    foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+        my $sql = "SELECT accession FROM uniref WHERE uniref${version}_seed = '$id'";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
+        }
+    }
 }
 
 
@@ -117,13 +138,32 @@ sub retrieveDomains {
     my $domainFamily = uc($self->{config}->{domain_family});
     my $famTable = $domainFamily =~ m/^PF/ ? "PFAM" : "INTERPRO";
     
-    foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
-        my $sql = "SELECT start, end FROM $famTable WHERE $famTable.id = '$domainFamily' AND accession = '$id'";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute;
-        while (my $row = $sth->fetchrow_hashref) {
-            push @{$self->{data}->{uniprot_ids}->{$id}}, {'start' => $row->{start}, 'end' => $row->{end}};
+    my $selectFn = sub {
+        my $struct = shift;
+        my @ids = @_;
+        foreach my $id (@ids) {
+            my $sql = "SELECT start, end FROM $famTable WHERE $famTable.id = '$domainFamily' AND accession = '$id'";
+            my $sth = $self->{dbh}->prepare($sql);
+            $sth->execute;
+            while (my $row = $sth->fetchrow_hashref) {
+                push @{$struct->{$id}}, {'start' => $row->{start}, 'end' => $row->{end}};
+            }
         }
+    };
+
+    &$selectFn($self->{data}->{uniprot_ids}, keys %{$self->{data}->{uniprot_ids}});
+
+    # If we are using UniRef and domain, then we need to look up the domain info for the family
+    # for each UniRef cluster member.
+    if ($self->{config}->{uniref_version}) {
+        my $metaKey = "UniRef$self->{config}->{uniref_version}_IDs";
+        my @upIds;
+        foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+            my @clIds = @{$self->{data}->{meta}->{$id}->{$metaKey}};
+            push @upIds, @clIds;
+        }
+        $self->{data}->{uniref_cluster_members} = {};
+        &$selectFn($self->{data}->{uniref_cluster_members}, @upIds);
     }
 }
 
@@ -156,6 +196,13 @@ sub reverseLookupManualAccessions {
 
     $self->{stats}->{num_matched} = $numUniprotIds;
     $self->{stats}->{num_unmatched} = $numNoMatches;
+}
+
+
+sub getUserUniRefIds {
+    my $self = shift;
+
+    return $self->{data}->{uniref_cluster_members};
 }
 
 

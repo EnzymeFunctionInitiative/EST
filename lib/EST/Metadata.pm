@@ -112,6 +112,7 @@ sub makeMeta {
         $meta->{UniRef90_IDs} = exists $data->{UniRef90_IDs} ? $data->{UniRef90_IDs} : undef;
         $meta->{UniRef90_Cluster_Size} = exists $data->{UniRef90_IDs} ? scalar @{$data->{UniRef90_IDs}} : undef;
     } else {
+        # This is an ID that is not a member of a family UniRef cluster.
         if (not exists $uniref->{$id}) {
             $meta->{$self->{attr_source}} = $exists ? $self->{type}->{combined} : $self->{type}->{user};
             push @{$meta->{$self->{type}->{attr_name}}}, $id if $exists;
@@ -119,6 +120,11 @@ sub makeMeta {
             $meta->{Description} = exists $data->{description} ? $data->{description} : undef;
             $meta->{Other_IDs} = exists $data->{other_ids} ? $data->{other_ids} : undef;
             $meta->{$self->{attr_len}} = exists $data->{seq_len} ? $data->{seq_len} : undef;
+
+            $meta->{UniRef50_IDs} = exists $data->{UniRef50_IDs} ? $data->{UniRef50_IDs} : undef;
+            $meta->{UniRef50_Cluster_Size} = exists $data->{UniRef50_IDs} ? scalar @{$data->{UniRef50_IDs}} : undef;
+            $meta->{UniRef90_IDs} = exists $data->{UniRef90_IDs} ? $data->{UniRef90_IDs} : undef;
+            $meta->{UniRef90_Cluster_Size} = exists $data->{UniRef90_IDs} ? scalar @{$data->{UniRef90_IDs}} : undef;
         } else {
             $meta->{$self->{attr_source}} = $self->{type}->{combined};
             push @{$meta->{$self->{type}->{attr_name}}}, $id;

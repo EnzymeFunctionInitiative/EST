@@ -55,6 +55,7 @@ if (exists $familyConfig->{data}) {
 
 my %accessionArgs = getAccessionCmdLineArgs();
 $accessionArgs{domain_family} = $familyConfig->{config}->{domain_family};
+$accessionArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
 my $accessionData = new EST::Accession(dbh => $dbh, config_file_path => $configFile);
 $accessionData->configure(%accessionArgs);
 $accessionData->parseFile();
@@ -71,7 +72,8 @@ $statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, 
 
 if ($otherConfig->{uniprot_domain_length_file}) {
     my $histo = new EST::LengthHistogram;
-    my $ids = EST::IdList::mergeIds($familyFullDomainIds, $userIds);
+    my $userUnirefIds = $accessionData->getUserUniRefIds(); # This structure includes the UniRef cluster IDs in addition to cluster members.
+    my $ids = EST::IdList::mergeIds($familyFullDomainIds, $userUnirefIds);
     $histo->addData($ids);
     $histo->saveToFile($otherConfig->{uniprot_domain_length_file});
 }

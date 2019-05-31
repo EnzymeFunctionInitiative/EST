@@ -495,6 +495,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         push @args, $fastaFileOption;
     } elsif ($accessionFile) {
         $retrScript .= "d.pl";
+        push @args, "-uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
         push @args, $accessionFileOption;
     }
 
@@ -927,7 +928,7 @@ if (defined $LegacyGraphs) {
     $lenFiles{$lenUnirefFile} = {title => "UniRef$unirefVersion Cluster IDs, Full Length", file => "length_histogram_uniref"} if $unirefVersion;
     $lenFiles{$lenUnirefDomFile} = {title => "UniRef$unirefVersion Cluster IDs, Domain", file => "length_histogram_uniref_domain"} if $unirefVersion and $domain eq "on";
     foreach my $file (keys %lenFiles) {
-        my $title = "\"(" . $lenFiles{$file}->{title} . ")\"";
+        my $title = $lenFiles{$file}->{title} ? "\"(" . $lenFiles{$file}->{title} . ")\"" : "\"\"";
         $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}.png $jobId $title");
         $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}_sm.png $jobId $title $smallWidth $smallHeight");
     }
