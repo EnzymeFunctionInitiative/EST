@@ -143,7 +143,7 @@ my $EstMod = $ENV{EFIESTMOD};
 $Legacy = defined $Legacy ? 1 : 0;
 my $PerlMod = $Legacy ? "perl" : "Perl";
 my $BlastMod = $Legacy ? "blast" : "BLAST";
-my $DiamondMod = "DIAMOND";
+my $DiamondMod = "DIAMOND/0.9.24-IGB-gcc-8.2.0"; # This needs to match the lmod version
 
 
 # Number of processors to use for the blast job.
@@ -891,6 +891,8 @@ SQL
     {
         $sql = <<SQL;
 
+START TRANSACTION;
+
 select 'CREATING ANNOTATIONS' as '';
 drop table if exists annotations;
 create table annotations(accession varchar(10) primary key,
@@ -989,6 +991,8 @@ load data local infile '$OutputDir/INTERPRO.tab' into table INTERPRO;
 
 select 'LOADING idmapping' as '';
 load data local infile '$OutputDir/idmapping.tab' into table idmapping;
+
+COMMIT;
 
 GRANT SELECT ON `$dbName`.* TO '$DbUser'\@'$IpRange';
 
