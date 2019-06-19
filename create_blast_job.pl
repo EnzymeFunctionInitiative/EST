@@ -189,7 +189,7 @@ my $dependencyId;
 my $B = $S->getBuilder();
 
 $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
-$B->resource(1, 1, "50gb");
+$B->resource(1, 1, "70gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
