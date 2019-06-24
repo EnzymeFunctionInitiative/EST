@@ -461,10 +461,12 @@ $B->renderToFile("$scriptDir/graphs.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/graphs.sh"));
 print "Graph job is:\n $submitResult\n";
+my $graphJobId = getJobId($convRatioJob);
 
 
 if ($removeTempFiles) {
     $B = $S->getBuilder();
+    $B->dependency(0, $graphJobId); 
     $B->resource(1, 1, "5gb");
     $B->addAction("rm -rf $outputDir/rdata");
     $B->addAction("rm -rf $outputDir/blast");
