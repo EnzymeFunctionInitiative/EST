@@ -31,7 +31,7 @@ use lib "$FindBin::Bin/lib";
 use AlignmentScore;
 
 
-my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs);
+my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $useMinEdgeAttr);
 my $result = GetOptions(
     "blast=s"               => \$inputBlast,
     "fasta=s"               => \$inputFasta,
@@ -41,6 +41,7 @@ my $result = GetOptions(
     "maxfull|max-edges=i"   => \$maxNumEdges,
     "dbver=s"               => \$dbver,
     "include-sequences"     => \$includeSeqs,
+    "use-min-edge-attr"     => \$useMinEdgeAttr,
 );
 
 die "Missing -blast command line argument" if not $inputBlast;
@@ -54,6 +55,7 @@ die "-max-edges must be an integer" if defined $maxNumEdges and $maxNumEdges =~ 
 
 $includeSeqs = 0            if not defined $includeSeqs;
 $maxNumEdges = 10000000     if not defined $maxNumEdges;
+$useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
 
 
 
@@ -243,12 +245,16 @@ while (<BLASTFILE>) {
     my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen) = @parts;
 
     my $alignmentScore = compute_ascore(@parts);
-    $writer->startTag('edge', 'id' => "$qid,$sid", 'label' => "$qid,$sid", 'source' => $qid, 'target' => $sid);
-    $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $pid);
-    $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $alignmentScore);
-    $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $alen);
-
-    $writer->endTag();
+    my %edgeProp = ('id' => "$qid,$sid", 'label' => "$qid,$sid", 'source' => $qid, 'target' => $sid);
+    if (not $useMinEdgeAttr) {
+        $writer->startTag('edge', %edgeProp);
+        $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $pid);
+        $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $alignmentScore);
+        $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $alen);
+        $writer->endTag();
+    } else {
+        $writer->emptyTag('edge', %edgeProp);
+    }
 }
 close BLASTFILE;
 print time . " Finished writing edges\n";

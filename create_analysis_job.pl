@@ -32,7 +32,7 @@ use Constants;
 
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $config, $parentId, $parentDir, $cdhitUseAccurateAlgo,
-    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $unirefVersion);
+    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -54,6 +54,8 @@ my $result = GetOptions(
     "cdhit-opt=s"           => \$cdhitOpt,
     "include-sequences"     => \$includeSeqs,   # true to include sequences in the XGMML files
     "uniref-version=s"      => \$unirefVersion,
+    "use-anno-spec"         => \$useAnnoSpec,
+    "use-min-edge-attr"     => \$useMinEdgeAttr,
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$config,        # config file path, if not given will look for EFICONFIG env var
@@ -89,6 +91,8 @@ $cdhitOpt = ""              unless defined $cdhitOpt;
 $includeSeqs = 0            unless defined $includeSeqs;
 
 $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
+$useAnnoSpec = defined $useAnnoSpec ? 1 : 0;
+$useMinEdgeAttr = defined $useMinEdgeAttr ? 1 : 0;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_";
@@ -129,9 +133,9 @@ my $analysisDir = "$baseAnalysisDir/$filter-$minval-$minlen-$maxlen";
 if ($customClusterDir and $customClusterFile and -f "$baseAnalysisDir/$customClusterDir/$customClusterFile") {
     $analysisDir = "$baseAnalysisDir/$customClusterDir";
 }
-if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
-    $analysisDir .= "-$cdhitOpt";
-}
+$analysisDir .= "-$cdhitOpt" if $cdhitOpt eq "sb" or $cdhitOpt eq "est+";
+$analysisDir .= "-minn" if $useAnnoSpec;
+$analysisDir .= "-mine" if $useMinEdgeAttr;
 
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
@@ -169,6 +173,8 @@ print "Data from runs will be saved to $analysisDir\n";
 
 my $filteredBlastFile = "$analysisDir/2.out";
 my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
+my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
+my $annoSpecFile = "$generateDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
 
 ####################################################################################################
 # RETRIEVE ANNOTATIONS (STRUCT.OUT) FOR SSN
@@ -176,8 +182,20 @@ my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
 # thresholds.
 #
 
-my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
+#TODO: right now if you useAnnoSpec, we actually just include the bare minimum.  In the future allow the user to determine which annotations to include.
+if ($useAnnoSpec) {
+    open SPEC, ">", $annoSpecFile;
+    print SPEC <<ANNO;
+Sequence_Length
+Organism
+Superkingdom
+Description
+ANNO
+    close SPEC;
+}
+
 my $userHeaderFileOption = "-meta-file $userHeaderFile";
+my $annoSpecOption = " -anno-spec-file $annoSpecFile" if $useAnnoSpec;
 my $lenArgs = "-min-len $minlen -max-len $maxlen";
 my $annoDep = 0;
 mkdir $analysisDir or die "could not make analysis folder $analysisDir\n";
@@ -186,7 +204,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("module load $perlMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption -config=$config");
+$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption $annoSpecOption -config=$config");
 $B->jobName("${jobNamePrefix}get_annotations");
 $B->renderToFile("$analysisDir/get_annotations.sh");
 my $annojob = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
@@ -234,7 +252,8 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg");
+my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");
 $B->renderToFile("$analysisDir/fullxgmml.sh");
@@ -276,7 +295,7 @@ if ($cdhitOpt ne "sb") {
 
 $B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -c \$CDHIT -d 0 $algoOption $bandwidthOption");
 $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg");
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg");
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}cdhit");
 $B->renderToFile("$analysisDir/cdhit.sh");

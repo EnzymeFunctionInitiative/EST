@@ -25,7 +25,7 @@ use FileUtil;
 
 
 
-my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $minLen, $maxLen);
+my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $minLen, $maxLen, $annoSpecFile);
 my $result = GetOptions(
     "out=s"                 => \$annoOut,
     "meta-file=s"           => \$metaFileIn,
@@ -33,6 +33,7 @@ my $result = GetOptions(
     "config=s"              => \$configFile,
     "min-len=i"             => \$minLen,
     "max-len=i"             => \$maxLen,
+    "anno-spec-file=s"      => \$annoSpecFile,      # if this is specified we only write out the attributes listed in the file
 );
 
 
@@ -88,6 +89,7 @@ if ($maxLen) {
     $unirefLenFiltWhere .= " AND A.$sqlLenField <= $maxLen";
 }
 
+my $annoSpec = readAnnoSpec($annoSpecFile);
 
 
 my $db = new EFI::Database(config_file_path => $configFile);
@@ -131,19 +133,23 @@ foreach my $accession (sort keys %$idMeta){
 
         #TODO: handle uniref cluster seqeuences ncbi ids
         # Now get a list of NCBI IDs
-        my $sql = EFI::Annotations::build_id_mapping_query_string($accession);
-        my $sth = $dbh->prepare($sql);
-        $sth->execute;
         my @ncbiIds;
-        while (my $idRow = $sth->fetchrow_hashref) {
-            if (exists $idTypes{$idRow->{foreign_id_type}}) {
-                push @ncbiIds, $idTypes{$idRow->{foreign_id_type}} . ":" . $idRow->{foreign_id};
+        if (not $annoSpec or exists $annoSpec->{"NCBI_IDS"}) {
+            my $sql = EFI::Annotations::build_id_mapping_query_string($accession);
+            my $sth = $dbh->prepare($sql);
+            $sth->execute;
+            while (my $idRow = $sth->fetchrow_hashref) {
+                if (exists $idTypes{$idRow->{foreign_id_type}}) {
+                    push @ncbiIds, $idTypes{$idRow->{foreign_id_type}} . ":" . $idRow->{foreign_id};
+                }
             }
+            $sth->finish();
         }
         
-        my $data = EFI::Annotations::build_annotations($accession, \@rows, \@ncbiIds);
+        my @params = ($accession, \@rows, \@ncbiIds);
+        push @params, $annoSpec if $annoSpec;
+        my $data = EFI::Annotations::build_annotations(@params);
         print OUT $data;
-        $sth->finish();
     }
 }
 
@@ -176,4 +182,22 @@ close META;
 close OUT;
 
 $dbh->disconnect();
+
+
+sub readAnnoSpec {
+    my $file = shift;
+    return 0 if not $file or not -f $file;
+
+    my $spec = {};
+
+    open FILE, $file or warn "Unable to read anno spec file $file: $!" and return 0;
+    while (<FILE>) {
+        chomp;
+        $spec->{$_} = 1 if $_;
+    }
+    close FILE;
+
+    return $spec;
+}
+
 
