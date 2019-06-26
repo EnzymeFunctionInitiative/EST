@@ -59,7 +59,7 @@ use Getopt::Long;
 use POSIX qw(ceil);
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm getLmod);
-use EFI::Config;
+use EFI::Config qw(cluster_configure);
 
 use lib "$FindBin::Bin/lib";
 use Constants;
@@ -239,6 +239,8 @@ if (not defined $configFile or not -f $configFile) {
         die "--config file parameter is not specified.  module load efiest_v2 should take care of this.";
     }
 }
+my $config = {};
+cluster_configure($config, config_file_path => $configFile);
 
 if (exists $ENV{EFI_LEGACY_GRAPHS}) {
     $LegacyGraphs = 1;
@@ -424,6 +426,7 @@ $logDir = "" if not -d $logDir;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{node} = $clusterNode if $clusterNode;
+$schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 my $S = new EFI::SchedulerApi(%schedArgs);
 my $jobNamePrefix = $jobId ? $jobId . "_" : ""; 
 

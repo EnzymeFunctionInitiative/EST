@@ -24,14 +24,14 @@ use FindBin;
 use Getopt::Long;
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm);
-use EFI::Config;
+use EFI::Config qw(cluster_configure);
 
 use lib "$FindBin::Bin/lib";
 use Constants;
 
 
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
-    $customClusterFile, $customClusterDir, $scheduler, $dryrun, $config, $parentId, $parentDir, $cdhitUseAccurateAlgo,
+    $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr);
 my $result = GetOptions(
     "filter=s"              => \$filter,
@@ -58,7 +58,7 @@ my $result = GetOptions(
     "use-min-edge-attr"     => \$useMinEdgeAttr,
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
-    "config"                => \$config,        # config file path, if not given will look for EFICONFIG env var
+    "config"                => \$configFile,        # config file path, if not given will look for EFICONFIG env var
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -112,13 +112,15 @@ if (not defined $relativeGenerateDir) {
     die "A temporary directory specified by -tmp is required for the program to run";
 }
 
-if (not defined $config or not -f $config) {
+if (not defined $configFile or not -f $configFile) {
     if (exists $ENV{EFICONFIG}) {
-        $config = $ENV{EFICONFIG};
+        $configFile = $ENV{EFICONFIG};
     } else {
         die "--config file parameter is not specified.  module load efiest_v2 should take care of this.";
     }
 }
+my $config = {};
+cluster_configure($config, config_file_path => $configFile);
 
 my $hasParent = defined $parentId and $parentId > 0 and defined $parentDir and -d $parentDir;
 
@@ -166,6 +168,7 @@ $logDir = "" if not -d $logDir;
 
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
+$schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 my $S = new EFI::SchedulerApi(%schedArgs);
 my $B;
 
@@ -204,7 +207,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("module load $perlMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption $annoSpecOption -config=$config");
+$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption $annoSpecOption -config=$configFile");
 $B->jobName("${jobNamePrefix}get_annotations");
 $B->renderToFile("$analysisDir/get_annotations.sh");
 my $annojob = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
