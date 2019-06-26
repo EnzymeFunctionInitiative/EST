@@ -26,7 +26,7 @@ use EFI::SchedulerApi;
 use EFI::Util qw(getSchedulerType usesSlurm);
 use EFI::Util::FileHandle;
 use EFI::Database;
-use EFI::Config qw(biocluster_configure);
+use EFI::Config qw(cluster_configure);
 
 use constant BUILD_ENA => 2;
 use constant BUILD_COUNTS => 4;
@@ -50,6 +50,7 @@ my $Legacy;
 my $enaDir;
 my $buildCountsOnly;
 my $doPdbBlast;
+my $dbType;
 
 my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "download"      => \$doDownload,
@@ -70,6 +71,7 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "ena-dir=s"     => \$enaDir,
                         "build-counts"  => \$buildCountsOnly,   # build the family count table only
                         "pdb-blast"     => \$doPdbBlast,
+                        "db-type=s"     => \$dbType,
                        );
 
 my $usage = <<USAGE;
@@ -97,6 +99,8 @@ Usage: $0
     -bc1            configure the scripts to work with biocluster1 instead of biocluster 2
     -scheduler      specify the scheduler to use (defaults to slurm, can be torque)
     -queue          the cluster queue to use for computation
+
+    -db-type        type of database to write SQL commands for (optional); mysql or sqlite
 
     -config         path to configuration file (defaults to EFICONFIG env var, if present)
 
@@ -126,6 +130,8 @@ if (not $queue and not ($sql or $doDownload or $buildCountsOnly)) {
 
 
 $doPdbBlast = defined $doPdbBlast;
+$dbType = "mysql" if not $dbType;
+
 
 # Various directories and files.
 my $DbSupport = $ENV{EFIDBHOME} . "/support";
@@ -198,7 +204,7 @@ my $DoSubmit = not defined $noSubmit;
 
 # Get info from the configuration file.
 my $config = {};
-biocluster_configure($config, %dbArgs);
+cluster_configure($config, %dbArgs);
 my $UniprotLocation = $config->{build}->{uniprot_url};
 my $InterproLocation = $config->{build}->{interpro_url};
 my $TaxonomyLocation = $config->{tax}->{remote_url};
@@ -847,25 +853,32 @@ sub writeSqlCommands {
     my $countSql = "";
     my $enaSql = "";
 
+    my $startTrans = $dbType eq "sqlite" ? "BEGIN TRANSACTION;" : "START TRANSACTION;";
+    my $endTrans = "COMMIT;";
+
     if ($buildOptions & BUILD_COUNTS) {
         $countSql = <<SQL;
 
-select 'CREATING family_info' as '';
-drop table if exists family_info;
-create table family_info(family varchar(10) primary key, short_name varchar(50), long_name varchar(255), num_members integer, num_uniref50_members integer, num_uniref90_members integer);
-/*create table family_info(family varchar(10) primary key, short_name varchar(50), long_name varchar(255), num_members integer, num_uniref50_members integer, num_uniref90_members integer, family_type varchar(22), parent varchar(10));*/
-create index family_Index on family_info (family);
+$startTrans
+SELECT 'CREATING family_info' AS '';
+DROP TABLE IF EXISTS family_info;
+CREATE TABLE family_info(family VARCHAR(10) PRIMARY KEY, short_name VARCHAR(50), long_name VARCHAR(255), num_members INTEGER, num_uniref50_members INTEGER, num_uniref90_members INTEGER);
+/*CREATE TABLE family_info(family VARCHAR(10) PRIMARY KEY, short_name VARCHAR(50), long_name VARCHAR(255), num_members INTEGER, num_uniref50_members INTEGER, num_uniref90_members INTEGER, family_type VARCHAR(22), parent VARCHAR(10));*/
+CREATE INDEX family_Index ON family_info (family);
 
-select 'LOADING family_info' as '';
-load data local infile '$OutputDir/family_info.tab' into table family_info;
+SELECT 'LOADING family_info' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/family_info.tab' INTO TABLE family_info;
+$endTrans
 
-select 'CREATING PFAM_clans' as '';
-drop table if exists PFAM_clans;
-create table PFAM_clans(pfam_id varchar(24), clan_id varchar(24));
-create index clan_id_Index on PFAM_clans (clan_id);
+$startTrans
+SELECT 'CREATING PFAM_clans' AS '';
+DROP TABLE IF EXISTS PFAM_clans;
+CREATE TABLE PFAM_clans(pfam_id VARCHAR(24), clan_id VARCHAR(24));
+CREATE INDEX clan_id_Index ON PFAM_clans (clan_id);
 
-select 'LOADING PFAM_clans' as '';
-load data local infile '$OutputDir/PFAM_clans.tab' into table PFAM_clans;
+SELECT 'LOADING PFAM_clans' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/PFAM_clans.tab' INTO TABLE PFAM_clans;
+$endTrans
 
 SQL
         ;
@@ -874,15 +887,17 @@ SQL
     if ($buildOptions & BUILD_ENA) {
         $enaSql = <<SQL;
 
-select 'CREATING ena' as '';
-drop table if exists ena;
-create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int);
-/*create table ena(ID varchar(20),AC varchar(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain varchar(2000),pfam varchar(1800));*/
-create index ena_acnum_index on ena(AC, NUM);
-create index ena_ID_index on ena(id);
+$startTrans
+SELECT 'CREATING ena' AS '';
+DROP TABLE IF EXISTS ena;
+CREATE TABLE ena(ID VARCHAR(20),AC VARCHAR(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int);
+/*CREATE TABLE ena(ID VARCHAR(20),AC VARCHAR(10),NUM int,TYPE bool,DIRECTION bool,start int, stop int,strain VARCHAR(2000),pfam VARCHAR(1800));*/
+CREATE INDEX ena_acnum_Index ON ena(AC, NUM);
+CREATE INDEX ena_ID_Index ON ena(id);
 
-select 'LOADING ena' as '';
-load data local infile '$OutputDir/ena.tab' into table ena;
+SELECT 'LOADING ena' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/ena.tab' INTO TABLE ena;
+$endTrans
 
 SQL
         ;
@@ -891,123 +906,128 @@ SQL
     {
         $sql = <<SQL;
 
-START TRANSACTION;
+$startTrans
+SELECT 'CREATING ANNOTATIONS' AS '';
+DROP TABLE IF EXISTS annotations;
+CREATE TABLE annotations(accession VARCHAR(10) PRIMARY KEY,
+                         Uniprot_ID VARCHAR(15),
+                         STATUS VARCHAR(10),
+                         Sequence_Length INTEGER,
+                         Taxonomy_ID INTEGER,
+                         GDNA VARCHAR(5),
+                         Description VARCHAR(255),
+                         SwissProt_Description VARCHAR(255),
+                         Organism VARCHAR(150),
+                         GN VARCHAR(40),
+                         pdb VARCHAR(3000),
+                         GO VARCHAR(1300),
+                         KEGG VARCHAR(100),
+                         STRING VARCHAR(100),
+                         BRENDA VARCHAR(100),
+                         PATRIC VARCHAR(100),
+                         HMP_Body_Site VARCHAR(75),
+                         HMP_Oxygen VARCHAR(50),
+                         EFI_ID VARCHAR(6),
+                         EC VARCHAR(185),
+                         Cazy VARCHAR(30));
+CREATE INDEX TaxID_Index ON annotations (Taxonomy_ID);
+CREATE INDEX accession_Index ON annotations (accession);
+CREATE INDEX STATUS_Index ON annotations (STATUS);
+SELECT 'LOADING annotations' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/annotations.tab' INTO TABLE annotations;
+$endTrans
 
-select 'CREATING ANNOTATIONS' as '';
-drop table if exists annotations;
-create table annotations(accession varchar(10) primary key,
-                         Uniprot_ID varchar(15),
-                         STATUS varchar(10),
-                         Sequence_Length integer,
-                         Taxonomy_ID integer,
-                         GDNA varchar(5),
-                         Description varchar(255),
-                         SwissProt_Description varchar(255),
-                         Organism varchar(150),
-                         GN varchar(40),
-                         pdb varchar(3000),
-                         GO varchar(1300),
-                         KEGG varchar(100),
-                         STRING varchar(100),
-                         BRENDA varchar(100),
-                         PATRIC varchar(100),
-                         HMP_Body_Site varchar(75),
-                         HMP_Oxygen varchar(50),
-                         EFI_ID varchar(6),
-                         EC varchar(185),
-                         Cazy varchar(30));
-create index TaxID_Index ON annotations (Taxonomy_ID);
-create index accession_Index ON annotations (accession);
+$startTrans
+SELECT 'CREATING TAXONOMY' AS '';
+DROP TABLE IF EXISTS taxonomy;
+CREATE TABLE taxonomy(Taxonomy_ID INTEGER, Domain VARCHAR(25), Kingdom VARCHAR(25), Phylum VARCHAR(30), Class VARCHAR(25), TaxOrder VARCHAR(30), Family VARCHAR(25), Genus VARCHAR(40), Species VARCHAR(50));
+CREATE INDEX TaxID_Index ON taxonomy (Taxonomy_ID);
+SELECT 'LOADING taxonomy' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/taxonomy.tab' INTO TABLE taxonomy;
+$endTrans
 
-select 'CREATING TAXONOMY' as '';
-drop table if exists taxonomy;
-create table taxonomy(Taxonomy_ID integer, Domain varchar(25), Kingdom varchar(25), Phylum varchar(30), Class varchar(25), TaxOrder varchar(30), Family varchar(25), Genus varchar(40), Species varchar(50));
-create index TaxID_Index ON taxonomy (Taxonomy_ID);
+$startTrans
+SELECT 'CREATING GENE3D' AS '';
+DROP TABLE IF EXISTS GENE3D;
+CREATE TABLE GENE3D(id VARCHAR(24), accession VARCHAR(10), start INTEGER, end INTEGER);
+CREATE INDEX GENE3D_ID_Index ON GENE3D (id);
+SELECT 'LOADING GENE3D' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/GENE3D.tab' INTO TABLE GENE3D;
+$endTrans
 
-select 'CREATING GENE3D' as '';
-drop table if exists GENE3D;
-create table GENE3D(id varchar(24), accession varchar(10), start integer, end integer);
-create index GENE3D_ID_Index on GENE3D (id);
+$startTrans
+SELECT 'CREATING PFAM' AS '';
+DROP TABLE IF EXISTS PFAM;
+CREATE TABLE PFAM(id VARCHAR(24), accession VARCHAR(10), start INTEGER, end INTEGER);
+CREATE INDEX PAM_ID_Index ON PFAM (id);
+CREATE INDEX PAM_Accession_Index ON PFAM (accession);
+SELECT 'LOADING PFAM' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/PFAM.tab' INTO TABLE PFAM;
+$endTrans
 
-select 'CREATING PFAM' as '';
-drop table if exists PFAM;
-create table PFAM(id varchar(24), accession varchar(10), start integer, end integer);
-create index PAM_ID_Index on PFAM (id);
-create index PAM_Accession_Index on PFAM (accession);
+$startTrans
+SELECT 'CREATING UNIREF' AS '';
+DROP TABLE IF EXISTS uniref;
+CREATE TABLE uniref(accession VARCHAR(10), uniref50_seed VARCHAR(10), uniref90_seed VARCHAR(10));
+CREATE INDEX uniref_accession_Index ON uniref (accession);
+CREATE INDEX uniref50_seed_Index ON uniref (uniref50_seed);
+CREATE INDEX uniref90_seed_Index ON uniref (uniref90_seed);
+SELECT 'LOADING UNIREF' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/uniref.tab' INTO TABLE uniref;
+$endTrans
 
-select 'CREATING UNIREF' as '';
-drop table if exists uniref;
-create table uniref(accession varchar(10), uniref50_seed varchar(10), uniref90_seed varchar(10));
-create index uniref_accession_index on uniref (accession);
-create index uniref50_seed_index on uniref (uniref50_seed);
-create index uniref90_seed_index on uniref (uniref90_seed);
+$startTrans
+SELECT 'CREATING SSF' AS '';
+DROP TABLE IF EXISTS SSF;
+CREATE TABLE SSF(id VARCHAR(24), accession VARCHAR(10), start INTEGER, end INTEGER);
+CREATE INDEX SSF_ID_Index ON SSF (id);
+SELECT 'LOADING SSF' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/SSF.tab' INTO TABLE SSF;
+$endTrans
 
-select 'CREATING SSF' as '';
-drop table if exists SSF;
-create table SSF(id varchar(24), accession varchar(10), start integer, end integer);
-create index SSF_ID_Index on SSF (id);
+$startTrans
+SELECT 'CREATING INTERPRO' AS '';
+DROP TABLE IF EXISTS INTERPRO;
+CREATE TABLE INTERPRO(id VARCHAR(24), accession VARCHAR(10), start INTEGER, end INTEGER, family_type VARCHAR(22), parent VARCHAR(10), is_leaf BOOLEAN);
+CREATE INDEX INTERPRO_ID_Index ON INTERPRO (id);
+CREATE INDEX INTERPRO_Accession_Index ON INTERPRO (accession);
+SELECT 'LOADING INTERPRO' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/INTERPRO.tab' INTO TABLE INTERPRO;
+$endTrans
 
-select 'CREATING INTERPRO' as '';
-drop table if exists INTERPRO;
-create table INTERPRO(id varchar(24), accession varchar(10), start integer, end integer, family_type varchar(22), parent varchar(10), is_leaf boolean);
-create index INTERPRO_ID_Index on INTERPRO (id);
-create index INTERPRO_Accession_Index on INTERPRO (accession);
+$startTrans
+SELECT 'CREATING colors' AS '';
+DROP TABLE IF EXISTS colors;
+CREATE TABLE colors(cluster INTEGER PRIMARY KEY,color VARCHAR(7));
+SELECT 'LOADING colors' AS '';
+LOAD DATA LOCAL INFILE '$DbSupport/colors.tab' INTO TABLE colors;
+$endTrans
 
+$startTrans
+SELECT 'CREATING idmapping' AS '';
+DROP TABLE IF EXISTS idmapping;
+CREATE TABLE idmapping (uniprot_id VARCHAR(15), foreign_id_type VARCHAR(15), foreign_id VARCHAR(20));
+CREATE INDEX uniprot_id_Index ON idmapping (uniprot_id);
+CREATE INDEX foreign_id_Index ON idmapping (foreign_id);
+SELECT 'LOADING idmapping' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/idmapping.tab' INTO TABLE idmapping;
+$endTrans
 
-select 'CREATING colors' as '';
-drop table if exists colors;
-create table colors(cluster int primary key,color varchar(7));
-
-select 'CREATING idmapping' as '';
-drop table if exists idmapping;
-create table idmapping (uniprot_id varchar(15), foreign_id_type varchar(15), foreign_id varchar(20));
-create index uniprot_id_Index on idmapping (uniprot_id);
-create index foreign_id_Index on idmapping (foreign_id);
-
-
-select 'LOADING colors' as '';
-load data local infile '$DbSupport/colors.tab' into table colors;
-
-select 'LOADING annotations' as '';
-load data local infile '$OutputDir/annotations.tab' into table annotations;
-
-select 'LOADING taxonomy' as '';
-load data local infile '$OutputDir/taxonomy.tab' into table taxonomy;
-
-select 'LOADING GENE3D' as '';
-load data local infile '$OutputDir/GENE3D.tab' into table GENE3D;
-
-select 'LOADING UNIREF' as '';
-load data local infile '$OutputDir/uniref.tab' into table uniref;
-
-select 'LOADING PFAM' as '';
-load data local infile '$OutputDir/PFAM.tab' into table PFAM;
-
-select 'LOADING SSF' as '';
-load data local infile '$OutputDir/SSF.tab' into table SSF;
-
-select 'LOADING INTERPRO' as '';
-load data local infile '$OutputDir/INTERPRO.tab' into table INTERPRO;
-
-select 'LOADING idmapping' as '';
-load data local infile '$OutputDir/idmapping.tab' into table idmapping;
-
-COMMIT;
-
-GRANT SELECT ON `$dbName`.* TO '$DbUser'\@'$IpRange';
+/*GRANT SELECT ON `$dbName`.* TO '$DbUser'\@'$IpRange';*/
 
 SQL
         ;
         
         if ($doPdbBlast) {
             $sql .= <<SQL;
-select 'CREATING pdbhits' as '';
-drop table if exists pdbhits;
-create table pdbhits(ACC varchar(10) primary key, PDB varchar(4), e varchar(20));
-create index pdbhits_ACC_Index on pdbhits (ACC);
-
-select 'LOADING pdbhits' as '';
-load data local infile '$OutputDir/pdb.tab' into table pdbhits;
+$startTrans
+SELECT 'CREATING pdbhits' AS '';
+DROP TABLE IF EXISTS pdbhits;
+CREATE TABLE pdbhits(ACC VARCHAR(10) PRIMARY KEY, PDB VARCHAR(4), e VARCHAR(20));
+CREATE INDEX pdbhits_ACC_Index ON pdbhits (ACC);
+SELECT 'LOADING pdbhits' AS '';
+LOAD DATA LOCAL INFILE '$OutputDir/pdb.tab' INTO TABLE pdbhits;
+$endTrans
 SQL
         }
     }

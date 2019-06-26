@@ -13,7 +13,7 @@ use File::Basename;
 use Getopt::Long;
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm getLmod);
-use EFI::Config;
+use EFI::Config qw(cluster_configure);
 
 use lib $FindBin::Bin . "/lib";
 use BlastUtil;
@@ -64,6 +64,8 @@ if (not $configFile or not -f $configFile) {
 }
 
 die "-config file argument is required" if not $configFile or not -f $configFile;
+my $config = {};
+cluster_configure($config, config_file_path => $configFile);
 
 
 die "-tmpdir argument is required" if not $tmpdir;
@@ -164,6 +166,7 @@ mkdir $logDir;
 $logDir = "" if not -d $logDir;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
+$schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 my $S = new EFI::SchedulerApi(%schedArgs);
 
 my $scriptDir = "$baseOutputDir/scripts";
