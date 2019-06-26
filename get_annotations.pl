@@ -96,6 +96,7 @@ my $dbh = $db->getHandle();
 open OUT, ">$annoOut" or die "cannot write struct.out file $annoOut\n";
 
 my %unirefIds;
+my %unirefClusterIdSeqLen;
 foreach my $accession (sort keys %$idMeta){
     if ($accession !~ /^z/) {
         # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
@@ -121,6 +122,8 @@ foreach my $accession (sort keys %$idMeta){
                 push @rows, $row;
                 if ($row->{accession} ne $accession) {
                     push(@{$unirefIds{$accession}}, [$row->{accession}, $row->{EFI::Annotations::FIELD_SEQ_LEN_KEY}]);
+                } else {
+                    $unirefClusterIdSeqLen{$accession} = $row->{EFI::Annotations::FIELD_SEQ_LEN_KEY};
                 }
             }
             $sth->finish;
@@ -156,7 +159,9 @@ while (my $line = <META>) {
             print OUT "\t", join("\t", $field, join(",", $seedId, @ids)), "\n";
         } elsif ($field eq $clusterSizeField) {
             my $size = scalar(map { $_->[1] } @{$unirefIds{$seedId}}) + 1; # + for the seed sequence
+            my $clusterIdRow = grep {$seedId eq $_->[0]} @{$unirefIds{$seedId}};
             print OUT "\t", join("\t", $field, $size), "\n";
+            print OUT "\t", join("\t", EFI::Annotations::FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY, $unirefClusterIdSeqLen{$seedId}), "\n" if $unirefClusterIdSeqLen{$seedId};
         } else {
             print OUT "\t", join("\t", $field, $value), "\n";
         }
