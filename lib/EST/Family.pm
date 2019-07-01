@@ -50,7 +50,7 @@ sub loadFamilyParameters {
     my ($ipro, $pfam, $gene3d, $ssf);
     my ($useDomain, $fraction, $maxSequence, $maxFullFam);
     my ($unirefVersion);
-    my ($domainFamily);
+    my ($domainFamily, $domainRegion);
 
     my $result = GetOptions(
         "ipro=s"                => \$ipro,
@@ -61,6 +61,7 @@ sub loadFamilyParameters {
         "max-full-fam-ur90=i"   => \$maxFullFam,
         "domain=s"              => \$useDomain,
         "domain-family=s"       => \$domainFamily, # Option D
+        "domain-region=s"       => \$domainRegion, # Option D
         "fraction=i"            => \$fraction,
         "uniref-version=s"      => \$unirefVersion,
     );
@@ -92,6 +93,7 @@ sub loadFamilyParameters {
     $config->{max_seq} =        defined $maxSequence ? $maxSequence : 0;
     $config->{max_full_fam} =   defined $maxFullFam ? $maxFullFam : 0;
     $config->{domain_family} =  ($config->{use_domain} and defined $domainFamily) ? $domainFamily : "";
+    $config->{domain_region} =  ($config->{domain_family} and $domainRegion) ? $domainRegion : "";
 
     if ($numFam) {
         return {data => $data, config => $config};

@@ -70,7 +70,7 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -97,6 +97,7 @@ my $result = GetOptions(
     "multiplex=s"       => \$multiplexing,
     "domain=s"          => \$domain,
     "domain-family=s"   => \$domainFamily,
+    "domain-region=s"   => \$domainRegion,
     "force-domain=i"    => \$forceDomain,
     "fraction=i"        => \$fraction,
     "blast=s"           => \$blast,
@@ -273,6 +274,7 @@ $minSeqLen = 0      if not defined $minSeqLen;
 $maxSeqLen = 0      if not defined $maxSeqLen;
 $forceDomain = 0    if not defined $forceDomain;
 $domainFamily = ""  if not defined $domainFamily;
+$domainRegion = "domain" if not defined $domainRegion;
 
 # Maximum number of sequences to process, 0 disables it
 $maxsequence = 0    if not defined $maxsequence;
@@ -467,6 +469,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my $maxSeqLenOpt = $maxSeqLen ? "-max-seq-len $maxSeqLen" : "";
 
     my $domFamArg = $domainFamily ? "-domain-family $domainFamily" : "";
+    my $domRegionArg = ($domainRegion eq "cterminal" or $domainRegion eq "nterminal") ? "-domain-region $domainRegion" : "";
 
     my @args = (
         "-config=$configFile", "-error-file $errorFile",
@@ -488,6 +491,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         push @args, "-uniprot-dom-len-output $lenUniprotDomFile";
         push @args, "-uniref-dom-len-output $lenUnirefDomFile" if $unirefVersion;
         push @args, $domFamArg if $domFamArg;
+        push @args, $domRegionArg if $domFamArg and $domainRegion;
     }
 
     my $retrScript = "get_sequences_option_";

@@ -53,6 +53,7 @@ sub configure {
     $self->{config}->{id_file} = $args{id_file};
     $self->{config}->{domain_family} = $args{domain_family};
     $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
+    $self->{config}->{domain_region} = $args{domain_region};
 }
 
 
@@ -135,18 +136,24 @@ sub retrieveUniRefMetadata {
 sub retrieveDomains {
     my $self = shift;
 
+    my $domReg = $self->{config}->{domain_region};
+
     my $domainFamily = uc($self->{config}->{domain_family});
     my $famTable = $domainFamily =~ m/^PF/ ? "PFAM" : "INTERPRO";
+    my $seqLenField = $domReg eq "cterminal" ? ", Sequence_Length AS full_len" : "";
+    my $seqLenJoin = $domReg eq "cterminal" ? "LEFT JOIN annotations ON $famTable.accession = annotations.accession" : "";
     
     my $selectFn = sub {
         my $struct = shift;
         my @ids = @_;
         foreach my $id (@ids) {
-            my $sql = "SELECT start, end FROM $famTable WHERE $famTable.id = '$domainFamily' AND accession = '$id'";
+            my $sql = "SELECT start, end $seqLenField FROM $famTable $seqLenJoin WHERE $famTable.id = '$domainFamily' AND $famTable.accession = '$id'";
             my $sth = $self->{dbh}->prepare($sql);
             $sth->execute;
             while (my $row = $sth->fetchrow_hashref) {
-                push @{$struct->{$id}}, {'start' => $row->{start}, 'end' => $row->{end}};
+                my $piece = {start => $row->{start}, end => $row->{end}};
+                $piece->{full_len} = $row->{full_len} if $seqLenField;
+                push @{$struct->{$id}}, $piece;
             }
         }
     };
@@ -164,6 +171,61 @@ sub retrieveDomains {
         }
         $self->{data}->{uniref_cluster_members} = {};
         &$selectFn($self->{data}->{uniref_cluster_members}, @upIds);
+    }
+
+    if ($domReg eq "cterminal" or $domReg eq "nterminal") {
+        $self->getDomainRegion($domReg);
+    }
+}
+
+
+sub getDomainRegion {
+    my $self = shift;
+    my $domReg = shift;
+
+    my $computeFn = sub {
+        my $struct = shift;
+        my @ids = @_;
+        my $outputIds = {};
+        foreach my $id (@ids) {
+            my $region = {};
+            my $idObject = $struct->{$id};
+            my $numPieces = scalar @$idObject; 
+            for (my $i = 0; $i < $numPieces; $i++) {
+                my $piece = $idObject->[$i];
+                my $newStruct = {};
+                my $len = 0;
+                if ($domReg eq "cterminal") {
+                    $newStruct->{start} = $piece->{end} + 1;
+                    $newStruct->{end} = $i < $numPieces - 1 ? $idObject->[$i+1]->{start} - 1 : $idObject->[$i]->{full_len};
+                    $len = exists $newStruct->{end} ? $newStruct->{end} - $newStruct->{start} : 1;
+                } else {
+                    $newStruct->{start} = ($i > 0 ? $idObject->[$i-1]->{end} : 0) + 1;
+                    $newStruct->{end} = $piece->{start} - 1;
+                    $len = $newStruct->{end} - $newStruct->{start};
+                }
+                if ($len > 0) {
+                    push @{$outputIds->{$id}}, $newStruct;
+                }
+            }
+        }
+        return $outputIds;
+    };
+
+    my $newIds = &$computeFn($self->{data}->{uniprot_ids}, keys %{$self->{data}->{uniprot_ids}});
+    $self->{data}->{uniprot_ids} = $newIds;
+
+    # If we are using UniRef and domain, then we need to look up the domain region for the family
+    # for each UniRef cluster member.
+    if ($self->{config}->{uniref_version}) {
+        my $metaKey = "UniRef$self->{config}->{uniref_version}_IDs";
+        my @upIds;
+        foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+            my @clIds = @{$self->{data}->{meta}->{$id}->{$metaKey}};
+            push @upIds, grep { exists $self->{data}->{uniref_cluster_members}->{$_} } @clIds;
+        }
+        $newIds = &$computeFn($self->{data}->{uniref_cluster_members}, @upIds);
+        $self->{data}->{uniref_cluster_members} = $newIds;
     }
 }
 

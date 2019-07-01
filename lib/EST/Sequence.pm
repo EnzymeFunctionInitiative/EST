@@ -84,8 +84,12 @@ sub retrieveAndSaveSequences {
                     my @domains = @$refVal;
                     if (scalar @domains) {
                         foreach my $piece (@domains) {
-                            my $theSeq = join("\n", unpack("(A80)*", substr $sequence, ${$piece}{'start'}-1, ${$piece}{'end'}-${$piece}{'start'}+1));
-                            print SEQ_OUTPUT ">$id:${$piece}{'start'}:${$piece}{'end'}\n$theSeq\n\n";
+                            my $start = exists $piece->{start} ? $piece->{start} : 1;
+                            my $end = exists $piece->{end} ? $piece->{end} : length($sequence);
+                            my $len = $end - $start;
+                            my $subSeq = substr $sequence, $start-1, $len+1;
+                            my $theSeq = join("\n", unpack("(A80)*", $subSeq));
+                            print SEQ_OUTPUT ">$id:$start:$end\n$theSeq\n\n";
                             (my $lenSeq = $theSeq) =~ s/[^A-Z]//g;
                             $histo->addData(length($lenSeq));
                         }

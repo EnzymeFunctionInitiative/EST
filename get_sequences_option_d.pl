@@ -55,6 +55,7 @@ if (exists $familyConfig->{data}) {
 
 my %accessionArgs = getAccessionCmdLineArgs();
 $accessionArgs{domain_family} = $familyConfig->{config}->{domain_family};
+$accessionArgs{domain_region} = $familyConfig->{config}->{domain_region};
 $accessionArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
 my $accessionData = new EST::Accession(dbh => $dbh, config_file_path => $configFile);
 $accessionData->configure(%accessionArgs);
