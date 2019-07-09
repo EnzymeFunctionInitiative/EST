@@ -1,4 +1,5 @@
 library("rhdf5")
+library(Hmisc)
 
 args <- commandArgs(trailingOnly = TRUE)
 type = args[1]
@@ -76,8 +77,14 @@ boxplot(newdata,
         xlab = "Alignment Score",
         ylim = range(0,100),
         xlim = range(bars_to_use[0], bars_to_use[-1]),
-        xaxt = "n",
+        axes = FALSE,
         frame = F)
+y_label_range <- c(0,10,20,30,40,50,60,70,80,90,100)
+y_minor_interval <- 4
+if (im_height < 500) {
+    y_label_range <- c(0, 20, 40, 60, 80, 100)
+    y_minor_interval <- 2
+}
 
 for (i in bars_to_use) {
     key = i
@@ -100,16 +107,18 @@ for (i in bars_to_use) {
             border = "blue", 
             whiskcol = whisk_color, 
             staplecol = whisk_color,
-            add = TRUE , 
-            xaxt = "n", 
-            yaxt = "n", 
-            at=key, 
+            add = TRUE, 
+            axes = FALSE,
+            at = key, 
             range = 0, 
             frame=F)
     rm(newdata)
     gc()
 }
-axis(side = 1, box_range)
+
+axis(side = 2, at = y_label_range)
+axis(side = 1, at = box_range)
+minor.tick(nx = 1, ny = y_minor_interval, tick.ratio = 0.8)
 
 dev.off()
 
