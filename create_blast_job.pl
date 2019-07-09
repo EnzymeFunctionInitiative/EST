@@ -78,7 +78,7 @@ mkdir $outputDir or die "Could not make directory $outputDir\n" if not -d $outpu
 
 my $blastDb = "$data_files/combined.fasta";
 my $perpass = 1000;
-my $incfrac = 0.95;
+my $incfrac = 1; # was 0.95
 my $maxhits = 5000;
 my $sortdir = '/scratch';
 

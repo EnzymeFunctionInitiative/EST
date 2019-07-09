@@ -69,7 +69,7 @@ if ($expandUniref) {
 }
 
 
-my $histo = new EST::LengthHistogram;
+my $histo = new EST::LengthHistogram(incfrac => $incfrac);
 
 while (@metaIds) {
     my @batch = splice(@metaIds, 0, 50);

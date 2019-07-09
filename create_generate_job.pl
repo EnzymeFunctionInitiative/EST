@@ -281,8 +281,8 @@ $maxsequence = 0    if not defined $maxsequence;
 
 # Fraction of sequences to include in graphs, reduces effects of outliers
 if (not defined $incfrac) {
-    print "-incfrac not specified, using default of 0.99\n";
-    $incfrac=0.99;
+    print "-incfrac not specified, using default of 1\n";
+    $incfrac = 1; # was 0.99
 }
 
 # We will keep the domain option on
