@@ -50,7 +50,7 @@ sub loadFamilyParameters {
     my ($ipro, $pfam, $gene3d, $ssf);
     my ($useDomain, $fraction, $maxSequence, $maxFullFam);
     my ($unirefVersion);
-    my ($domainFamily);
+    my ($domainFamily, $domainRegion);
 
     my $result = GetOptions(
         "ipro=s"                => \$ipro,
@@ -61,6 +61,7 @@ sub loadFamilyParameters {
         "max-full-fam-ur90=i"   => \$maxFullFam,
         "domain=s"              => \$useDomain,
         "domain-family=s"       => \$domainFamily, # Option D
+        "domain-region=s"       => \$domainRegion, # Option D
         "fraction=i"            => \$fraction,
         "uniref-version=s"      => \$unirefVersion,
     );
@@ -92,6 +93,7 @@ sub loadFamilyParameters {
     $config->{max_seq} =        defined $maxSequence ? $maxSequence : 0;
     $config->{max_full_fam} =   defined $maxFullFam ? $maxFullFam : 0;
     $config->{domain_family} =  ($config->{use_domain} and defined $domainFamily) ? $domainFamily : "";
+    $config->{domain_region} =  ($config->{domain_family} and $domainRegion) ? $domainRegion : "";
 
     if ($numFam) {
         return {data => $data, config => $config};
@@ -126,7 +128,9 @@ sub retrieveFamilyAccessions {
     } else {
         $fractionFunc = sub {
             my $count = shift;
-            return $count % $self->{config}->{fraction} == 0;
+            my $status = shift || "";
+            # Always return true for SwissProt proteins
+            return ($status eq "Reviewed" or $count % $self->{config}->{fraction} == 0);
         };
     }
 
@@ -194,9 +198,11 @@ sub getDomainFromDb {
         $unirefJoin = "LEFT JOIN uniref ON $table.accession = uniref.accession";
     }
 
+    my $spJoin = "LEFT JOIN annotations2 ON $table.accession = annotations2.accession";
+    my $spCol = ", annotations2.STATUS AS STATUS";
+
     foreach my $family (@families) {
-        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol FROM $table $unirefJoin WHERE $table.id = '$family'";
-        #my $sql = "select * from $table $joinClause where $table.id = '$family'";
+        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol FROM $table $unirefJoin $spJoin WHERE $table.id = '$family'";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         my $ac = 1;
@@ -226,7 +232,9 @@ sub getDomainFromDb {
                 }
                 $unirefMapping->{$uniprotId} = $unirefId if $unirefId ne $uniprotId;
             } else {
-                if (&$fractionFunc($count)) {
+                my $isSwissProt = $row->{STATUS} eq "Reviewed";
+                my $isFraction = &$fractionFunc($count);
+                if ($isFraction or $isSwissProt) {
                     $ac++;
                     push @{$ids->{$uniprotId}}, {'start' => $row->{start}, 'end' => $row->{end}};
                 }

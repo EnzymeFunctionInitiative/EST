@@ -17,7 +17,7 @@ sub compute_ascore {
     die "Invalid number of parts for computing alingment score" if scalar @parts < 7;
 
     my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen) = @parts;
-    #my $alignmentScore=-(log(@line[3])/log(10))+@line[12]*log(2)/log(10);
+    #OLD FORMULA: Prior to April 2017. my $alignmentScore=-(log(@line[3])/log(10))+@line[12]*log(2)/log(10);
     my $alignmentScore = int(
         -(log($qlen * $slen) / log(10))
             +

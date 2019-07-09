@@ -28,7 +28,7 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs);
+my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs, $useMinEdgeAttr);
 my $result = GetOptions(
     "blast=s"	        => \$blast,
     "cdhit=s"	        => \$cdhit,
@@ -39,6 +39,7 @@ my $result = GetOptions(
     "dbver=s"	        => \$dbver,
     "maxfull=i"	        => \$maxNumEdges,
     "include-sequences" => \$includeSeqs,
+    "use-min-edge-attr" => \$useMinEdgeAttr,
 );
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $outputFile or not $title or not $dbver or not $cdhit;
@@ -52,6 +53,7 @@ if (defined $maxNumEdges) {
 }
 
 $includeSeqs = 0 if not defined $includeSeqs;
+$useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
 
 my $anno = new EFI::Annotations;
 
@@ -285,11 +287,16 @@ while (<BLASTFILE>) {
         #my $log=-(log($line[3])/log(10))+$line[2]*log(2)/log(10);
         my $log=int(-(log($line[5]*$line[6])/log(10))+$line[4]*log(2)/log(10));
         $numEdges++;
-        $writer->startTag('edge', 'id' => "$line[0],$line[1]", 'label'=> "$line[0],$line[1]", 'source' => $line[0], 'target' => $line[1]);
-        $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $line[2]);
-        $writer->emptyTag('att', 'name' => 'alignment_score', 'type' => 'real', 'value' => $log);
-        $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $line[3]);
-        $writer->endTag;
+        my %edgeProp = ('id' => "$line[0],$line[1]", 'label'=> "$line[0],$line[1]", 'source' => $line[0], 'target' => $line[1]);
+        if (not $useMinEdgeAttr) {
+            $writer->startTag('edge', %edgeProp);
+            $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $line[2]);
+            $writer->emptyTag('att', 'name' => 'alignment_score', 'type' => 'real', 'value' => $log);
+            #Remove this 6/26/19; deemed unnecessary. $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $line[3]);
+            $writer->endTag;
+        } else {
+            $writer->emptyTag('edge', %edgeProp);
+        }
     }
 }
 close BLASTFILE;
