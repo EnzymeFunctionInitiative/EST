@@ -54,7 +54,8 @@ my $dbh = $db->getHandle();
 
 # Contains the attributes for each UniRef cluster ID
 my $annoMap = FileUtil::read_struct_file($annoFile);
-my @metaIds = keys %$annoMap;
+my @metaIds = grep m/^[^z]/, keys %$annoMap;
+my @unkIds = grep m/^z/, keys %$annoMap; # unknown IDs (e.g. zzz*)
 
 if ($expandUniref) {
     my @uniprotIds;
@@ -81,6 +82,11 @@ while (@metaIds) {
         my $len = $row->[1];
         $histo->addData($len);
     }
+}
+
+foreach my $id (@unkIds) {
+    my $len = $annoMap->{$id}->{Sequence_Length};
+    $histo->addData($len);
 }
 
 
