@@ -166,6 +166,7 @@ sub retrieveDomains {
         my $metaKey = "UniRef$self->{config}->{uniref_version}_IDs";
         my @upIds;
         foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+            push @upIds, $id and next if not exists $self->{data}->{meta}->{$id}->{$metaKey};
             my @clIds = @{$self->{data}->{meta}->{$id}->{$metaKey}};
             push @upIds, @clIds;
         }
