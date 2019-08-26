@@ -23,7 +23,7 @@ BEGIN {
 #       createdb.sh             makes fasta database out of sequences.fa
 #           formatdb            blast program to format sequences.fa into database
 #   Step 5 Blast
-#       blast-qsub.sh           job array of np elements that blasts each fraction of sequences.fa against database of sequences.fa
+#       blastqsub.sh           job array of np elements that blasts each fraction of sequences.fa against database of sequences.fa
 #           blastall            blast program that does the compares
 #   Step 6 Combine blasts back together
 #       catjob.sh               concationates blast output files together into blastfinal.tab
@@ -339,12 +339,13 @@ print "force-domain is $forceDomain\n";
 my $accOutFile = "$outputDir/accession.txt";
 my $errorFile = "$accOutFile.failed";
 
+my $filtSeqFilename = "sequences.fa";
 
 my $fracOutputDir = "$outputDir/fractions";
 my $blastOutputDir = "$outputDir/blastout";
 my $structFile = "$outputDir/struct.out";
 my $allSeqFile = "$outputDir/allsequences.fa";
-my $filtSeqFile = "$outputDir/sequences.fa";
+my $filtSeqFile = "$outputDir/$filtSeqFilename";
 
 my $lenUniprotFile = "$outputDir/length_uniprot.tab"; # full lengths of all UniProt sequences (expanded from UniRef if necessary)
 my $lenUniprotDomFile = "$outputDir/length_uniprot_domain.tab"; # domain lengths of all UniProt sequences (expanded from UniRef if necessary)
@@ -430,7 +431,8 @@ $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{node} = $clusterNode if $clusterNode;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 my $S = new EFI::SchedulerApi(%schedArgs);
-my $jobNamePrefix = $jobId ? $jobId . "_" : ""; 
+my $jobNamePrefix = $jobId ? $jobId . "_" : "";
+my $progressFile = "$outputDir/progress";
 
 my $scriptDir = "$baseOutputDir/scripts";
 mkdir $scriptDir;
@@ -521,6 +523,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
 
+    $B->addAction("echo 33 > $progressFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile("$scriptDir/initial_import.sh");
 
@@ -672,9 +675,9 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("cd $outputDir");
 if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
     $B->addAction("module load diamond");
-    $B->addAction("diamond makedb --in sequences.fa -d database");
+    $B->addAction("diamond makedb --in $filtSeqFilename -d database");
 } else {
-    $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
+    $B->addAction("formatdb -i $filtSeqFilename -n database -p T -o T ");
 }
 $B->jobName("${jobNamePrefix}createdb");
 $B->renderToFile("$scriptDir/createdb.sh");
@@ -737,11 +740,12 @@ $B->addAction("    echo \"BLAST failed; likely due to file format.\"");
 $B->addAction("    echo \$OUT > $outputDir/blast.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
-$B->jobName("${jobNamePrefix}blast-qsub");
-$B->renderToFile("$scriptDir/blast-qsub.sh");
+$B->addAction("echo 50 > $progressFile");
+$B->jobName("${jobNamePrefix}blastqsub");
+$B->renderToFile("$scriptDir/blastqsub.sh");
 
 $B->jobArray("");
-my $blastjob = $S->submit("$scriptDir/blast-qsub.sh");
+my $blastjob = $S->submit("$scriptDir/blastqsub.sh");
 chomp $blastjob;
 print "blast job is:\n $blastjob\n";
 ($prevJobId) = split /\./, $blastjob;
@@ -783,6 +787,7 @@ $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/a
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->addAction("echo 67 > $progressFile");
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 
@@ -830,7 +835,7 @@ $B = $S->getBuilder();
 $B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
         
-$B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -seq-count-output $seqCountFile");
+$B->addAction("$efiEstTools/calc_blast_stats.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -unique-seq-file $filtSeqFile -seq-count-output $seqCountFile");
 $B->jobName("${jobNamePrefix}conv_ratio");
 $B->renderToFile("$scriptDir/conv_ratio.sh");
 my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
@@ -957,6 +962,7 @@ if ($removeTempFiles) {
     $B->addAction("rm $blastOutputDir/blastout-*.tab");
     $B->addAction("rm $fracOutputDir/fracfile-*.fa");
 }
+$B->addAction("echo 100 > $progressFile");
 $B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile("$scriptDir/graphs.sh");
 
