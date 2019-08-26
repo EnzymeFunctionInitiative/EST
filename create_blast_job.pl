@@ -180,6 +180,8 @@ my $jobNamePrefix = $jobId ? $jobId . "_" : "";
 my $queryFile = "$outputDir/query.fa";
 my $allSeqFilename = "allsequences.fa";
 my $allSeqFile = "$outputDir/$allSeqFilename";
+my $filtSeqFilename = "sequences.fa";
+my $filtSeqFile = "$outputDir/$filtSeqFilename";
 my $accOutFile = "$outputDir/accessions.txt";
 my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 
@@ -263,9 +265,9 @@ $B->addAction("module load $efiDbMod");
 #  $B->addAction("module load blast");
 $B->addAction("cd $outputDir");
 if ($multiplexing eq "on") {
-    $B->addAction("cd-hit -d 0 -c $sim -s $lengthdif -i $allSeqFile -o $outputDir/sequences.fa");
+    $B->addAction("cd-hit -d 0 -c $sim -s $lengthdif -i $allSeqFile -o $filtSeqFile");
 } else {
-    $B->addAction("cp $allSeqFile $outputDir/sequences.fa");
+    $B->addAction("cp $allSeqFile $filtSeqFile");
 }
 $B->jobName("${jobNamePrefix}multiplex");
 $B->renderToFile("$scriptDir/multiplex.sh");
@@ -287,7 +289,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("mkdir $blastOutDir");
 $B->addAction("NP=$np");
 $B->addAction("sleep 10"); # Here to avoid a syncing issue we had with the grep on the next line.
-$B->addAction("NSEQ=`grep \\> $outputDir/sequences.fa | wc -l`");
+$B->addAction("NSEQ=`grep \\> $filtSeqFile | wc -l`");
 $B->addAction("if [ \$NSEQ -le 50 ]; then");
 $B->addAction("    NP=1");
 $B->addAction("elif [ \$NSEQ -le 200 ]; then");
@@ -300,7 +302,7 @@ $B->addAction("elif [ \$NSEQ -le 1200 ]; then");
 $B->addAction("    NP=16");
 $B->addAction("fi");
 $B->addAction("echo \"Using \$NP parts with \$NSEQ sequences\"");
-$B->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $outputDir/sequences.fa");
+$B->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $filtSeqFile");
 $B->jobName("${jobNamePrefix}fracfile");
 $B->renderToFile("$scriptDir/fracfile.sh");
 
@@ -317,7 +319,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
-$B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
+$B->addAction("formatdb -i $filtSeqFilename -n database -p T -o T ");
 $B->jobName("${jobNamePrefix}createdb");
 $B->renderToFile("$scriptDir/createdb.sh");
 
@@ -341,11 +343,11 @@ $B->addAction("INFILE=\"$blastOutDir/fracfile-{JOB_ARRAYID}.fa\"");
 $B->addAction("if [[ -f \$INFILE && -s \$INFILE ]]; then");
 $B->addAction("    blastall -p blastp -i \$INFILE -d $outputDir/database -m 8 -e $famEvalue -b $blasthits -o $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab");
 $B->addAction("fi");
-$B->jobName("${jobNamePrefix}blast-qsub");
-$B->renderToFile("$scriptDir/blast-qsub.sh");
+$B->jobName("${jobNamePrefix}blastqsub");
+$B->renderToFile("$scriptDir/blastqsub.sh");
 
 
-chomp($submitResult = $S->submit("$scriptDir/blast-qsub.sh"));
+chomp($submitResult = $S->submit("$scriptDir/blastqsub.sh"));
 print "blast job is:\n $submitResult\n";
 $dependencyId = getJobId($submitResult);
 
@@ -376,9 +378,9 @@ $B->dependency(0, $dependencyId);
 $B->resource(1, 1, "300gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
-$B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa");
+$B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
-$B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $outputDir/sequences.fa -out $outputDir/unsorted.1.out");
+$B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $filtSeqFile -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
@@ -398,7 +400,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 if ($multiplexing eq "on") {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
-    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $outputDir/sequences.fa.clstr");
+    $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $filtSeqFile.clstr");
 } else {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/remove_dups.pl -in $outputDir/mux.out -out $outputDir/1.out");
@@ -420,7 +422,8 @@ $dependencyId = getJobId($submitResult);
 $B = $S->getBuilder();
 $B->dependency(0, $dependencyId);
 $B->resource(1, 1, "5gb");
-$B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -seq-count-output $seqCountFile");
+$B->addAction("NSEQ=`grep \\> $filtSeqFile | wc -l`");
+$B->addAction("$efiEstTools/calc_blast_stats.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -unique-seq-file $filtSeqFile -seq-count-output $seqCountFile");
 $B->jobName("${jobNamePrefix}conv_ratio");
 $B->renderToFile("$scriptDir/conv_ratio.sh");
 chomp(my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh"));
@@ -482,7 +485,7 @@ if ($removeTempFiles) {
     #$B->addAction("rm -f $outputDir/struct.out");
     $B->addAction("rm -f $outputDir/formatdb.log");
     $B->addAction("rm -f $outputDir/mux.out");
-    $B->addAction("rm -f $outputDir/sequences.fa.*");
+    $B->addAction("rm -f $filtSeqFile.*");
     $B->jobName("${jobNamePrefix}cleanup");
     $B->renderToFile("$scriptDir/cleanup.sh");
     my $cleanupJob = $S->submit("$scriptDir/cleanup.sh");
