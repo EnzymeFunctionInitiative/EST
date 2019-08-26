@@ -198,8 +198,8 @@ sub getDomainFromDb {
         $unirefJoin = "LEFT JOIN uniref ON $table.accession = uniref.accession";
     }
 
-    my $spJoin = "LEFT JOIN annotations2 ON $table.accession = annotations2.accession";
-    my $spCol = ", annotations2.STATUS AS STATUS";
+    my $spJoin = $self->{config}->{fraction} > 1 ? "LEFT JOIN annotations ON $table.accession = annotations.accession" : "";
+    my $spCol = $self->{config}->{fraction} > 1 ? ", annotations.STATUS AS STATUS" : "";
 
     foreach my $family (@families) {
         my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol FROM $table $unirefJoin $spJoin WHERE $table.id = '$family'";
@@ -232,7 +232,7 @@ sub getDomainFromDb {
                 }
                 $unirefMapping->{$uniprotId} = $unirefId if $unirefId ne $uniprotId;
             } else {
-                my $isSwissProt = $row->{STATUS} eq "Reviewed";
+                my $isSwissProt = $self->{config}->{fraction} > 1 ? $row->{STATUS} eq "Reviewed" : 0;
                 my $isFraction = &$fractionFunc($count);
                 if ($isFraction or $isSwissProt) {
                     $ac++;

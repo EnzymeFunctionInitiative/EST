@@ -23,7 +23,7 @@ use warnings;
 use FindBin;
 use Getopt::Long;
 use EFI::SchedulerApi;
-use EFI::Util qw(usesSlurm);
+use EFI::Util qw(usesSlurm checkForDomain);
 use EFI::Config qw(cluster_configure);
 
 use lib "$FindBin::Bin/lib";
@@ -163,7 +163,7 @@ if ($unirefVersion) {
 }
 
 my $logDir = "$baseOutputDir/log";
-mkdir $logDir;
+mkdir $logDir if not $dryrun;
 $logDir = "" if not -d $logDir;
 
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
@@ -200,8 +200,10 @@ ANNO
 my $userHeaderFileOption = "-meta-file $userHeaderFile";
 my $annoSpecOption = " -anno-spec-file $annoSpecFile" if $useAnnoSpec;
 my $lenArgs = "-min-len $minlen -max-len $maxlen";
+# Don't filter out UniRef cluster members if this is a domain job.
+$lenArgs = "" if checkForDomain("$generateDir/1.out");
 my $annoDep = 0;
-mkdir $analysisDir or die "could not make analysis folder $analysisDir\n";
+mkdir $analysisDir or die "could not make analysis folder $analysisDir\n" if not $dryrun;
 $B = $S->getBuilder();
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $perlMod");
@@ -344,5 +346,6 @@ $B->renderToFile("$analysisDir/stats.sh");
 my $statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
 chomp $statjob;
 print "Stats job is:\n $statjob\n";
+
 
 
