@@ -9,7 +9,7 @@ use lib "$FindBin::Bin/lib";
 use AlignmentScore;
 
 
-my ($inputBlast, $outputBlast, $filter, $minLen, $maxLen, $minVal, $inputFasta, $outputFasta);
+my ($inputBlast, $outputBlast, $filter, $minLen, $maxLen, $minVal, $inputFasta, $outputFasta, $domainLenMeta);
 my $result = GetOptions(
     "blastin=s"     => \$inputBlast,
     "blastout=s"    => \$outputBlast,
@@ -18,7 +18,9 @@ my $result = GetOptions(
     "maxlen=s"      => \$maxLen,
     "minval=s"      => \$minVal,
     "fastain=s"     => \$inputFasta,
-    "fastaout=s"    => \$outputFasta);
+    "fastaout=s"    => \$outputFasta,
+    "domain-meta=s" => \$domainLenMeta,
+);
 
 my %sequences;
 
@@ -94,16 +96,20 @@ while (my $line = <BLAST>) {
 close OUT;
 close BLAST;
 
+
 open FASTAIN, $inputFasta or die "Cannot open fasta file $inputFasta";
 open FASTAOUT, ">$outputFasta" or die "Cannot write to fasta file $outputFasta";
 my $sequence = "";
 my @seqLines; # keep track of individual lines in the sequence since we write them out as they come in
 my $key = "";
+my %lenMap;
 while (my $line = <FASTAIN>) {
     chomp $line;
     if ($line =~ /^>/) {
         if (length $sequence >= $minLen and (length $sequence <= $maxLen or $maxLen == 0)) { 
             print FASTAOUT "$key\n", join("\n", @seqLines), "\n\n";
+            $key =~ s/^\>(.+?):\d+:\d+$/$1/;
+            $lenMap{$key} = length $sequence;
         }
         $key = $line;
         $sequence = "";
@@ -116,4 +122,14 @@ while (my $line = <FASTAIN>) {
 print FASTAOUT "$key\n", join("\n", @seqLines), "\n\n";
 close FASTAOUT;
 close FASTAIN;
+
+
+if ($domainLenMeta) {
+    my $field = "Cluster_ID_Domain_Length";
+    open META, ">>", $domainLenMeta;
+    foreach my $id (keys %lenMap) {
+        print META "$id\n\t$field\t$lenMap{$id}\n";
+    }
+    close META;
+}
 
