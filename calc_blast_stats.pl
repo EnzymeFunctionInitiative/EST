@@ -7,10 +7,11 @@ use strict;
 use Getopt::Long;
 
 
-my ($edgeIn, $seqIn, $statsFile);
+my ($edgeIn, $seqIn, $uniqueSeqIn, $statsFile);
 my $result = GetOptions(
     "edge-file=s"           => \$edgeIn,
     "seq-file=s"            => \$seqIn,
+    "unique-seq-file=s"     => \$uniqueSeqIn,
     "seq-count-output=s"    => \$statsFile,
 );
 
@@ -25,6 +26,12 @@ $numLines =~ s/^\s*(\d+).*$/$1/s;
 my $numSeq = `grep \\> $seqIn | wc -l`;
 chomp $numSeq;
 
+my $numUniqueSeq = 0;
+if ($uniqueSeqIn and -f $uniqueSeqIn) {
+    $numUniqueSeq = `grep \\> $uniqueSeqIn | wc -l`;
+    chomp $numUniqueSeq;
+}
+
 my $numerator = $numLines * 2;
 my $denominator = int($numSeq * ($numSeq - 1));
 my $convRatio = 1;
@@ -36,5 +43,6 @@ if ($denominator != 0) {
 open META, ">>", $statsFile or die "Unable to open stats file for appending $statsFile: $!";
 print META "ConvergenceRatio\t$convRatio\n";
 print META "EdgeCount\t$numLines\n";
+print META "UniqueSeq\t$numUniqueSeq\n" if $numUniqueSeq;
 close META;
 
