@@ -23,7 +23,7 @@ use warnings;
 use FindBin;
 use Getopt::Long;
 use EFI::SchedulerApi;
-use EFI::Util qw(usesSlurm checkForDomain);
+use EFI::Util qw(usesSlurm);
 use EFI::Config qw(cluster_configure);
 
 use lib "$FindBin::Bin/lib";
@@ -197,11 +197,13 @@ ANNO
     close SPEC;
 }
 
+my $hasDomain = checkForDomain("$generateDir/1.out");
+
 my $userHeaderFileOption = "-meta-file $userHeaderFile";
 my $annoSpecOption = " -anno-spec-file $annoSpecFile" if $useAnnoSpec;
 my $lenArgs = "-min-len $minlen -max-len $maxlen";
 # Don't filter out UniRef cluster members if this is a domain job.
-$lenArgs = "" if checkForDomain("$generateDir/1.out");
+$lenArgs = "" if $hasDomain;
 my $annoDep = 0;
 mkdir $analysisDir or die "could not make analysis folder $analysisDir\n" if not $dryrun;
 $B = $S->getBuilder();
@@ -232,7 +234,8 @@ if ($customClusterDir and $customClusterFile) {
     $B->addAction("$toolpath/filter_custom.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -custom-cluster-file $analysisDir/$customClusterFile");
     $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
 } else {
-    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen");
+    my $domMetaArg = ($unirefVersion and $hasDomain) ? "-domain-meta $filteredAnnoFile" : "";
+    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen $domMetaArg");
 }
 if ($hasParent) {
     $B->addAction("cp $parentDir/*.png $baseAnalysisDir/");
@@ -347,5 +350,16 @@ my $statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
 chomp $statjob;
 print "Stats job is:\n $statjob\n";
 
+
+
+sub checkForDomain {
+    my $file = shift;
+
+    open FILE, $file or return 0;
+    my $line = <FILE>;
+    close FILE;
+
+    return $line =~ m/^\S+:\d+:\d+/;
+}
 
 
