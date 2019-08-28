@@ -1,3 +1,8 @@
+
+# This file is provided so that we can use the id mapping file that is built by the database
+# tools, rather than doing a database lookup.  This is only used used during the database
+# build process.
+
 package IdMappingFile;
 
 use strict;
