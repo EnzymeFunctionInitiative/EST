@@ -56,7 +56,7 @@ my $result = GetOptions("dir=s"         => \$WorkingDir,
                         "download"      => \$doDownload,
                         "interactive"   => \$interactive,
                         "log=s"         => \$logFile,
-                        "dryrun"        => \$dryRun,
+                        "dry-run|dryrun"    => \$dryRun,
                         "exists"        => \$skipIfExists,
                         "bc1"           => \$Legacy,        # configures the scripts to work with biocluster 1 instead of biocluster 2
                         "scheduler=s"   => \$scheduler,     # to set the scheduler to slurm
@@ -191,7 +191,7 @@ my $DB = new EFI::Database(%dbArgs);
 
 # Output the sql commands necessary for creating the database and importing the data, then exit.
 if (defined $sql) {
-    writeSqlCommands($dbName, $buildOptions, "sql");
+    writeSqlCommands($dbName, $buildOptions, $dbType eq "sqlite" ? "sqlite" : "mysql");
     exit(0);
 }
 
@@ -228,7 +228,7 @@ my $fileNum = 0;
     
 if (defined $buildEna and $buildEna) {
 
-    $fileNum = 17;
+    $fileNum = $dbType eq "sqlite" ? 37 : 17;
 
     $enaDir = "$InputDir/ena/release" if not defined $enaDir;
     if (not -d $enaDir or not -d "$enaDir/std") {
