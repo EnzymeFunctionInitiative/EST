@@ -467,7 +467,7 @@ $B->renderToFile("$scriptDir/graphs.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/graphs.sh"));
 print "Graph job is:\n $submitResult\n";
-my $graphJobId = getJobId($convRatioJob);
+my $graphJobId = getJobId($submitResult);
 
 
 if ($removeTempFiles) {
