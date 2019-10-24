@@ -21,7 +21,7 @@ use BlastUtil;
 
 my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType);
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "tmp|tmpdir=s"      => \$tmpdir,
@@ -49,6 +49,8 @@ my $result = GetOptions(
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config=s"          => \$configFile,    # new-style config file
+    "exclude-fragments" => \$excludeFragments,
+    "db-type=s"         => \$dbType, # uniprot, uniref50, uniref90  default to uniprot
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -56,7 +58,7 @@ die "Environment variables not set properly: missing EFIDB variable" if not exis
 my $efiEstTools = $ENV{EFIEST};
 my $efiEstMod = $ENV{EFIESTMOD};
 my $efiDbMod = $ENV{EFIDBMOD};
-my $data_files = $ENV{EFIDBPATH};
+my $databaseDir = $ENV{EFIDBPATH};
 my $dbVer = $ENV{EFIDB};
 
 if (not $configFile or not -f $configFile) {
@@ -76,7 +78,13 @@ my $outputDir = "$baseOutputDir/$tmpdir";
 print "db is: $dbVer\n";
 mkdir $outputDir or die "Could not make directory $outputDir\n" if not -d $outputDir;
 
-my $blastDb = "$data_files/combined.fasta";
+my $dbName = "combined";
+if ($dbType and ($dbType eq "uniref50" or $dbType eq "uniref90")) {
+    $dbName = "$dbType";
+}
+$dbName .= ($excludeFragments ? "_nf" : "") . ".fasta";
+
+my $blastDb = "$databaseDir/$dbName";
 my $perpass = 1000;
 my $incfrac = 1; # was 0.95
 my $maxhits = 5000;
@@ -155,6 +163,8 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
     $fraction = 1;
 }
 
+$excludeFragments = defined($excludeFragments);
+
 my $pythonMod = getLmod("Python/2", "Python");
 my $gdMod = getLmod("GD.*Perl", "GD");
 my $perlMod = "Perl";
@@ -193,6 +203,7 @@ my $submitResult;
 my $dependencyId;
 my $B = $S->getBuilder();
 
+#TODO: handle fragment database
 $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
 $B->resource(1, 1, "70gb");
 $B->addAction("module load $efiEstMod");
@@ -238,6 +249,7 @@ if ($pfam or $ipro) {
 push @args, "-blast-file $outputDir/blastfinal.tab";
 push @args, "-query-file $queryFile";
 push @args, "-max-results $maxBlastResults" if $maxBlastResults;
+push @args, "-exclude-fragments" if $excludeFragments;
 
 $B = $S->getBuilder();
 $B->dependency(0, $dependencyId); 

@@ -11,16 +11,8 @@ use warnings;
 use strict;
 
 use Getopt::Long qw(:config pass_through);
-use Exporter;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION     = 1.00;
-@ISA         = qw(Exporter);
-@EXPORT      = qw(loadFamilyParameters);
-@EXPORT_OK   = qw();
-
-use base qw(EST::Base);
-use EST::Base;
+use parent qw(EST::Base);
 
 
 
@@ -28,13 +20,13 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = EST::Base->new(%args);
+    my $self = $class->SUPER::new(%args);
 
     die "No dbh provided" if not exists $args{dbh};
 
     $self->{dbh} = $args{dbh};
 
-    return bless($self, $class);
+    return $self;
 }
 
 
@@ -50,7 +42,7 @@ sub loadFamilyParameters {
     my ($ipro, $pfam, $gene3d, $ssf);
     my ($useDomain, $fraction, $maxSequence, $maxFullFam);
     my ($unirefVersion);
-    my ($domainFamily, $domainRegion);
+    my ($domainFamily, $domainRegion, $excludeFragments);
 
     my $result = GetOptions(
         "ipro=s"                => \$ipro,
@@ -64,6 +56,7 @@ sub loadFamilyParameters {
         "domain-region=s"       => \$domainRegion, # Option D
         "fraction=i"            => \$fraction,
         "uniref-version=s"      => \$unirefVersion,
+        "exclude-fragments"     => \$excludeFragments,
     );
 
     my $data = {interpro => [], pfam => [], gene3d => [], ssf => []};
@@ -94,6 +87,7 @@ sub loadFamilyParameters {
     $config->{max_full_fam} =   defined $maxFullFam ? $maxFullFam : 0;
     $config->{domain_family} =  ($config->{use_domain} and defined $domainFamily) ? $domainFamily : "";
     $config->{domain_region} =  ($config->{domain_family} and $domainRegion) ? $domainRegion : "";
+    $config->{exclude_fragments}    = $excludeFragments;
 
     if ($numFam) {
         return {data => $data, config => $config};
@@ -198,11 +192,18 @@ sub getDomainFromDb {
         $unirefJoin = "LEFT JOIN uniref ON $table.accession = uniref.accession";
     }
 
-    my $spJoin = $self->{config}->{fraction} > 1 ? "LEFT JOIN annotations ON $table.accession = annotations.accession" : "";
-    my $spCol = $self->{config}->{fraction} > 1 ? ", annotations.STATUS AS STATUS" : "";
+    my $annoTable = "annotations";
+
+    my $whereJoin = ($self->{config}->{fraction} > 1 or $self->{config}->{exclude_fragments}) ? "LEFT JOIN $annoTable ON $table.accession = $annoTable.accession" : "";
+    my $spCol = $self->{config}->{fraction} > 1 ? ", $annoTable.STATUS AS STATUS" : "";
+    my $fragWhere = "";
+    if ($self->dbSupportsFragment() and $self->{config}->{exclude_fragments}) {
+        $fragWhere = " AND $annoTable.Fragment = 0";
+    }
 
     foreach my $family (@families) {
-        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol FROM $table $unirefJoin $spJoin WHERE $table.id = '$family'";
+        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol FROM $table $unirefJoin $whereJoin WHERE $table.id = '$family' $fragWhere";
+        print "SQL $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         my $ac = 1;

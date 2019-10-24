@@ -11,16 +11,8 @@ use warnings;
 use strict;
 
 use Getopt::Long qw(:config pass_through);
-use Exporter;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION     = 1.00;
-@ISA         = qw(Exporter);
-@EXPORT      = qw(getBLASTCmdLineArgs);
-@EXPORT_OK   = qw();
-
-use base qw(EST::Base);
-use EST::Base;
+use parent qw(EST::Base);
 
 our $INPUT_SEQ_ID = "zINPUTSEQ";
 our $INPUT_SEQ_TYPE = "INPUT";
@@ -30,9 +22,9 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = EST::Base->new(%args);
+    my $self = $class->SUPER::new(%args);
 
-    return bless($self, $class);
+    return $self;
 }
 
 

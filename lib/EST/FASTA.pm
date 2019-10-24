@@ -11,16 +11,8 @@ use strict;
 
 use Data::Dumper;
 use Getopt::Long qw(:config pass_through);
-use Exporter;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION     = 1.00;
-@ISA         = qw(Exporter);
-@EXPORT      = qw(getFastaCmdLineArgs);
-@EXPORT_OK   = qw();
-
-use base qw(EST::Base);
-use EST::Base;
+use parent qw(EST::Base);
 
 
 use EFI::Fasta::Headers;
@@ -30,13 +22,11 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = EST::Base->new(%args);
+    my $self = $class->SUPER::new(%args);
 
     die "No config parameter provided" if not exists $args{config_file_path};
 
     $self->{config_file_path} = $args{config_file_path};
-
-    bless $self, $class;
 
     return $self;
 }

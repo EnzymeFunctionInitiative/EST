@@ -50,7 +50,7 @@ if (exists $familyConfig->{data}) {
 }
 
 
-my %fastaArgs = getFastaCmdLineArgs();
+my %fastaArgs = EST::FASTA::getFastaCmdLineArgs();
 my $fastaData = new EST::FASTA(config_file_path => $configFile);
 $fastaData->configure(%fastaArgs);
 $fastaData->parseFile();

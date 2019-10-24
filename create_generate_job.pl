@@ -70,7 +70,7 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -114,6 +114,7 @@ my $result = GetOptions(
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
     "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "config=s"          => \$configFile,    # new-style config file
+    "exclude-fragments" => \$excludeFragments,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -285,6 +286,8 @@ if (not defined $incfrac) {
     $incfrac = 1; # was 0.99
 }
 
+$excludeFragments = defined($excludeFragments);
+
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
 
@@ -334,6 +337,7 @@ print "Python module is $pythonMod\n";
 print "max-full-family is $maxFullFam\n";
 print "cd-hit is $cdHitOnly\n";
 print "force-domain is $forceDomain\n";
+print "exclude-fragments is $excludeFragments\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -360,13 +364,14 @@ $seqCountFile = "$outputDir/acc_counts" if not $seqCountFile;
 
 # Error checking for user supplied dat and fa files
 my $accessionFileOption = "";
+my $noMatchFileOption = "";
 if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $baseOutputDir . "/$accessionFile" if not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
     $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $baseOutputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
-    $noMatchFile = "-no-match-file $noMatchFile";
+    $noMatchFileOption = "-no-match-file $noMatchFile";
 
 } else {
     $accessionFile = "";
@@ -506,7 +511,10 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $retrScript .= "d.pl";
         push @args, "-uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
         push @args, $accessionFileOption;
+        push @args, $noMatchFileOption;
     }
+
+    push @args, "-exclude-fragments" if $excludeFragments;
 
     $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
 

@@ -76,7 +76,7 @@ sub setupConfig {
     my $db = new EFI::Database(config_file_path => $configFile);
     my $dbh = $db->getHandle();
     
-    my $familyConfig = loadFamilyParameters();
+    my $familyConfig = EST::Family::loadFamilyParameters();
     
     my $fastaDb = "$ENV{EFI_DB_DIR}/$ENV{EFI_UNIPROT_DB}";
     $batchSize = $batchSize ? $batchSize : ($ENV{EFI_PASS} ? $ENV{EFI_PASS} : 1000);
@@ -109,6 +109,7 @@ sub setupConfig {
 
     my %otherConfig;
     $otherConfig{uniprot_domain_length_file} = $uniprotDomLenOutput if $uniprotDomLenOutput and $unirefDomLenOutput;
+    $otherConfig{db_version} = $db->getVersion($dbh);
 
     my $accObj = new EST::IdList(%accArgs);
     my $seqObj = new EST::Sequence(%seqArgs);

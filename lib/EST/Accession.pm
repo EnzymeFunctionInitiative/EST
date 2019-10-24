@@ -11,26 +11,18 @@ use strict;
 
 use Data::Dumper;
 use Getopt::Long qw(:config pass_through);
-use Exporter;
 use List::MoreUtils qw(uniq);
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
-
-$VERSION     = 1.00;
-@ISA         = qw(Exporter);
-@EXPORT      = qw(getAccessionCmdLineArgs);
-@EXPORT_OK   = qw();
 
 use EFI::IdMapping;
 
-use base qw(EST::Base);
-use EST::Base;
+use parent qw(EST::Base);
 
 
 sub new {
     my $class = shift;
     my %args = @_;
     
-    my $self = EST::Base->new(%args);
+    my $self = $class->SUPER::new(%args);
 
     die "No dbh provided" if not exists $args{dbh};
     die "No config parameter provided" if not exists $args{config_file_path};
@@ -39,7 +31,7 @@ sub new {
     $self->{dbh} = $args{dbh};
     $self->{data} = {};
 
-    return bless $self, $class;
+    return $self;
 }
 
 
@@ -61,14 +53,16 @@ sub configure {
 # Look in @ARGV
 sub getAccessionCmdLineArgs {
 
-    my ($idFile);
+    my ($idFile, $noMatchFile);
     my $result = GetOptions(
         "accession-file|id-file=s"      => \$idFile,
+        "no-match-file=s"               => \$noMatchFile,
     );
 
     $idFile = "" if not $idFile;
+    $noMatchFile = "" if not $noMatchFile;
 
-    return (id_file => $idFile);
+    return (id_file => $idFile, no_match_file => $noMatchFile);
 }
 
 
@@ -104,6 +98,10 @@ sub parseFile {
     my $idMapper = new EFI::IdMapping(config_file_path => $self->{config_file_path});
     $self->reverseLookupManualAccessions($idMapper);
 
+    if ($self->{config}->{exclude_fragments}) {
+        $self->excludeFragments();
+    }
+
     if ($self->{config}->{uniref_version}) {
         $self->retrieveUniRefMetadata();
     }
@@ -130,6 +128,28 @@ sub retrieveUniRefMetadata {
             push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
         }
     }
+}
+
+
+sub excludeFragments {
+    my $self = shift;
+
+    my %full;
+
+    my @ids = keys %{$self->{data}->{uniprot_ids}};
+    my $batchSize = 20;
+    while (scalar @ids) {
+        my @group = splice(@ids, 0, $batchSize);
+        my $whereIds = join(",", map { "'$_'" } @group);
+        my $sql = "SELECT accession FROM annotations WHERE accession IN ($whereIds) AND Fragment = 0";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            $full{$row->{accession}} = $self->{data}->{uniprot_ids}->{$row->{accession}};
+        }
+    }
+
+    $self->{data}->{uniprot_ids} = \%full;
 }
 
 
@@ -256,6 +276,7 @@ sub reverseLookupManualAccessions {
     }
 
     $self->{data}->{meta} = $meta;
+    $self->{data}->{no_matches} = $noMatches;
 
     $self->{stats}->{num_matched} = $numUniprotIds;
     $self->{stats}->{num_unmatched} = $numNoMatches;
@@ -289,6 +310,13 @@ sub getStatistics {
     my $self = shift;
 
     return $self->{stats};
+}
+
+
+sub getNoMatches {
+    my $self = shift;
+
+    return $self->{data}->{no_matches};
 }
 
 
