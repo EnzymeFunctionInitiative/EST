@@ -100,7 +100,7 @@ if ($oldPhyloFile) {
 
 $debug = 2**50 if not defined $debug; #TODO: debug
 
-my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy);
+my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy, $is_fragment);
 my (@BRENDA, @CAZY, @GO, @INTERPRO, @KEGG, $lastline, @OC_domain_array, @PATRIC, @PDB, @PFAM, $refseqline, @STRING);
 
 print "Parsing DAT Annotation Information\n";
@@ -187,7 +187,7 @@ print "Wrote the following columns to the annotations table:\n    ";
 print join("\n    ", "element", "id", "status", "size", "OX_tax_id", "GDNA", "DE_desc",
                  "RDE_reviewed_desc", "OS_organism", "GN_gene", "PDB",
                  "GO", "kegg", "string", "brenda", "patric", "hmpsite", "hmpoxygen",
-                 "efiTid", "EC", "cazy", "ncbiStr", "uniref50", "uniref90");
+                 "efiTid", "EC", "cazy", "is_fragment");
 print "\n";
 
 
@@ -279,6 +279,7 @@ sub write_line {
         $DE_desc=~s/\s+/ /g;
         $DE_desc=~s/\&/and/g;
         $DE_desc=~s/^\s+//g;
+        $is_fragment = ($DE_desc =~ /Flags:.*Fragment/) ? 1 : 0;
         #$DE_desc=~s/{.*?}$//;
         if($DE_desc=~/^RecName: Full=(.*)/){
             $DE_desc=$1;
@@ -319,6 +320,7 @@ sub write_line {
         push @line, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric;
         push @line, $hmpsite, $hmpoxygen, $efiTid, $EC;
         push @line, $cazy;
+        push @line, $is_fragment;
 
         print STRUCT join("\t", @line), "\n";
     }
@@ -410,40 +412,6 @@ sub getGiNums {
         #print "GI\t@line[0]\t".$GI{@line[0]}{'number'}."\t".$GI{@line[0]}{'count'}."\n";
     }
     close GI;
-}
-
-
-sub getUnirefData {
-    my $file = shift;
-
-    my $data = {};
-
-    open UR, $file or die "Could not open UniRef file $file for reading: $!";
-    while (<UR>) {
-        chomp;
-        my ($seed, $member) = split /\t/;
-        $data->{$member} = $seed;
-    }
-    close UR;
-
-    return $data;
-}
-
-
-sub getFamilyData {
-    my $file = shift;
-
-    my $data = {};
-
-    open DATA, $file or die "Could not open family file $file for reading: $!";
-    while (<DATA>) {
-        chomp;
-        my ($family, $acId) = split /\t/;
-        push(@{ $data->{$acId} }, $family);
-    }
-    close DATA;
-
-    return $data;
 }
 
 

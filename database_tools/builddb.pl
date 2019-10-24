@@ -370,7 +370,7 @@ sub submitEnaJob {
         #my $release = $emblDirs[-1];
         #my $enaInputDir = "$ENV{EFIEMBL}/Release_$release";
         
-        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -interpro $OutputDir/INTERPRO.tab -pfam $OutputDir/PFAM.tab -org $OutputDir/organism.tab -idmapping $OutputDir/idmapping.tab -log $BuildDir/make_ena_table.log");
+        $B->addAction("$ScriptDir/make_ena_table.pl -embl $enaInputDir -pro $enaDir/pro.tab -env $enaDir/env.tab -fun $enaDir/fun.tab -com $enaDir/com.tab -interpro $OutputDir/INTERPRO.tab -pfam $OutputDir/PFAM.tab -idmapping $OutputDir/idmapping.tab -log $BuildDir/make_ena_table.log");
         $B->addAction("date > $CompletedFlagFile.make_ena_table\n");
         $B->addAction("cat $enaDir/env.tab $enaDir/fun.tab $enaDir/pro.tab > $OutputDir/ena.tab");
         $B->addAction("date > $CompletedFlagFile.cat_ena\n");
@@ -524,7 +524,7 @@ sub submitFormatDbAndSplitFastaJob {
             $B->addAction("formatdb -i $dbDir/$target -p T -o T");
             $B->addAction("mv $dbDir/$target $BuildDir/$db");
             $B->addAction("diamond makedb --in $BuildDir/$db -d $diamondDbDir/$target");
-            $B->addAction("date > $CompletedFlagFile.formatdb.$db\n");
+            $B->addAction("date > $CompletedFlagFile.formatdb.$target\n");
         }
     }
     
@@ -829,12 +829,8 @@ sub submitAnnotationsJob {
     if (not $skipIfExists or not -f "$OutputDir/annotations.tab") {
         # Exclude GI
         #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
-        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -pfam $OutputDir/PFAM.tab -interpro $OutputDir/INTERPRO.tab");
+        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
         $B->addAction("date > $CompletedFlagFile.make_annotations_table\n");
-    }
-    if (not $skipIfExists or not -f "$OutputDir/organism.tab") {
-        $B->addAction("cut -f 1,9 $OutputDir/annotations.tab > $OutputDir/organism.tab");
-        $B->addAction("date > $CompletedFlagFile.organism.tab\n");
     }
 
     $B->addAction("date > $CompletedFlagFile.$fileNum-annotations\n");
@@ -929,10 +925,12 @@ CREATE TABLE annotations(accession VARCHAR(10) PRIMARY KEY,
                          HMP_Oxygen VARCHAR(50),
                          EFI_ID VARCHAR(6),
                          EC VARCHAR(185),
-                         Cazy VARCHAR(30));
+                         Cazy VARCHAR(30),
+                         Fragment TINYINT(1));
 CREATE INDEX TaxID_Index ON annotations (Taxonomy_ID);
 CREATE INDEX accession_Index ON annotations (accession);
 CREATE INDEX STATUS_Index ON annotations (STATUS);
+CREATE INDEX Fragment_Index ON annotations (Fragment);
 SELECT 'LOADING annotations' AS '';
 LOAD DATA LOCAL INFILE '$OutputDir/annotations.tab' INTO TABLE annotations;
 $endTrans
@@ -1011,6 +1009,13 @@ CREATE INDEX uniprot_id_Index ON idmapping (uniprot_id);
 CREATE INDEX foreign_id_Index ON idmapping (foreign_id);
 SELECT 'LOADING idmapping' AS '';
 LOAD DATA LOCAL INFILE '$OutputDir/idmapping.tab' INTO TABLE idmapping;
+$endTrans
+
+$startTrans
+SELECT 'CREATING version' AS '';
+DROP TABLE IF EXISTS version;
+CREATE TABLE version (db_version INTEGER);
+INSERT INTO version VALUES (2);
 $endTrans
 
 /*GRANT SELECT ON `$dbName`.* TO '$DbUser'\@'$IpRange';*/

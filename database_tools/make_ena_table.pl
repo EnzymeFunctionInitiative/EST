@@ -14,7 +14,6 @@ BEGIN {
 # -env      output tab file containing data from any files in mirror std, con, wgs/*, and wgs/etc/* directories with env in the name 
 # -com      output final tab output file
 # -pfam     input pfam tab file created from the interprot xml processing scripts (PFAM.tab)
-# -org      input organism.tab file
 # -v        output warnings if there are mixed accession issues
 # -log      output content to a log file (and print to console); if not specified a make_ena_table.log file is created in the current
 #           directory
@@ -31,6 +30,8 @@ use IdMappingFile;
 # Uncommenting this line merely lists the files. The script doesn't read them.
 #$LIST_FILES_ONLY = 1;
 
+my $appendOutput = 0;
+
 
 sub logprint { print LOG @_, "\n"; print @_, "\n"; }
 sub logwarn { print LOG "WARN: ", @_, "\n"; print STDERR @_, "\n"; }
@@ -46,11 +47,13 @@ sub process{
     my @proteinIds;
     my %processedAlready;
 
+    my $outflag = $appendOutput ? ">>" : ">";
+
     # Debug mode
     if (not defined $out) {
         *OUT = STDOUT;
     } else {
-        open(OUT, ">$out") or die "cannot write to output file $out" if not defined $LIST_FILES_ONLY;
+        open OUT, $outflag, $out or die "cannot write $outflag to output file $out" if not defined $LIST_FILES_ONLY;
     }
 
     foreach $file (@files){
@@ -216,7 +219,10 @@ $result = GetOptions(
     "config=s"      => \$configFile,
     "legacy-wgs"    => \$legacyWgs,
     "debug=s"       => \$debugParseFile,
+    "append"        => \$appendOutput,
 );
+
+$appendOutput = defined($appendOutput);
 
 my $baseDir = $ENV{PWD};
 
@@ -263,57 +269,51 @@ $log = "$baseDir/$logName" unless defined $log;
 open LOG, "> $log";
 
 
-opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std";
+opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std: $!";
 @pro=apply {$_="$embl/std/".$_} grep {$_=~/.*_pro.*/} readdir DIR;
 closedir DIR;
-opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std";
+opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std: $!";
 @fun=apply {$_="$embl/std/".$_} grep {$_=~/.*_fun.*/} readdir DIR;
 closedir DIR;
-opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std";
+opendir(DIR, "$embl/std") or warn "cannot open embl mirror directory $embl/std: $!";
 @env=apply {$_="$embl/std/".$_} grep {$_=~/.*_env.*/} readdir DIR;
 closedir DIR;
-opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con";
+opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con: $!";
 push(@pro, apply {$_="$embl/con/".$_} grep {$_=~/.*_pro.*/} readdir DIR);
 closedir DIR;
-opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con";
+opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con: $!";
 push(@fun, apply {$_="$embl/con/".$_} grep {$_=~/.*_fun.*/} readdir DIR);
 closedir DIR;
-opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con";
+opendir(DIR, "$embl/con") or warn "cannot open embl mirror directory $embl/con: $!";
 push(@env, apply {$_="$embl/con/".$_} grep {$_=~/.*_env.*/} readdir DIR);
 closedir DIR;
-opendir(WGS, "$embl/wgs") or warn "cannot open wgs direcotry in embl mirror directory $embl/wgs";;
+opendir(WGS, "$embl/wgs") or warn "cannot open wgs directory in embl mirror directory $embl/wgs: $!";
 @wgsdirs= sort{ $a cmp $b } grep {$_!~/\./ && $_ ne 'etc'}readdir WGS;
 closedir WGS;
 foreach $dir (@wgsdirs){
     logprint "Listing $embl/wgs/$dir";
-    opendir(DIR, "$embl/wgs/$dir") or die "could not open embl subdirectory $embl/wgs/$dir";
+    opendir(DIR, "$embl/wgs/$dir") or die "could not open embl subdirectory $embl/wgs/$dir: $!";
     my @wgsdir = readdir DIR;
     closedir(DIR);
 
-    if ($legacyWgs) {
-        push @pro, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_pro.*/} @wgsdir;
-        push @fun, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_fun.*/} @wgsdir;
-        push @env, apply {$_="$embl/wgs/$dir/".$_}  sort{ $a cmp $b } grep {$_=~/.*_env.*/} @wgsdir;
-    } else {
-        my @sorted = sort{ $a cmp $b } grep {$_=~/\.master\.dat$/} @wgsdir;
-        my @masters = apply {$_="$embl/wgs/$dir/".$_} @sorted;
-        my @datFiles = apply {$_ =~ s/^(.*)\.master\.dat$/$1/} @sorted;
-        for (my $i = 0; $i <= $#masters; $i++) {
-            my $type = getMasterType($masters[$i]);
-            my $datFilePath = "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
-            
-            if (not -f $datFilePath) {
-                warn "Unable to find $datFilePath so ignoring $masters[$i]";
-                next;
-            }
+    my @sorted = sort{ $a cmp $b } grep {$_=~/\.master\.dat$/} @wgsdir;
+    my @masters = apply {$_="$embl/wgs/$dir/".$_} @sorted;
+    my @datFiles = apply {$_ =~ s/^(.*)\.master\.dat$/$1/} @sorted;
+    for (my $i = 0; $i <= $#masters; $i++) {
+        my $type = getMasterType($masters[$i]);
+        my $datFilePath = "$embl/wgs/$dir/" . $datFiles[$i] . ".dat";
 
-            if ($type eq "pro") {
-                push @pro, $datFilePath;
-            } elsif ($type eq "fun") {
-                push @fun, $datFilePath;
-            } elsif ($type eq "env") {
-                push @env, $datFilePath;
-            }
+        if (not -f $datFilePath) {
+            warn "Unable to find $datFilePath so ignoring $masters[$i]";
+            next;
+        }
+
+        if ($type eq "pro") {
+            push @pro, $datFilePath;
+        } elsif ($type eq "fun") {
+            push @fun, $datFilePath;
+        } elsif ($type eq "env") {
+            push @env, $datFilePath;
         }
     }
 }
