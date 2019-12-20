@@ -13,14 +13,24 @@ structure.  The structure is created for any of the following build steps.
 
 All scripts are created in BUILD_DIR/build
 
+The --dir parameter is optional; if it is omitted the current working directory
+is used as the database build directory.
+
+If --config is omitted, the EFITools/conf directory is checked for a config
+file.
+
+To output SQL loading files for a SQLite3 file, add the --db-type sqlite3
+command-line argument.
 
 ## Step 1: Downloading UniProt and Interpro files
 
 builddb.pl can be used to create a script that downloads the requisite files
 and is used as follows:
 
-    # builddb.pl -dir BUILD_DIR -download -queue efi -scheduler slurm -config EFI_CONFIG_FILE
+    # builddb.pl --dir BUILD_DIR --download
 
+This creates a script 0-download.sh, which can be executed using bash.  The
+output from the downloads are stored in input/.  
 
 ## Step 2: Downloading ENA files
 
@@ -42,7 +52,7 @@ The UniProt and Interpro files need to be processed and blast'ed after being
 downloaded.  To create and automatically submit scripts that will process the
 downloaded files, the following command can be run:
 
-    # builddb.pl -dir BUILD_DIR -queue efi -scheduler slurm -db-name YYYY-MM -config EFI_CONFIG_FILE
+    # builddb.pl --dir BUILD_DIR --db-name YYYY-MM --config EFI_CONFIG_FILE
 
 
 ## Step 4: Process ENA files
@@ -52,7 +62,7 @@ namely the process-downloads job file.  Once that job is completed, builddb.pl
 can be used to create and start a job that processes the ENA files and builds
 a tab file that can be imported into the database.  It can be run as follows:
 
-    # builddb.pl -dir BUILD_DIR -ena-dir ENA_DIR -build-ena -queue efi -scheduler slurm -config EFI_CONFIG_FILE
+    # builddb.pl --dir BUILD_DIR --ena-dir ENA_DIR --build-ena --config EFI_CONFIG_FILE
 
 This could be triggered at the end of the script that downloads (rsync) the
 ENA files from biomirror and made a dependency of the process-downloads job.
@@ -68,7 +78,13 @@ mitigate the risk of overwriting a database, the scripts require that the
 user have created a database manually (e.g. "create database YYYY-MM" from
 within MySQL).  
 
+The .sql files are output by default, but can be output again by running
 
+    # builddb.pl --dir BUILD_DIR --db-name YYYY-MM --sql
+
+By default .sql scripts are created that are compatible with MySQL/MariaDB.
+To create ones that are compatible with SQLite3, add the --db-type sqlite3
+parameter to the command line arguments.
 
 
 ## Appendix A
@@ -76,6 +92,6 @@ within MySQL).
 To ONLY create a script and SQL file that will create the family_counts table
 that needs to be imported into the EFI webserver mysql database:
 
-    # builddb.pl  -dir BUILD_DIR -build-counts -config EFI_CONFIG_FILE
+    # builddb.pl --dir BUILD_DIR --build-counts --config EFI_CONFIG_FILE
 
 
