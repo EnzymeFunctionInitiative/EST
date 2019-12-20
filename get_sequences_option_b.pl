@@ -35,7 +35,7 @@ $statsObj->configureSourceTypes(
 );
 
 
-my $famData = new EST::Family(dbh => $dbh);
+my $famData = new EST::Family(dbh => $dbh, db_version => $otherConfig->{db_version});
 $famData->configure($familyConfig);
 
 $famData->retrieveFamilyAccessions();
