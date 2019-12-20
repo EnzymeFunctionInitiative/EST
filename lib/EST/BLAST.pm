@@ -22,7 +22,11 @@ sub new {
     my $class = shift;
     my %args = @_;
 
+    die "No dbh provided" if not exists $args{dbh};
+
     my $self = $class->SUPER::new(%args);
+
+    $self->{dbh} = $args{dbh};
 
     return $self;
 }
@@ -39,6 +43,8 @@ sub configure {
     $self->{config}->{blast_file} = $args{blast_file};
     $self->{config}->{query_file} = $args{query_file};
     $self->{config}->{max_results} = $args{max_results} ? $args{max_results} : 1000;
+    # Comes from family config
+    $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
 }
 
 
@@ -91,9 +97,31 @@ sub parseFile {
     $self->{data}->{first_hit} = $firstHit;
     $self->{data}->{query_seq} = $self->loadQuerySequence();
 
+    $self->{data}->{metadata} = {};
+    if ($self->{config}->{uniref_version}) {
+        $self->retrieveUniRefMetadata();
+    }
+
     $self->{stats} = {num_blast_retr => scalar keys %$ids};
 
     close BLAST_FILE;
+}
+
+
+sub retrieveUniRefMetadata {
+    my $self = shift;
+
+    my $version = $self->{config}->{uniref_version};
+
+    my $metaKey = "UniRef${version}_IDs";
+    foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+        my $sql = "SELECT accession FROM uniref WHERE uniref${version}_seed = '$id'";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
+        }
+    }
 }
 
 
@@ -107,7 +135,7 @@ sub getSequenceIds {
 sub getMetadata {
     my $self = shift;
     
-    my $md = {};
+    my $md = $self->{data}->{metadata};
     map { $md->{$_} = {}; } keys %{$self->{data}->{uniprot_ids}};
 
     (my $len = $self->{data}->{query_seq}) =~ s/\s//gs;
