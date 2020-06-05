@@ -12,6 +12,8 @@ sub new {
 
     my $self = {};
 
+    $self->{db_version} = exists $args{db_version} ? $args{db_version} : 0;
+
     return bless($self, $class);
 }
 
@@ -37,6 +39,12 @@ sub getMetadata {
 sub getStatistics {
     my $self = shift;
     return {};
+}
+
+
+sub dbSupportsFragment {
+    my $self = shift;
+    return $self->{db_version} > 1;
 }
 
 

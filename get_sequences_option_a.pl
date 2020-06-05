@@ -50,8 +50,9 @@ if (exists $familyConfig->{data}) {
 }
 
 
-my %blastArgs = getBLASTCmdLineArgs();
-my $blastData = new EST::BLAST();
+my %blastArgs = EST::BLAST::getBLASTCmdLineArgs();
+$blastArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
+my $blastData = new EST::BLAST(dbh => $dbh);
 $blastData->configure(%blastArgs);
 $blastData->parseFile();
 

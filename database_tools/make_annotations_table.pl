@@ -12,7 +12,6 @@ use FindBin;
 
 use lib "$FindBin::Bin/lib";
 
-use IdMappingFile;
 use EFI::IdMapping::Util;
 
 
@@ -49,17 +48,6 @@ USAGE
 die "Input file -dat argument is required: $usage" if (not defined $inputFile or not -f $inputFile);
 die "Output file -struct argument is required; $usage" if not $outputFile;
 
-
-my $idMapper = new IdMappingFile(forward_lookup => 1); #Same signature as EFI::IdMapping
-my $includeNcbi = 0;
-# For now, we are not including the NCBI IDs in the annotations table, rather when each job is run we retrieve
-# the NCBI IDs from the idmapping table in the database.
-#if ($idMappingFile and -f $idMappingFile) {
-#    $includeNcbi = 1;
-#    print "Reading in idmapping table\n";
-#    $idMapper->parseTable($idMappingFile);
-#    print "Done\n";
-#}
 
 
 my (%efiTidData, %hmpData, %gdnaData, %refseq, %GI, %phylo);
@@ -112,8 +100,8 @@ if ($oldPhyloFile) {
 
 $debug = 2**50 if not defined $debug; #TODO: debug
 
-my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy);
-my (@BRENDA, @CAZY, @GO, @INTERPRO, @KEGG, $lastline, @OC_domain_array, @PATRIC, @PDB, @PFAM, $refseqline, @STRING, @NCBI);
+my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy, $is_fragment);
+my (@BRENDA, @CAZY, @GO, @INTERPRO, @KEGG, $lastline, @OC_domain_array, @PATRIC, @PDB, @PFAM, $refseqline, @STRING);
 
 print "Parsing DAT Annotation Information\n";
 open DAT, $inputFile or die "could not open dat file $inputFile\n";
@@ -131,7 +119,7 @@ while (<DAT>){
         $element = $DE_desc = $OS_organism = $OC_domain = "";
         $GDNA="None";
         $cazy = $EC = $OX_tax_id = $GN_gene = $HMP = "None";
-        @CAZY = @PFAM = @PDB = @INTERPRO = @GO = @KEGG = @STRING = @BRENDA = @PATRIC = @NCBI = ();
+        @CAZY = @PFAM = @PDB = @INTERPRO = @GO = @KEGG = @STRING = @BRENDA = @PATRIC = ();
     }elsif($line=~/^AC\s+(\w+);/){
         unless($lastline=~/^AC/){
             $element=$1;
@@ -140,9 +128,6 @@ while (<DAT>){
             }else{
                 $efiTid="NA";
             }
-            @NCBI = map { "GI:$_" } $idMapper->forwardLookup(EFI::IdMapping::Util::GI, $element);
-            push @NCBI, map { "RefSeq:$_" } $idMapper->forwardLookup(EFI::IdMapping::Util::NCBI, $element);
-            push @NCBI, map { "EMBL-CDS:$_" } $idMapper->forwardLookup(EFI::IdMapping::Util::GENBANK, $element);
         }
     }elsif($line=~/^OX   NCBI_TaxID=(\d+)/){
         $OX_tax_id=$1;
@@ -202,7 +187,7 @@ print "Wrote the following columns to the annotations table:\n    ";
 print join("\n    ", "element", "id", "status", "size", "OX_tax_id", "GDNA", "DE_desc",
                  "RDE_reviewed_desc", "OS_organism", "GN_gene", "PDB",
                  "GO", "kegg", "string", "brenda", "patric", "hmpsite", "hmpoxygen",
-                 "efiTid", "EC", "cazy", "ncbiStr", "uniref50", "uniref90");
+                 "efiTid", "EC", "cazy", "is_fragment");
 print "\n";
 
 
@@ -212,8 +197,6 @@ print "\n";
 
 sub write_line {
     if(defined $element){
-        my $ncbiStr = "None";
-        $ncbiStr = join(",", @NCBI) if scalar @NCBI;
 
         if(scalar @PDB){
             $PDB=join ',', @PDB;
@@ -296,6 +279,7 @@ sub write_line {
         $DE_desc=~s/\s+/ /g;
         $DE_desc=~s/\&/and/g;
         $DE_desc=~s/^\s+//g;
+        $is_fragment = ($DE_desc =~ /Flags:.*Fragment/) ? 1 : 0;
         #$DE_desc=~s/{.*?}$//;
         if($DE_desc=~/^RecName: Full=(.*)/){
             $DE_desc=$1;
@@ -336,7 +320,7 @@ sub write_line {
         push @line, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric;
         push @line, $hmpsite, $hmpoxygen, $efiTid, $EC;
         push @line, $cazy;
-        push @line, $ncbiStr;
+        push @line, $is_fragment;
 
         print STRUCT join("\t", @line), "\n";
     }
@@ -428,40 +412,6 @@ sub getGiNums {
         #print "GI\t@line[0]\t".$GI{@line[0]}{'number'}."\t".$GI{@line[0]}{'count'}."\n";
     }
     close GI;
-}
-
-
-sub getUnirefData {
-    my $file = shift;
-
-    my $data = {};
-
-    open UR, $file or die "Could not open UniRef file $file for reading: $!";
-    while (<UR>) {
-        chomp;
-        my ($seed, $member) = split /\t/;
-        $data->{$member} = $seed;
-    }
-    close UR;
-
-    return $data;
-}
-
-
-sub getFamilyData {
-    my $file = shift;
-
-    my $data = {};
-
-    open DATA, $file or die "Could not open family file $file for reading: $!";
-    while (<DATA>) {
-        chomp;
-        my ($family, $acId) = split /\t/;
-        push(@{ $data->{$acId} }, $family);
-    }
-    close DATA;
-
-    return $data;
 }
 
 

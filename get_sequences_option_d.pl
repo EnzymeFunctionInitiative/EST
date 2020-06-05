@@ -53,10 +53,11 @@ if (exists $familyConfig->{data}) {
 }
 
 
-my %accessionArgs = getAccessionCmdLineArgs();
+my %accessionArgs = EST::Accession::getAccessionCmdLineArgs();
 $accessionArgs{domain_family} = $familyConfig->{config}->{domain_family};
 $accessionArgs{domain_region} = $familyConfig->{config}->{domain_region};
 $accessionArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
+$accessionArgs{exclude_fragments} = $familyConfig->{config}->{exclude_fragments};
 my $accessionData = new EST::Accession(dbh => $dbh, config_file_path => $configFile);
 $accessionData->configure(%accessionArgs);
 $accessionData->parseFile();
@@ -77,6 +78,15 @@ if ($otherConfig->{uniprot_domain_length_file}) {
     my $ids = EST::IdList::mergeIds($familyFullDomainIds, $userUnirefIds);
     $histo->addData($ids);
     $histo->saveToFile($otherConfig->{uniprot_domain_length_file});
+}
+
+if ($accessionArgs{no_match_file}) {
+    my $noMatches = $accessionData->getNoMatches();
+    open my $fh, ">", $accessionArgs{no_match_file} or warn "Unable to write to $accessionArgs{no_match_file}: $!" and exit(0);
+    foreach my $id (@$noMatches) {
+        $fh->print("$id\n");
+    }
+    close $fh;
 }
 
 

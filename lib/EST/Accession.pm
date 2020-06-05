@@ -11,26 +11,18 @@ use strict;
 
 use Data::Dumper;
 use Getopt::Long qw(:config pass_through);
-use Exporter;
 use List::MoreUtils qw(uniq);
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
-
-$VERSION     = 1.00;
-@ISA         = qw(Exporter);
-@EXPORT      = qw(getAccessionCmdLineArgs);
-@EXPORT_OK   = qw();
 
 use EFI::IdMapping;
 
-use base qw(EST::Base);
-use EST::Base;
+use parent qw(EST::Base);
 
 
 sub new {
     my $class = shift;
     my %args = @_;
     
-    my $self = EST::Base->new(%args);
+    my $self = $class->SUPER::new(%args);
 
     die "No dbh provided" if not exists $args{dbh};
     die "No config parameter provided" if not exists $args{config_file_path};
@@ -39,7 +31,7 @@ sub new {
     $self->{dbh} = $args{dbh};
     $self->{data} = {};
 
-    return bless $self, $class;
+    return $self;
 }
 
 
@@ -54,6 +46,7 @@ sub configure {
     $self->{config}->{domain_family} = $args{domain_family};
     $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
     $self->{config}->{domain_region} = $args{domain_region};
+    $self->{config}->{exclude_fragments} = $args{exclude_fragments};
 }
 
 
@@ -61,14 +54,16 @@ sub configure {
 # Look in @ARGV
 sub getAccessionCmdLineArgs {
 
-    my ($idFile);
+    my ($idFile, $noMatchFile);
     my $result = GetOptions(
         "accession-file|id-file=s"      => \$idFile,
+        "no-match-file=s"               => \$noMatchFile,
     );
 
     $idFile = "" if not $idFile;
+    $noMatchFile = "" if not $noMatchFile;
 
-    return (id_file => $idFile);
+    return (id_file => $idFile, no_match_file => $noMatchFile);
 }
 
 
@@ -104,6 +99,10 @@ sub parseFile {
     my $idMapper = new EFI::IdMapping(config_file_path => $self->{config_file_path});
     $self->reverseLookupManualAccessions($idMapper);
 
+    if ($self->{config}->{exclude_fragments}) {
+        $self->excludeFragments();
+    }
+
     if ($self->{config}->{uniref_version}) {
         $self->retrieveUniRefMetadata();
     }
@@ -124,12 +123,38 @@ sub retrieveUniRefMetadata {
     my $metaKey = "UniRef${version}_IDs";
     foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
         my $sql = "SELECT accession FROM uniref WHERE uniref${version}_seed = '$id'";
+        if ($self->{config}->{exclude_fragments}) {
+            $sql = "SELECT U.accession FROM uniref AS U LEFT JOIN annotations AS A ON U.accession = A.accession WHERE uniref${version}_seed = '$id' AND A.Fragment = 0";
+        }
+        print "SQL $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         while (my $row = $sth->fetchrow_hashref) {
             push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
         }
     }
+}
+
+
+sub excludeFragments {
+    my $self = shift;
+
+    my %full;
+
+    my @ids = keys %{$self->{data}->{uniprot_ids}};
+    my $batchSize = 20;
+    while (scalar @ids) {
+        my @group = splice(@ids, 0, $batchSize);
+        my $whereIds = join(",", map { "'$_'" } @group);
+        my $sql = "SELECT accession FROM annotations WHERE accession IN ($whereIds) AND Fragment = 0";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            $full{$row->{accession}} = $self->{data}->{uniprot_ids}->{$row->{accession}};
+        }
+    }
+
+    $self->{data}->{uniprot_ids} = \%full;
 }
 
 
@@ -166,6 +191,7 @@ sub retrieveDomains {
         my $metaKey = "UniRef$self->{config}->{uniref_version}_IDs";
         my @upIds;
         foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+            push @upIds, $id and next if not exists $self->{data}->{meta}->{$id}->{$metaKey};
             my @clIds = @{$self->{data}->{meta}->{$id}->{$metaKey}};
             push @upIds, @clIds;
         }
@@ -255,6 +281,7 @@ sub reverseLookupManualAccessions {
     }
 
     $self->{data}->{meta} = $meta;
+    $self->{data}->{no_matches} = $noMatches;
 
     $self->{stats}->{num_matched} = $numUniprotIds;
     $self->{stats}->{num_unmatched} = $numNoMatches;
@@ -288,6 +315,13 @@ sub getStatistics {
     my $self = shift;
 
     return $self->{stats};
+}
+
+
+sub getNoMatches {
+    my $self = shift;
+
+    return $self->{data}->{no_matches};
 }
 
 

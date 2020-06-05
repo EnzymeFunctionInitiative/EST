@@ -23,7 +23,7 @@ BEGIN {
 #       createdb.sh             makes fasta database out of sequences.fa
 #           formatdb            blast program to format sequences.fa into database
 #   Step 5 Blast
-#       blast-qsub.sh           job array of np elements that blasts each fraction of sequences.fa against database of sequences.fa
+#       blastqsub.sh           job array of np elements that blasts each fraction of sequences.fa against database of sequences.fa
 #           blastall            blast program that does the compares
 #   Step 6 Combine blasts back together
 #       catjob.sh               concationates blast output files together into blastfinal.tab
@@ -70,11 +70,13 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments);
+my ($runSerial, $baseOutputDir);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
     "tmp|dir-name=s"    => \$outputDirName,
+    "job-dir=s"         => \$baseOutputDir,
     "evalue=s"          => \$evalue,
     "incfrac=f"         => \$incfrac,
     "ipro=s"            => \$ipro,
@@ -114,6 +116,8 @@ my $result = GetOptions(
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
     "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "config=s"          => \$configFile,    # new-style config file
+    "exclude-fragments" => \$excludeFragments,
+    "serial-script=s"   => \$runSerial,     # run in serial mode
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -285,6 +289,9 @@ if (not defined $incfrac) {
     $incfrac = 1; # was 0.99
 }
 
+$excludeFragments = defined($excludeFragments);
+$runSerial = defined($runSerial) ? $runSerial : "";
+
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
 
@@ -293,7 +300,15 @@ $jobId = "" if $jobId =~ /\D/;
 
 $noMatchFile = ""   if not defined $noMatchFile;
 
-my $baseOutputDir = $ENV{PWD};
+if ($runSerial) {
+    use EFI::Util::System;
+    my $specs = getSystemSpec();
+    $np = $specs->{num_cpu} / 2;
+}
+
+
+
+$baseOutputDir = ($baseOutputDir and -d $baseOutputDir) ? $baseOutputDir : $ENV{PWD};
 my $outputDir = "$baseOutputDir/$outputDirName";
 
 my $pythonMod = getLmod("Python/2", "Python");
@@ -334,17 +349,20 @@ print "Python module is $pythonMod\n";
 print "max-full-family is $maxFullFam\n";
 print "cd-hit is $cdHitOnly\n";
 print "force-domain is $forceDomain\n";
+print "exclude-fragments is $excludeFragments\n";
+print "serial-script is $runSerial\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
 my $errorFile = "$accOutFile.failed";
 
+my $filtSeqFilename = "sequences.fa";
 
 my $fracOutputDir = "$outputDir/fractions";
 my $blastOutputDir = "$outputDir/blastout";
 my $structFile = "$outputDir/struct.out";
 my $allSeqFile = "$outputDir/allsequences.fa";
-my $filtSeqFile = "$outputDir/sequences.fa";
+my $filtSeqFile = "$outputDir/$filtSeqFilename";
 
 my $lenUniprotFile = "$outputDir/length_uniprot.tab"; # full lengths of all UniProt sequences (expanded from UniRef if necessary)
 my $lenUniprotDomFile = "$outputDir/length_uniprot_domain.tab"; # domain lengths of all UniProt sequences (expanded from UniRef if necessary)
@@ -359,13 +377,14 @@ $seqCountFile = "$outputDir/acc_counts" if not $seqCountFile;
 
 # Error checking for user supplied dat and fa files
 my $accessionFileOption = "";
+my $noMatchFileOption = "";
 if (defined $accessionFile and -e $accessionFile) {
     $accessionFile = $baseOutputDir . "/$accessionFile" if not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
     $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $baseOutputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
-    $noMatchFile = "-no-match-file $noMatchFile";
+    $noMatchFileOption = "-no-match-file $noMatchFile";
 
 } else {
     $accessionFile = "";
@@ -429,8 +448,11 @@ my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"]
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{node} = $clusterNode if $clusterNode;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
+$schedArgs{run_serial} = $runSerial ? 1 : 0;
 my $S = new EFI::SchedulerApi(%schedArgs);
-my $jobNamePrefix = $jobId ? $jobId . "_" : ""; 
+my $jobNamePrefix = $jobId ? $jobId . "_" : "";
+my $progressFile = "$outputDir/progress";
+initSerialScript() if $runSerial;
 
 my $scriptDir = "$baseOutputDir/scripts";
 mkdir $scriptDir;
@@ -504,7 +526,10 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $retrScript .= "d.pl";
         push @args, "-uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
         push @args, $accessionFileOption;
+        push @args, $noMatchFileOption;
     }
+
+    push @args, "-exclude-fragments" if $excludeFragments;
 
     $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
 
@@ -521,14 +546,15 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
 
+    $B->addAction("echo 33 > $progressFile");
     $B->jobName("${jobNamePrefix}initial_import");
-    $B->renderToFile("$scriptDir/initial_import.sh");
+    $B->renderToFile(getRenderFilePath("$scriptDir/initial_import.sh"));
 
     # Submit and keep the job id for next dependancy
     my $importjob = $S->submit("$scriptDir/initial_import.sh");
     chomp $importjob;
 
-    print "import job is:\n $importjob\n";
+    print "import job is:\n $importjob\n" if not $runSerial;
     ($prevJobId) = split(/\./, $importjob);
 
 # Tax id code is different, so it is exclusive
@@ -549,12 +575,12 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $B->addAction("cat $metadataFile >> $structFile");
     }
     $B->jobName("${jobNamePrefix}initial_import");
-    $B->renderToFile("$scriptDir/initial_import.sh");
+    $B->renderToFile(getRenderFilePath("$scriptDir/initial_import.sh"));
 
     my $importjob = $S->submit("$scriptDir/initial_import.sh");
     chomp $importjob;
 
-    print "import job is:\n $importjob\n";
+    print "import job is:\n $importjob\n" if not $runSerial;
     ($prevJobId) = split /\./, $importjob;
 } else {
     die "Error Submitting Import Job\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
@@ -592,10 +618,10 @@ if ($cdHitOnly) {
     $B->addAction("touch  $outputDir/1.out.completed");
 
     $B->jobName("${jobNamePrefix}cdhit");
-    $B->renderToFile("$scriptDir/cdhit.sh");
+    $B->renderToFile(getRenderFilePath("$scriptDir/cdhit.sh"));
     my $cdhitjob = $S->submit("$scriptDir/cdhit.sh");
     chomp $cdhitjob;
-    print "CD-HIT job is:\n $cdhitjob\n";
+    print "CD-HIT job is:\n $cdhitjob\n" if not $runSerial;
     exit;
 }
 
@@ -633,11 +659,11 @@ CMDS
     $B->addAction("cp $allSeqFile $filtSeqFile");
 }
 $B->jobName("${jobNamePrefix}multiplex");
-$B->renderToFile("$scriptDir/multiplex.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/multiplex.sh"));
 
 my $muxjob = $S->submit("$scriptDir/multiplex.sh");
 chomp $muxjob;
-print "mux job is:\n $muxjob\n";
+print "mux job is:\n $muxjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $muxjob;
 
 
@@ -651,11 +677,11 @@ $B->dependency(0, $prevJobId);
 $B->addAction("mkdir -p $fracOutputDir");
 $B->addAction("$efiEstTools/split_fasta.pl -parts $np -tmp $fracOutputDir -source $filtSeqFile");
 $B->jobName("${jobNamePrefix}fracfile");
-$B->renderToFile("$scriptDir/fracfile.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/fracfile.sh"));
 
 my $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
 chomp $fracfilejob;
-print "fracfile job is:\n $fracfilejob\n";
+print "fracfile job is:\n $fracfilejob\n" if not $runSerial;
 ($prevJobId) = split /\./, $fracfilejob;
 
 
@@ -672,16 +698,16 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("cd $outputDir");
 if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
     $B->addAction("module load diamond");
-    $B->addAction("diamond makedb --in sequences.fa -d database");
+    $B->addAction("diamond makedb --in $filtSeqFilename -d database");
 } else {
-    $B->addAction("formatdb -i sequences.fa -n database -p T -o T ");
+    $B->addAction("formatdb -i $filtSeqFilename -n database -p T -o T ");
 }
 $B->jobName("${jobNamePrefix}createdb");
-$B->renderToFile("$scriptDir/createdb.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/createdb.sh"));
 
 my $createdbjob = $S->submit("$scriptDir/createdb.sh");
 chomp $createdbjob;
-print "createdb job is:\n $createdbjob\n";
+print "createdb job is:\n $createdbjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $createdbjob;
 
 
@@ -709,7 +735,17 @@ $B->addAction("module load $efiEstMod");
 if ($blast eq "blast") {
     $B->addAction("module load oldapps") if $oldapps;
     #$B->addAction("module load blast");
-    $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
+    if ($runSerial) {
+        open my $fh, ">", "$scriptDir/blast.sh";
+        print $fh "#!/bin/bash\n";
+        print $fh "module load $efiEstMod\n";
+        print $fh "blastall -p blastp -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-\$1.fa.tab -i $fracOutputDir/fracfile-\$1.fa\n";
+        close $fh;
+        chmod 0755, "$scriptDir/blast.sh";
+        $B->addAction("echo {1..$np} | xargs -n 1 -P $np $scriptDir/blast.sh");
+    } else {
+        $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
+    }
 } elsif ($blast eq "blast+") {
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load BLAST+");
@@ -737,13 +773,14 @@ $B->addAction("    echo \"BLAST failed; likely due to file format.\"");
 $B->addAction("    echo \$OUT > $outputDir/blast.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
-$B->jobName("${jobNamePrefix}blast-qsub");
-$B->renderToFile("$scriptDir/blast-qsub.sh");
+$B->addAction("echo 50 > $progressFile");
+$B->jobName("${jobNamePrefix}blastqsub");
+$B->renderToFile(getRenderFilePath("$scriptDir/blastqsub.sh"));
 
 $B->jobArray("");
-my $blastjob = $S->submit("$scriptDir/blast-qsub.sh");
+my $blastjob = $S->submit("$scriptDir/blastqsub.sh");
 chomp $blastjob;
-print "blast job is:\n $blastjob\n";
+print "blast job is:\n $blastjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $blastjob;
 
 
@@ -763,10 +800,10 @@ $B->addAction("    touch $outputDir/blast.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
 $B->jobName("${jobNamePrefix}catjob");
-$B->renderToFile("$scriptDir/catjob.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/catjob.sh"));
 my $catjob = $S->submit("$scriptDir/catjob.sh");
 chomp $catjob;
-print "Cat job is:\n $catjob\n";
+print "Cat job is:\n $catjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $catjob;
 
 
@@ -783,12 +820,13 @@ $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/a
 $B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
 $B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->addAction("echo 67 > $progressFile");
 $B->jobName("${jobNamePrefix}blastreduce");
-$B->renderToFile("$scriptDir/blastreduce.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/blastreduce.sh"));
 
 my $blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
 chomp $blastreducejob;
-print "Blastreduce job is:\n $blastreducejob\n";
+print "Blastreduce job is:\n $blastreducejob\n" if not $runSerial;
 
 ($prevJobId) = split /\./, $blastreducejob;
 
@@ -814,11 +852,11 @@ if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
 $B->jobName("${jobNamePrefix}demux");
-$B->renderToFile("$scriptDir/demux.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/demux.sh"));
 
 my $demuxjob = $S->submit("$scriptDir/demux.sh");
 chomp $demuxjob;
-print "Demux job is:\n $demuxjob\n";
+print "Demux job is:\n $demuxjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $demuxjob;
 
 
@@ -830,12 +868,12 @@ $B = $S->getBuilder();
 $B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
         
-$B->addAction("$efiEstTools/calc_conv_ratio.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -seq-count-output $seqCountFile");
+$B->addAction("$efiEstTools/calc_blast_stats.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -unique-seq-file $filtSeqFile -seq-count-output $seqCountFile");
 $B->jobName("${jobNamePrefix}conv_ratio");
-$B->renderToFile("$scriptDir/conv_ratio.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/conv_ratio.sh"));
 my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
 chomp $convRatioJob;
-print "Convergence ratio job is:\n $convRatioJob\n";
+print "Convergence ratio job is:\n $convRatioJob\n" if not $runSerial;
 my @convRatioJobLine=split /\./, $convRatioJob;
 
 
@@ -852,11 +890,11 @@ $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-align.pl -blastout $outputDir/1.out -align $outputDir/alignment_length.png");
-$B->renderToFile("$scriptDir/quartalign.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/quartalign.sh"));
 
 my $quartalignjob = $S->submit("$scriptDir/quartalign.sh");
 chomp $quartalignjob;
-print "Quartile Align job is:\n $quartalignjob\n";
+print "Quartile Align job is:\n $quartalignjob\n" if not $runSerial;
 
 
 $B->queue($memqueue);
@@ -866,11 +904,11 @@ $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-perid.pl -blastout $outputDir/1.out -pid $outputDir/percent_identity.png");
-$B->renderToFile("$scriptDir/quartpid.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/quartpid.sh"));
 
 my $quartpidjob = $S->submit("$scriptDir/quartpid.sh");
 chomp $quartpidjob;
-print "Quartiles Percent Identity job is:\n $quartpidjob\n";
+print "Quartiles Percent Identity job is:\n $quartpidjob\n" if not $runSerial;
 
 
 $B->queue($memqueue);
@@ -879,11 +917,11 @@ $B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $allSeqFile -lengths $outputDir/length_histogram.png -incfrac $incfrac");
-$B->renderToFile("$scriptDir/simplegraphs.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/simplegraphs.sh"));
 
 my $simplegraphjob = $S->submit("$scriptDir/simplegraphs.sh");
 chomp $simplegraphjob;
-print "Simplegraphs job is:\n $simplegraphjob\n";
+print "Simplegraphs job is:\n $simplegraphjob\n" if not $runSerial;
 =cut end comment
 
 
@@ -957,11 +995,36 @@ if ($removeTempFiles) {
     $B->addAction("rm $blastOutputDir/blastout-*.tab");
     $B->addAction("rm $fracOutputDir/fracfile-*.fa");
 }
+$B->addAction("echo 100 > $progressFile");
 $B->jobName("${jobNamePrefix}graphs");
-$B->renderToFile("$scriptDir/graphs.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/graphs.sh"));
 
 my $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
-print "Graph job is:\n $graphjob\n";
+print "Graph job is:\n $graphjob\n" if not $runSerial;
+
+
+
+
+sub getRenderFilePath {
+    if (not $runSerial) {
+        return $_[0];
+    } else {
+        (my $fname = $_[0]) =~ s%^.*?([^/]+)\.sh$%$1%;
+        return ($runSerial, "#\n#\n#\n#\n#$fname");
+    }
+}
+
+
+sub initSerialScript {
+    open my $fh, ">", $runSerial or die "Unable to write to serial-script $runSerial: $!";
+    print $fh "#!/bin/bash\n";
+    close $fh;
+
+    chmod 0755, $runSerial;
+}
+
+
+
 
 
