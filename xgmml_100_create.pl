@@ -31,7 +31,7 @@ use lib "$FindBin::Bin/lib";
 use AlignmentScore;
 
 
-my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $useMinEdgeAttr);
+my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr);
 my $result = GetOptions(
     "blast=s"               => \$inputBlast,
     "fasta=s"               => \$inputFasta,
@@ -41,6 +41,7 @@ my $result = GetOptions(
     "maxfull|max-edges=i"   => \$maxNumEdges,
     "dbver=s"               => \$dbver,
     "include-sequences"     => \$includeSeqs,
+    "include-all-sequences" => \$includeAllSeqs,
     "use-min-edge-attr"     => \$useMinEdgeAttr,
 );
 
@@ -54,6 +55,7 @@ die "-max-edges must be an integer" if defined $maxNumEdges and $maxNumEdges =~ 
 
 
 $includeSeqs = 0            if not defined $includeSeqs;
+$includeAllSeqs = 0         if not defined $includeAllSeqs;
 $maxNumEdges = 10000000     if not defined $maxNumEdges;
 $useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
 
@@ -103,7 +105,7 @@ while (my $line = <FASTA>) {
             $curSeqId = $1;
             $sequences{$curSeqId} = "";
         }
-    } elsif ($includeSeqs and $curSeqId =~ m/^z/) {
+    } elsif ($includeSeqs and ($includeAllSeqs or $curSeqId =~ m/^z/)) {
         $sequences{$curSeqId} .= $line;
     }
 }
@@ -154,7 +156,8 @@ if (-e $annoFile) {
                 }
             }
             if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
-                $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
+                ($includeAllSeqs or $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA) and
+                exists $sequences{$id})
             {
                 $uprot{$id}{EFI::Annotations::FIELD_SEQ_KEY} = $sequences{$id};
                 $hasSeqs = 1;

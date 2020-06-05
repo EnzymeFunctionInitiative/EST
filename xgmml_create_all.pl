@@ -28,7 +28,7 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs, $useMinEdgeAttr);
+my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr);
 my $result = GetOptions(
     "blast=s"	        => \$blast,
     "cdhit=s"	        => \$cdhit,
@@ -39,6 +39,7 @@ my $result = GetOptions(
     "dbver=s"	        => \$dbver,
     "maxfull=i"	        => \$maxNumEdges,
     "include-sequences" => \$includeSeqs,
+    "include-all-sequences" => \$includeAllSeqs,
     "use-min-edge-attr" => \$useMinEdgeAttr,
 );
 
@@ -53,6 +54,7 @@ if (defined $maxNumEdges) {
 }
 
 $includeSeqs = 0 if not defined $includeSeqs;
+$includeAllSeqs = 0 if not defined $includeAllSeqs;
 $useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
 
 my $anno = new EFI::Annotations;
@@ -79,7 +81,7 @@ while (my $line = <FASTA>) {
             $curSeqId = $1;
             $sequences{$curSeqId} = "";
         }
-    } elsif ($includeSeqs and $curSeqId =~ m/^z/) {
+    } elsif ($includeSeqs and ($includeAllSeqs or $curSeqId =~ m/^z/)) {
         $sequences{$curSeqId} .= $line;
     }
 }
@@ -116,7 +118,8 @@ if (-e $struct) {
                 $uprot{$id}{$key} = \@tmpline;
             } else {
                 if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
-                    $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA and exists $sequences{$id})
+                    ($includeAllSeqs or $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA) and
+                    exists $sequences{$id})
                 {
                     $uprot{$id}{EFI::Annotations::FIELD_SEQ_KEY} = $sequences{$id};
                     $hasSeqs = 1;

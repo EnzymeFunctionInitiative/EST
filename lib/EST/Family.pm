@@ -202,7 +202,7 @@ sub getDomainFromDb {
     my $annoTable = "annotations";
     my $annoJoinStr = "LEFT JOIN $annoTable ON $table.accession = $annoTable.accession"; # Used conditionally
 
-    my $annoJoin = ($self->{config}->{fraction} > 1 or $self->{config}->{exclude_fragments}) ? $annoJoinStr : "";
+    my $annoJoin = ($self->{config}->{fraction} > 1 or $self->{config}->{exclude_fragments} or $domReg eq "cterminal") ? $annoJoinStr : "";
     my $spCol = $self->{config}->{fraction} > 1 ? ", $annoTable.STATUS AS STATUS" : "";
     my $fragWhere = "";
     if ($self->dbSupportsFragment() and $self->{config}->{exclude_fragments}) {
@@ -210,10 +210,11 @@ sub getDomainFromDb {
     }
     
     my $seqLenCol = $domReg eq "cterminal" ? ", Sequence_Length AS full_len" : "";
-    $annoJoin = ($domReg eq "cterminal" and not $annoJoin) ? $annoJoinStr : "";
+    #$annoJoin = ($domReg eq "cterminal" and not $annoJoin) ? $annoJoinStr : "";
 
     foreach my $family (@families) {
         my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol $seqLenCol FROM $table $unirefJoin $annoJoin WHERE $table.id = '$family' $fragWhere";
+        print "SQL $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         my $ac = 1;

@@ -15,31 +15,32 @@ use lib "$FindBin::Bin/lib";
 use EFI::IdMapping::Util;
 
 
-my ($inputFile, $outputFile, $giFile, $efiTidFile, $gdnaFile, $hmpFile, $oldPhyloFile, $debug, $idMappingFile);
+my ($inputFile, $outputFile, $fragmentIdFile, $giFile, $efiTidFile, $gdnaFile, $hmpFile, $oldPhyloFile, $debug, $idMappingFile);
 my $result = GetOptions(
-    "dat=s"         => \$inputFile,
-    "annotations=s" => \$outputFile,
-    "uniprotgi=s"   => \$giFile,
-    "efitid=s"      => \$efiTidFile,
-    "gdna=s"        => \$gdnaFile,
-    "hmp=s"         => \$hmpFile,
-    "phylo=s"       => \$oldPhyloFile,
-    "idmapping=s"   => \$idMappingFile,
-    "debug=i"       => \$debug,  #TODO: debug
+    "dat=s"             => \$inputFile,
+    "annotations=s"     => \$outputFile,
+    "fragment-ids=s"    => \$fragmentIdFile,
+    "uniprotgi=s"       => \$giFile,
+    "efitid=s"          => \$efiTidFile,
+    "gdna=s"            => \$gdnaFile,
+    "hmp=s"             => \$hmpFile,
+    "phylo=s"           => \$oldPhyloFile,
+    "idmapping=s"       => \$idMappingFile,
+    "debug=i"           => \$debug,  #TODO: debug
 );
 
 my $usage = <<USAGE;
-Usage: $0 -dat combined_dat_input_file -annotations output_annotations_tab_file
-            [-uniprotgi gi_file_path -efitid efi_tid_file_path -gdna gdna_file_path -hmp hmp_file_path
-             -phylo old_phylogeny_file_path -debug num_iterations_to_run -idmapping idmapping_tab_file_path
-             -uniref50 uniref50_tab_file -uniref90 uniref90_tab_file -pfam pfam_tab_file
-             -interpro interpro_tab_file]
+Usage: $0 --dat combined_dat_input_file --annotations output_annotations_tab_file 
+            [-uniprotgi gi_file_path --efitid efi_tid_file_path --gdna gdna_file_path --hmp hmp_file_path
+             --phylo old_phylogeny_file_path --debug num_iterations_to_run --idmapping idmapping_tab_file_path
+             --uniref50 uniref50_tab_file --uniref90 uniref90_tab_file --pfam pfam_tab_file
+             --interpro interpro_tab_file --annotations-nf output_id_list_no_frags]
 
     Anything in [] is optional.
 
-        -phylo      will use the old GOLD data and build that into the table, otherwise taxonomy is left out
-        -uniprotgi  will include GI numbers, otherwise they are left out
-        -idmapping  use the idmapping.tab file output by the import_id_mapping.pl script to obtain the
+        --phylo      will use the old GOLD data and build that into the table, otherwise taxonomy is left out
+        --uniprotgi  will include GI numbers, otherwise they are left out
+        --idmapping  use the idmapping.tab file output by the import_id_mapping.pl script to obtain the
                     refseq, embl-cds, and gi numbers 
 
 USAGE
@@ -100,12 +101,14 @@ if ($oldPhyloFile) {
 
 $debug = 2**50 if not defined $debug; #TODO: debug
 
-my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy, $is_fragment);
+my ($element, $id, $status, $size, $OX_tax_id, $GDNA, $HMP, $DE_desc, $RDE_reviewed_desc, $OS_organism, $OC_domain, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric, $giline, $hmpsite, $hmpoxygen, $efiTid, $EC, $phylum, $class, $order, $family, $genus, $species, $cazy, $isFragment);
 my (@BRENDA, @CAZY, @GO, @INTERPRO, @KEGG, $lastline, @OC_domain_array, @PATRIC, @PDB, @PFAM, $refseqline, @STRING);
 
 print "Parsing DAT Annotation Information\n";
 open DAT, $inputFile or die "could not open dat file $inputFile\n";
-open STRUCT, ">$outputFile" or die "could not write struct data to $outputFile\n";
+open my $annoFh, ">", $outputFile or die "could not write struct data to $outputFile\n";
+my $fragIdsFh;
+open $fragIdsFh, ">", $fragmentIdFile or die "could not write struct data to $fragmentIdFile\n" if $fragmentIdFile;
 my $c = 0; #TODO: debug
 while (<DAT>){  
     last if $c++ > $debug; #TODO: debug
@@ -180,14 +183,15 @@ write_line();
 
 
 close DAT;
-close STRUCT;
+close $annoFh;
+close $fragIdsFh if $fragIdsFh;
 
 
 print "Wrote the following columns to the annotations table:\n    ";
 print join("\n    ", "element", "id", "status", "size", "OX_tax_id", "GDNA", "DE_desc",
                  "RDE_reviewed_desc", "OS_organism", "GN_gene", "PDB",
                  "GO", "kegg", "string", "brenda", "patric", "hmpsite", "hmpoxygen",
-                 "efiTid", "EC", "cazy", "is_fragment");
+                 "efiTid", "EC", "cazy", "isFragment");
 print "\n";
 
 
@@ -279,7 +283,7 @@ sub write_line {
         $DE_desc=~s/\s+/ /g;
         $DE_desc=~s/\&/and/g;
         $DE_desc=~s/^\s+//g;
-        $is_fragment = ($DE_desc =~ /Flags:.*Fragment/) ? 1 : 0;
+        $isFragment = ($DE_desc =~ /Flags:.*Fragment/) ? 1 : 0;
         #$DE_desc=~s/{.*?}$//;
         if($DE_desc=~/^RecName: Full=(.*)/){
             $DE_desc=$1;
@@ -320,9 +324,10 @@ sub write_line {
         push @line, $GN_gene, $PDB, $GO, $kegg, $string, $brenda, $patric;
         push @line, $hmpsite, $hmpoxygen, $efiTid, $EC;
         push @line, $cazy;
-        push @line, $is_fragment;
+        push @line, $isFragment;
 
-        print STRUCT join("\t", @line), "\n";
+        print $annoFh join("\t", @line), "\n";
+        print $fragIdsFh join("\t", $id), "\n" if $fragIdsFh and $isFragment;
     }
 }
 
