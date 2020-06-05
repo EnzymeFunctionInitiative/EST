@@ -32,7 +32,7 @@ use Constants;
 
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
-    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr);
+    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -53,6 +53,7 @@ my $result = GetOptions(
     "cdhit-default-word"    => \$cdhitDefaultWord,      # Get rid of this?
     "cdhit-opt=s"           => \$cdhitOpt,
     "include-sequences"     => \$includeSeqs,   # true to include sequences in the XGMML files
+    "include-all-sequences" => \$includeAllSeqs,   # true to include sequences in the XGMML files
     "uniref-version=s"      => \$unirefVersion,
     "use-anno-spec"         => \$useAnnoSpec,
     "use-min-edge-attr"     => \$useMinEdgeAttr,
@@ -89,6 +90,7 @@ $cdhitBandwidth = ""        unless defined $cdhitBandwidth;
 $cdhitDefaultWord = 0       unless defined $cdhitDefaultWord;
 $cdhitOpt = ""              unless defined $cdhitOpt;
 $includeSeqs = 0            unless defined $includeSeqs;
+$includeAllSeqs = 0         unless defined $includeAllSeqs;
 
 $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 $useAnnoSpec = defined $useAnnoSpec ? 1 : 0;
@@ -260,6 +262,7 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
+$seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
 $B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg");
 $B->addAction("zip -j $outFile.zip $outFile");

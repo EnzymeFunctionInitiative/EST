@@ -97,7 +97,7 @@ my $result = GetOptions(
     "no-match-file=s"   => \$noMatchFile,
     "sim=s"             => \$sim,
     "multiplex=s"       => \$multiplexing,
-    "domain=s"          => \$domain,
+    "domain:s"          => \$domain,
     "domain-family=s"   => \$domainFamily,
     "domain-region=s"   => \$domainRegion,
     "force-domain=i"    => \$forceDomain,
@@ -135,8 +135,8 @@ if (defined $blast and $blast ne "blast" and $blast ne "blast+" and $blast ne "b
 }
 
 # Defaults and error checking for splitting sequences into domains
-if (defined $domain and $domain ne "off" and $domain ne "on") {
-    die "domain value of $domain is not valid, must be either on or off\n";
+if (defined $domain and $domain ne "off") {
+    $domain = "on";
 } elsif (not defined $domain) {
     $domain = "off";
     $domainFamily = "";
@@ -351,6 +351,7 @@ print "cd-hit is $cdHitOnly\n";
 print "force-domain is $forceDomain\n";
 print "exclude-fragments is $excludeFragments\n";
 print "serial-script is $runSerial\n";
+print "domain-region is $domainRegion\n";
 
 
 my $accOutFile = "$outputDir/accession.txt";
@@ -513,7 +514,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         push @args, "-uniprot-dom-len-output $lenUniprotDomFile";
         push @args, "-uniref-dom-len-output $lenUnirefDomFile" if $unirefVersion;
         push @args, $domFamArg if $domFamArg;
-        push @args, $domRegionArg if $domFamArg and $domainRegion;
+        push @args, $domRegionArg if $domainRegion;
     }
 
     my $retrScript = "get_sequences_option_";

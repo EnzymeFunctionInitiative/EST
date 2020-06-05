@@ -513,18 +513,34 @@ sub submitFormatDbAndSplitFastaJob {
     $B->addAction("module load $EstMod");
     $B->addAction("module load $PerlMod");
     $B->addAction("module load $DiamondMod");
+
+    my @fileSets = (["combined/combined.fasta", "uniref/uniref90.fasta", "uniref/uniref50.fasta"]);
+    my $processFragments = 1;
+    if ($processFragments) {
+        my @nfFiles = ("combined/combined_nf.fasta", "uniref/uniref90_nf.fasta", "uniref/uniref50_nf.fasta");
+        push @fileSets, \@nfFiles;
+        $B->addAction("\n");
+        foreach my $nfFile (@nfFiles) {
+            (my $inFile = $nfFile) =~s /_nf\.fasta$/.fasta/;
+            $B->addAction("$ScriptDir/remove_ids_from_file.pl --id-list $BuildDir/fragment_ids.tab --in $BuildDir/$inFile --out $BuildDir/$nfFile");
+        }
+        $B->addAction("\n");
+    }
     
     #build fasta database
     if (not $skipIfExists or not -f "$dbDir/formatdb.log") {
-        my @dbs = ("combined/combined.fasta", "uniref/uniref90.fasta", "uniref/uniref50.fasta");
-        foreach my $db (@dbs) {
-            (my $target = $db) =~ s%^.*?([^/]+)$%$1%;
-            $B->addAction("cd $dbDir");
-            $B->addAction("mv $BuildDir/$db $dbDir/$target");
-            $B->addAction("formatdb -i $dbDir/$target -p T -o T");
-            $B->addAction("mv $dbDir/$target $BuildDir/$db");
-            $B->addAction("diamond makedb --in $BuildDir/$db -d $diamondDbDir/$target");
-            $B->addAction("date > $CompletedFlagFile.formatdb.$target\n");
+        foreach my $fileSet (@fileSets) {
+            #my @dbs = ("combined/combined.fasta", "uniref/uniref90.fasta", "uniref/uniref50.fasta");
+            my @dbs = @$fileSet;
+            foreach my $db (@dbs) {
+                (my $target = $db) =~ s%^.*?([^/]+)$%$1%;
+                $B->addAction("cd $dbDir");
+                $B->addAction("mv $BuildDir/$db $dbDir/$target");
+                $B->addAction("formatdb -i $dbDir/$target -p T -o T");
+                $B->addAction("mv $dbDir/$target $BuildDir/$db");
+                $B->addAction("diamond makedb --in $BuildDir/$db -d $diamondDbDir/$target");
+                $B->addAction("date > $CompletedFlagFile.formatdb.$target\n");
+            }
         }
     }
     
@@ -829,7 +845,7 @@ sub submitAnnotationsJob {
     if (not $skipIfExists or not -f "$OutputDir/annotations.tab") {
         # Exclude GI
         #$B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -uniprotgi $LocalSupportDir/gionly.dat -efitid $LocalSupportDir/efi-accession.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab -phylo $LocalSupportDir/phylo.tab");
-        $B->addAction($ScriptDir . "/make_annotations_table.pl -dat $CombinedDir/combined.dat -annotations $OutputDir/annotations.tab -gdna $LocalSupportDir/gdna.tab -hmp $LocalSupportDir/hmp.tab");
+        $B->addAction($ScriptDir . "/make_annotations_table.pl --dat $CombinedDir/combined.dat --annotations $OutputDir/annotations.tab --fragment-ids $BuildDir/fragment_ids.tab --gdna $LocalSupportDir/gdna.tab --hmp $LocalSupportDir/hmp.tab");
         $B->addAction("date > $CompletedFlagFile.make_annotations_table\n");
     }
 
