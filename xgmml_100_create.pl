@@ -31,7 +31,7 @@ use lib "$FindBin::Bin/lib";
 use AlignmentScore;
 
 
-my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr);
+my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile);
 my $result = GetOptions(
     "blast=s"               => \$inputBlast,
     "fasta=s"               => \$inputFasta,
@@ -43,6 +43,7 @@ my $result = GetOptions(
     "include-sequences"     => \$includeSeqs,
     "include-all-sequences" => \$includeAllSeqs,
     "use-min-edge-attr"     => \$useMinEdgeAttr,
+    "nc-map=s"              => \$ncMapFile,
 );
 
 die "Missing -blast command line argument" if not $inputBlast;
@@ -89,6 +90,16 @@ my $anno = new EFI::Annotations;
 print time . " check length of 2.out file\n";
 
 
+my $connectivity = {};
+if ($ncMapFile and -f $ncMapFile) {
+    open my $fh, "<", $ncMapFile;
+    while (<$fh>) {
+        chomp;
+        my ($id, $nc, $color) = split(m/\t/);
+        $connectivity->{$id} = {nc => $nc, color => $color};
+    }
+    close $fh;
+}
 
 
 
@@ -232,6 +243,17 @@ foreach my $element (@uprotnumbers) {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
             }
         }
+    }
+    if ($connectivity->{$origelement}) {
+        $writer->emptyTag('att', 'type' => 'real',
+                          'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity"),
+                          'value' => $connectivity->{$origelement}->{nc});
+        $writer->emptyTag('att', 'type' => 'string',
+                          'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity Color"),
+                          'value' => $connectivity->{$origelement}->{color});
+        $writer->emptyTag('att', 'type' => 'string',
+                          'name' => "node.fillColor",
+                          'value' => $connectivity->{$origelement}->{color});
     }
     $writer->endTag();
 }
