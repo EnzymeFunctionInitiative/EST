@@ -32,7 +32,8 @@ use Constants;
 
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
-    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr);
+    $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
+    $computeNc);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -57,6 +58,7 @@ my $result = GetOptions(
     "uniref-version=s"      => \$unirefVersion,
     "use-anno-spec"         => \$useAnnoSpec,
     "use-min-edge-attr"     => \$useMinEdgeAttr,
+    "compute-nc"            => \$computeNc,
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$configFile,        # config file path, if not given will look for EFICONFIG env var
@@ -95,6 +97,7 @@ $includeAllSeqs = 0         unless defined $includeAllSeqs;
 $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 $useAnnoSpec = defined $useAnnoSpec ? 1 : 0;
 $useMinEdgeAttr = defined $useMinEdgeAttr ? 1 : 0;
+$computeNc = defined $computeNc ? 1 : 0;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_";
@@ -140,6 +143,7 @@ if ($customClusterDir and $customClusterFile and -f "$baseAnalysisDir/$customClu
 $analysisDir .= "-$cdhitOpt" if $cdhitOpt eq "sb" or $cdhitOpt eq "est+";
 $analysisDir .= "-minn" if $useAnnoSpec;
 $analysisDir .= "-mine" if $useMinEdgeAttr;
+$analysisDir .= "-nc" if $computeNc;
 
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
@@ -257,14 +261,18 @@ my @filterjobline = split /\./, $filterjob;
 
 $B = $S->getBuilder();
 $B->dependency(0, $filterjobline[0]);
-$B->resource(1, 1, "10gb");
+$B->resource(1, 1, "30gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
+$B->addAction("module load GD");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
+my $ncFile = "$analysisDir/${safeTitle}full_ssn_nc";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
 $seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg");
+$B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc;
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
+$B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");
 $B->renderToFile("$analysisDir/fullxgmml.sh");
@@ -283,8 +291,9 @@ my @fulljobline = split /\./, $fulljob;
 $B = $S->getBuilder();
 $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
 $B->dependency(0, $filterjobline[0]);
-$B->resource(1, 1, "10gb");
+$B->resource(1, 1, "30gb");
 $B->addAction("module load $efiEstMod");
+$B->addAction("module load GD");
 #$B->addAction("module load cd-hit");
 $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
 if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
@@ -306,7 +315,10 @@ if ($cdhitOpt ne "sb") {
 
 $B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -c \$CDHIT -d 0 $algoOption $bandwidthOption");
 $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg");
+$ncFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn_nc";
+$B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc; 
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
+$B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}cdhit");
 $B->renderToFile("$analysisDir/cdhit.sh");
