@@ -993,8 +993,11 @@ if (defined $LegacyGraphs) {
 $B->addAction("touch  $outputDir/1.out.completed");
 if ($removeTempFiles) {
     $B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
-    $B->addAction("rm $blastOutputDir/blastout-*.tab");
-    $B->addAction("rm $fracOutputDir/fracfile-*.fa");
+    $B->addAction("rm -rf $blastOutputDir");
+    $B->addAction("rm -rf $fracOutputDir");
+    $B->addAction("rm -rf $outputDir/rdata");
+    $B->addAction("rm $outputDir/database.* $outputDir/format.log");
+    $B->addAction("rm $outputDir/*.tab $outputDir/sequences.fa.clstr");
 }
 $B->addAction("echo 100 > $progressFile");
 $B->jobName("${jobNamePrefix}graphs");
