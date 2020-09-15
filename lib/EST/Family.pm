@@ -223,6 +223,9 @@ sub getDomainFromDb {
             next if (not $useDomain and exists $idsProcessed{$uniprotId});
             $idsProcessed{$uniprotId} = 1;
 
+            my $isSwissProt = $self->{config}->{fraction} > 1 ? $row->{STATUS} eq "Reviewed" : 0;
+            my $isFraction = &$fractionFunc($count);
+
             if ($unirefVersion) {
                 my $unirefId = $row->{$unirefField};
                 $ac++;
@@ -231,12 +234,14 @@ sub getDomainFromDb {
                 # in the UniRef cluster that corresponds to the UniRef cluster ID.
                 my $piece = {'start' => $row->{start}, 'end' => $row->{end}};
                 $piece->{full_len} = $row->{full_len} if $seqLenCol;
-                print "LEN $piece->{full_len}\n";
-                if ($unirefId eq $uniprotId) {
+                if ($unirefId eq $uniprotId and ($isSwissProt or $isFraction)) {
                     push @{$ids->{$uniprotId}}, \%$piece;
                     push @{$fullFamIds->{$uniprotId}}, \%$piece if $useDomain;
-                } elsif ($useDomain) {
+                } elsif ($useDomain and ($isSwissProt or $isFraction)) {
                     push @{$fullFamIds->{$uniprotId}}, \%$piece;
+                }
+                if ($unirefId ne $uniprotId and ($isSwissProt or $isFraction)) {
+                    $unirefMapping->{$uniprotId} = $unirefId;
                 }
                 # Only increment the family size if the uniref cluster ID hasn't yet been encountered.  This
                 # is because the select query above retrieves all accessions in the family based on UniProt
@@ -245,10 +250,7 @@ sub getDomainFromDb {
                     $unirefFamSizeHelper{$unirefId} = 1;
                     $count++;
                 }
-                $unirefMapping->{$uniprotId} = $unirefId if $unirefId ne $uniprotId;
             } else {
-                my $isSwissProt = $self->{config}->{fraction} > 1 ? $row->{STATUS} eq "Reviewed" : 0;
-                my $isFraction = &$fractionFunc($count);
                 if ($isFraction or $isSwissProt) {
                     $ac++;
                     my $piece = {'start' => $row->{start}, 'end' => $row->{end}};
