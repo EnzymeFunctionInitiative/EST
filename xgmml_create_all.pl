@@ -28,7 +28,7 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr);
+my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile);
 my $result = GetOptions(
     "blast=s"	        => \$blast,
     "cdhit=s"	        => \$cdhit,
@@ -41,6 +41,7 @@ my $result = GetOptions(
     "include-sequences" => \$includeSeqs,
     "include-all-sequences" => \$includeAllSeqs,
     "use-min-edge-attr" => \$useMinEdgeAttr,
+    "nc-map=s"          => \$ncMapFile,
 );
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $outputFile or not $title or not $dbver or not $cdhit;
@@ -69,6 +70,17 @@ my %headuprot=();
 
 my ($numEdges, $nodecount) = (0, 0);
 
+
+my $connectivity = {};
+if ($ncMapFile and -f $ncMapFile) {
+    open my $fh, "<", $ncMapFile;
+    while (<$fh>) {
+        chomp;
+        my ($id, $nc, $color) = split(m/\t/);
+        $connectivity->{$id} = {nc => $nc, color => $color};
+    }
+    close $fh;
+}
 
 
 my %sequences;
@@ -225,6 +237,17 @@ while (<CDHIT>) {
                 $writer->endTag();
             }
         }
+        if ($connectivity->{$head}) {
+            $writer->emptyTag('att', 'type' => 'real',
+                              'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity"),
+                              'value' => $connectivity->{$head}->{nc});
+            $writer->emptyTag('att', 'type' => 'string',
+                              'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity Color"),
+                              'value' => $connectivity->{$head}->{color});
+            $writer->emptyTag('att', 'type' => 'string',
+                              'name' => "node.fillColor",
+                              'value' => $connectivity->{$head}->{color});
+        }
         $writer->endTag();
         %clusterdata=();
         $count=0;
@@ -246,7 +269,7 @@ while (<CDHIT>) {
             }
             if ($key eq "ACC") {
                 push @{$clusterdata{$key}}, $element;
-            } elsif (is_array($uprot{$element}{$key})) {
+            } elsif (isArray($uprot{$element}{$key})) {
                 push @{$clusterdata{$key}}, @{$uprot{$element}{$key}};
             } elsif ($uprot{$element}{$key}) {
                 push @{$clusterdata{$key}}, $uprot{$element}{$key};
@@ -321,7 +344,10 @@ if ($numEdges > $maxNumEdges) {
 
 print "finished $nodecount nodes $numEdges edges to file $outputFile\n";
 
-sub is_array {
+
+
+
+sub isArray {
     my ($ref) = @_;
     # Firstly arrays need to be references, throw
     #  out non-references early.
