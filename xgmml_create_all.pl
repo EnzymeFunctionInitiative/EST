@@ -237,17 +237,16 @@ while (<CDHIT>) {
                 $writer->endTag();
             }
         }
+        my $ncVal = 0;
+        my $ncColor = "";
         if ($connectivity->{$head}) {
-            $writer->emptyTag('att', 'type' => 'real',
-                              'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity"),
-                              'value' => $connectivity->{$head}->{nc});
-            $writer->emptyTag('att', 'type' => 'string',
-                              'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity Color"),
-                              'value' => $connectivity->{$head}->{color});
-            $writer->emptyTag('att', 'type' => 'string',
-                              'name' => "node.fillColor",
-                              'value' => $connectivity->{$head}->{color});
+            $ncVal = $connectivity->{$head}->{nc};
+            $ncColor = $connectivity->{$head}->{color};
         }
+        my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
+        $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
+        $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
+        $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
         $writer->endTag();
         %clusterdata=();
         $count=0;

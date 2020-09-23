@@ -5,23 +5,32 @@ use warnings;
 
 use FindBin;
 use Getopt::Long;
+use Data::Dumper;
 
 use lib "$FindBin::Bin/lib";
 use NeighborhoodConnectivity;
+use CdHitParser;
 
 
-my ($inputBlast, $inputXgmml, $output, $includeMeta);
+my ($inputBlast, $inputXgmml, $output, $includeMeta, $cdhit);
 my $result = GetOptions(
     "input-blast=s"     => \$inputBlast,
     "input-xgmml=s"     => \$inputXgmml,
     "output-map=s"      => \$output,
     "include-meta"      => \$includeMeta,
+    "cdhit=s"           => \$cdhit,
 );
 
 die "Need --input-blast blast file OR --input-xgmml xgmml" if (not $inputBlast or not -f $inputBlast) and (not $inputXgmml or not -f $inputXgmml);
 die "Need --output-map" if not $output;
 
 $includeMeta = defined($includeMeta);
+
+$cdhit = "" if $cdhit and not -f $cdhit;
+my $filterIds = {};
+$filterIds = getCdHitClusters($cdhit);
+print Dumper($filterIds);
+
 
 my %degree;
 my %N;
@@ -32,13 +41,17 @@ if ($inputBlast) {
     open $in, "<", $inputBlast;
     $parseFn = sub {
         my ($source, $target) = split(m/\t/, $_[0]);
-        return ($source, $target);
+        if (not $cdhit or ($filterIds->{$source} and $filterIds->{$target})) {
+            return ($source, $target);
+        } else {
+            return ("", "");
+        }
     };
 } else {
     open $in, "<", $inputXgmml;
     $parseFn = sub {
         my $line = $_[0];
-        return if not $line =~ m/\<edge/;
+        return ("", "") if not $line =~ m/\<edge/;
         my ($source, $target);
         if ($line =~ m/label="([^"]+),([^"]+)"/) {
             $source = $1;
@@ -73,10 +86,29 @@ if ($includeMeta and $NC->{_meta}) {
 
 $out->print(join("\t", "ID", "NC", "COLOR"), "\n");
 foreach my $id (sort keys %$NC) {
-    next if not $NC->{$id}->{nc};
-    $out->print(join("\t", $id, $NC->{$id}->{nc}, $NC->{$id}->{color}), "\n");
+    if (not $NC->{$id}->{nc}) {
+        $out->print(join("\t", $id, 0, ""), "\n");
+    } else {
+        $out->print(join("\t", $id, $NC->{$id}->{nc}, $NC->{$id}->{color}), "\n");
+    }
 }
 
 close $out;
+
+
+
+sub getCdHitClusters {
+    my $file = shift;
+    my $cp = new CdHitParser();
+    open my $fh, "<", $file;
+    while (my $line = <$fh>) {
+        chomp $line;
+        $cp->parse_line($line);
+    }
+    $cp->finish;
+    my $data = {};
+    map { $data->{$_} = 1 } $cp->get_clusters();
+    return $data;
+}
 
 
