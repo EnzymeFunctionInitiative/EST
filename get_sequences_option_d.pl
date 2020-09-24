@@ -42,7 +42,7 @@ my $unirefMap = {};
 my $familyFullDomainIds = undef; # Used when domain and uniref are enabled
 
 if (exists $familyConfig->{data}) {
-    my $famData = new EST::Family(dbh => $dbh);
+    my $famData = new EST::Family(dbh => $dbh, db_version => $otherConfig->{db_version});
     $famData->configure($familyConfig);
     $famData->retrieveFamilyAccessions();
     $familyIds = $famData->getSequenceIds();

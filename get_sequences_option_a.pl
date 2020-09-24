@@ -21,7 +21,7 @@ use EST::Family;
 use EST::BLAST;
 
 
-my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = setupConfig();
+my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj, $otherConfig) = setupConfig();
 
 $metaObj->configureSourceTypes(
     EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY,
@@ -40,7 +40,7 @@ my $familyStats = {};
 my $unirefMap = {};
 
 if (exists $familyConfig->{data}) {
-    my $famData = new EST::Family(dbh => $dbh);
+    my $famData = new EST::Family(dbh => $dbh, db_version => $otherConfig->{db_version});
     $famData->configure($familyConfig);
     $famData->retrieveFamilyAccessions();
     $familyIds = $famData->getSequenceIds();
