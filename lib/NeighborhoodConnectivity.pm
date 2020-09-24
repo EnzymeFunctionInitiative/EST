@@ -24,7 +24,7 @@ sub getConnectivity {
         foreach my $n (@{$N->{$id}}) {
             $nc += $degree->{$n};
         }
-        my $val = int($nc * 100 / $k) / 100;
+        my $val = $k ? int($nc * 100 / $k) / 100 : 0;
         $NC{$id}->{nc} = $val;
         $maxNC = $val > $maxNC ? $val : $maxNC;
         $minNC = $val < $minNC ? $val : $minNC;
