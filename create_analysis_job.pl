@@ -33,7 +33,7 @@ use Constants;
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc);
+    $computeNc, $noRepNodeNetworks);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -59,6 +59,7 @@ my $result = GetOptions(
     "use-anno-spec"         => \$useAnnoSpec,
     "use-min-edge-attr"     => \$useMinEdgeAttr,
     "compute-nc"            => \$computeNc,
+    "no-repnode"            => \$noRepNodeNetworks,
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$configFile,        # config file path, if not given will look for EFICONFIG env var
@@ -94,10 +95,13 @@ $cdhitOpt = ""              unless defined $cdhitOpt;
 $includeSeqs = 0            unless defined $includeSeqs;
 $includeAllSeqs = 0         unless defined $includeAllSeqs;
 
+
 $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 $useAnnoSpec = defined $useAnnoSpec ? 1 : 0;
 $useMinEdgeAttr = defined $useMinEdgeAttr ? 1 : 0;
 $computeNc = defined $computeNc ? 1 : 0;
+
+my $cleanup = 1;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_";
@@ -288,58 +292,62 @@ my @fulljobline = split /\./, $fulljob;
 #submit series of repnode network calculations
 #depends on filterblast
 
-$B = $S->getBuilder();
-$B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
-$B->dependency(0, $filterjobline[0]);
-$B->resource(1, 1, "30gb");
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load GD");
-#$B->addAction("module load cd-hit");
-$B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
-if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
-    $B->addAction("WORDOPT=5");
-    $B->addAction('if (( $(echo "$CDHIT < 0.81" | bc -l) )); then WORDOPT=5; fi');
-    $B->addAction('if (( $(echo "$CDHIT < 0.71" | bc -l) )); then WORDOPT=4; fi');
-    $B->addAction('if (( $(echo "$CDHIT < 0.61" | bc -l) )); then WORDOPT=3; fi');
-    $B->addAction('if (( $(echo "$CDHIT < 0.51" | bc -l) )); then WORDOPT=2; fi');
-    $B->addAction('echo $WORDOPT');
-    $wordOption = '-n $WORDOPT';
-} else {
-    $wordOption = "-n 2"; # Default option
+my $depId = $fulljobline[0];
+
+if (not $noRepNodeNetworks) {
+    $B = $S->getBuilder();
+    $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
+    $B->dependency(0, $filterjobline[0]);
+    $B->resource(1, 1, "30gb");
+    $B->addAction("module load $efiEstMod");
+    $B->addAction("module load GD");
+    #$B->addAction("module load cd-hit");
+    $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
+    if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
+        $B->addAction("WORDOPT=5");
+        $B->addAction('if (( $(echo "$CDHIT < 0.81" | bc -l) )); then WORDOPT=5; fi');
+        $B->addAction('if (( $(echo "$CDHIT < 0.71" | bc -l) )); then WORDOPT=4; fi');
+        $B->addAction('if (( $(echo "$CDHIT < 0.61" | bc -l) )); then WORDOPT=3; fi');
+        $B->addAction('if (( $(echo "$CDHIT < 0.51" | bc -l) )); then WORDOPT=2; fi');
+        $B->addAction('echo $WORDOPT');
+        $wordOption = '-n $WORDOPT';
+    } else {
+        $wordOption = "-n 2"; # Default option
+    }
+    
+    my $lengthOverlapOption = "";
+    if ($cdhitOpt ne "sb") {
+        $lengthOverlapOption = "-s $lengthOverlap";
+    }
+    
+    my $cdhitFile = "$analysisDir/cdhit\$CDHIT";
+    $B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $cdhitFile -c \$CDHIT -d 0 $algoOption $bandwidthOption");
+    $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
+    $ncFile = "";
+    if ($computeNc) {
+        $ncFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn_nc";
+        $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab --cdhit $cdhitFile.clstr"); 
+        $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
+    }
+    $B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
+    $B->addAction("zip -j $outFile.zip $outFile");
+    $B->jobName("${jobNamePrefix}cdhit");
+    $B->renderToFile("$analysisDir/cdhit.sh");
+    
+    #submit the filter script, job dependences should keep it from running till all blast out files are combined
+    my $repnodejob = $S->submit("$analysisDir/cdhit.sh", $dryrun, $schedType);
+    chomp $repnodejob;
+    print "Repnodes job is:\n $repnodejob\n";
+
+    my @repnodejobline = split /\./, $repnodejob;
+    $depId = $repnodejobline[0];
 }
-
-my $lengthOverlapOption = "";
-if ($cdhitOpt ne "sb") {
-    $lengthOverlapOption = "-s $lengthOverlap";
-}
-
-my $cdhitFile = "$analysisDir/cdhit\$CDHIT";
-$B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $cdhitFile -c \$CDHIT -d 0 $algoOption $bandwidthOption");
-$outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$ncFile = "";
-if ($computeNc) {
-    $ncFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn_nc";
-    $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab --cdhit $cdhitFile.clstr"); 
-    $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
-}
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
-$B->addAction("zip -j $outFile.zip $outFile");
-$B->jobName("${jobNamePrefix}cdhit");
-$B->renderToFile("$analysisDir/cdhit.sh");
-
-#submit the filter script, job dependences should keep it from running till all blast out files are combined
-my $repnodejob = $S->submit("$analysisDir/cdhit.sh", $dryrun, $schedType);
-chomp $repnodejob;
-print "Repnodes job is:\n $repnodejob\n";
-
-
-my @repnodejobline = split /\./, $repnodejob;
 
 #test to fix dependancies
 #depends on cdhit.sh
 $B = $S->getBuilder();
 $B->resource(1, 1, "1gb");
-$B->dependency(1, $repnodejobline[0]);
+$B->dependency(1, $depId);
 $B->addAction("module load $efiEstMod");
 $B->addAction("sleep 5");
 $B->jobName("${jobNamePrefix}fix");
@@ -361,6 +369,7 @@ $B->resource(1, 1, "5gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("$toolpath/stats.pl -run-dir $analysisDir -out $analysisDir/stats.tab");
+$B->addAction("rm $analysisDir/*.xgmml") if $cleanup;
 $B->jobName("${jobNamePrefix}stats");
 $B->renderToFile("$analysisDir/stats.sh");
 
