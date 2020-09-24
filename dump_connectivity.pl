@@ -26,10 +26,12 @@ die "Need --output-map" if not $output;
 
 $includeMeta = defined($includeMeta);
 
-$cdhit = "" if $cdhit and not -f $cdhit;
 my $filterIds = {};
-$filterIds = getCdHitClusters($cdhit);
-print Dumper($filterIds);
+if ($cdhit) {
+    $cdhit = "" if not -f $cdhit;
+    $filterIds = getCdHitClusters($cdhit) if $cdhit;
+}
+
 
 
 my %degree;
@@ -75,6 +77,8 @@ while (my $line = <$in>) {
 
 close $in;
 
+map { if (not exists $degree{$_}) { $degree{$_} = 0; $N{$_} = []; } } keys %$filterIds;
+
 
 my $NC = getConnectivity(\%degree, \%N);
 
@@ -86,11 +90,7 @@ if ($includeMeta and $NC->{_meta}) {
 
 $out->print(join("\t", "ID", "NC", "COLOR"), "\n");
 foreach my $id (sort keys %$NC) {
-    if (not $NC->{$id}->{nc}) {
-        $out->print(join("\t", $id, 0, ""), "\n");
-    } else {
-        $out->print(join("\t", $id, $NC->{$id}->{nc}, $NC->{$id}->{color}), "\n");
-    }
+    $out->print(join("\t", $id, $NC->{$id}->{nc}, $NC->{$id}->{color}), "\n");
 }
 
 close $out;
