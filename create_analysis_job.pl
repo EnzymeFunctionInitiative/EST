@@ -313,12 +313,16 @@ if ($cdhitOpt ne "sb") {
     $lengthOverlapOption = "-s $lengthOverlap";
 }
 
-$B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $analysisDir/cdhit\$CDHIT -c \$CDHIT -d 0 $algoOption $bandwidthOption");
+my $cdhitFile = "$analysisDir/cdhit\$CDHIT";
+$B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $cdhitFile -c \$CDHIT -d 0 $algoOption $bandwidthOption");
 $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
-$ncFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn_nc";
-$B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc; 
-$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $analysisDir/cdhit\$CDHIT.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
-$B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
+$ncFile = "";
+if ($computeNc) {
+    $ncFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn_nc";
+    $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab --cdhit $cdhitFile.clstr"); 
+    $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
+}
+$B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}cdhit");
 $B->renderToFile("$analysisDir/cdhit.sh");

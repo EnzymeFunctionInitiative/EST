@@ -244,17 +244,16 @@ foreach my $element (@uprotnumbers) {
             }
         }
     }
+    my $ncVal = 0;
+    my $ncColor = "";
     if ($connectivity->{$origelement}) {
-        $writer->emptyTag('att', 'type' => 'real',
-                          'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity"),
-                          'value' => $connectivity->{$origelement}->{nc});
-        $writer->emptyTag('att', 'type' => 'string',
-                          'name' => ($annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity Color"),
-                          'value' => $connectivity->{$origelement}->{color});
-        $writer->emptyTag('att', 'type' => 'string',
-                          'name' => "node.fillColor",
-                          'value' => $connectivity->{$origelement}->{color});
+        $ncVal = $connectivity->{$origelement}->{nc};
+        $ncColor = $connectivity->{$origelement}->{color};
     }
+    my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
+    $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
+    $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
+    $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
     $writer->endTag();
 }
 
