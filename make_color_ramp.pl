@@ -25,6 +25,7 @@ die "Need --min" if (not $inputFile or not -f $inputFile) and (not defined $min 
 die "Need --max" if (not $inputFile or not -f $inputFile) and not $max;
 die "Need --output png file" if not $file;
 
+
 if ($inputFile and -f $inputFile) {
     my $newmin = 1e9;
     my $newmax = 0;
@@ -50,13 +51,6 @@ if ($inputFile and -f $inputFile) {
     }
     close $fh;
 }
-die "Unable to find min or max" if not defined $min or not $max;
-print "Found color min $min and max $max\n";
-my $ramp = NeighborhoodConnectivity::computeColorRamp($min, $max);
-
-
-my $range = $max - $min + 1;
-my $dx = $range > 700 ? 1 : ($range > 400 ? 2 : ($range > 200 ? 3 : 4)); # Individual ramp color width
 
 
 my $px = 20; # padding for width
@@ -64,12 +58,9 @@ my $py = 10; # padding for height
 my $pt = 5; # padding from ramp to text
 my $dy = 60; # Individual ramp color height
 my $th = 30; # Text height
-my $imw = 800+$px*2; #($max - $min + 1) * $dx + $px * 2;
+my $imw = 800+$px*2;
 my $imh = $dy + $th + $pt + $py * 2;
-#my $ticStep = $range / 4; #40 / $dx;
 my $ticStep = 100;
-
-
 
 my $gdt = new GD::Text;
 $gdt->set_font(gdSmallFont);
@@ -79,39 +70,37 @@ my $black = $im->colorAllocate(0, 0, 0);
 $im->fill(0, 0, $white);
 
 
-my $y1 = $py;
-my $y2 = $y1 + $dy;
-
-#drawTic($min, $px+$dx/2, $y2);
-
-my $drawWidth = $imw - $px*2;
-for (my $i = 0; $i < $drawWidth; $i++) {
-    my $x1 = $px + $i;
-    my $x2 = $x1 + 1;
-    my $val = int(($i / $drawWidth) * $range) + $min;
-    my $color = NeighborhoodConnectivity::getColor($ramp, $val);
-    my $gdc = $im->colorAllocate(@$color);
-    $im->filledRectangle($x1, $y1, $x2, $y2, $gdc);
-    if ($i % $ticStep == 0) {
-        my $lx = ($x2 - $x1) / 2 + $x1;
-        drawTic($val, $lx, $y2);
+if (not defined $min or not $max) {
+    print "Min/max error $min $max: saving empty image\n";
+} else {
+    print "Found color min $min and max $max\n";
+    my $ramp = NeighborhoodConnectivity::computeColorRamp($min, $max);
+    
+    
+    my $range = $max - $min + 1;
+    my $dx = $range > 700 ? 1 : ($range > 400 ? 2 : ($range > 200 ? 3 : 4)); # Individual ramp color width
+    
+    
+    my $y1 = $py;
+    my $y2 = $y1 + $dy;
+    
+    
+    my $drawWidth = $imw - $px*2;
+    for (my $i = 0; $i < $drawWidth; $i++) {
+        my $x1 = $px + $i;
+        my $x2 = $x1 + 1;
+        my $val = int(($i / $drawWidth) * $range) + $min;
+        my $color = NeighborhoodConnectivity::getColor($ramp, $val);
+        my $gdc = $im->colorAllocate(@$color);
+        $im->filledRectangle($x1, $y1, $x2, $y2, $gdc);
+        if ($i % $ticStep == 0) {
+            my $lx = ($x2 - $x1) / 2 + $x1;
+            drawTic($val, $lx, $y2);
+        }
     }
+    
+    drawTic($max, $drawWidth + $px, $y2);
 }
-
-drawTic($max, $drawWidth + $px, $y2);
-
-#for (my $i = $min; $i <= $max; $i++) {
-#    my $di = $i - $min;
-#    my $x1 = $px + $di * $dx;
-#    my $x2 = $x1 + $dx;
-#    my $color = NeighborhoodConnectivity::getColor($ramp, $i);
-#    my $gdc = $im->colorAllocate(@$color);
-#    $im->filledRectangle($x1, $y1, $x2, $y2, $gdc);
-#    if (($di + 1) % $ticStep == 0) {
-#        my $lx = ($x2 - $x1) / 2 + $x1;
-#        drawTic($i, $lx, $y2);
-#    }
-#}
 
 
 drawText("Network Connectivity", $imw/2, $py+$dy+15, gdMediumBoldFont);
