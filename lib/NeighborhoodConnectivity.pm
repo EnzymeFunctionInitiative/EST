@@ -85,7 +85,8 @@ sub computeColorRamp {
     my $ramp = sub {
         my $val = shift;
         # Normalize val to number of color points
-        my $idx = int(($val-$min) * $ng / ($max-$min));
+        my $df = $max - $min;
+        my $idx = $df ? int(($val-$min) * $ng / $df) : 1;
         $idx = $idx > $ng ? $ng : ($idx < 1 ? 1 : $idx);
         my @t = map { int } @{$grads[$idx - 1]};
         return \@t;

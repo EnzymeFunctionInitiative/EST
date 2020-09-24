@@ -90,6 +90,7 @@ if ($includeMeta and $NC->{_meta}) {
 
 $out->print(join("\t", "ID", "NC", "COLOR"), "\n");
 foreach my $id (sort keys %$NC) {
+    next if $id eq "_meta";
     $out->print(join("\t", $id, $NC->{$id}->{nc}, $NC->{$id}->{color}), "\n");
 }
 
