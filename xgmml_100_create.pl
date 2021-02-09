@@ -244,16 +244,18 @@ foreach my $element (@uprotnumbers) {
             }
         }
     }
-    my $ncVal = 0;
-    my $ncColor = "";
-    if ($connectivity->{$origelement}) {
-        $ncVal = $connectivity->{$origelement}->{nc};
-        $ncColor = $connectivity->{$origelement}->{color};
+    if ($ncMapFile) {
+        my $ncVal = 0;
+        my $ncColor = "";
+        if ($connectivity->{$origelement}) {
+            $ncVal = $connectivity->{$origelement}->{nc};
+            $ncColor = $connectivity->{$origelement}->{color};
+        }
+        my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
+        $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
+        $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
+        $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
     }
-    my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
-    $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
-    $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
-    $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
     $writer->endTag();
 }
 

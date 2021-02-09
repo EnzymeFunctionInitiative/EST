@@ -115,10 +115,12 @@ sub parseFile {
                     $hasUniprot = 1;
                     $lastId = -1;
                     $numMultUniprotIdSeq += scalar @{ $result->{uniprot_ids} } - 1;
+                    my $desc = substr((split(m/>/, $result->{raw_headers}))[0], 0, 150);
                     foreach my $res (@{ $result->{uniprot_ids} }) {
                         $upMeta->{$res->{uniprot_id}} = {
                             query_id => $res->{other_id},
-                            other_ids => $result->{other_ids}
+                            other_ids => $result->{other_ids},
+                            description => $desc,
                         };
                     }
                 }
@@ -174,8 +176,10 @@ sub parseFile {
     $self->{data}->{seq_meta} = {};
     map {
             my $id = $seq{$_}->{id};
-            $self->{data}->{seq}->{$id} = $seq{$_}->{seq};
-            $self->{data}->{seq_meta}->{$id} = $seqMeta->{$_};
+            if ($id) {
+                $self->{data}->{seq}->{$id} = $seq{$_}->{seq};
+                $self->{data}->{seq_meta}->{$id} = $seqMeta->{$_};
+            }
         } keys %seq;
     $self->{data}->{uniprot_meta} = $upMeta; # Metadata for IDs that had a UniProt match
     $self->{data}->{uniprot_ids} = \@fastaUniprotMatch;

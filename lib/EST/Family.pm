@@ -139,10 +139,10 @@ sub retrieveFamilyAccessions {
     # Only used when domains are enabled.
     $self->{data}->{full_dom_uniprot_ids} = $self->{config}->{use_domain} ? {} : undef;
 
-    my ($actualI, $fullFamSizeI) = $self->getDomainFromDb("INTERPRO", $fractionFunc, $self->{family}->{interpro});
-    my ($actualP, $fullFamSizeP) = $self->getDomainFromDb("PFAM", $fractionFunc, \@pfam);
-    my ($actualG, $fullFamSizeG) = $self->getDomainFromDb("GENE3D", $fractionFunc, $self->{family}->{gene3d});
-    my ($actualS, $fullFamSizeS) = $self->getDomainFromDb("SSF", $fractionFunc, $self->{family}->{ssf});
+    my ($actualI, $fullFamSizeI, $allIdsI) = $self->getDomainFromDb("INTERPRO", $fractionFunc, $self->{family}->{interpro});
+    my ($actualP, $fullFamSizeP, $allIdsP) = $self->getDomainFromDb("PFAM", $fractionFunc, \@pfam);
+    my ($actualG, $fullFamSizeG, $allIdsG) = $self->getDomainFromDb("GENE3D", $fractionFunc, $self->{family}->{gene3d});
+    my ($actualS, $fullFamSizeS, $allIdsS) = $self->getDomainFromDb("SSF", $fractionFunc, $self->{family}->{ssf});
     
     my $domReg = $self->{config}->{domain_region};
     if ($domReg eq "cterminal" or $domReg eq "nterminal") {
@@ -150,7 +150,11 @@ sub retrieveFamilyAccessions {
     }
 
     $self->{stats}->{num_ids} = $actualI + $actualP + $actualG + $actualS;
-    $self->{stats}->{num_full_family} = $fullFamSizeI + $fullFamSizeP + $fullFamSizeG + $fullFamSizeS;
+    # Not correct
+    #$self->{stats}->{num_full_family} = $fullFamSizeI + $fullFamSizeP + $fullFamSizeG + $fullFamSizeS;
+    my %allIds;
+    map { $allIds{$_} = 1 } (@$allIdsI, @$allIdsP, @$allIdsG, @$allIdsS);
+    $self->{stats}->{num_full_family} = scalar keys %allIds;
 } 
 
 
@@ -265,14 +269,22 @@ sub getDomainFromDb {
 
     # Get actual family count
     my $fullFamCount = 0;
+    my @fullIds;
     if ($unirefVersion) {
-        my $sql = "select count(distinct accession) from $table where $table.id in ('" . join("', '", @families) . "')";
+        #my $sql = "select count(distinct accession) from $table where $table.id in ('" . join("', '", @families) . "')";
+        #my $sth = $self->{dbh}->prepare($sql);
+        #$sth->execute;
+        #$fullFamCount = $sth->fetchrow;
+        my $sql = "select distinct accession from $table where $table.id in ('" . join("', '", @families) . "')";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
-        $fullFamCount = $sth->fetchrow;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @fullIds, $row->{accession};
+        }
+        $fullFamCount = scalar @fullIds;
     }
 
-    return ($count, $fullFamCount);
+    return ($count, $fullFamCount, \@fullIds);
 }
 
 
@@ -306,7 +318,7 @@ sub getDomainRegion {
                 }
                 if ($len > 0) {
                     push @{$outputIds->{$id}}, $newStruct;
-                } 
+                }
             }
         }
         foreach my $id (@ids) {

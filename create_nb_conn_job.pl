@@ -19,11 +19,12 @@ use EFI::Util qw(usesSlurm);
 my $estPath = $FindBin::Bin;
 
 my ($ssnIn, $outputPath, $outputName);
-my ($scheduler, $dryRun, $queue, $jobId, $configFile, $ramReservation);
+my ($scheduler, $dryRun, $queue, $jobId, $configFile, $ramReservation, $dumpOnly);
 my $result = GetOptions(
     "ssn-in=s"                  => \$ssnIn,
     "output-name=s"             => \$outputName,
     "output-path=s"             => \$outputPath,
+    "dump-only"                 => \$dumpOnly,
     "scheduler=s"               => \$scheduler,
     "dry-run"                   => \$dryRun,
     "queue=s"                   => \$queue,
@@ -86,7 +87,7 @@ my $SS = new EFI::SchedulerApi(type => $schedType, queue => $queue, resource => 
 #TODO: move this to a central location
 if (not $ramReservation) {
     my $ramPredictionM = 0.02;
-    my $ramSafety = 10;
+    my $ramSafety = $ssnInZip =~ m/\.zip$/ ? 20 : 10;
     my $fileSize = -s $ssnInZip;
     $fileSize *= 10 if $ssnInZip =~ m/\.zip$/;
     $fileSize = $fileSize / 1024 / 1024; # MB
@@ -104,17 +105,19 @@ $B->addAction("module load $estModule");
 $B->addAction("cd $outputPath");
 $B->addAction("$estPath/unzip_file.pl --in $ssnInZip --out $ssnIn") if $ssnInZip =~ /\.zip/i;
 $B->addAction("$estPath/dump_connectivity.pl --input-xgmml $ssnIn --output-map $ncMap");
-$B->addAction("$estPath/paint_ssn.pl --input $ssnIn \\
+if (not $dumpOnly) {
+    $B->addAction("$estPath/paint_ssn.pl --input $ssnIn \\
     --output $ssnOut \\
     --color-map $ncMap \\
     --node-col 1 --color-col 3 \\
     --primary-color \\
     --color-name \"Neighborhood Connectivity Color\" \\
     --extra-col 2-\"Neighborhood Connectivity\"");
-$B->addAction("$estPath/make_color_ramp.pl --input $ncMap --output $outputPath/legend.png");
-$B->addAction("mv $ssnOut $ssnOutNamed");
-$B->addAction("zip -jq $ssnOutZip $ssnOutNamed");
-$B->addAction("rm $ssnOutNamed");
+    $B->addAction("$estPath/make_color_ramp.pl --input $ncMap --output $outputPath/legend.png");
+    $B->addAction("mv $ssnOut $ssnOutNamed");
+    $B->addAction("zip -jq $ssnOutZip $ssnOutNamed");
+    $B->addAction("rm $ssnOutNamed");
+}
 $B->addAction("touch $outputPath/1.out.completed");
 
 
