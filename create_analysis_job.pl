@@ -33,7 +33,7 @@ use Constants;
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks);
+    $computeNc, $noRepNodeNetworks, $cleanup);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -43,7 +43,7 @@ my $result = GetOptions(
     "minlen=i"              => \$minlen,
     "title=s"               => \$title,
     "maxfull=i"             => \$maxfull,
-    "job-id=i"              => \$jobId,
+    "job-id=s"              => \$jobId,
     "lengthdif=i"           => \$lengthOverlap,
     "custom-cluster-file=s" => \$customClusterFile,
     "custom-cluster-dir=s"  => \$customClusterDir,
@@ -63,6 +63,7 @@ my $result = GetOptions(
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$configFile,        # config file path, if not given will look for EFICONFIG env var
+    "keep-xgmml"            => \$cleanup,
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -95,16 +96,15 @@ $cdhitOpt = ""              unless defined $cdhitOpt;
 $includeSeqs = 0            unless defined $includeSeqs;
 $includeAllSeqs = 0         unless defined $includeAllSeqs;
 
-
+$cleanup = not $cleanup;
 $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 $useAnnoSpec = defined $useAnnoSpec ? 1 : 0;
 $useMinEdgeAttr = defined $useMinEdgeAttr ? 1 : 0;
 $computeNc = defined $computeNc ? 1 : 0;
 
-my $cleanup = 1;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
-$safeTitle .= "_";
+$safeTitle .= "_" if $safeTitle;
 
 if (defined $jobId and $jobId) {
     $safeTitle = $jobId . "_" . $safeTitle;
@@ -210,7 +210,7 @@ ANNO
 my $hasDomain = checkForDomain("$generateDir/1.out");
 
 my $userHeaderFileOption = "-meta-file $userHeaderFile";
-my $annoSpecOption = " -anno-spec-file $annoSpecFile" if $useAnnoSpec;
+my $annoSpecOption = $useAnnoSpec ? " -anno-spec-file $annoSpecFile" : "";
 my $lenArgs = "-min-len $minlen -max-len $maxlen";
 # Don't filter out UniRef cluster members if this is a domain job.
 $lenArgs = "" if $hasDomain;
@@ -268,7 +268,7 @@ $B->dependency(0, $filterjobline[0]);
 $B->resource(1, 1, "30gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $perlMod");
-$B->addAction("module load GD");
+$B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
 my $ncFile = "$analysisDir/${safeTitle}full_ssn_nc";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
@@ -300,7 +300,7 @@ if (not $noRepNodeNetworks) {
     $B->dependency(0, $filterjobline[0]);
     $B->resource(1, 1, "30gb");
     $B->addAction("module load $efiEstMod");
-    $B->addAction("module load GD");
+    $B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
     #$B->addAction("module load cd-hit");
     $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
     if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
