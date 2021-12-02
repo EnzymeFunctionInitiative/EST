@@ -35,7 +35,7 @@ die "Require --job-name-prefix" if not $namePrefix;
 $queue = $ENV{EFI_QUEUE} if not $queue;
 die "Require --queue or EFI_QUEUE" if not $queue;
 
-$maxJobs = 3 if not $maxJobs;
+$maxJobs = 4 if not $maxJobs;
 $dryRun = defined $dryRun;
 
 my $blasthits = 1000000;  
@@ -57,7 +57,7 @@ my $parts = partitionClusters($maxJobs, \@bySize, \%sizes);
 
 foreach my $partNum (keys %$parts) {
     my @clusterIds = @{$parts->{$partNum}};
-    my $np = getNumTasks(\@clusterIds, \%sizes);
+    my ($np, $ram) = getNumTasks(\@clusterIds, \%sizes);
 
     my $B = $SS->getBuilder();
     $B->addAction("module load $estModule");
@@ -105,7 +105,7 @@ foreach my $partNum (keys %$parts) {
     
     $B = $SS->getBuilder();
     $B->dependency(1, $jobId);
-    $B->resource(1, 1, "30gb");
+    $B->resource(1, 1, "${ram}gb");
 
     foreach my $clusterId (@clusterIds) {
         my $outDir = "$outputDir/cluster_$clusterId";
@@ -147,6 +147,7 @@ sub getNumTasks {
     my $sizes = shift;
 
     my $np = 24;
+    my $ram = 30;
 
     # First is largest
     my $ns = $sizes->{$ids->[$#$ids]};
@@ -164,8 +165,10 @@ sub getNumTasks {
         $np = 12;
     } elsif ($ns < 1200) {
         $np = 16;
+    } elsif ($ns > 10000) {
+        $ram = 150;
     }
-    return $np;
+    return ($np, $ram);
 }
 
 

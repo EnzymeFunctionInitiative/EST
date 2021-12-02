@@ -109,7 +109,7 @@ if (not $ramReservation and $ssnIn) {
 
 my $B = $SS->getBuilder();
 
-my $maxJobs = 3;
+my $maxJobs = 6;
 
 my $blastJobId = "";
 my @a = (('a'..'z'), 0..9);

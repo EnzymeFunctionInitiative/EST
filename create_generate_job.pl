@@ -815,14 +815,14 @@ print "Cat job is:\n $catjob\n" if not $runSerial;
 #
 $B = $S->getBuilder();
 
-$B->queue($memqueue);
-$B->resource(1, 1, "350gb");
+#TODO uncomment this $B->queue($memqueue);
+$B->resource(1, 4, "370gb");
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
-$B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
+$B->addAction("sort --parallel 4 -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
-$B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->addAction("sort --parallel 4 -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->addAction("echo 67 > $progressFile");
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile(getRenderFilePath("$scriptDir/blastreduce.sh"));
@@ -947,7 +947,7 @@ if (defined $LegacyGraphs) {
     my $evalueFile = "$outputDir/evalue.tab";
     my $defaultLengthFile = "$outputDir/length.tab";
     $B->resource(1, 1, "50gb");
-    $B->addAction("module load $gdMod");
+    $B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
     $B->addAction("mkdir -p $outputDir/rdata");

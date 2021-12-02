@@ -387,13 +387,13 @@ $dependencyId = getJobId($submitResult);
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, $dependencyId); 
-$B->resource(1, 1, "300gb");
+$B->resource(1, 4, "370gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
-$B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
+$B->addAction("sort --parallel 4 -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $filtSeqFile -out $outputDir/unsorted.1.out");
-$B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->addAction("sort --parallel 4 -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 

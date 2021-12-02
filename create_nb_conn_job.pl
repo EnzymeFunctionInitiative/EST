@@ -99,7 +99,7 @@ my $B = $SS->getBuilder();
 
 $B->resource(1, 1, "${ramReservation}gb");
 $B->addAction("source /etc/profile");
-$B->addAction("module load GD");
+$B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
 $B->addAction("module load Perl");
 $B->addAction("module load $estModule");
 $B->addAction("cd $outputPath");
