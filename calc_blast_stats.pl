@@ -48,7 +48,7 @@ if ($clusterModeDir) {
     }
     my $format = "%.${digits}e";
 
-    open my $fh, ">>", $statsFile or die "Unable to open stats file for appending $statsFile: $!";
+    open my $fh, ">", $statsFile or die "Unable to open stats file for appending $statsFile: $!";
     my @headers = ("Cluster Number", "Convergence Ratio", "Number of IDs", "Number of BLAST Matches", "SSN Cluster Convergence Ratio", "Number of Nodes", "Number of Edges");
     $fh->print(join("\t", @headers), "\n");
     foreach my $cluster (sort { $a <=> $b } keys %clusters) {
