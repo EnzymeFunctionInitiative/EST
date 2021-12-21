@@ -45,6 +45,7 @@ sub configure {
     $self->{config}->{max_results} = $args{max_results} ? $args{max_results} : 1000;
     # Comes from family config
     $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
+    $self->{config}->{tax_search} = $args{tax_search};
 }
 
 
@@ -91,6 +92,10 @@ sub parseFile {
         if ($count >= $self->{config}->{max_results}) {
             last;
         }
+    }
+
+    if ($self->{config}->{tax_search}) {
+        $ids = $self->excludeIds($ids);
     }
 
     $self->{data}->{uniprot_ids} = $ids;

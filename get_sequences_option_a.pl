@@ -52,6 +52,7 @@ if (exists $familyConfig->{data}) {
 
 my %blastArgs = EST::BLAST::getBLASTCmdLineArgs();
 $blastArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
+$blastArgs{tax_search} = $familyConfig->{config}->{tax_search};
 my $blastData = new EST::BLAST(dbh => $dbh);
 $blastData->configure(%blastArgs);
 $blastData->parseFile();

@@ -58,6 +58,7 @@ $accessionArgs{domain_family} = $familyConfig->{config}->{domain_family};
 $accessionArgs{domain_region} = $familyConfig->{config}->{domain_region};
 $accessionArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
 $accessionArgs{exclude_fragments} = $familyConfig->{config}->{exclude_fragments};
+$accessionArgs{tax_search} = $familyConfig->{config}->{tax_search};
 my $accessionData = new EST::Accession(dbh => $dbh, config_file_path => $configFile);
 $accessionData->configure(%accessionArgs);
 $accessionData->parseFile();

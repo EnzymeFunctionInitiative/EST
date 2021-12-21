@@ -51,7 +51,8 @@ if (exists $familyConfig->{data}) {
 
 
 my %fastaArgs = EST::FASTA::getFastaCmdLineArgs();
-my $fastaData = new EST::FASTA(config_file_path => $configFile);
+$fastaArgs{tax_search} = $familyConfig->{config}->{tax_search};
+my $fastaData = new EST::FASTA(dbh => $dbh, config_file_path => $configFile);
 $fastaData->configure(%fastaArgs);
 $fastaData->parseFile();
 

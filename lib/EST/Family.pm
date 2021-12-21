@@ -44,6 +44,7 @@ sub loadFamilyParameters {
     my ($useDomain, $fraction, $maxSequence, $maxFullFam);
     my ($unirefVersion);
     my ($domainFamily, $domainRegion, $excludeFragments);
+    my ($taxSearch);
 
     my $result = GetOptions(
         "ipro=s"                => \$ipro,
@@ -58,6 +59,7 @@ sub loadFamilyParameters {
         "fraction=i"            => \$fraction,
         "uniref-version=s"      => \$unirefVersion,
         "exclude-fragments"     => \$excludeFragments,
+        "tax-search=s"          => \$taxSearch,
     );
 
     my $data = {interpro => [], pfam => [], gene3d => [], ssf => []};
@@ -89,12 +91,34 @@ sub loadFamilyParameters {
     $config->{domain_family} =  ($config->{use_domain} and $domainFamily) ? $domainFamily : "";
     $config->{domain_region} =  ($config->{use_domain} and $domainRegion) ? $domainRegion : "";
     $config->{exclude_fragments}    = $excludeFragments;
+    $config->{tax_search} =     "";
+
+    if ($taxSearch) {
+        my $search = parseTaxSearch($taxSearch);
+        $config->{tax_search} = $search;
+    }
 
     if ($numFam) {
         return {data => $data, config => $config};
     } else {
         return {config => $config};
     }
+}
+
+
+sub parseTaxSearch {
+    my $taxSearch = shift;
+    $taxSearch =~ s/_/ /g;
+    my @parts = split(m/;/, $taxSearch);
+    my $search = {};
+    my %catMap = ("superkingdom" => "Domain", "kingdom" => "Kingdom", "phylum" => "Phylum", "class" => "Class", "order" => "TaxOrder", "family" => "Family", "genus" => "Genus", "species" => "Species");
+    foreach my $part (@parts) {
+        my ($c, $v) = split(m/:/, $part);
+        $c = lc $c;
+        my $cat = $catMap{$c} // $c;
+        push @{$search->{$cat}}, $v;
+    }
+    return $search;
 }
 
 
@@ -141,8 +165,10 @@ sub retrieveFamilyAccessions {
 
     my ($actualI, $fullFamSizeI, $allIdsI) = $self->getDomainFromDb("INTERPRO", $fractionFunc, $self->{family}->{interpro});
     my ($actualP, $fullFamSizeP, $allIdsP) = $self->getDomainFromDb("PFAM", $fractionFunc, \@pfam);
-    my ($actualG, $fullFamSizeG, $allIdsG) = $self->getDomainFromDb("GENE3D", $fractionFunc, $self->{family}->{gene3d});
-    my ($actualS, $fullFamSizeS, $allIdsS) = $self->getDomainFromDb("SSF", $fractionFunc, $self->{family}->{ssf});
+    #my ($actualG, $fullFamSizeG, $allIdsG) = $self->getDomainFromDb("GENE3D", $fractionFunc, $self->{family}->{gene3d});
+    #my ($actualS, $fullFamSizeS, $allIdsS) = $self->getDomainFromDb("SSF", $fractionFunc, $self->{family}->{ssf});
+    my ($actualG, $fullFamSizeG, $allIdsG) = (0, 0, []);
+    my ($actualS, $fullFamSizeS, $allIdsS) = (0, 0, []);
     
     my $domReg = $self->{config}->{domain_region};
     if ($domReg eq "cterminal" or $domReg eq "nterminal") {
@@ -206,18 +232,34 @@ sub getDomainFromDb {
     my $annoTable = "annotations";
     my $annoJoinStr = "LEFT JOIN $annoTable ON $table.accession = $annoTable.accession"; # Used conditionally
 
-    my $annoJoin = ($self->{config}->{fraction} > 1 or $self->{config}->{exclude_fragments} or $domReg eq "cterminal") ? $annoJoinStr : "";
-    my $spCol = $self->{config}->{fraction} > 1 ? ", $annoTable.STATUS AS STATUS" : "";
+    my $annoJoin = "";
+    if ($self->{config}->{fraction} > 1 or $self->{config}->{exclude_fragments} or $domReg eq "cterminal" or $self->{config}->{tax_search}) {
+        $annoJoin = $annoJoinStr;
+    }
+
+    my $spCol = "";
+    if ($self->{config}->{fraction} > 1) {
+        $spCol = ", $annoTable.STATUS AS STATUS";
+    }
+
     my $fragWhere = "";
-    if ($self->dbSupportsFragment() and $self->{config}->{exclude_fragments}) {
+    if ($self->{config}->{exclude_fragments} and $self->dbSupportsFragment()) {
         $fragWhere = " AND $annoTable.Fragment = 0";
     }
-    
+
+    my $taxSearchWhere = "";
+    my $taxSearchJoin = "";
+    if ($self->{config}->{tax_search}) {
+        my $cond = EST::Base::flattenTaxSearch($self->{config}->{tax_search});
+        $taxSearchWhere = "AND ($cond)";
+        $taxSearchJoin = "LEFT JOIN taxonomy ON $annoTable.Taxonomy_ID = taxonomy.Taxonomy_ID";
+    }
+
     my $seqLenCol = $domReg eq "cterminal" ? ", Sequence_Length AS full_len" : "";
     #$annoJoin = ($domReg eq "cterminal" and not $annoJoin) ? $annoJoinStr : "";
 
     foreach my $family (@families) {
-        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol $seqLenCol FROM $table $unirefJoin $annoJoin WHERE $table.id = '$family' $fragWhere";
+        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol $seqLenCol FROM $table $unirefJoin $annoJoin $taxSearchJoin WHERE $table.id = '$family' $fragWhere $taxSearchWhere";
         print "SQL $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;

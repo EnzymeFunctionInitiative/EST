@@ -47,6 +47,7 @@ sub configure {
     $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
     $self->{config}->{domain_region} = $args{domain_region};
     $self->{config}->{exclude_fragments} = $args{exclude_fragments};
+    $self->{config}->{tax_search} = $args{tax_search};
 }
 
 
@@ -99,8 +100,8 @@ sub parseFile {
     my $idMapper = new EFI::IdMapping(config_file_path => $self->{config_file_path});
     $self->reverseLookupManualAccessions($idMapper);
 
-    if ($self->{config}->{exclude_fragments}) {
-        $self->excludeFragments();
+    if ($self->{config}->{exclude_fragments} or $self->{config}->{tax_search}) {
+        $self->{data}->{uniprot_ids} = $self->excludeIds($self->{data}->{uniprot_ids});
     }
 
     if ($self->{config}->{uniref_version}) {
@@ -126,35 +127,12 @@ sub retrieveUniRefMetadata {
         if ($self->{config}->{exclude_fragments}) {
             $sql = "SELECT U.accession FROM uniref AS U LEFT JOIN annotations AS A ON U.accession = A.accession WHERE uniref${version}_seed = '$id' AND A.Fragment = 0";
         }
-        print "SQL $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         while (my $row = $sth->fetchrow_hashref) {
             push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
         }
     }
-}
-
-
-sub excludeFragments {
-    my $self = shift;
-
-    my %full;
-
-    my @ids = keys %{$self->{data}->{uniprot_ids}};
-    my $batchSize = 20;
-    while (scalar @ids) {
-        my @group = splice(@ids, 0, $batchSize);
-        my $whereIds = join(",", map { "'$_'" } @group);
-        my $sql = "SELECT accession FROM annotations WHERE accession IN ($whereIds) AND Fragment = 0";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute;
-        while (my $row = $sth->fetchrow_hashref) {
-            $full{$row->{accession}} = $self->{data}->{uniprot_ids}->{$row->{accession}};
-        }
-    }
-
-    $self->{data}->{uniprot_ids} = \%full;
 }
 
 

@@ -48,5 +48,44 @@ sub dbSupportsFragment {
 }
 
 
+sub flattenTaxSearch {
+    my $taxSearch = shift;
+    my @cond;
+    foreach my $cat (keys %$taxSearch) {
+        my $vals = $taxSearch->{$cat};
+        map { push @cond, "$cat LIKE '\%$_\%'" } @$vals;
+    }
+    my $where = join(" OR ", @cond);
+    return $where;
+}
+
+
+sub excludeIds {
+    my $self = shift;
+    my $ids = shift;
+
+    my %full;
+
+    my $fragmentWhere = $self->{config}->{exclude_fragments} ? "AND Fragment = 0" : "";
+    my $taxWhere = $self->{config}->{tax_search} ? (" AND (" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}) . ")") : "";
+    my $taxJoin = $self->{config}->{tax_search} ? "LEFT JOIN taxonomy ON annotations.Taxonomy_ID = taxonomy.Taxonomy_ID" : "";
+
+    my @ids = keys %$ids;
+    my $batchSize = 20;
+    while (scalar @ids) {
+        my @group = splice(@ids, 0, $batchSize);
+        my $whereIds = join(",", map { "'$_'" } @group);
+        my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            $full{$row->{accession}} = $ids->{$row->{accession}};
+        }
+    }
+
+    return \%full;
+}
+
+
 1;
 

@@ -27,6 +27,7 @@ sub new {
     die "No config parameter provided" if not exists $args{config_file_path};
 
     $self->{config_file_path} = $args{config_file_path};
+    $self->{dbh} = $args{dbh};
 
     return $self;
 }
@@ -41,6 +42,7 @@ sub configure {
 
     $self->{config}->{use_headers} = exists $args{use_headers} ? $args{use_headers} : 0;
     $self->{config}->{fasta_file} = $args{fasta_file};
+    $self->{config}->{tax_search} = $args{tax_search};
 }
 
 
@@ -170,6 +172,10 @@ sub parseFile {
 
     $parser->finish();
 
+    if ($self->{config}->{tax_search}) {
+        my $newUpMeta = $self->excludeIds($upMeta);
+        $upMeta = $newUpMeta;
+    }
     my @fastaUniprotMatch = sort keys %$upMeta;
 
     $self->{data}->{seq} = {};

@@ -70,8 +70,8 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments);
-my ($runSerial, $baseOutputDir);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch);
+my ($runSerial, $baseOutputDir, $largeMem);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -118,6 +118,8 @@ my $result = GetOptions(
     "config=s"          => \$configFile,    # new-style config file
     "exclude-fragments" => \$excludeFragments,
     "serial-script=s"   => \$runSerial,     # run in serial mode
+    "tax-search=s"      => \$taxSearch,
+    "large-mem"         => \$largeMem,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -460,6 +462,12 @@ mkdir $scriptDir;
 $scriptDir = $outputDir if not -d $scriptDir;
 
 
+my @allJobIds;
+my $sortPrefix = "br-";
+my @a = (('a'..'z'), 0..9);
+$sortPrefix .= $a[rand(@a)] for 1..5;
+
+
 ########################################################################################################################
 # Get sequences and annotations.  This creates fasta and struct.out files.
 #
@@ -534,6 +542,8 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     push @args, "-exclude-fragments" if $excludeFragments;
 
+    push @args, "-tax-search \"$taxSearch\"" if $taxSearch;
+
     $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
 
     my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
@@ -588,6 +598,9 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 } else {
     die "Error Submitting Import Job\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
 }
+
+push @allJobIds, $prevJobId;
+
 
 
 #######################################################################################################################
@@ -669,6 +682,8 @@ chomp $muxjob;
 print "mux job is:\n $muxjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $muxjob;
 
+push @allJobIds, $prevJobId;
+
 
 ########################################################################################################################
 # Break sequenes.fa into parts so we can run blast in parallel.
@@ -686,6 +701,8 @@ my $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
 chomp $fracfilejob;
 print "fracfile job is:\n $fracfilejob\n" if not $runSerial;
 ($prevJobId) = split /\./, $fracfilejob;
+
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -712,6 +729,8 @@ my $createdbjob = $S->submit("$scriptDir/createdb.sh");
 chomp $createdbjob;
 print "createdb job is:\n $createdbjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $createdbjob;
+
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -786,6 +805,8 @@ chomp $blastjob;
 print "blast job is:\n $blastjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $blastjob;
 
+push @allJobIds, $prevJobId;
+
 
 ########################################################################################################################
 # Join all the blast outputs back together
@@ -809,20 +830,23 @@ chomp $catjob;
 print "Cat job is:\n $catjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $catjob;
 
+push @allJobIds, $prevJobId;
+
 
 ########################################################################################################################
 # Remove like vs like and reverse matches
 #
 $B = $S->getBuilder();
 
-#TODO uncomment this $B->queue($memqueue);
-$B->resource(1, 4, "370gb");
+$B->queue($memqueue);
+my $sortRam = $largeMem ? "700gb" : "370gb";
+$B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
-$B->addAction("sort --parallel 4 -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
+$B->addAction("sort --parallel 4 -T $sortdir --compress-program gzip -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
-$B->addAction("sort --parallel 4 -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->addAction("sort --parallel 4 -T $sortdir --compress-program gzip -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->addAction("echo 67 > $progressFile");
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile(getRenderFilePath("$scriptDir/blastreduce.sh"));
@@ -832,6 +856,8 @@ chomp $blastreducejob;
 print "Blastreduce job is:\n $blastreducejob\n" if not $runSerial;
 
 ($prevJobId) = split /\./, $blastreducejob;
+
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -862,6 +888,7 @@ chomp $demuxjob;
 print "Demux job is:\n $demuxjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $demuxjob;
 
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -878,6 +905,8 @@ my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
 chomp $convRatioJob;
 print "Convergence ratio job is:\n $convRatioJob\n" if not $runSerial;
 my @convRatioJobLine=split /\./, $convRatioJob;
+
+push @allJobIds, $convRatioJobLine[0];
 
 
 
@@ -1008,7 +1037,19 @@ $B->renderToFile(getRenderFilePath("$scriptDir/graphs.sh"));
 my $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n" if not $runSerial;
+($prevJobId) = split /\./, $graphjob;
 
+push @allJobIds, $prevJobId;
+
+
+$B = $S->getBuilder();
+
+$B->resource(1, 1, "1gb");
+$B->dependency(1, \@allJobIds);
+$B->addAction("rm -f $sortdir/$sortPrefix*");
+$B->jobName("${jobNamePrefix}cleanuperr");
+$B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
+my $cleanupErrJob = $S->submit("$scriptDir/cleanuperr.sh");
 
 
 

@@ -21,7 +21,7 @@ use BlastUtil;
 
 my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch);
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "tmp|tmpdir=s"      => \$tmpdir,
@@ -51,6 +51,7 @@ my $result = GetOptions(
     "config=s"          => \$configFile,    # new-style config file
     "exclude-fragments" => \$excludeFragments,
     "db-type=s"         => \$dbType, # uniprot, uniref50, uniref90  default to uniprot
+    "tax-search=s"      => \$taxSearch,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -250,6 +251,8 @@ push @args, "-blast-file $outputDir/blastfinal.tab";
 push @args, "-query-file $queryFile";
 push @args, "-max-results $maxBlastResults" if $maxBlastResults;
 push @args, "-exclude-fragments" if $excludeFragments;
+push @args, "-tax-search \"$taxSearch\"" if $taxSearch;
+
 
 $B = $S->getBuilder();
 $B->dependency(0, $dependencyId); 
