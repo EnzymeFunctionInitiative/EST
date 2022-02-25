@@ -19,8 +19,8 @@ usage: get_fasta.pl -input file_containing_input_ids -output output_file
 USAGE
 ;
 
-my $blastDbPath = $ENV{EFIDBPATH};
-die "No EFIDBPATH environment variable provided." if not $blastDbPath;
+my $blastDbPath = $ENV{EFI_DB_DIR};
+die "No EFI_DB_DIR environment variable provided." if not $blastDbPath;
 die "Input file does not exist." if not -f $inputFile;
 
 print "Using blast database: $blastDbPath\n";
@@ -31,6 +31,7 @@ my %clusters;
 open my $fh, "<", $inputFile;
 while (<$fh>) {
     chomp;
+    next if not m/^[A-Z]/i;
     my ($id, $cluster) = split(m/\t/);
     push @ids, $id;
     push @{$clusters{$cluster}}, $id if $cluster and $byCluster;

@@ -101,7 +101,11 @@ sub parseFile {
     $self->reverseLookupManualAccessions($idMapper);
 
     if ($self->{config}->{exclude_fragments} or $self->{config}->{tax_search}) {
-        $self->{data}->{uniprot_ids} = $self->excludeIds($self->{data}->{uniprot_ids});
+    #if ($self->{config}->{exclude_fragments}) {
+        my $filterTax = ($self->{config}->{tax_search} and not $self->{config}->{uniref_version}) ? 1 : 0;
+        $self->{data}->{uniprot_ids} = $self->excludeIds($self->{data}->{uniprot_ids}, $filterTax);
+        my $data = $self->{data};
+        map { delete $data->{meta}->{$_} if not $data->{uniprot_ids}->{$_}; } keys %{ $data->{meta} };
     }
 
     if ($self->{config}->{uniref_version}) {
@@ -121,16 +125,81 @@ sub retrieveUniRefMetadata {
 
     my $version = $self->{config}->{uniref_version};
 
+    my $taxSearch = $self->{config}->{tax_search};
+
+    my @extraCols;
+    my @extraJoin;
+    my @extraWhere;
+    if ($self->{config}->{exclude_fragments} or $taxSearch) {
+        push @extraJoin, "LEFT JOIN annotations AS A ON U.accession = A.accession";
+        if ($self->{config}->{exclude_fragments}) {
+            push @extraWhere, "A.Fragment = 0";
+        }
+        # This code removes any members of a UniRef cluster that do not match the taxonomy filter.  As of 2/23/22 it is disabled
+        # because we want to include all members.
+        if ($taxSearch) {
+            push @extraJoin, "LEFT JOIN taxonomy AS T ON A.Taxonomy_ID = T.Taxonomy_ID";
+            foreach my $cat (keys %$taxSearch) {
+                push @extraCols, "T.$cat AS T_$cat";
+            }
+            #push @extraWhere, "(" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}, "T") . ")";
+        }
+    }
+
+    my $extraWhere = join(" AND ", @extraWhere);
+    $extraWhere = "AND $extraWhere" if $extraWhere;
+    my $extraJoin = join(" ", @extraJoin);
+    my $extraCols = join(", ", @extraCols);
+    $extraCols = ", $extraCols" if $extraCols;
+
+    my %taxValues;
     my $metaKey = "UniRef${version}_IDs";
     foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
-        my $sql = "SELECT accession FROM uniref WHERE uniref${version}_seed = '$id'";
-        if ($self->{config}->{exclude_fragments}) {
-            $sql = "SELECT U.accession FROM uniref AS U LEFT JOIN annotations AS A ON U.accession = A.accession WHERE uniref${version}_seed = '$id' AND A.Fragment = 0";
-        }
+        my $sql = "SELECT U.accession $extraCols FROM uniref AS U $extraJoin WHERE U.uniref${version}_seed = '$id' $extraWhere";
+        #print "ACCESSION METADATA $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         while (my $row = $sth->fetchrow_hashref) {
             push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
+
+            # Get the taxonomy
+            if ($taxSearch) {
+                foreach my $cat (keys %$taxSearch) {
+                    $taxValues{$row->{accession}}->{$cat} = $row->{"T_$cat"};
+                }
+            }
+        }
+    }
+
+    my $matchTaxFilter = sub {
+        my @theIds = @_;
+        foreach my $cat (keys %$taxSearch) {
+            foreach my $pat (@{ $taxSearch->{$cat} }) {
+                foreach my $id (@theIds) {
+                    next if not $taxValues{$id}->{$cat};
+                    return 1 if $taxValues{$id}->{$cat} =~ m/$pat/i;
+                }
+            }
+        }
+        return 0;
+    };
+
+    if ($taxSearch) {
+        my $unirefData = $self->{data}->{meta};
+        foreach my $unirefId (keys %taxValues) {
+            next if not $unirefData->{$unirefId};
+            # This is a uniref ID
+
+            my @clusterIds = @{ $unirefData->{$unirefId}->{$metaKey} };
+            #my @kids = grep { $_ ne $unirefId} @{ $unirefData->{$unirefId}->{$metaKey} };
+            # See if the children match, if so automatically include
+            #if (&$matchTaxFilter($unirefId) or &$matchTaxFilter(@kids)) {
+            if (&$matchTaxFilter(@clusterIds)) {
+                # inclusion is automatic at this point
+            } else {
+                delete $unirefData->{$unirefId};
+                delete $self->{data}->{uniprot_ids}->{$unirefId};
+            }
         }
     }
 }

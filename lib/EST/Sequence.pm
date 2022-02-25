@@ -53,7 +53,6 @@ sub retrieveAndSaveSequences {
         my @batch = splice(@ids, 0, $self->{batch_size});
         my $batchline = join ',', @batch;
             my @parms = ("fastacmd", "-d", "$self->{fasta_db}", "-s", "$batchline");
-            print join(" ", @parms), "\n";
         my ($fastacmdOutput, $fastaErr) = capture {
             system(@parms);
         };

@@ -70,7 +70,7 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly);
 my ($runSerial, $baseOutputDir, $largeMem);
 my $result = GetOptions(
     "np=i"              => \$np,
@@ -120,6 +120,7 @@ my $result = GetOptions(
     "serial-script=s"   => \$runSerial,     # run in serial mode
     "tax-search=s"      => \$taxSearch,
     "large-mem"         => \$largeMem,
+    "tax-search-only"   => \$taxSearchOnly,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -293,6 +294,7 @@ if (not defined $incfrac) {
 
 $excludeFragments = defined($excludeFragments);
 $runSerial = defined($runSerial) ? $runSerial : "";
+$useFastaHeaders = ($taxSearchOnly or $useFastaHeaders);
 
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
@@ -473,6 +475,7 @@ $sortPrefix .= $a[rand(@a)] for 1..5;
 #
 my $B = $S->getBuilder();
 $B->resource(1, 1, "5gb");
+$B->mailEnd() if $taxSearchOnly;
 my $prevJobId;
 
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
@@ -542,9 +545,23 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     push @args, "-exclude-fragments" if $excludeFragments;
 
-    push @args, "-tax-search \"$taxSearch\"" if $taxSearch;
+    my $taxOutputFile = "$outputDir/tax.json";
+    #push @args, "--tax-search \"$taxSearch\" --tax-output $taxOutputFile" if $taxSearch;
+    push @args, "--tax-search \"$taxSearch\"" if $taxSearch;
 
     $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
+
+    #if ($taxSearchOnly or not $fastaFile) {
+    {
+        #my $useUnirefArg = (not $fastaFile and not $accessionFile) ? "--use-uniref" : "";
+        # If a uniref version is specified, assume that the input IDs are that version, expand them, and then get
+        # the taxonomy for that and all uniref IDs.  If a uniref version is not specified, then get the taxonomy for that and all uniref IDs.
+        my $useUnirefArg = (not $fastaFile) ? ("--use-uniref" . ($unirefVersion ? " --uniref-version $unirefVersion" : "")) : "";
+        #$B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile --metadata-file $metadataFile --config $configFile $useUnirefArg");
+        #my $sourceFileArg = $accessionFile ? "--metadata-file $metadataFile" : "--accession-file $accOutFile";
+        my $sourceFileArg = "--accession-file $accOutFile";
+        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg");
+    }
 
     my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
     push @lenUniprotArgs, "-output $lenUniprotFile";
@@ -559,6 +576,11 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
 
+    if ($taxSearchOnly) {
+        $B->addAction("formatdb -i $allSeqFile -n database -p T -o T ");
+        $B->addAction("touch $outputDir/1.out.completed");
+    }
+
     $B->addAction("echo 33 > $progressFile");
     $B->jobName("${jobNamePrefix}initial_import");
     $B->renderToFile(getRenderFilePath("$scriptDir/initial_import.sh"));
@@ -569,6 +591,10 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     print "import job is:\n $importjob\n" if not $runSerial;
     ($prevJobId) = split(/\./, $importjob);
+
+    if ($taxSearchOnly) {
+        exit;
+    }
 
 # Tax id code is different, so it is exclusive
 } elsif ($taxid) {

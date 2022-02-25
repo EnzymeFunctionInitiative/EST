@@ -50,10 +50,12 @@ sub dbSupportsFragment {
 
 sub flattenTaxSearch {
     my $taxSearch = shift;
+    my $tablePrefix = shift // "";
+    $tablePrefix = "$tablePrefix." if $tablePrefix;
     my @cond;
     foreach my $cat (keys %$taxSearch) {
         my $vals = $taxSearch->{$cat};
-        map { push @cond, "$cat LIKE '\%$_\%'" } @$vals;
+        map { push @cond, "$tablePrefix$cat LIKE '\%$_\%'" } @$vals;
     }
     my $where = join(" OR ", @cond);
     return $where;
@@ -63,19 +65,27 @@ sub flattenTaxSearch {
 sub excludeIds {
     my $self = shift;
     my $ids = shift;
+    my $useTax = shift // 1;
 
     my %full;
 
     my $fragmentWhere = $self->{config}->{exclude_fragments} ? "AND Fragment = 0" : "";
-    my $taxWhere = $self->{config}->{tax_search} ? (" AND (" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}) . ")") : "";
-    my $taxJoin = $self->{config}->{tax_search} ? "LEFT JOIN taxonomy ON annotations.Taxonomy_ID = taxonomy.Taxonomy_ID" : "";
+    my $taxWhere = "";
+    my $taxJoin = "";
+    if ($useTax) {
+        $taxWhere = $self->{config}->{tax_search} ? (" AND (" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}) . ")") : "";
+        $taxJoin = $self->{config}->{tax_search} ? "LEFT JOIN taxonomy ON annotations.Taxonomy_ID = taxonomy.Taxonomy_ID" : "";
+    }
 
     my @ids = keys %$ids;
-    my $batchSize = 20;
+    my $batchSize = 1;
     while (scalar @ids) {
-        my @group = splice(@ids, 0, $batchSize);
-        my $whereIds = join(",", map { "'$_'" } @group);
-        my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
+        my $id = shift @ids;
+        #my @group = splice(@ids, 0, $batchSize);
+        #my $whereIds = join(",", map { "'$_'" } @group);
+        #my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
+        my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession = '$id' $fragmentWhere $taxWhere";
+        print "EXCLUDE SQL $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         while (my $row = $sth->fetchrow_hashref) {
