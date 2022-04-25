@@ -44,7 +44,7 @@ sub configure {
     $self->{config}->{query_file} = $args{query_file};
     $self->{config}->{max_results} = $args{max_results} ? $args{max_results} : 1000;
     # Comes from family config
-    $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
+    $self->{config}->{blast_uniref_version} = ($args{blast_uniref_version} and ($args{blast_uniref_version} == 50 or $args{blast_uniref_version} == 90)) ? $args{blast_uniref_version} : "";
     $self->{config}->{tax_search} = $args{tax_search};
 }
 
@@ -53,18 +53,20 @@ sub configure {
 # Look in @ARGV
 sub getBLASTCmdLineArgs {
 
-    my ($blastFile, $nResults, $queryFile);
+    my ($blastFile, $nResults, $queryFile, $blastUnirefVersion);
     my $result = GetOptions(
         "blast-file=s"          => \$blastFile,
         "max|max-results=i"     => \$nResults,
         "query-file=s"          => \$queryFile,
+        "blast-uniref-version=i"=> \$blastUnirefVersion,
     );
 
     $blastFile = "" if not $blastFile;
     $nResults = 1000 if not $nResults;
     $queryFile = "" if not $queryFile;
+    $blastUnirefVersion = "" if not $blastUnirefVersion;
 
-    return (blast_file => $blastFile, max_results => $nResults, query_file => $queryFile);
+    return (blast_file => $blastFile, max_results => $nResults, query_file => $queryFile, blast_uniref_version => $blastUnirefVersion);
 }
 
 
@@ -103,7 +105,7 @@ sub parseFile {
     $self->{data}->{query_seq} = $self->loadQuerySequence();
 
     $self->{data}->{metadata} = {};
-    if ($self->{config}->{uniref_version}) {
+    if ($self->{config}->{blast_uniref_version}) {
         $self->retrieveUniRefMetadata();
     }
 
@@ -116,7 +118,7 @@ sub parseFile {
 sub retrieveUniRefMetadata {
     my $self = shift;
 
-    my $version = $self->{config}->{uniref_version};
+    my $version = $self->{config}->{blast_uniref_version};
 
     my $metaKey = "UniRef${version}_IDs";
     foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
@@ -124,7 +126,7 @@ sub retrieveUniRefMetadata {
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         while (my $row = $sth->fetchrow_hashref) {
-            push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
+            push @{$self->{data}->{metadata}->{$id}->{$metaKey}}, $row->{accession};
         }
     }
 }
@@ -141,7 +143,7 @@ sub getMetadata {
     my $self = shift;
     
     my $md = $self->{data}->{metadata};
-    map { $md->{$_} = {}; } keys %{$self->{data}->{uniprot_ids}};
+    map { $md->{$_} = {} if not $md->{$_}; } keys %{$self->{data}->{uniprot_ids}};
 
     (my $len = $self->{data}->{query_seq}) =~ s/\s//gs;
     $md->{$INPUT_SEQ_ID} = {

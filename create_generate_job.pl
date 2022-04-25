@@ -70,8 +70,9 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax);
 my ($runSerial, $baseOutputDir, $largeMem);
+my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -121,6 +122,8 @@ my $result = GetOptions(
     "tax-search=s"      => \$taxSearch,
     "large-mem"         => \$largeMem,
     "tax-search-only"   => \$taxSearchOnly,
+    "source-tax=s"      => \$sourceTax,
+    "legacy-anno"       => \$legacyAnno, # Remove the legacy after summer 2022
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -383,14 +386,20 @@ $seqCountFile = "$outputDir/acc_counts" if not $seqCountFile;
 # Error checking for user supplied dat and fa files
 my $accessionFileOption = "";
 my $noMatchFileOption = "";
+my $taxSourceAccessionFile = "";
 if (defined $accessionFile and -e $accessionFile) {
-    $accessionFile = $baseOutputDir . "/$accessionFile" if not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
+    if ($sourceTax) {
+        $taxSourceAccessionFile = $accessionFile;
+        my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
+        $accessionFile = $baseOutputDir . "/$taxJobId.txt";
+    } elsif (not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/)) {
+        $accessionFile = $baseOutputDir . "/$accessionFile";
+    }
     $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $baseOutputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFileOption = "-no-match-file $noMatchFile";
-
 } else {
     $accessionFile = "";
 }
@@ -544,11 +553,17 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     }
 
     push @args, "-exclude-fragments" if $excludeFragments;
+    push @args, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
 
     my $taxOutputFile = "$outputDir/tax.json";
     #push @args, "--tax-search \"$taxSearch\" --tax-output $taxOutputFile" if $taxSearch;
     push @args, "--tax-search \"$taxSearch\"" if $taxSearch;
 
+    if ($accessionFile and $sourceTax) {
+        my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
+        my @srcArgs = ("--json-file", $taxSourceAccessionFile, "--tree-id", $taxTreeId, "--id-type", $taxIdType, "--output-file", $accessionFile);
+        $B->addAction("$efiEstTools/extract_taxonomy_tree.pl " . join(" ", @srcArgs));
+    }
     $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
 
     #if ($taxSearchOnly or not $fastaFile) {
@@ -560,17 +575,20 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         #$B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile --metadata-file $metadataFile --config $configFile $useUnirefArg");
         #my $sourceFileArg = $accessionFile ? "--metadata-file $metadataFile" : "--accession-file $accOutFile";
         my $sourceFileArg = "--accession-file $accOutFile";
-        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg");
+        my $legacyAnnoArg = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
+        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg $legacyAnnoArg"); # Remove the legacy after summer 2022
     }
 
     my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
     push @lenUniprotArgs, "-output $lenUniprotFile";
     push @lenUniprotArgs, "-expand-uniref" if $unirefVersion;
+    push @lenUniprotArgs, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
     $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUniprotArgs));
     
     if ($unirefVersion) {
         my @lenUnirefArgs = ("-struct $metadataFile", "-config $configFile");
         push @lenUnirefArgs, "-output $lenUnirefFile";
+        push @lenUnirefArgs, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
         $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUnirefArgs));
     }
 

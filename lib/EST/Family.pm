@@ -45,6 +45,7 @@ sub loadFamilyParameters {
     my ($unirefVersion);
     my ($domainFamily, $domainRegion, $excludeFragments);
     my ($taxSearch);
+    my ($legacyAnno); # Remove this after summer 2022
 
     my $result = GetOptions(
         "ipro=s"                => \$ipro,
@@ -60,6 +61,7 @@ sub loadFamilyParameters {
         "uniref-version=s"      => \$unirefVersion,
         "exclude-fragments"     => \$excludeFragments,
         "tax-search=s"          => \$taxSearch,
+        "legacy-anno"           => \$legacyAnno, # Remove this after summer 2022
     );
 
     my $data = {interpro => [], pfam => [], gene3d => [], ssf => []};
@@ -92,6 +94,7 @@ sub loadFamilyParameters {
     $config->{domain_region} =  ($config->{use_domain} and $domainRegion) ? $domainRegion : "";
     $config->{exclude_fragments}    = $excludeFragments;
     $config->{tax_search} =     "";
+    $config->{legacy_anno} = $legacyAnno // 0; # Remove this after summer 2022
 
     if ($taxSearch) {
         my $search = parseTaxSearch($taxSearch);
@@ -149,7 +152,7 @@ sub retrieveFamilyAccessions {
             my $count = shift;
             my $status = shift || "";
             # Always return true for SwissProt proteins
-            return ($status eq "Reviewed" or $count % $self->{config}->{fraction} == 0);
+            return ($status or $count % $self->{config}->{fraction} == 0);
         };
     }
 
@@ -240,19 +243,28 @@ sub getDomainFromDb {
 
     my $spCol = "";
     if ($self->{config}->{fraction} > 1) {
-        $spCol = ", $annoTable.STATUS AS STATUS";
+        #TODO
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "STATUS AS swissprot_status" : "swissprot_status";
+        $spCol = ", $annoTable.$colVer";
     }
 
     my $fragWhere = "";
     if ($self->{config}->{exclude_fragments} and $self->dbSupportsFragment()) {
-        $fragWhere = " AND $annoTable.Fragment = 0";
+        #TODO
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "Fragment" : "is_fragment";
+        $fragWhere = " AND $annoTable.$colVer = 0";
     }
 
     my $taxSearchWhere = "";
     my $taxSearchJoin = "";
     my $taxCols = "";
     if ($isTaxSearch) {
-        $taxSearchJoin = "LEFT JOIN taxonomy AS T ON $annoTable.Taxonomy_ID = T.Taxonomy_ID";
+        #TODO
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "Taxonomy_ID" : "taxonomy_id";
+        $taxSearchJoin = "LEFT JOIN taxonomy AS T ON $annoTable.$colVer = T.$colVer";
         if (not $unirefVersion) {
             my $cond = EST::Base::flattenTaxSearch($taxSearch);
             $taxSearchWhere = "AND ($cond)";
@@ -265,7 +277,9 @@ sub getDomainFromDb {
         }
     }
 
-    my $seqLenCol = $domReg eq "cterminal" ? ", Sequence_Length AS full_len" : "";
+    # Remove the legacy after summer 2022
+    my $colVer = $self->{config}->{legacy_anno} ? "Sequence_Length" : "seq_len";
+    my $seqLenCol = $domReg eq "cterminal" ? ", $colVer AS full_len" : "";
     #$annoJoin = ($domReg eq "cterminal" and not $annoJoin) ? $annoJoinStr : "";
 
     my %taxValues;
@@ -281,7 +295,13 @@ sub getDomainFromDb {
             next if (not $useDomain and exists $idsProcessed{$uniprotId});
             $idsProcessed{$uniprotId} = 1;
 
-            my $isSwissProt = $self->{config}->{fraction} > 1 ? $row->{STATUS} eq "Reviewed" : 0;
+            #TODO
+            # Remove the legacy after summer 2022
+            my $isSwissProt = 0;
+            if ($self->{config}->{fraction} > 1) {
+                my $spVal = $self->{config}->{legacy_anno} ? ($row->{swissprot_status} and $row->{swissprot_status} eq "Reviewed") : $row->{swissprot_status};
+                $isSwissProt = ($self->{config}->{fraction} > 1 and $spVal);
+            }
             my $isFraction = &$fractionFunc($count);
 
             if ($unirefVersion) {

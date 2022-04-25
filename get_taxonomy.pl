@@ -21,6 +21,7 @@ use EFI::Database;
 
 
 my ($accIdFile, $outputFile, $configFile, $metadataFile, $useUniref, $unirefVersion, $debug);
+my ($legacyAnno); # Remove the legacy after summer 2022
 my $result = GetOptions(
     "accession-file=s"  => \$accIdFile,
     "output-file=s"     => \$outputFile,
@@ -29,6 +30,7 @@ my $result = GetOptions(
     "use-uniref"        => \$useUniref,
     "uniref-version=i"  => \$unirefVersion,
     "debug"             => \$debug,
+    "legacy-anno"       => \$legacyAnno, # Remove this after summer 2022
 );
 
 if ((not $configFile or not -f $configFile) and exists $ENV{EFI_CONFIG} and -f $ENV{EFI_CONFIG}) {
@@ -93,9 +95,16 @@ if ($useUniref) {
     }
 }
 
+
+
+#TODO
+# Remove the legacy after summer 2022
+my $colVer = $legacyAnno ? "Taxonomy_ID" : "taxonomy_id";
+
+my $nodeId = 0;
 foreach my $id (@ids) {
     #my $sql = "SELECT T.* $unirefCol FROM taxonomy AS T LEFT JOIN annotations AS A ON T.Taxonomy_ID = A.Taxonomy_ID $unirefJoin WHERE A.accession = '$id'";
-    my $sql = "SELECT A.accession, T.* $unirefCol FROM taxonomy AS T LEFT JOIN annotations AS A ON T.Taxonomy_ID = A.Taxonomy_ID $unirefJoin WHERE $conditionCol = '$id'";
+    my $sql = "SELECT A.accession, T.* $unirefCol FROM taxonomy AS T LEFT JOIN annotations AS A ON T.$colVer = A.$colVer $unirefJoin WHERE $conditionCol = '$id'";
     print "TAXONOMY SQL $sql\n" if $debug;
     my $sth = $dbh->prepare($sql);
     $sth->execute;
@@ -132,9 +141,10 @@ my $taxTable = $taxData->{data};
 #            Species => 8,
 #        };
 my $speciesMap = {};
-my ($kids, $numSeq, $numUR90Seq, $numUR50Seq, $numSpecies) = traverseTree($taxTable, "root", $speciesMap, 1);
+my $id = 1;
+my ($kids, $numSeq, $numUR90Seq, $numUR50Seq, $numSpecies) = traverseTree($taxTable, "root", $speciesMap, 1, \$id);
 
-my $data = {nq => $numSeq, ns => $numSpecies, node => "Root", children => $kids, d => 0 };
+my $data = {nq => $numSeq, ns => $numSpecies, node => "Root", children => $kids, d => 0, id => 0};
 #my $data = {nq => $numSeq, n9 => $numUR90Seq, n5 => $numUR50Seq, ns => $numSpecies, node => "Root", children => $kids, d => 0 };
 my $taxStuff = {
 #    tree => $taxTable,
@@ -168,31 +178,40 @@ sub addTaxData {
     my $uniprot = $row->{accession};
     my $uniref50 = $row->{uniref50_seed} // "";
     my $uniref90 = $row->{uniref90_seed} // "";
+
+    my ($domainCol, $kingdomCol, $phylumCol, $classCol, $orderCol, $familyCol, $genusCol, $speciesCol) =
+       ("domain",   "kingdom",   "phylum",   "class",   "tax_order", "family", "genus",   "species");
+    # Remove the legacy after summer 2022
+    if ($legacyAnno) {
+        ($domainCol, $kingdomCol, $phylumCol, $classCol, $orderCol, $familyCol, $genusCol, $speciesCol) =
+        ("Domain",   "Kingdom",   "Phylum",   "Class",   "TaxOrder", "Family",  "Genus",   "Species");
+    }
+
     if (not $taxData->{unique_test}->{$uniprot}) {
-        my $isValid = ($row->{Domain} or $row->{Kingdom} or $row->{Phylum} or $row->{Class} or $row->{TaxOrder} or $row->{Family} or $row->{Genus} or $row->{Species});
+        my $isValid = ($row->{$domainCol} or $row->{$kingdomCol} or $row->{$phylumCol} or $row->{$classCol} or $row->{$orderCol} or $row->{$familyCol} or $row->{$genusCol} or $row->{$speciesCol});
         return if not $isValid;
         my $leafData = {"sa" => $uniprot, "sa50" => $uniref50, "sa90" => $uniref90};
 #        print <<DEBUG;
 #$uniprot $uniref50 $uniref90
-#    Domain:	$row->{Domain}
-#    Kingdom:	$row->{Kingdom}
-#    Phylum:	$row->{Phylum}
-#    Class:	$row->{Class}
-#    TaxOrder:	$row->{TaxOrder}
-#    Family:	$row->{Family}
-#    Genus:	$row->{Genus}
-#    Species:	$row->{Species}
+#    Domain:	$row->{domain}
+#    Kingdom:	$row->{kingdom}
+#    Phylum:	$row->{phylum}
+#    Class:	$row->{class}
+#    TaxOrder:	$row->{tax_order}
+#    Family:	$row->{family}
+#    Genus:	$row->{genus}
+#    Species:	$row->{species}
 #DEBUG
         push @{
             $taxData->{data}->
-                {$row->{Domain}     // "None"}->
-                {$row->{Kingdom}    // "None"}->
-                {$row->{Phylum}     // "None"}->
-                {$row->{Class}      // "None"}->
-                {$row->{TaxOrder}   // "None"}->
-                {$row->{Family}     // "None"}->
-                {$row->{Genus}      // "None"}->
-                {$row->{Species}    // "None"}->{sequences}
+                {$row->{$domainCol}     // "None"}->
+                {$row->{$kingdomCol}    // "None"}->
+                {$row->{$phylumCol}     // "None"}->
+                {$row->{$classCol}      // "None"}->
+                {$row->{$orderCol}      // "None"}->
+                {$row->{$familyCol}     // "None"}->
+                {$row->{$genusCol}      // "None"}->
+                {$row->{$speciesCol}    // "None"}->{sequences}
             }, $leafData;
         $taxData->{unique_test}->{$uniprot} = 1;
     }
@@ -204,6 +223,7 @@ sub traverseTree {
     my $parentName = shift;
     my $speciesMap = shift;
     my $level = shift;
+    my $idRef = shift;
 
     my $numSpecies = 0;
     my $numSeq = 0;
@@ -226,7 +246,8 @@ sub traverseTree {
             map { $ur50Map{$_->{sa50}} = 1 } @$group;
         } else {
             my $struct = {node => $name};
-            my ($kids, $numSeqNext, $numUR90SeqNext, $numUR50SeqNext, $numSpeciesNext) = traverseTree($group, lc($name), $speciesMap, $level + 1);
+            $struct->{id} = ${$idRef}++;
+            my ($kids, $numSeqNext, $numUR90SeqNext, $numUR50SeqNext, $numSpeciesNext) = traverseTree($group, lc($name), $speciesMap, $level + 1, $idRef);
             $struct->{nq} = $numSeqNext;
             #$struct->{n9} = $numUR90SeqNext;
             #$struct->{n5} = $numUR50SeqNext;

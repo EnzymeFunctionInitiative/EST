@@ -34,6 +34,7 @@ my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $m
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
     $computeNc, $noRepNodeNetworks, $cleanup);
+my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -64,6 +65,7 @@ my $result = GetOptions(
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$configFile,        # config file path, if not given will look for EFICONFIG env var
     "keep-xgmml"            => \$cleanup,
+    "legacy-anno"           => \$legacyAnno, # Remove the legacy after summer 2022
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -199,16 +201,17 @@ my $annoSpecFile = "$generateDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
 if ($useAnnoSpec) {
     open SPEC, ">", $annoSpecFile;
     print SPEC <<ANNO;
-Sequence_Length
-Organism
-Superkingdom
-Description
+seq_len
+organism
+superkingdom
+description
 ANNO
     close SPEC;
 }
 
 my $hasDomain = checkForDomain("$generateDir/1.out");
 
+my $legacyAnnoArgs = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
 my $userHeaderFileOption = "-meta-file $userHeaderFile";
 my $annoSpecOption = $useAnnoSpec ? " -anno-spec-file $annoSpecFile" : "";
 my $lenArgs = "-min-len $minlen -max-len $maxlen";
@@ -221,7 +224,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("module load $perlMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption $annoSpecOption -config=$configFile");
+$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption $annoSpecOption -config=$configFile $legacyAnnoArgs"); # Remove the legacy after summer 2022
 $B->jobName("${jobNamePrefix}get_annotations");
 $B->renderToFile("$analysisDir/get_annotations.sh");
 my $annojob = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
@@ -275,7 +278,7 @@ my $seqsArg = $includeSeqs ? "-include-sequences" : "";
 $seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
 $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc;
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
 $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");

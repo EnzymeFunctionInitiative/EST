@@ -48,6 +48,7 @@ sub configure {
     $self->{config}->{domain_region} = $args{domain_region};
     $self->{config}->{exclude_fragments} = $args{exclude_fragments};
     $self->{config}->{tax_search} = $args{tax_search};
+    $self->{config}->{legacy_anno} = $args{legacy_anno} // 0;
 }
 
 
@@ -133,12 +134,16 @@ sub retrieveUniRefMetadata {
     if ($self->{config}->{exclude_fragments} or $taxSearch) {
         push @extraJoin, "LEFT JOIN annotations AS A ON U.accession = A.accession";
         if ($self->{config}->{exclude_fragments}) {
-            push @extraWhere, "A.Fragment = 0";
+            # Remove the legacy after summer 2022
+            my $fragmentCol = $self->{config}->{legacy_anno} ? "Fragment" : "is_fragment";
+            push @extraWhere, "A.$fragmentCol = 0";
         }
         # This code removes any members of a UniRef cluster that do not match the taxonomy filter.  As of 2/23/22 it is disabled
         # because we want to include all members.
         if ($taxSearch) {
-            push @extraJoin, "LEFT JOIN taxonomy AS T ON A.Taxonomy_ID = T.Taxonomy_ID";
+            # Remove the legacy after summer 2022
+            my $colVer = $self->{config}->{legacy_anno} ? "Taxonomy_ID" : "taxonomy_id";
+            push @extraJoin, "LEFT JOIN taxonomy AS T ON A.$colVer = T.$colVer";
             foreach my $cat (keys %$taxSearch) {
                 push @extraCols, "T.$cat AS T_$cat";
             }
@@ -212,7 +217,9 @@ sub retrieveDomains {
 
     my $domainFamily = uc($self->{config}->{domain_family});
     my $famTable = $domainFamily =~ m/^PF/ ? "PFAM" : "INTERPRO";
-    my $seqLenField = $domReg eq "cterminal" ? ", Sequence_Length AS full_len" : "";
+    # Remove the legacy after summer 2022
+    my $colVer = $self->{config}->{legacy_anno} ? "Sequence_Length" : "seq_len";
+    my $seqLenField = $domReg eq "cterminal" ? ", seq_len AS full_len" : "";
     my $seqLenJoin = $domReg eq "cterminal" ? "LEFT JOIN annotations ON $famTable.accession = annotations.accession" : "";
     
     my $selectFn = sub {

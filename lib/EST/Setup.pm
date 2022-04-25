@@ -38,7 +38,7 @@ sub setupConfig {
     my ($blastIds, $pfam, $interpro);
     my ($accOutput, $seqOutput, $metaOutput, $statsOutput);
     my ($minSeqLen, $maxSeqLen, $batchSize);
-    my ($unirefDomLenOutput, $uniprotDomLenOutput);
+    my ($unirefDomLenOutput, $uniprotDomLenOutput, $legacyAnno);
     my $result = GetOptions(
         "config=s"                          => \$configFile,
         "accession-output=s"                => \$accOutput,
@@ -50,6 +50,7 @@ sub setupConfig {
         "seq-count-file|seq-count-output=s" => \$statsOutput,
         "uniprot-dom-len-output=s"          => \$uniprotDomLenOutput,
         "uniref-dom-len-output=s"           => \$unirefDomLenOutput,
+        "legacy-anno"                       => \$legacyAnno,
     );
     
     if ((not $configFile or not -f $configFile) and exists $ENV{EFI_CONFIG} and -f $ENV{EFI_CONFIG}) {
@@ -102,6 +103,7 @@ sub setupConfig {
     my %metaArgs = (
         meta_output_file => $metaOutput,
     );
+    $metaArgs{attr_seq_len} = "Sequence_Length" if $legacyAnno;
 
     my %statsArgs = (
         stats_output_file => $statsOutput,

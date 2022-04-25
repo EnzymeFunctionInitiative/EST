@@ -114,7 +114,7 @@ my $maxJobs = 6;
 my $blastJobId = "";
 my @a = (('a'..'z'), 0..9);
 $blastJobId .= $a[rand(@a)] for 1..5;
-my $blastJobPrefix = "${jobNamePrefix}conv_ratio_$blastJobId";
+my $blastJobPrefix = "CR_$blastJobId";
 
 mkdir $clusterDir;
 
@@ -140,7 +140,7 @@ if ($ssnIn) {
 }
 
 $B->addAction("mkdir -p $clusterDir");
-$B->addAction("$estPath/make_blast_jobs.pl --input-ids $outIdList --output-dir $clusterDir --job-name-prefix $blastJobPrefix --max-jobs $maxJobs --queue $queue --evalue $evalue");
+$B->addAction("$estPath/make_blast_jobs.pl --input-ids $outIdList --output-dir $clusterDir --job-name-prefix blast_$blastJobPrefix --max-jobs $maxJobs --queue $queue --evalue $evalue");
 
 my $jobName = "prep_$blastJobPrefix";
 my $jobScript = "$outputPath/$jobName.sh";
@@ -161,7 +161,7 @@ echo "Wait for BLAST jobs to start up"
 sleep 60
 
 echo "Waiting for $blastJobPrefix to finish up"
-while squeue --partition efi,efi-mem --format "%i,%j" | grep $blastJobPrefix > /dev/null
+while squeue --partition efi,efi-mem --format "%i,%j" | grep blast_$blastJobPrefix > /dev/null
 do
     sleep 30
     echo "Still waiting"
@@ -175,7 +175,7 @@ CODE
 $B->addAction("touch  $outputPath/1.out.completed");
 
 
-$jobName = "wait_conv_ratio_blast";
+$jobName = "wait_${blastJobPrefix}_blast";
 $jobScript = "$outputPath/$jobName.sh";
 $B->jobName("$jobNamePrefix$jobName");
 $B->renderToFile($jobScript);

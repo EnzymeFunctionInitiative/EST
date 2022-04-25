@@ -69,12 +69,16 @@ sub excludeIds {
 
     my %full;
 
-    my $fragmentWhere = $self->{config}->{exclude_fragments} ? "AND Fragment = 0" : "";
+    # Remove the legacy after summer 2022
+    my $fracColVer = $self->{config}->{legacy_anno} ? "Fragment" : "is_fragment";
+    my $fragmentWhere = $self->{config}->{exclude_fragments} ? "AND $fracColVer = 0" : "";
     my $taxWhere = "";
     my $taxJoin = "";
     if ($useTax) {
         $taxWhere = $self->{config}->{tax_search} ? (" AND (" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}) . ")") : "";
-        $taxJoin = $self->{config}->{tax_search} ? "LEFT JOIN taxonomy ON annotations.Taxonomy_ID = taxonomy.Taxonomy_ID" : "";
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "Taxonomy_ID" : "taxonomy_id";
+        $taxJoin = $self->{config}->{tax_search} ? "LEFT JOIN taxonomy ON annotations.$colVer = taxonomy.$colVer" : "";
     }
 
     my @ids = keys %$ids;

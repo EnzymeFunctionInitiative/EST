@@ -1,6 +1,5 @@
 #!/bin/env perl
 
-
 BEGIN {
     die "Please load efishared before runing this script" if not $ENV{EFI_SHARED};
     use lib $ENV{EFI_SHARED};
@@ -50,18 +49,19 @@ if (exists $familyConfig->{data}) {
 }
 
 
+
 my %blastArgs = EST::BLAST::getBLASTCmdLineArgs();
-$blastArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
+#$blastArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
 $blastArgs{tax_search} = $familyConfig->{config}->{tax_search};
 my $blastData = new EST::BLAST(dbh => $dbh);
 $blastData->configure(%blastArgs);
 $blastData->parseFile();
 
-
 my $userIds = $blastData->getSequenceIds();
-my $userMetadata = $blastData->getMetadata();
+my $userMetadata = $blastData->getMetadata(); # Looks up UniRef IDs if using UniRef, so may take some time.
 my $userStats = $blastData->getStatistics();
 my $userSeq = $blastData->getQuerySequence();
+
 
 my $inputIdSource = {};
 $inputIdSource->{$EST::BLAST::INPUT_SEQ_ID} = $EST::BLAST::INPUT_SEQ_TYPE;
