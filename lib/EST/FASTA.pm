@@ -27,6 +27,7 @@ sub new {
     die "No config parameter provided" if not exists $args{config_file_path};
 
     $self->{config_file_path} = $args{config_file_path};
+    $self->{dbh} = $args{dbh};
 
     return $self;
 }
@@ -41,6 +42,7 @@ sub configure {
 
     $self->{config}->{use_headers} = exists $args{use_headers} ? $args{use_headers} : 0;
     $self->{config}->{fasta_file} = $args{fasta_file};
+    $self->{config}->{tax_search} = $args{tax_search};
 }
 
 
@@ -115,10 +117,12 @@ sub parseFile {
                     $hasUniprot = 1;
                     $lastId = -1;
                     $numMultUniprotIdSeq += scalar @{ $result->{uniprot_ids} } - 1;
+                    my $desc = substr((split(m/>/, $result->{raw_headers}))[0], 0, 150);
                     foreach my $res (@{ $result->{uniprot_ids} }) {
                         $upMeta->{$res->{uniprot_id}} = {
                             query_id => $res->{other_id},
-                            other_ids => $result->{other_ids}
+                            other_ids => $result->{other_ids},
+                            description => $desc,
                         };
                     }
                 }
@@ -168,14 +172,20 @@ sub parseFile {
 
     $parser->finish();
 
+    if ($self->{config}->{tax_search}) {
+        my $newUpMeta = $self->excludeIds($upMeta);
+        $upMeta = $newUpMeta;
+    }
     my @fastaUniprotMatch = sort keys %$upMeta;
 
     $self->{data}->{seq} = {};
     $self->{data}->{seq_meta} = {};
     map {
             my $id = $seq{$_}->{id};
-            $self->{data}->{seq}->{$id} = $seq{$_}->{seq};
-            $self->{data}->{seq_meta}->{$id} = $seqMeta->{$_};
+            if ($id) {
+                $self->{data}->{seq}->{$id} = $seq{$_}->{seq};
+                $self->{data}->{seq_meta}->{$id} = $seqMeta->{$_};
+            }
         } keys %seq;
     $self->{data}->{uniprot_meta} = $upMeta; # Metadata for IDs that had a UniProt match
     $self->{data}->{uniprot_ids} = \@fastaUniprotMatch;

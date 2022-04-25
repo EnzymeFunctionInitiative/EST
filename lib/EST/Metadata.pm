@@ -16,7 +16,7 @@ sub new {
     my $self = {};
     $self->{output_file} = $args{meta_output_file};
     $self->{attr_source} = $args{attr_seq_source} ? $args{attr_seq_source} : "Sequence_Source";
-    $self->{attr_len} = $args{attr_seq_len} ? $args{attr_seq_len} : "Sequence_Length";
+    $self->{attr_len} = $args{attr_seq_len} ? $args{attr_seq_len} : "seq_len";
 
     return bless($self, $class);
 }

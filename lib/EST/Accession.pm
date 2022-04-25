@@ -47,6 +47,8 @@ sub configure {
     $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
     $self->{config}->{domain_region} = $args{domain_region};
     $self->{config}->{exclude_fragments} = $args{exclude_fragments};
+    $self->{config}->{tax_search} = $args{tax_search};
+    $self->{config}->{legacy_anno} = $args{legacy_anno} // 0;
 }
 
 
@@ -99,8 +101,12 @@ sub parseFile {
     my $idMapper = new EFI::IdMapping(config_file_path => $self->{config_file_path});
     $self->reverseLookupManualAccessions($idMapper);
 
-    if ($self->{config}->{exclude_fragments}) {
-        $self->excludeFragments();
+    if ($self->{config}->{exclude_fragments} or $self->{config}->{tax_search}) {
+    #if ($self->{config}->{exclude_fragments}) {
+        my $filterTax = ($self->{config}->{tax_search} and not $self->{config}->{uniref_version}) ? 1 : 0;
+        $self->{data}->{uniprot_ids} = $self->excludeIds($self->{data}->{uniprot_ids}, $filterTax);
+        my $data = $self->{data};
+        map { delete $data->{meta}->{$_} if not $data->{uniprot_ids}->{$_}; } keys %{ $data->{meta} };
     }
 
     if ($self->{config}->{uniref_version}) {
@@ -120,41 +126,87 @@ sub retrieveUniRefMetadata {
 
     my $version = $self->{config}->{uniref_version};
 
+    my $taxSearch = $self->{config}->{tax_search};
+
+    my @extraCols;
+    my @extraJoin;
+    my @extraWhere;
+    if ($self->{config}->{exclude_fragments} or $taxSearch) {
+        push @extraJoin, "LEFT JOIN annotations AS A ON U.accession = A.accession";
+        if ($self->{config}->{exclude_fragments}) {
+            # Remove the legacy after summer 2022
+            my $fragmentCol = $self->{config}->{legacy_anno} ? "Fragment" : "is_fragment";
+            push @extraWhere, "A.$fragmentCol = 0";
+        }
+        # This code removes any members of a UniRef cluster that do not match the taxonomy filter.  As of 2/23/22 it is disabled
+        # because we want to include all members.
+        if ($taxSearch) {
+            # Remove the legacy after summer 2022
+            my $colVer = $self->{config}->{legacy_anno} ? "Taxonomy_ID" : "taxonomy_id";
+            push @extraJoin, "LEFT JOIN taxonomy AS T ON A.$colVer = T.$colVer";
+            foreach my $cat (keys %$taxSearch) {
+                push @extraCols, "T.$cat AS T_$cat";
+            }
+            #push @extraWhere, "(" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}, "T") . ")";
+        }
+    }
+
+    my $extraWhere = join(" AND ", @extraWhere);
+    $extraWhere = "AND $extraWhere" if $extraWhere;
+    my $extraJoin = join(" ", @extraJoin);
+    my $extraCols = join(", ", @extraCols);
+    $extraCols = ", $extraCols" if $extraCols;
+
+    my %taxValues;
     my $metaKey = "UniRef${version}_IDs";
     foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
-        my $sql = "SELECT accession FROM uniref WHERE uniref${version}_seed = '$id'";
-        if ($self->{config}->{exclude_fragments}) {
-            $sql = "SELECT U.accession FROM uniref AS U LEFT JOIN annotations AS A ON U.accession = A.accession WHERE uniref${version}_seed = '$id' AND A.Fragment = 0";
-        }
-        print "SQL $sql\n";
+        my $sql = "SELECT U.accession $extraCols FROM uniref AS U $extraJoin WHERE U.uniref${version}_seed = '$id' $extraWhere";
+        #print "ACCESSION METADATA $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
         while (my $row = $sth->fetchrow_hashref) {
             push @{$self->{data}->{meta}->{$id}->{$metaKey}}, $row->{accession};
-        }
-    }
-}
 
-
-sub excludeFragments {
-    my $self = shift;
-
-    my %full;
-
-    my @ids = keys %{$self->{data}->{uniprot_ids}};
-    my $batchSize = 20;
-    while (scalar @ids) {
-        my @group = splice(@ids, 0, $batchSize);
-        my $whereIds = join(",", map { "'$_'" } @group);
-        my $sql = "SELECT accession FROM annotations WHERE accession IN ($whereIds) AND Fragment = 0";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute;
-        while (my $row = $sth->fetchrow_hashref) {
-            $full{$row->{accession}} = $self->{data}->{uniprot_ids}->{$row->{accession}};
+            # Get the taxonomy
+            if ($taxSearch) {
+                foreach my $cat (keys %$taxSearch) {
+                    $taxValues{$row->{accession}}->{$cat} = $row->{"T_$cat"};
+                }
+            }
         }
     }
 
-    $self->{data}->{uniprot_ids} = \%full;
+    my $matchTaxFilter = sub {
+        my @theIds = @_;
+        foreach my $cat (keys %$taxSearch) {
+            foreach my $pat (@{ $taxSearch->{$cat} }) {
+                foreach my $id (@theIds) {
+                    next if not $taxValues{$id}->{$cat};
+                    return 1 if $taxValues{$id}->{$cat} =~ m/$pat/i;
+                }
+            }
+        }
+        return 0;
+    };
+
+    if ($taxSearch) {
+        my $unirefData = $self->{data}->{meta};
+        foreach my $unirefId (keys %taxValues) {
+            next if not $unirefData->{$unirefId};
+            # This is a uniref ID
+
+            my @clusterIds = @{ $unirefData->{$unirefId}->{$metaKey} };
+            #my @kids = grep { $_ ne $unirefId} @{ $unirefData->{$unirefId}->{$metaKey} };
+            # See if the children match, if so automatically include
+            #if (&$matchTaxFilter($unirefId) or &$matchTaxFilter(@kids)) {
+            if (&$matchTaxFilter(@clusterIds)) {
+                # inclusion is automatic at this point
+            } else {
+                delete $unirefData->{$unirefId};
+                delete $self->{data}->{uniprot_ids}->{$unirefId};
+            }
+        }
+    }
 }
 
 
@@ -165,7 +217,9 @@ sub retrieveDomains {
 
     my $domainFamily = uc($self->{config}->{domain_family});
     my $famTable = $domainFamily =~ m/^PF/ ? "PFAM" : "INTERPRO";
-    my $seqLenField = $domReg eq "cterminal" ? ", Sequence_Length AS full_len" : "";
+    # Remove the legacy after summer 2022
+    my $colVer = $self->{config}->{legacy_anno} ? "Sequence_Length" : "seq_len";
+    my $seqLenField = $domReg eq "cterminal" ? ", seq_len AS full_len" : "";
     my $seqLenJoin = $domReg eq "cterminal" ? "LEFT JOIN annotations ON $famTable.accession = annotations.accession" : "";
     
     my $selectFn = sub {

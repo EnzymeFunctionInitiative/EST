@@ -48,5 +48,58 @@ sub dbSupportsFragment {
 }
 
 
+sub flattenTaxSearch {
+    my $taxSearch = shift;
+    my $tablePrefix = shift // "";
+    $tablePrefix = "$tablePrefix." if $tablePrefix;
+    my @cond;
+    foreach my $cat (keys %$taxSearch) {
+        my $vals = $taxSearch->{$cat};
+        map { push @cond, "$tablePrefix$cat LIKE '\%$_\%'" } @$vals;
+    }
+    my $where = join(" OR ", @cond);
+    return $where;
+}
+
+
+sub excludeIds {
+    my $self = shift;
+    my $ids = shift;
+    my $useTax = shift // 1;
+
+    my %full;
+
+    # Remove the legacy after summer 2022
+    my $fracColVer = $self->{config}->{legacy_anno} ? "Fragment" : "is_fragment";
+    my $fragmentWhere = $self->{config}->{exclude_fragments} ? "AND $fracColVer = 0" : "";
+    my $taxWhere = "";
+    my $taxJoin = "";
+    if ($useTax) {
+        $taxWhere = $self->{config}->{tax_search} ? (" AND (" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}) . ")") : "";
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "Taxonomy_ID" : "taxonomy_id";
+        $taxJoin = $self->{config}->{tax_search} ? "LEFT JOIN taxonomy ON annotations.$colVer = taxonomy.$colVer" : "";
+    }
+
+    my @ids = keys %$ids;
+    my $batchSize = 1;
+    while (scalar @ids) {
+        my $id = shift @ids;
+        #my @group = splice(@ids, 0, $batchSize);
+        #my $whereIds = join(",", map { "'$_'" } @group);
+        #my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
+        my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession = '$id' $fragmentWhere $taxWhere";
+        print "EXCLUDE SQL $sql\n";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            $full{$row->{accession}} = $ids->{$row->{accession}};
+        }
+    }
+
+    return \%full;
+}
+
+
 1;
 

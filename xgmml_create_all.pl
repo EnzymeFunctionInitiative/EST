@@ -226,10 +226,10 @@ while (<CDHIT>) {
                     #remove illegal xml characters from annotation data
                     $piece = "" if not $piece;
                     $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g;
-                    if ($key eq "Sequence_Length" and $head=~/\w{6,10}:(\d+):(\d+)/) {
+                    if ($key eq "seq_len" and $head=~/\w{6,10}:(\d+):(\d+)/) {
                         $piece=$2-$1+1;
                     }
-                    my $type = EFI::Annotations::get_attribute_type($key);
+                    my $type = $anno->get_attribute_type($key);
                     if (($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY) or ($piece and $piece ne "None")) {
                         $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
                     }
@@ -237,16 +237,18 @@ while (<CDHIT>) {
                 $writer->endTag();
             }
         }
-        my $ncVal = 0;
-        my $ncColor = "";
-        if ($connectivity->{$head}) {
-            $ncVal = $connectivity->{$head}->{nc};
-            $ncColor = $connectivity->{$head}->{color};
+        if ($ncMapFile) {
+            my $ncVal = 0;
+            my $ncColor = "";
+            if ($connectivity->{$head}) {
+                $ncVal = $connectivity->{$head}->{nc};
+                $ncColor = $connectivity->{$head}->{color};
+            }
+            my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
+            $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
+            $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
+            $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
         }
-        my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
-        $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
-        $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
-        $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
         $writer->endTag();
         %clusterdata=();
         $count=0;
@@ -289,7 +291,7 @@ foreach my $key (@metas) {
         @{$clusterdata{$key}}=uniq @{$clusterdata{$key}};
         $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
         foreach my $piece (@{$clusterdata{$key}}) {
-            my $type = EFI::Annotations::get_attribute_type($key);
+            my $type = $anno->get_attribute_type($key);
             if (($type ne "integer" and $key ne EFI::Annotations::FIELD_SEQ_KEY) or ($piece and $piece ne "None")) {
                 $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
             }
