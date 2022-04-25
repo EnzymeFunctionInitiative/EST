@@ -52,8 +52,9 @@ sub retrieveAndSaveSequences {
     while (scalar @ids) {
         my @batch = splice(@ids, 0, $self->{batch_size});
         my $batchline = join ',', @batch;
+            my @parms = ("fastacmd", "-d", "$self->{fasta_db}", "-s", "$batchline");
         my ($fastacmdOutput, $fastaErr) = capture {
-            system("fastacmd", "-d", "$self->{fasta_db}", "-s", "$batchline");
+            system(@parms);
         };
         push(@err, $fastaErr);
         

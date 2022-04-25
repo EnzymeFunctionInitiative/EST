@@ -117,6 +117,24 @@ sub parse {
         }
         return $params;
     };
+    my $getEdgeParams = sub {
+        my $xmlNode = shift;
+        my $params = {};
+        my $label = $xmlNode->getAttribute("label");
+        if ($label) {
+            my ($n1, $n2) = split(m/,/, $label);
+            $params->{source} = $n1;
+            $params->{target} = $n2;
+        } else {
+            my $source = $xmlNode->getAttribute("source");
+            my $target = $xmlNode->getAttribute("target");
+            if ($source and $target) {
+                $params->{source} = $source;
+                $params->{target} = $target;
+            }
+        }
+        return $params;
+    };
 
     my $handleMetadataNode = sub {
         my $xmlNode = shift;
@@ -163,7 +181,8 @@ sub parse {
             &$nodeHandler($xmlNode, $params);
             push @nodes, $xmlNode;
         } elsif ($reader->name() eq "edge") {
-            &$edgeHandler($xmlNode);
+            my $params = &$getEdgeParams($xmlNode);
+            &$edgeHandler($xmlNode, $params);
             push @edges, $xmlNode;
         } elsif ($reader->name eq METADATA_READER) {
             &$handleMetadataNode($xmlNode);
@@ -224,7 +243,7 @@ sub getClusterNumber {
     my @annotations = $xmlNode->findnodes('./*');
     foreach my $annotation (@annotations) {
         my $attrName = $annotation->getAttribute('name');
-        if ($attrName eq "Cluster Number") {
+        if ($attrName eq "Cluster Number" or $attrName eq "Sequence Count Cluster Number" or $attrName eq "Node Count Cluster Number") {
             $val = $annotation->getAttribute('value');
             last;
         } elsif ($attrName eq "Singleton Number") {

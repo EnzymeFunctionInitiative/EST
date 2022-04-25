@@ -21,7 +21,8 @@ use BlastUtil;
 
 my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch);
+my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "tmp|tmpdir=s"      => \$tmpdir,
@@ -38,7 +39,7 @@ my $result = GetOptions(
     "seq-count-file=s"  => \$seqCountFile,
     "ipro=s"            => \$ipro,
     "pfam=s"            => \$pfam,
-    "uniref-version=s"  => \$unirefVersion,
+    "uniref-version=s"  => \$unirefVersion, # for families only
     "uniref-expand"     => \$unirefExpand,  # expand to include all homologues of UniRef seed sequences that are provided.
     "fraction=i"        => \$fraction,
     "maxsequence=s"     => \$maxFullFamily,
@@ -50,7 +51,9 @@ my $result = GetOptions(
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config=s"          => \$configFile,    # new-style config file
     "exclude-fragments" => \$excludeFragments,
-    "db-type=s"         => \$dbType, # uniprot, uniref50, uniref90  default to uniprot
+    "db-type=s"         => \$dbType, # uniprot, uniref50, uniref90  default to uniprot; if uniref expand IDs to include UniRef members as node attribute
+    "tax-search=s"      => \$taxSearch,
+    "legacy-anno"       => \$legacyAnno, # Remove the legacy after summer 2022
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -79,8 +82,10 @@ print "db is: $dbVer\n";
 mkdir $outputDir or die "Could not make directory $outputDir\n" if not -d $outputDir;
 
 my $dbName = "combined";
+my $blastUnirefVersion = "";
 if ($dbType and ($dbType eq "uniref50" or $dbType eq "uniref90")) {
     $dbName = "$dbType";
+    $blastUnirefVersion = substr($dbType, 6);
 }
 $dbName .= ($excludeFragments ? "_nf" : "") . ".fasta";
 
@@ -240,8 +245,8 @@ my @args = (
 
 push @args, "-pfam $pfam" if $pfam;
 push @args, "-ipro $ipro" if $ipro;
+push @args, "--uniref-version $unirefVersion" if $unirefVersion; # For families only
 if ($pfam or $ipro) {
-    push @args, "-uniref-version $unirefVersion" if $unirefVersion;
     push @args, "-max-sequence $maxFullFamily" if $maxFullFamily;
     push @args, "-fraction $fraction" if $fraction;
 }
@@ -250,6 +255,10 @@ push @args, "-blast-file $outputDir/blastfinal.tab";
 push @args, "-query-file $queryFile";
 push @args, "-max-results $maxBlastResults" if $maxBlastResults;
 push @args, "-exclude-fragments" if $excludeFragments;
+push @args, "-tax-search \"$taxSearch\"" if $taxSearch;
+push @args, "--blast-uniref-version $blastUnirefVersion" if $blastUnirefVersion;
+push @args, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
+
 
 $B = $S->getBuilder();
 $B->dependency(0, $dependencyId); 
@@ -387,13 +396,13 @@ $dependencyId = getJobId($submitResult);
 $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, $dependencyId); 
-$B->resource(1, 1, "300gb");
+$B->resource(1, 4, "370gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
-$B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
+$B->addAction("sort --parallel 4 -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $filtSeqFile -out $outputDir/unsorted.1.out");
-$B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->addAction("sort --parallel 4 -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile("$scriptDir/blastreduce.sh");
 

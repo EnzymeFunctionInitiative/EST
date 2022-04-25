@@ -70,8 +70,9 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments);
-my ($runSerial, $baseOutputDir);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax);
+my ($runSerial, $baseOutputDir, $largeMem);
+my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -118,6 +119,11 @@ my $result = GetOptions(
     "config=s"          => \$configFile,    # new-style config file
     "exclude-fragments" => \$excludeFragments,
     "serial-script=s"   => \$runSerial,     # run in serial mode
+    "tax-search=s"      => \$taxSearch,
+    "large-mem"         => \$largeMem,
+    "tax-search-only"   => \$taxSearchOnly,
+    "source-tax=s"      => \$sourceTax,
+    "legacy-anno"       => \$legacyAnno, # Remove the legacy after summer 2022
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -291,6 +297,7 @@ if (not defined $incfrac) {
 
 $excludeFragments = defined($excludeFragments);
 $runSerial = defined($runSerial) ? $runSerial : "";
+$useFastaHeaders = ($taxSearchOnly or $useFastaHeaders);
 
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
@@ -379,14 +386,20 @@ $seqCountFile = "$outputDir/acc_counts" if not $seqCountFile;
 # Error checking for user supplied dat and fa files
 my $accessionFileOption = "";
 my $noMatchFileOption = "";
+my $taxSourceAccessionFile = "";
 if (defined $accessionFile and -e $accessionFile) {
-    $accessionFile = $baseOutputDir . "/$accessionFile" if not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/);
+    if ($sourceTax) {
+        $taxSourceAccessionFile = $accessionFile;
+        my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
+        $accessionFile = $baseOutputDir . "/$taxJobId.txt";
+    } elsif (not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/)) {
+        $accessionFile = $baseOutputDir . "/$accessionFile";
+    }
     $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $baseOutputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFileOption = "-no-match-file $noMatchFile";
-
 } else {
     $accessionFile = "";
 }
@@ -460,11 +473,18 @@ mkdir $scriptDir;
 $scriptDir = $outputDir if not -d $scriptDir;
 
 
+my @allJobIds;
+my $sortPrefix = "br-";
+my @a = (('a'..'z'), 0..9);
+$sortPrefix .= $a[rand(@a)] for 1..5;
+
+
 ########################################################################################################################
 # Get sequences and annotations.  This creates fasta and struct.out files.
 #
 my $B = $S->getBuilder();
 $B->resource(1, 1, "5gb");
+$B->mailEnd() if $taxSearchOnly;
 my $prevJobId;
 
 if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $accessionId or $accessionFile) {
@@ -474,6 +494,8 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
+    $B->addAction("module unload MariaDB");
+    $B->addAction("module load MariaDB/10.1.31-IGB-gcc-4.9.4");
     $B->addAction("cd $outputDir");
     $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
     $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
@@ -531,21 +553,51 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     }
 
     push @args, "-exclude-fragments" if $excludeFragments;
+    push @args, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
 
+    my $taxOutputFile = "$outputDir/tax.json";
+    #push @args, "--tax-search \"$taxSearch\" --tax-output $taxOutputFile" if $taxSearch;
+    push @args, "--tax-search \"$taxSearch\"" if $taxSearch;
+
+    if ($accessionFile and $sourceTax) {
+        my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
+        my @srcArgs = ("--json-file", $taxSourceAccessionFile, "--tree-id", $taxTreeId, "--id-type", $taxIdType, "--output-file", $accessionFile);
+        $B->addAction("$efiEstTools/extract_taxonomy_tree.pl " . join(" ", @srcArgs));
+    }
     $B->addAction("$efiEstTools/$retrScript " . join(" ", @args));
+
+    #if ($taxSearchOnly or not $fastaFile) {
+    {
+        #my $useUnirefArg = (not $fastaFile and not $accessionFile) ? "--use-uniref" : "";
+        # If a uniref version is specified, assume that the input IDs are that version, expand them, and then get
+        # the taxonomy for that and all uniref IDs.  If a uniref version is not specified, then get the taxonomy for that and all uniref IDs.
+        my $useUnirefArg = (not $fastaFile) ? ("--use-uniref" . ($unirefVersion ? " --uniref-version $unirefVersion" : "")) : "";
+        #$B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile --metadata-file $metadataFile --config $configFile $useUnirefArg");
+        #my $sourceFileArg = $accessionFile ? "--metadata-file $metadataFile" : "--accession-file $accOutFile";
+        my $sourceFileArg = "--accession-file $accOutFile";
+        my $legacyAnnoArg = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
+        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg $legacyAnnoArg"); # Remove the legacy after summer 2022
+    }
 
     my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
     push @lenUniprotArgs, "-output $lenUniprotFile";
     push @lenUniprotArgs, "-expand-uniref" if $unirefVersion;
+    push @lenUniprotArgs, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
     $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUniprotArgs));
     
     if ($unirefVersion) {
         my @lenUnirefArgs = ("-struct $metadataFile", "-config $configFile");
         push @lenUnirefArgs, "-output $lenUnirefFile";
+        push @lenUnirefArgs, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
         $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUnirefArgs));
     }
 
     # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
+
+    if ($taxSearchOnly) {
+        $B->addAction("formatdb -i $allSeqFile -n database -p T -o T ");
+        $B->addAction("touch $outputDir/1.out.completed");
+    }
 
     $B->addAction("echo 33 > $progressFile");
     $B->jobName("${jobNamePrefix}initial_import");
@@ -557,6 +609,10 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     print "import job is:\n $importjob\n" if not $runSerial;
     ($prevJobId) = split(/\./, $importjob);
+
+    if ($taxSearchOnly) {
+        exit;
+    }
 
 # Tax id code is different, so it is exclusive
 } elsif ($taxid) {
@@ -586,6 +642,9 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 } else {
     die "Error Submitting Import Job\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
 }
+
+push @allJobIds, $prevJobId;
+
 
 
 #######################################################################################################################
@@ -667,6 +726,8 @@ chomp $muxjob;
 print "mux job is:\n $muxjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $muxjob;
 
+push @allJobIds, $prevJobId;
+
 
 ########################################################################################################################
 # Break sequenes.fa into parts so we can run blast in parallel.
@@ -684,6 +745,8 @@ my $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
 chomp $fracfilejob;
 print "fracfile job is:\n $fracfilejob\n" if not $runSerial;
 ($prevJobId) = split /\./, $fracfilejob;
+
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -710,6 +773,8 @@ my $createdbjob = $S->submit("$scriptDir/createdb.sh");
 chomp $createdbjob;
 print "createdb job is:\n $createdbjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $createdbjob;
+
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -784,6 +849,8 @@ chomp $blastjob;
 print "blast job is:\n $blastjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $blastjob;
 
+push @allJobIds, $prevJobId;
+
 
 ########################################################################################################################
 # Join all the blast outputs back together
@@ -807,6 +874,8 @@ chomp $catjob;
 print "Cat job is:\n $catjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $catjob;
 
+push @allJobIds, $prevJobId;
+
 
 ########################################################################################################################
 # Remove like vs like and reverse matches
@@ -814,13 +883,14 @@ print "Cat job is:\n $catjob\n" if not $runSerial;
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-$B->resource(1, 1, "350gb");
+my $sortRam = $largeMem ? "700gb" : "370gb";
+$B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
-$B->addAction("sort -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
+$B->addAction("sort --parallel 4 -T $sortdir --compress-program gzip -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
-$B->addAction("sort -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
+$B->addAction("sort --parallel 4 -T $sortdir --compress-program gzip -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->addAction("echo 67 > $progressFile");
 $B->jobName("${jobNamePrefix}blastreduce");
 $B->renderToFile(getRenderFilePath("$scriptDir/blastreduce.sh"));
@@ -830,6 +900,8 @@ chomp $blastreducejob;
 print "Blastreduce job is:\n $blastreducejob\n" if not $runSerial;
 
 ($prevJobId) = split /\./, $blastreducejob;
+
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -860,6 +932,7 @@ chomp $demuxjob;
 print "Demux job is:\n $demuxjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $demuxjob;
 
+push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -876,6 +949,8 @@ my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh");
 chomp $convRatioJob;
 print "Convergence ratio job is:\n $convRatioJob\n" if not $runSerial;
 my @convRatioJobLine=split /\./, $convRatioJob;
+
+push @allJobIds, $convRatioJobLine[0];
 
 
 
@@ -945,7 +1020,7 @@ if (defined $LegacyGraphs) {
     my $evalueFile = "$outputDir/evalue.tab";
     my $defaultLengthFile = "$outputDir/length.tab";
     $B->resource(1, 1, "50gb");
-    $B->addAction("module load $gdMod");
+    $B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $rMod");
     $B->addAction("mkdir -p $outputDir/rdata");
@@ -1006,7 +1081,19 @@ $B->renderToFile(getRenderFilePath("$scriptDir/graphs.sh"));
 my $graphjob = $S->submit("$scriptDir/graphs.sh");
 chomp $graphjob;
 print "Graph job is:\n $graphjob\n" if not $runSerial;
+($prevJobId) = split /\./, $graphjob;
 
+push @allJobIds, $prevJobId;
+
+
+$B = $S->getBuilder();
+
+$B->resource(1, 1, "1gb");
+$B->dependency(1, \@allJobIds);
+$B->addAction("rm -f $sortdir/$sortPrefix*");
+$B->jobName("${jobNamePrefix}cleanuperr");
+$B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
+my $cleanupErrJob = $S->submit("$scriptDir/cleanuperr.sh");
 
 
 

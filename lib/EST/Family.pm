@@ -44,6 +44,8 @@ sub loadFamilyParameters {
     my ($useDomain, $fraction, $maxSequence, $maxFullFam);
     my ($unirefVersion);
     my ($domainFamily, $domainRegion, $excludeFragments);
+    my ($taxSearch);
+    my ($legacyAnno); # Remove this after summer 2022
 
     my $result = GetOptions(
         "ipro=s"                => \$ipro,
@@ -58,6 +60,8 @@ sub loadFamilyParameters {
         "fraction=i"            => \$fraction,
         "uniref-version=s"      => \$unirefVersion,
         "exclude-fragments"     => \$excludeFragments,
+        "tax-search=s"          => \$taxSearch,
+        "legacy-anno"           => \$legacyAnno, # Remove this after summer 2022
     );
 
     my $data = {interpro => [], pfam => [], gene3d => [], ssf => []};
@@ -89,12 +93,35 @@ sub loadFamilyParameters {
     $config->{domain_family} =  ($config->{use_domain} and $domainFamily) ? $domainFamily : "";
     $config->{domain_region} =  ($config->{use_domain} and $domainRegion) ? $domainRegion : "";
     $config->{exclude_fragments}    = $excludeFragments;
+    $config->{tax_search} =     "";
+    $config->{legacy_anno} = $legacyAnno // 0; # Remove this after summer 2022
+
+    if ($taxSearch) {
+        my $search = parseTaxSearch($taxSearch);
+        $config->{tax_search} = $search;
+    }
 
     if ($numFam) {
         return {data => $data, config => $config};
     } else {
         return {config => $config};
     }
+}
+
+
+sub parseTaxSearch {
+    my $taxSearch = shift;
+    $taxSearch =~ s/_/ /g;
+    my @parts = split(m/;/, $taxSearch);
+    my $search = {};
+    my %catMap = ("superkingdom" => "Domain", "kingdom" => "Kingdom", "phylum" => "Phylum", "class" => "Class", "order" => "TaxOrder", "family" => "Family", "genus" => "Genus", "species" => "Species");
+    foreach my $part (@parts) {
+        my ($c, $v) = split(m/:/, $part);
+        $c = lc $c;
+        my $cat = $catMap{$c} // $c;
+        push @{$search->{$cat}}, $v;
+    }
+    return $search;
 }
 
 
@@ -125,7 +152,7 @@ sub retrieveFamilyAccessions {
             my $count = shift;
             my $status = shift || "";
             # Always return true for SwissProt proteins
-            return ($status eq "Reviewed" or $count % $self->{config}->{fraction} == 0);
+            return ($status or $count % $self->{config}->{fraction} == 0);
         };
     }
 
@@ -139,10 +166,12 @@ sub retrieveFamilyAccessions {
     # Only used when domains are enabled.
     $self->{data}->{full_dom_uniprot_ids} = $self->{config}->{use_domain} ? {} : undef;
 
-    my ($actualI, $fullFamSizeI) = $self->getDomainFromDb("INTERPRO", $fractionFunc, $self->{family}->{interpro});
-    my ($actualP, $fullFamSizeP) = $self->getDomainFromDb("PFAM", $fractionFunc, \@pfam);
-    my ($actualG, $fullFamSizeG) = $self->getDomainFromDb("GENE3D", $fractionFunc, $self->{family}->{gene3d});
-    my ($actualS, $fullFamSizeS) = $self->getDomainFromDb("SSF", $fractionFunc, $self->{family}->{ssf});
+    my ($actualI, $fullFamSizeI, $allIdsI) = $self->getDomainFromDb("INTERPRO", $fractionFunc, $self->{family}->{interpro});
+    my ($actualP, $fullFamSizeP, $allIdsP) = $self->getDomainFromDb("PFAM", $fractionFunc, \@pfam);
+    #my ($actualG, $fullFamSizeG, $allIdsG) = $self->getDomainFromDb("GENE3D", $fractionFunc, $self->{family}->{gene3d});
+    #my ($actualS, $fullFamSizeS, $allIdsS) = $self->getDomainFromDb("SSF", $fractionFunc, $self->{family}->{ssf});
+    my ($actualG, $fullFamSizeG, $allIdsG) = (0, 0, []);
+    my ($actualS, $fullFamSizeS, $allIdsS) = (0, 0, []);
     
     my $domReg = $self->{config}->{domain_region};
     if ($domReg eq "cterminal" or $domReg eq "nterminal") {
@@ -150,7 +179,11 @@ sub retrieveFamilyAccessions {
     }
 
     $self->{stats}->{num_ids} = $actualI + $actualP + $actualG + $actualS;
-    $self->{stats}->{num_full_family} = $fullFamSizeI + $fullFamSizeP + $fullFamSizeG + $fullFamSizeS;
+    # Not correct
+    #$self->{stats}->{num_full_family} = $fullFamSizeI + $fullFamSizeP + $fullFamSizeG + $fullFamSizeS;
+    my %allIds;
+    map { $allIds{$_} = 1 } (@$allIdsI, @$allIdsP, @$allIdsG, @$allIdsS);
+    $self->{stats}->{num_full_family} = scalar keys %allIds;
 } 
 
 
@@ -182,9 +215,10 @@ sub getDomainFromDb {
     my $domReg = $self->{config}->{domain_region};
 
     my $ids = $self->{data}->{uniprot_ids};
-    my $fullFamIds = $useDomain ? $self->{data}->{full_dom_uniprot_ids} : {};
     my $unirefData = $self->{data}->{uniref_data};
     my $unirefMapping = $self->{data}->{uniref_mapping};
+    my $isTaxSearch = $self->{config}->{tax_search} ? 1 : 0;
+    my $taxSearch = $self->{config}->{tax_search};
 
     my $count = 1;
     my %unirefFamSizeHelper;
@@ -202,18 +236,56 @@ sub getDomainFromDb {
     my $annoTable = "annotations";
     my $annoJoinStr = "LEFT JOIN $annoTable ON $table.accession = $annoTable.accession"; # Used conditionally
 
-    my $annoJoin = ($self->{config}->{fraction} > 1 or $self->{config}->{exclude_fragments} or $domReg eq "cterminal") ? $annoJoinStr : "";
-    my $spCol = $self->{config}->{fraction} > 1 ? ", $annoTable.STATUS AS STATUS" : "";
-    my $fragWhere = "";
-    if ($self->dbSupportsFragment() and $self->{config}->{exclude_fragments}) {
-        $fragWhere = " AND $annoTable.Fragment = 0";
+    my $annoJoin = "";
+    if ($self->{config}->{fraction} > 1 or $self->{config}->{exclude_fragments} or $domReg eq "cterminal" or $isTaxSearch) {
+        $annoJoin = $annoJoinStr;
     }
-    
-    my $seqLenCol = $domReg eq "cterminal" ? ", Sequence_Length AS full_len" : "";
+
+    my $spCol = "";
+    if ($self->{config}->{fraction} > 1) {
+        #TODO
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "STATUS AS swissprot_status" : "swissprot_status";
+        $spCol = ", $annoTable.$colVer";
+    }
+
+    my $fragWhere = "";
+    if ($self->{config}->{exclude_fragments} and $self->dbSupportsFragment()) {
+        #TODO
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "Fragment" : "is_fragment";
+        $fragWhere = " AND $annoTable.$colVer = 0";
+    }
+
+    my $taxSearchWhere = "";
+    my $taxSearchJoin = "";
+    my $taxCols = "";
+    if ($isTaxSearch) {
+        #TODO
+        # Remove the legacy after summer 2022
+        my $colVer = $self->{config}->{legacy_anno} ? "Taxonomy_ID" : "taxonomy_id";
+        $taxSearchJoin = "LEFT JOIN taxonomy AS T ON $annoTable.$colVer = T.$colVer";
+        if (not $unirefVersion) {
+            my $cond = EST::Base::flattenTaxSearch($taxSearch);
+            $taxSearchWhere = "AND ($cond)";
+        } else {
+            my @taxCols;
+            foreach my $cat (keys %$taxSearch) {
+                push @taxCols, "T.$cat AS T_$cat";
+            }
+            $taxCols = ", " . join(", ", @taxCols);
+        }
+    }
+
+    # Remove the legacy after summer 2022
+    my $colVer = $self->{config}->{legacy_anno} ? "Sequence_Length" : "seq_len";
+    my $seqLenCol = $domReg eq "cterminal" ? ", $colVer AS full_len" : "";
     #$annoJoin = ($domReg eq "cterminal" and not $annoJoin) ? $annoJoinStr : "";
 
+    my %taxValues;
+    my $fullFamIds;
     foreach my $family (@families) {
-        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol $seqLenCol FROM $table $unirefJoin $annoJoin WHERE $table.id = '$family' $fragWhere";
+        my $sql = "SELECT $table.accession AS accession, start, end $unirefCol $spCol $seqLenCol $taxCols FROM $table $unirefJoin $annoJoin $taxSearchJoin WHERE $table.id = '$family' $fragWhere $taxSearchWhere";
         print "SQL $sql\n";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute;
@@ -223,32 +295,49 @@ sub getDomainFromDb {
             next if (not $useDomain and exists $idsProcessed{$uniprotId});
             $idsProcessed{$uniprotId} = 1;
 
-            my $isSwissProt = $self->{config}->{fraction} > 1 ? $row->{STATUS} eq "Reviewed" : 0;
+            #TODO
+            # Remove the legacy after summer 2022
+            my $isSwissProt = 0;
+            if ($self->{config}->{fraction} > 1) {
+                my $spVal = $self->{config}->{legacy_anno} ? ($row->{swissprot_status} and $row->{swissprot_status} eq "Reviewed") : $row->{swissprot_status};
+                $isSwissProt = ($self->{config}->{fraction} > 1 and $spVal);
+            }
             my $isFraction = &$fractionFunc($count);
 
             if ($unirefVersion) {
                 my $unirefId = $row->{$unirefField};
-                $ac++;
-                push @{$unirefData->{$unirefId}}, $uniprotId;
-                # The accession element will be overwritten multiple times, once for each accession ID 
-                # in the UniRef cluster that corresponds to the UniRef cluster ID.
-                my $piece = {'start' => $row->{start}, 'end' => $row->{end}};
-                $piece->{full_len} = $row->{full_len} if $seqLenCol;
-                if ($unirefId eq $uniprotId and ($isSwissProt or $isFraction)) {
-                    push @{$ids->{$uniprotId}}, \%$piece;
-                    push @{$fullFamIds->{$uniprotId}}, \%$piece if $useDomain;
-                } elsif ($useDomain and ($isSwissProt or $isFraction)) {
-                    push @{$fullFamIds->{$uniprotId}}, \%$piece;
-                }
-                if ($unirefId ne $uniprotId and ($isSwissProt or $isFraction)) {
-                    $unirefMapping->{$uniprotId} = $unirefId;
-                }
                 # Only increment the family size if the uniref cluster ID hasn't yet been encountered.  This
                 # is because the select query above retrieves all accessions in the family based on UniProt
                 # not based on UniRef.
                 if (not exists $unirefFamSizeHelper{$unirefId}) {
                     $unirefFamSizeHelper{$unirefId} = 1;
                     $count++;
+                }
+                $ac++;
+                push @{$unirefData->{$unirefId}}, $uniprotId;
+
+                # Skip if we are using fractions and the current ID does not have a SwissProt annotation.
+                next if (not $isSwissProt and not $isFraction);
+
+                # Get the taxonomy
+                if ($isTaxSearch and $unirefVersion) {
+                    foreach my $cat (keys %$taxSearch) {
+                        $taxValues{$uniprotId}->{$cat} = $row->{"T_$cat"};
+                    }
+                }
+                
+                # The accession element will be overwritten multiple times, once for each accession ID 
+                # in the UniRef cluster that corresponds to the UniRef cluster ID.
+                my $piece = {'start' => $row->{start}, 'end' => $row->{end}};
+                $piece->{full_len} = $row->{full_len} if $seqLenCol;
+                if ($unirefId eq $uniprotId) {
+                    push @{$ids->{$uniprotId}}, \%$piece;
+                }
+
+                push @{$fullFamIds->{$uniprotId}}, \%$piece;
+
+                if ($unirefId ne $uniprotId) {
+                    $unirefMapping->{$uniprotId} = $unirefId;
                 }
             } else {
                 if ($isFraction or $isSwissProt) {
@@ -263,16 +352,67 @@ sub getDomainFromDb {
         $sth->finish;
     }
 
-    # Get actual family count
-    my $fullFamCount = 0;
-    if ($unirefVersion) {
-        my $sql = "select count(distinct accession) from $table where $table.id in ('" . join("', '", @families) . "')";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute;
-        $fullFamCount = $sth->fetchrow;
+    my $matchTaxFilter = sub {
+        my @theIds = @_;
+        foreach my $cat (keys %$taxSearch) {
+            foreach my $pat (@{ $taxSearch->{$cat} }) {
+                foreach my $id (@theIds) {
+                    next if not $taxValues{$id}->{$cat};
+                    return 1 if $taxValues{$id}->{$cat} =~ m/$pat/i;
+                }
+            }
+        }
+        return 0;
+    };
+
+    if ($unirefVersion and $isTaxSearch) {
+        foreach my $uniprotId (keys %taxValues) {
+            next if not $unirefData->{$uniprotId};
+            # This is a uniref ID
+            my @kids = grep { $_ ne $uniprotId } @{ $unirefData->{$uniprotId} };
+            # See if the children match, if so automatically include
+            if (&$matchTaxFilter($uniprotId) or &$matchTaxFilter(@kids)) {
+                # inclusion is automatic at this point
+            } else {
+                delete $unirefData->{$uniprotId};
+                delete $ids->{$uniprotId};
+                delete $unirefMapping->{$uniprotId};
+                delete $fullFamIds->{$uniprotId};
+                delete $unirefFamSizeHelper{$uniprotId};
+            }
+        }
+        #foreach my $uniprotId (keys %$fullFamIds) {
+        #    # This will be undefined if $uniprotId is actually a UniRef ID
+        #    my $unirefId = $unirefMapping->{$uniprotId};
+        #    # Check if the UniRef ID is already included; if not, add it because a member of the cluster was
+        #    # matched in the taxonomy search, even though the UniRef cluster ID wasn't.
+        #    if ($unirefId and not $ids->{$unirefId}) {
+        #        push @{$ids->{$unirefId}}, @{ $fullFamIds->{$uniprotId} };
+        #        push @{$unirefData->{$unirefId}}, $unirefId;
+        #    }
+        #}
     }
 
-    return ($count, $fullFamCount);
+    $self->{data}->{full_dom_uniprot_ids} = $fullFamIds if $useDomain;
+
+    # Get actual family count
+    my $fullFamCount = 0;
+    my @fullIds;
+    if ($unirefVersion) {
+        #my $sql = "select count(distinct accession) from $table where $table.id in ('" . join("', '", @families) . "')";
+        #my $sth = $self->{dbh}->prepare($sql);
+        #$sth->execute;
+        #$fullFamCount = $sth->fetchrow;
+        my $sql = "select distinct accession from $table where $table.id in ('" . join("', '", @families) . "')";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @fullIds, $row->{accession};
+        }
+        $fullFamCount = scalar @fullIds;
+    }
+
+    return ($count, $fullFamCount, \@fullIds);
 }
 
 
@@ -306,7 +446,7 @@ sub getDomainRegion {
                 }
                 if ($len > 0) {
                     push @{$outputIds->{$id}}, $newStruct;
-                } 
+                }
             }
         }
         foreach my $id (@ids) {
