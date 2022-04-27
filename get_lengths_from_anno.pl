@@ -24,12 +24,15 @@ use EST::LengthHistogram;
 
 my ($annoFile, $configFile, $incfrac);
 my ($outputFile, $expandUniref);
+# Remove the legacy after summer 2022
+my ($legacyAnno); 
 my $result = GetOptions(
     "struct=s"              => \$annoFile,
     "config=s"              => \$configFile,
     "incfrac=f"             => \$incfrac,
     "output=s"              => \$outputFile,
     "expand-uniref"         => \$expandUniref,
+    "legacy-anno"           => \$legacyAnno,
 );
 
 
@@ -72,10 +75,14 @@ if ($expandUniref) {
 
 my $histo = new EST::LengthHistogram(incfrac => $incfrac);
 
+my $seqLenField = "seq_len";
+# Remove the legacy after summer 2022
+$seqLenField = "Sequence_Length" if $legacyAnno;
+
 while (@metaIds) {
     my @batch = splice(@metaIds, 0, 50);
     my $queryIds = join("','", @batch);
-    my $sql = "SELECT accession, Sequence_Length FROM annotations WHERE accession IN ('$queryIds')";
+    my $sql = "SELECT accession, $seqLenField FROM annotations WHERE accession IN ('$queryIds')";
     my $sth = $dbh->prepare($sql);
     $sth->execute;
     while (my $row = $sth->fetchrow_arrayref) {
@@ -85,7 +92,7 @@ while (@metaIds) {
 }
 
 foreach my $id (@unkIds) {
-    my $len = $annoMap->{$id}->{Sequence_Length};
+    my $len = $annoMap->{$id}->{$seqLenField};
     $histo->addData($len);
 }
 

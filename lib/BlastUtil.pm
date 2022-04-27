@@ -30,8 +30,8 @@ sub write_input_sequence_metadata {
     my $seqLength = length $sequence;
 
     print $fh "$seqId\n";
-    print $fh "\tDescription\tInput Sequence\n";
-    print $fh "\tSequence_Length\t$seqLength\n";
+    print $fh "\tdescription\tInput Sequence\n";
+    print $fh "\tseq_len\t$seqLength\n";
     print $fh "\t" . EFI::Annotations::FIELD_SEQ_SRC_KEY . "\t" . EFI::Annotations::FIELD_SEQ_SRC_VALUE_INPUT . "\n";
 }
 

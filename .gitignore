@@ -3,4 +3,5 @@ efi.config
 tests/test.config
 tests/testEnvironment.sh
 *.bak
-
+.*.swp
+.*.swo

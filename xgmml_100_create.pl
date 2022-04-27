@@ -26,12 +26,13 @@ use Getopt::Long;
 use FindBin;
 use EFI::Config;
 use EFI::Annotations;
+use Data::Dumper;
 
 use lib "$FindBin::Bin/lib";
 use AlignmentScore;
 
 
-my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile);
+my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile, $legacyAnno);
 my $result = GetOptions(
     "blast=s"               => \$inputBlast,
     "fasta=s"               => \$inputFasta,
@@ -44,6 +45,7 @@ my $result = GetOptions(
     "include-all-sequences" => \$includeAllSeqs,
     "use-min-edge-attr"     => \$useMinEdgeAttr,
     "nc-map=s"              => \$ncMapFile,
+    "legacy-anno"           => \$legacyAnno,
 );
 
 die "Missing -blast command line argument" if not $inputBlast;
@@ -59,7 +61,6 @@ $includeSeqs = 0            if not defined $includeSeqs;
 $includeAllSeqs = 0         if not defined $includeAllSeqs;
 $maxNumEdges = 10000000     if not defined $maxNumEdges;
 $useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
-
 
 
 
@@ -123,6 +124,9 @@ while (my $line = <FASTA>) {
 close FASTA;
 print time . " Finished reading in uniprot numbers\n";
 
+my $seqLenField = "seq_len";
+# Remove the legacy after summer 2022
+$seqLenField = "Sequence_Length" if $legacyAnno;
 
 # Column headers and order in output file.
 my @metas;
@@ -223,7 +227,7 @@ foreach my $element (@uprotnumbers) {
             my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
             foreach my $piece (@pieces) {
                 $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
-                my $type = EFI::Annotations::get_attribute_type($key);
+                my $type = $anno->get_attribute_type($key);
                 #if ($piece or $type ne "integer") {
                 if ($type ne "integer" or ($piece and $piece ne "None")) {
                     $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
@@ -233,27 +237,29 @@ foreach my $element (@uprotnumbers) {
         } else {
             my $piece = $uprot{$element}{$key};
             $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
-            if ($key eq "Sequence_Length" and $origelement =~ /\w{6,10}:(\d+):(\d+)/) {
+            if ($key eq $seqLenField and $origelement =~ /\w{6,10}:(\d+):(\d+)/) {
                 $piece = $2 - $1 + 1;
                 print "start:$1\tend$2\ttotal:$piece\n";
             }
-            my $type = EFI::Annotations::get_attribute_type($key);
+            my $type = $anno->get_attribute_type($key);
             #if ($piece or $type ne "integer") {
             if ($type ne "integer" or ($piece and $piece ne "None")) {
                 $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
             }
         }
     }
-    my $ncVal = 0;
-    my $ncColor = "";
-    if ($connectivity->{$origelement}) {
-        $ncVal = $connectivity->{$origelement}->{nc};
-        $ncColor = $connectivity->{$origelement}->{color};
+    if ($ncMapFile) {
+        my $ncVal = 0;
+        my $ncColor = "";
+        if ($connectivity->{$origelement}) {
+            $ncVal = $connectivity->{$origelement}->{nc};
+            $ncColor = $connectivity->{$origelement}->{color};
+        }
+        my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
+        $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
+        $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
+        $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
     }
-    my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
-    $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
-    $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
-    $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
     $writer->endTag();
 }
 
