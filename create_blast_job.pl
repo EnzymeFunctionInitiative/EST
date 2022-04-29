@@ -267,6 +267,15 @@ $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("$efiEstTools/get_sequences_option_a.pl " . join(" ", @args));
+
+{
+    my $taxOutputFile = "$outputDir/tax.json";
+    my $legacyAnnoArg = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
+    my $sourceFileArg = "--accession-file $accOutFile";
+    my $useUnirefArg = "--use-uniref" . ($blastUnirefVersion ? " --uniref-version $blastUnirefVersion" : "");
+    $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg $legacyAnnoArg"); # Remove the legacy after summer 2022
+}
+
 $B->jobName("${jobNamePrefix}get_seq_meta");
 $B->renderToFile("$scriptDir/get_sequences.sh");
 
