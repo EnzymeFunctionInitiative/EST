@@ -49,7 +49,8 @@ my $key = "";
 my $sequence = "";
 while (my $line = <FASTA>) {
     chomp $line;
-    if ($line =~ /^>(\w{6,10})/ or $line =~ /^>(\w{6,10}\:\d+\:\d+)/) {
+    next if $line =~ m/^\s*$/;
+    if ($line =~ /^>(\w{6,10})$/ or $line =~ /^>(\w{6,10}\:\d+\:\d+)$/) {
         if ($key) {
             $seqLen{$key} = length $sequence;
         }
