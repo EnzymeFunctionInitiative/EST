@@ -171,7 +171,7 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
 $excludeFragments = defined($excludeFragments);
 
 my $pythonMod = getLmod("Python/2", "Python");
-my $gdMod = getLmod("GD.*Perl", "GD");
+my $gdMod = "GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1"; #getLmod("GD.*Perl", "GD");
 my $perlMod = "Perl";
 my $rMod = "R";
 
@@ -516,7 +516,7 @@ if ($removeTempFiles) {
     $B->addAction("rm -f $outputDir/formatdb.log");
     $B->addAction("rm -f $outputDir/mux.out");
     $B->addAction("rm -f $filtSeqFile.*");
-    $B->addAction("rm $outputDir/*.tab $outputDir/sequences.fa.clstr");
+    $B->addAction("rm $outputDir/sequences.fa.clstr");
     $B->jobName("${jobNamePrefix}cleanup");
     $B->renderToFile("$scriptDir/cleanup.sh");
     my $cleanupJob = $S->submit("$scriptDir/cleanup.sh");

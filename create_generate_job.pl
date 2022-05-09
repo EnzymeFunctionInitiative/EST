@@ -1072,7 +1072,7 @@ if ($removeTempFiles) {
     $B->addAction("rm -rf $fracOutputDir");
     $B->addAction("rm -rf $outputDir/rdata");
     #$B->addAction("rm $outputDir/database.* $outputDir/format.log"); # Needed for taxonomy
-    $B->addAction("rm $outputDir/*.tab $outputDir/sequences.fa.clstr");
+    $B->addAction("rm $outputDir/sequences.fa.clstr");
 }
 $B->addAction("echo 100 > $progressFile");
 $B->jobName("${jobNamePrefix}graphs");
