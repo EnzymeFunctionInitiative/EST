@@ -21,7 +21,7 @@ use BlastUtil;
 
 my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert);
 my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "seq=s"             => \$seq,
@@ -53,6 +53,7 @@ my $result = GetOptions(
     "exclude-fragments" => \$excludeFragments,
     "db-type=s"         => \$dbType, # uniprot, uniref50, uniref90  default to uniprot; if uniref expand IDs to include UniRef members as node attribute
     "tax-search=s"      => \$taxSearch,
+    "tax-search-invert" => \$taxSearchInvert,
     "legacy-anno"       => \$legacyAnno, # Remove the legacy after summer 2022
 );
 
@@ -251,11 +252,13 @@ if ($pfam or $ipro) {
     push @args, "-fraction $fraction" if $fraction;
 }
 
+my $taxOpt = $taxSearch ? ("--tax-search \"$taxSearch\"" . ($taxSearchInvert ? " --tax-search-invert" : "")) : "";
+
 push @args, "-blast-file $outputDir/blastfinal.tab";
 push @args, "-query-file $queryFile";
 push @args, "-max-results $maxBlastResults" if $maxBlastResults;
 push @args, "-exclude-fragments" if $excludeFragments;
-push @args, "-tax-search \"$taxSearch\"" if $taxSearch;
+push @args, $taxOpt if $taxOpt;
 push @args, "--blast-uniref-version $blastUnirefVersion" if $blastUnirefVersion;
 push @args, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
 

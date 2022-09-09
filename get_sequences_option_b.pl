@@ -53,6 +53,7 @@ $seqObj->retrieveAndSaveSequences($familyIds); # file path is configured by setu
 $accObj->saveSequenceIds($familyIds); # file path is configured by setupConfig
 my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
 $statsObj->saveSequenceStatistics($mergedMetadata, {}, $familyStats, {});
+$famData->saveSunburstIdsToFile($familyConfig->{config}->{sunburst_output_file});
 
 if ($otherConfig->{uniprot_domain_length_file}) {
     my $histo = new EST::LengthHistogram;

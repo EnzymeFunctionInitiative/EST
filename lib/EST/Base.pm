@@ -1,9 +1,13 @@
 
 package EST::Base;
 
-
-use warnings;
 use strict;
+use warnings;
+
+use Data::Dumper;
+
+use EST::Filter qw(flatten_tax_search exclude_ids);
+use EST::Sunburst;
 
 
 sub new {
@@ -13,6 +17,7 @@ sub new {
     my $self = {};
 
     $self->{db_version} = exists $args{db_version} ? $args{db_version} : 0;
+    $self->{sunburst_ids} = {family => {}, user_ids => {}};
 
     return bless($self, $class);
 }
@@ -42,23 +47,33 @@ sub getStatistics {
 }
 
 
-sub dbSupportsFragment {
+sub getSunburstIds {
     my $self = shift;
-    return $self->{db_version} > 1;
+    return $self->{sunburst_ids};
 }
 
 
-sub flattenTaxSearch {
-    my $taxSearch = shift;
-    my $tablePrefix = shift // "";
-    $tablePrefix = "$tablePrefix." if $tablePrefix;
-    my @cond;
-    foreach my $cat (keys %$taxSearch) {
-        my $vals = $taxSearch->{$cat};
-        map { push @cond, "$tablePrefix$cat LIKE '\%$_\%'" } @$vals;
+sub saveSunburstIdsToFile {
+    my $self = shift;
+    my $outputFile = $self->{config}->{sunburst_tax_output};
+    if ($outputFile) {
+        EST::Sunburst::save_ids_to_file($outputFile, $self->{sunburst_ids}->{family}, $self->{sunburst_ids}->{user_ids});
+    } else {
+        warn "No sunburst output file is specified so we can't write to anything...";
     }
-    my $where = join(" OR ", @cond);
-    return $where;
+}
+
+
+sub setFamilySunburstIds {
+    my $self = shift;
+    my $obj = shift;
+    $self->{sunburst_ids}->{family} = $obj->{sunburst_ids}->{family};
+}
+
+
+sub dbSupportsFragment {
+    my $self = shift;
+    return $self->{db_version} > 1;
 }
 
 
@@ -66,38 +81,9 @@ sub excludeIds {
     my $self = shift;
     my $ids = shift;
     my $useTax = shift // 1;
-
-    my %full;
-
-    # Remove the legacy after summer 2022
-    my $fracColVer = $self->{config}->{legacy_anno} ? "Fragment" : "is_fragment";
-    my $fragmentWhere = $self->{config}->{exclude_fragments} ? "AND $fracColVer = 0" : "";
-    my $taxWhere = "";
-    my $taxJoin = "";
-    if ($useTax) {
-        $taxWhere = $self->{config}->{tax_search} ? (" AND (" . EST::Base::flattenTaxSearch($self->{config}->{tax_search}) . ")") : "";
-        # Remove the legacy after summer 2022
-        my $colVer = $self->{config}->{legacy_anno} ? "Taxonomy_ID" : "taxonomy_id";
-        $taxJoin = $self->{config}->{tax_search} ? "LEFT JOIN taxonomy ON annotations.$colVer = taxonomy.$colVer" : "";
-    }
-
-    my @ids = keys %$ids;
-    my $batchSize = 1;
-    while (scalar @ids) {
-        my $id = shift @ids;
-        #my @group = splice(@ids, 0, $batchSize);
-        #my $whereIds = join(",", map { "'$_'" } @group);
-        #my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
-        my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession = '$id' $fragmentWhere $taxWhere";
-        print "EXCLUDE SQL $sql\n";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute;
-        while (my $row = $sth->fetchrow_hashref) {
-            $full{$row->{accession}} = $ids->{$row->{accession}};
-        }
-    }
-
-    return \%full;
+    my $taxSearch = $useTax ? $self->{config}->{tax_search} : 0;
+    my $unirefVersion = $self->{config}->{uniref_version};
+    return exclude_ids($self->{dbh}, $self->{config}->{exclude_fragments}, $ids, $taxSearch, $unirefVersion, 0);
 }
 
 

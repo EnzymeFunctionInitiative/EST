@@ -39,6 +39,7 @@ my $familyIds = {};
 my $familyMetadata = {};
 my $familyStats = {};
 my $unirefMap = {};
+my $familyObject;
 my $familyFullDomainIds = undef; # Used when domain and uniref are enabled
 
 if (exists $familyConfig->{data}) {
@@ -50,6 +51,7 @@ if (exists $familyConfig->{data}) {
     $familyStats = $famData->getStatistics();
     $unirefMap = $famData->getUniRefMapping();
     $familyFullDomainIds = $famData->getFullFamilyDomain();
+    $familyObject = $famData;
 }
 
 
@@ -60,6 +62,7 @@ $accessionArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
 $accessionArgs{exclude_fragments} = $familyConfig->{config}->{exclude_fragments};
 $accessionArgs{tax_search} = $familyConfig->{config}->{tax_search};
 $accessionArgs{legacy_anno} = $familyConfig->{config}->{legacy_anno};
+$accessionArgs{sunburst_tax_output} = $familyConfig->{config}->{sunburst_tax_output};
 my $accessionData = new EST::Accession(dbh => $dbh, config_file_path => $configFile);
 $accessionData->configure(%accessionArgs);
 $accessionData->parseFile();
@@ -73,6 +76,9 @@ $seqObj->retrieveAndSaveSequences($familyIds, $userIds, {}, $unirefMap, $familyF
 $accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
 my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
 $statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, $userStats);
+
+$accessionData->setFamilySunburstIds($familyObject) if $familyObject;
+$accessionData->saveSunburstIdsToFile($accessionArgs{sunburst_tax_output});
 
 if ($otherConfig->{uniprot_domain_length_file}) {
     my $histo = new EST::LengthHistogram;

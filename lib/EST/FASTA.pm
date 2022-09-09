@@ -43,6 +43,7 @@ sub configure {
     $self->{config}->{use_headers} = exists $args{use_headers} ? $args{use_headers} : 0;
     $self->{config}->{fasta_file} = $args{fasta_file};
     $self->{config}->{tax_search} = $args{tax_search};
+    $self->{config}->{sunburst_tax_output} = $args{sunburst_tax_output};
 }
 
 
@@ -172,11 +173,18 @@ sub parseFile {
 
     $parser->finish();
 
-    if ($self->{config}->{tax_search}) {
-        my $newUpMeta = $self->excludeIds($upMeta);
-        $upMeta = $newUpMeta;
-    }
     my @fastaUniprotMatch = sort keys %$upMeta;
+    my $numRemoved = 0;
+    if ($self->{config}->{tax_search}) {
+        my ($filteredIds, $unirefMapping) = $self->excludeIds($upMeta, 1, $self->{config}->{tax_search});
+        foreach my $origId (@fastaUniprotMatch) {
+            if (not $filteredIds->{$origId}) {
+                $numRemoved++;
+                delete $upMeta->{$origId};
+            }
+        }
+        @fastaUniprotMatch = sort keys %$upMeta;
+    }
 
     $self->{data}->{seq} = {};
     $self->{data}->{seq_meta} = {};
@@ -195,8 +203,44 @@ sub parseFile {
     $self->{stats}->{num_multi_id} = $numMultUniprotIdSeq;
     $self->{stats}->{num_matched} = scalar @fastaUniprotMatch;
     $self->{stats}->{num_unmatched} = $seqCount + $numMultUniprotIdSeq - $self->{stats}->{num_matched};
+    $self->{stats}->{num_filter_removed} = $numRemoved;
+
+    $self->addSunburstIds();
 
     return 1;
+}
+
+
+sub addSunburstIds {
+    my $self = shift;
+
+    my $unirefMapping = $self->retrieveUniRefIds();
+
+    my $sunburstIds = $self->{sunburst_ids}->{user_ids};
+
+    foreach my $id (keys %$unirefMapping) {
+        $sunburstIds->{$id} = {uniref50 => $unirefMapping->{$id}->[0], uniref90 => $unirefMapping->{$id}->[1]};
+    }
+}
+
+
+sub retrieveUniRefIds {
+    my $self = shift;
+
+    my $whereField = "accession";
+
+    my $data = {};
+
+    foreach my $id (@{$self->{data}->{uniprot_ids}}) {
+        my $sql = "SELECT * FROM uniref WHERE $whereField = '$id'";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        if (my $row = $sth->fetchrow_hashref) {
+            $data->{$id} = [$row->{uniref50_seed}, $row->{uniref90_seed}];
+        }
+    }
+
+    return $data;
 }
 
 

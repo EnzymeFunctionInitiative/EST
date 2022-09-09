@@ -23,20 +23,19 @@ use EST::LengthHistogram;
 
 
 my ($annoFile, $configFile, $incfrac);
-my ($outputFile, $expandUniref);
-# Remove the legacy after summer 2022
-my ($legacyAnno); 
+my ($outputFile, $expandUniref, $outputUniref50, $outputUniref90);
 my $result = GetOptions(
     "struct=s"              => \$annoFile,
     "config=s"              => \$configFile,
     "incfrac=f"             => \$incfrac,
     "output=s"              => \$outputFile,
     "expand-uniref"         => \$expandUniref,
-    "legacy-anno"           => \$legacyAnno,
+    "output-uniref90-len=s" => \$outputUniref90,
+    "output-uniref50-len=s" => \$outputUniref50,
 );
 
 
-die "Requires input -struct argument for annotation IDs" if not $annoFile or not -f $annoFile;
+die "Requires input --struct argument for annotation IDs" if not $annoFile or not -f $annoFile;
 die "Requires output length file argument" if not $outputFile;
 
 
@@ -56,38 +55,62 @@ my $dbh = $db->getHandle();
 
 
 # Contains the attributes for each UniRef cluster ID
-my $annoMap = FileUtil::read_struct_file($annoFile);
+my ($annoMap) = FileUtil::read_struct_file($annoFile);
 my @metaIds = grep m/^[^z]/, keys %$annoMap;
 my @unkIds = grep m/^z/, keys %$annoMap; # unknown IDs (e.g. zzz*)
 
-if ($expandUniref) {
-    my @uniprotIds;
+my @seedIds;
+my @uniprotIds;
+if ($expandUniref and not $outputUniref90) {
     foreach my $clId (@metaIds) {
         my $ids = exists $annoMap->{$clId}->{UniRef90_IDs} ? $annoMap->{$clId}->{UniRef90_IDs} :
                   exists $annoMap->{$clId}->{UniRef50_IDs} ? $annoMap->{$clId}->{UniRef50_IDs} : "";
         my @ids = split(m/,/, $ids);
         push @uniprotIds, @ids;
-        push @uniprotIds, $clId if not scalar @ids;
+        push @seedIds, $clId;
     }
-    @metaIds = @uniprotIds;
+} else {
+    @uniprotIds = @metaIds;
 }
 
 
+
 my $histo = new EST::LengthHistogram(incfrac => $incfrac);
+my $histoUniref50 = new EST::LengthHistogram(incfrac => $incfrac);
+my $histoUniref90 = new EST::LengthHistogram(incfrac => $incfrac);
 
 my $seqLenField = "seq_len";
-# Remove the legacy after summer 2022
-$seqLenField = "Sequence_Length" if $legacyAnno;
 
-while (@metaIds) {
-    my @batch = splice(@metaIds, 0, 50);
+my $allUnirefField = "";
+my $allUnirefJoin = "";
+my $whereField = "A.accession";
+if ($outputUniref90) {
+    $allUnirefField = ", U.uniref50_seed, U.uniref90_seed";
+    $allUnirefJoin = "LEFT JOIN uniref AS U ON A.accession = U.accession";
+    $whereField = "U.accession";
+}
+
+
+my %histoHasUniref90;
+my %histoHasUniref50;
+
+while (@uniprotIds) {
+    my @batch = splice(@uniprotIds, 0, 50);
     my $queryIds = join("','", @batch);
-    my $sql = "SELECT accession, $seqLenField FROM annotations WHERE accession IN ('$queryIds')";
+    my $sql = "SELECT $whereField AS acc, $seqLenField $allUnirefField FROM annotations AS A $allUnirefJoin WHERE $whereField IN ('$queryIds')";
     my $sth = $dbh->prepare($sql);
     $sth->execute;
-    while (my $row = $sth->fetchrow_arrayref) {
-        my $len = $row->[1];
+    while (my $row = $sth->fetchrow_hashref) {
+        my $len = $row->{seq_len};
         $histo->addData($len);
+        if ($row->{uniref50_seed}) {
+            $histoUniref50->addData($len) if not $histoHasUniref50{$row->{uniref50_seed}};
+            $histoHasUniref50{$row->{uniref50_seed}} = 1;
+        }
+        if ($row->{uniref90_seed}) {
+            $histoUniref90->addData($len) if not $histoHasUniref90{$row->{uniref90_seed}};
+            $histoHasUniref90{$row->{uniref90_seed}} = 1;
+        }
     }
 }
 
@@ -97,6 +120,8 @@ foreach my $id (@unkIds) {
 }
 
 
-$histo->saveToFile($outputFile);
+$histo->saveToFile($outputFile) if $outputFile;
+$histoUniref50->saveToFile($outputUniref50) if $outputUniref50;
+$histoUniref90->saveToFile($outputUniref90) if $outputUniref90;
 
 

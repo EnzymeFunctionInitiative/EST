@@ -23,10 +23,11 @@ use EFI::IdMapping::Util;
 
 use lib "$FindBin::Bin/lib";
 use FileUtil;
+use EST::Filter;
 
 
 
-my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $minLen, $maxLen, $annoSpecFile);
+my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $minLen, $maxLen, $annoSpecFile, $idListFile);
 my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "out=s"                 => \$annoOut,
@@ -37,6 +38,7 @@ my $result = GetOptions(
     "max-len=i"             => \$maxLen,
     "anno-spec-file=s"      => \$annoSpecFile,      # if this is specified we only write out the attributes listed in the file
     "legacy-anno"           => \$legacyAnno, # Remove this after summer 2022
+    "filter-id-list=s"      => \$idListFile,
 );
 
 
@@ -81,7 +83,8 @@ if ($unirefVersion) {
 }
 
 
-my $idMeta = FileUtil::read_struct_file($metaFileIn);
+$idListFile = "" if not $idListFile;
+my ($idMeta) = FileUtil::read_struct_file($metaFileIn, $idListFile);
 
 my $unirefLenFiltWhere = "";
 my $sqlLenField = EFI::Annotations::FIELD_SEQ_LEN_KEY;
@@ -176,6 +179,7 @@ my $seedId = "";
 while (my $line = <META>) {
     chomp $line;
     if ($line =~ m/^\t/) {
+        next if not $seedId;
         my ($empty, $field, $value) = split(m/\t/, $line, 3);
         if ($field eq $clusterField) {
             my @ids = map { $_->[0] } @{$unirefIds{$seedId}};
@@ -189,8 +193,12 @@ while (my $line = <META>) {
             print OUT "\t", join("\t", $field, $value), "\n";
         }
     } else {
-        $seedId = $line;
-        print OUT $line, "\n";
+        if (not $idListFile or not $line or $idMeta->{$line}) {
+            $seedId = $line;
+            print OUT $line, "\n";
+        } else {
+            $seedId = "";
+        }
     }
 }
 

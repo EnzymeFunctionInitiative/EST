@@ -37,14 +37,12 @@ sub setupConfig {
     my $configFile = "";
     my ($blastIds, $pfam, $interpro);
     my ($accOutput, $seqOutput, $metaOutput, $statsOutput);
-    my ($minSeqLen, $maxSeqLen, $batchSize);
+    my ($batchSize);
     my ($unirefDomLenOutput, $uniprotDomLenOutput, $legacyAnno);
     my $result = GetOptions(
         "config=s"                          => \$configFile,
         "accession-output=s"                => \$accOutput,
         "out|sequence-output=s"             => \$seqOutput,
-        "min-seq-len=i"                     => \$minSeqLen,  # Optional. This is only used for the dev Option E-type jobs. Length filtering for other jobs is done in the SSN generation step.
-        "max-seq-len=i"                     => \$maxSeqLen,  # Optional. This is only used for the dev Option E-type jobs. Length filtering for other jobs is done in the SSN generation step.
         "seq-retr-batch-size=i"             => \$batchSize,  # Optional.
         "meta-file|metadata-output=s"       => \$metaOutput,
         "seq-count-file|seq-count-output=s" => \$statsOutput,
@@ -81,14 +79,10 @@ sub setupConfig {
     
     my $fastaDb = "$ENV{EFI_DB_DIR}/$ENV{EFI_UNIPROT_DB}";
     $batchSize = $batchSize ? $batchSize : ($ENV{EFI_PASS} ? $ENV{EFI_PASS} : 1000);
-    $minSeqLen = $minSeqLen ? $minSeqLen : 0;
-    $maxSeqLen = $maxSeqLen ? $maxSeqLen : 1000000;
 
     my %seqArgs = (
         seq_output_file => $seqOutput,
         use_domain => $familyConfig->{config}->{use_domain} ? 1 : 0,
-        min_seq_len => $minSeqLen,
-        max_seq_len => $maxSeqLen,
         fasta_database => $fastaDb,
         batch_size => $batchSize,
         use_user_domain => ($familyConfig->{config}->{use_domain} and $familyConfig->{config}->{domain_family}) ? 1 : 0,

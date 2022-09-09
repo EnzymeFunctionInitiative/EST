@@ -38,6 +38,7 @@ my $familyIds = {};
 my $familyMetadata = {};
 my $familyStats = {};
 my $unirefMap = {};
+my $familyObject;
 
 if (exists $familyConfig->{data}) {
     my $famData = new EST::Family(dbh => $dbh, db_version => $otherConfig->{db_version});
@@ -47,11 +48,13 @@ if (exists $familyConfig->{data}) {
     $familyMetadata = $famData->getMetadata();
     $familyStats = $famData->getStatistics();
     $unirefMap = $famData->getUniRefMapping();
+    $familyObject = $famData;
 }
 
 
 my %fastaArgs = EST::FASTA::getFastaCmdLineArgs();
 $fastaArgs{tax_search} = $familyConfig->{config}->{tax_search};
+$fastaArgs{sunburst_tax_output} = $familyConfig->{config}->{sunburst_tax_output};
 my $fastaData = new EST::FASTA(dbh => $dbh, config_file_path => $configFile);
 $fastaData->configure(%fastaArgs);
 $fastaData->parseFile();
@@ -66,4 +69,7 @@ $seqObj->retrieveAndSaveSequences($familyIds, $userIds, $userSeq, $unirefMap); #
 $accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
 my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
 $statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, $userStats);
+
+$fastaData->setFamilySunburstIds($familyObject) if $familyObject;
+$fastaData->saveSunburstIdsToFile($fastaArgs{sunburst_tax_output});
 

@@ -11,6 +11,7 @@ use warnings;
 use strict;
 
 use Getopt::Long qw(:config pass_through);
+use Data::Dumper;
 
 use parent qw(EST::Base);
 
@@ -46,6 +47,7 @@ sub configure {
     # Comes from family config
     $self->{config}->{blast_uniref_version} = ($args{blast_uniref_version} and ($args{blast_uniref_version} == 50 or $args{blast_uniref_version} == 90)) ? $args{blast_uniref_version} : "";
     $self->{config}->{tax_search} = $args{tax_search};
+    $self->{config}->{sunburst_tax_output} = $args{sunburst_tax_output};
 }
 
 
@@ -97,7 +99,8 @@ sub parseFile {
     }
 
     if ($self->{config}->{tax_search}) {
-        $ids = $self->excludeIds($ids);
+        my ($filteredIds, $unirefIdsList) = $self->excludeIds($ids, 1, $self->{config}->{tax_search});
+        $ids = $filteredIds;
     }
 
     $self->{data}->{uniprot_ids} = $ids;
@@ -109,9 +112,44 @@ sub parseFile {
         $self->retrieveUniRefMetadata();
     }
 
+    $self->addSunburstIds();
+
     $self->{stats} = {num_blast_retr => scalar keys %$ids};
 
     close BLAST_FILE;
+}
+
+
+sub addSunburstIds {
+    my $self = shift;
+
+    my $unirefMapping = $self->retrieveUniRefIds();
+
+    my $sunburstIds = $self->{sunburst_ids}->{user_ids};
+
+    foreach my $id (keys %$unirefMapping) {
+        $sunburstIds->{$id} = {uniref50 => $unirefMapping->{$id}->[0], uniref90 => $unirefMapping->{$id}->[1]};
+    }
+}
+
+
+sub retrieveUniRefIds {
+    my $self = shift;
+
+    my $whereField = "accession";
+
+    my $data = {};
+
+    foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+        my $sql = "SELECT * FROM uniref WHERE $whereField = '$id'";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        if (my $row = $sth->fetchrow_hashref) {
+            $data->{$id} = [$row->{uniref50_seed}, $row->{uniref90_seed}];
+        }
+    }
+
+    return $data;
 }
 
 
