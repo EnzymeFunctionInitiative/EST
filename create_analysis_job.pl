@@ -222,17 +222,19 @@ mkdir $analysisDir or die "could not make analysis folder $analysisDir\n" if not
 # If a taxonomy search parameter has been added, then we need to filter the annotations by the taxonomy filter,
 # and then come up with a list of IDs (that is a subset of what the normal 2.out file would contain).
 my $analysisMetaFile = $userHeaderFile;
+my $idListOption = "";
 
 my $taxDepId;
 if ($taxSearch) {
-    $analysisMetaFile = "$analysisDir/filtered.ids";
+    $analysisMetaFile = "$analysisDir/filtered.meta";
     my $taxSearchOption = "--tax-filter \"$taxSearch\"";
+    $idListOption = "--filter-id-list $analysisDir/filtered.ids";
     $B = $S->getBuilder();
     $B->resource(1, 1, "5gb");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load $efiDbMod");
-    $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $taxSearchOption --config $configFile");
+    $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption --config $configFile");
     $B->jobName("${jobNamePrefix}get_filtered_ids");
     $B->renderToFile("$analysisDir/get_filtered_ids.sh");
     my $jobId = $S->submit("$analysisDir/get_filtered_ids.sh", $dryrun);
@@ -249,7 +251,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("module load $perlMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs --meta-file $analysisMetaFile $annoSpecOption $idListOption -config=$configFile");
+$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs --meta-file $analysisMetaFile $annoSpecOption -config=$configFile");
 $B->jobName("${jobNamePrefix}get_annotations");
 $B->renderToFile("$analysisDir/get_annotations.sh");
 my $annojob = $S->submit("$analysisDir/get_annotations.sh", $dryrun);

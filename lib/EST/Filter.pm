@@ -104,6 +104,26 @@ sub get_predefined_function {
             sql => $sql,
             fields => $fields,
         };
+    } elsif ($name eq "fungi") {
+        my $fn = sub {
+            my $idTax = shift;
+            if ($idTax->{phylum} and ($idTax->{phylum} =~ m/Ascomycota/ or $idTax->{phylum} =~ m/Basidiomycota/ or $idTax->{phylum} =~ m/Fungi incertae sedis/ or $idTax->{phylum} =~ m/unclassified fungi/))
+            {
+                return 1;
+            } else {
+                return 0;
+            }
+        };
+
+        my $sql = "<PFX>phylum LIKE '\%Ascomycota\%' OR <PFX>phylum LIKE '\%Basidiomycota\%' OR <PFX>phylum LIKE '\%Fungi incertae sedis\%' OR <PFX>phylum LIKE '\%unclassified fungi\%'";
+
+        my $fields = ["phylum"];
+
+        return {
+            code => $fn,
+            sql => $sql,
+            fields => $fields,
+        };
     } elsif ($name eq "eukaroyta_no_fungi") {
         my $fn = sub {
             my $idTax = shift;

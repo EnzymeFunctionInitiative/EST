@@ -79,7 +79,7 @@ while (my $line = <BLAST>) {
     my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen) = @parts;
 
     # Exclude if taxonomy filtering is in effect and one or other of the blast results is filtered out
-    next if ($idListFile and not ($idList->{$qid} or $idList->{$sid}));
+    next if ($idListFile and (not $idList->{$qid} or not $idList->{$sid}));
 
     if ($filterEvalue) {
         my $alignmentScore = compute_ascore(@parts);

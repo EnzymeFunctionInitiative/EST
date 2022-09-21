@@ -22,12 +22,13 @@ use FileUtil;
 
 
 
-my ($inputFile, $outputFile, $configFile, $taxFilter);
+my ($inputFile, $outputFile, $outputIdList, $configFile, $taxFilter);
 my $result = GetOptions(
     "meta-file=s"           => \$inputFile,
     "filtered-meta-file=s"  => \$outputFile,
     "config=s"              => \$configFile,
     "tax-filter=s"          => \$taxFilter,
+    "filter-id-list=s"      => \$outputIdList,
 );
 
 
@@ -110,12 +111,12 @@ if ($unirefKey) {
 FileUtil::write_struct_file($newMeta, $outputFile, $origIdOrder);
 
 
-#open my $fh, ">", $outputFile or die "Unable to write to id list file $idListFile: $!";
-#
-#foreach my $id (keys %$idsToUse) {
-#    $fh->print("$id\n");
-#}
-#
-#close $fh;
+open my $fh, ">", $outputIdList or die "Unable to write to id list file $outputIdList: $!";
+
+foreach my $id (sort keys %$newMeta) {
+    $fh->print("$id\n");
+}
+
+close $fh;
 
 
