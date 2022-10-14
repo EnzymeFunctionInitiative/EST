@@ -7,6 +7,8 @@ BEGIN {
 }
 
 
+
+
 use strict;
 use warnings;
 
@@ -14,23 +16,26 @@ use Getopt::Long;
 use Cwd qw(abs_path);
 use FindBin;
 use JSON;
+use Data::Dumper;
 
 use lib "$FindBin::Bin/lib";
 
 use EFI::Database;
+use EST::Sunburst;
 
 
-my ($accIdFile, $outputFile, $configFile, $metadataFile, $useUniref, $unirefVersion, $debug);
-my ($legacyAnno); # Remove the legacy after summer 2022
+my ($outputFile, $configFile, $useUniref, $unirefVersion, $debug, $accIdFile, $metadataFile, $sunburstIdFile);
 my $result = GetOptions(
-    "accession-file=s"  => \$accIdFile,
     "output-file=s"     => \$outputFile,
     "config=s"          => \$configFile,
-    "metadata-file=s"   => \$metadataFile,
-    "use-uniref"        => \$useUniref,
-    "uniref-version=i"  => \$unirefVersion,
+
+    "accession-file=s"      => \$accIdFile,      # Raw list of IDs
+    "metadata-file=s"       => \$metadataFile,   # fasta.metadata file from EST
+    "sunburst-id-file=s"    => \$sunburstIdFile, # sunburst data file
+
+#    "use-uniref"        => \$useUniref,
+#    "uniref-version=i"  => \$unirefVersion,
     "debug"             => \$debug,
-    "legacy-anno"       => \$legacyAnno, # Remove this after summer 2022
 );
 
 if ((not $configFile or not -f $configFile) and exists $ENV{EFI_CONFIG} and -f $ENV{EFI_CONFIG}) {
@@ -38,19 +43,104 @@ if ((not $configFile or not -f $configFile) and exists $ENV{EFI_CONFIG} and -f $
 }
 die "Invalid configuration file provided" if not $configFile;
 
-die "Missing ID/metadata file" if (not $metadataFile or not -f $metadataFile) and (not $accIdFile or not -f $accIdFile);
+die "Missing ID/metadata file" if (not $metadataFile or not -f $metadataFile) and (not $accIdFile or not -f $accIdFile) and (not $sunburstIdFile or not -f $sunburstIdFile);
 die "Need output file" if not $outputFile;
 
 #die "Need --uniref-version" if $useUniref and not $unirefVersion;
+
+$debug = $debug // 0;
 
 
 my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
 
+
+my $idData;
+if ($sunburstIdFile) {
+    $idData = EST::Sunburst::load_ids_from_file($sunburstIdFile);
+} elsif ($metadataFile) {
+    $idData = loadIdsFromMetadata($metadataFile);
+} elsif ($accIdFile) {
+    $idData = loadIdsFromAccIdFile($accIdFile);
+}
+#die "Invalid data" if not $idData;
+exit(0) if not $idData;
+
+
+my $sb = new EST::Sunburst(dbh => $dbh, debug => $debug);
+
+my $taxData = $sb->getTaxonomy($idData);
+die "Invalid tax data" if not $taxData;
+
+
+$sb->saveToJson($taxData, $outputFile);
+
+
+
+
+
+
+
+
+
+
+sub loadIdsFromMetadata {
+    my $file = shift;
+
+    my %ids;
+
+    my $lastId = "";
+
+    open my $fh, "<", $file or die "Unable to read ID/metadata file $file : $!";
+
+    while (my $line = <$fh>) {
+        chomp $line;
+        if ($line =~ m/^[A-Z]/i) {
+            $lastId = $line;
+        }
+
+        if ($line =~ m/^\s+(Efi|Uni)Ref([59]0)_IDs\s+(.*)$/) {
+            my $field = "uniref$2";
+            my @uniprotIds = split(m/,/, $3);
+            map { $ids{$_}->{$field} = $lastId } @uniprotIds;
+        }
+    }
+
+    close $fh;
+
+    return \%ids;
+}
+
+
+sub loadIdsFromAccIdFile {
+    my $file = shift;
+
+    my %ids;
+
+    open my $fh, "<", $file or die "Unable to read ID file $file : $!";
+
+    while (my $line = <$fh>) {
+        chomp $line;
+        $ids{$line} = {uniref50 => "", uniref90 => ""};
+    }
+
+    close $fh;
+
+    return \%ids;
+}
+
+
+
+
+
+
+
+
+__END__
+
 # SELECT PFAM.accession, taxonomy.* FROM PFAM LEFT JOIN annotations ON PFAM.accession = annotations.accession LEFT JOIN taxonomy ON taxonomy.Taxonomy_ID = annotations.Taxonomy_ID WHERE PFAM.id = 'FAM';
 # SELECT PFAM.accession, taxonomy.*, uniref.uniref50_seed, uniref.uniref90_seed FROM PFAM LEFT JOIN annotations ON PFAM.accession = annotations.accession LEFT JOIN taxonomy ON taxonomy.Taxonomy_ID = annotations.Taxonomy_ID LEFT JOIN uniref ON uniref.accession = PFAM.accession WHERE PFAM.id = 'FAM';
 # SELECT * FROM taxonomy LEFT JOIN PFAM ON taxonomy.
-
 
 my $taxData = {unique_test => {}, data => {}};
 
@@ -97,14 +187,11 @@ if ($useUniref) {
 
 
 
-#TODO
-# Remove the legacy after summer 2022
-my $colVer = $legacyAnno ? "Taxonomy_ID" : "taxonomy_id";
 
 my $nodeId = 0;
 foreach my $id (@ids) {
     #my $sql = "SELECT T.* $unirefCol FROM taxonomy AS T LEFT JOIN annotations AS A ON T.Taxonomy_ID = A.Taxonomy_ID $unirefJoin WHERE A.accession = '$id'";
-    my $sql = "SELECT A.accession, T.* $unirefCol FROM taxonomy AS T LEFT JOIN annotations AS A ON T.$colVer = A.$colVer $unirefJoin WHERE $conditionCol = '$id'";
+    my $sql = "SELECT A.accession, T.* $unirefCol FROM taxonomy AS T LEFT JOIN annotations AS A ON T.taxonomy_id = A.taxonomy_id $unirefJoin WHERE $conditionCol = '$id'";
     print "TAXONOMY SQL $sql\n" if $debug;
     my $sth = $dbh->prepare($sql);
     $sth->execute;
@@ -181,11 +268,6 @@ sub addTaxData {
 
     my ($domainCol, $kingdomCol, $phylumCol, $classCol, $orderCol, $familyCol, $genusCol, $speciesCol) =
        ("domain",   "kingdom",   "phylum",   "class",   "tax_order", "family", "genus",   "species");
-    # Remove the legacy after summer 2022
-    if ($legacyAnno) {
-        ($domainCol, $kingdomCol, $phylumCol, $classCol, $orderCol, $familyCol, $genusCol, $speciesCol) =
-        ("Domain",   "Kingdom",   "Phylum",   "Class",   "TaxOrder", "Family",  "Genus",   "Species");
-    }
 
     if (not $taxData->{unique_test}->{$uniprot}) {
         my $isValid = ($row->{$domainCol} or $row->{$kingdomCol} or $row->{$phylumCol} or $row->{$classCol} or $row->{$orderCol} or $row->{$familyCol} or $row->{$genusCol} or $row->{$speciesCol});
