@@ -231,7 +231,7 @@ sub exclude_ids {
     my $ids = shift;
     my $taxSearch = shift // "";
     my $unirefVersion = shift // 0;
-    my $taxFilterByExclude = shift // 0; # Doesn't work.  Should be 0 anyway
+    my $familyFilter = shift // 0;
 
     my $isTaxSearch = $taxSearch ? 1 : 0;
 
@@ -244,9 +244,11 @@ sub exclude_ids {
     my $unirefCol = ", uniref90_seed, uniref50_seed";
     my $unirefJoin = "LEFT JOIN uniref ON annotations.accession = uniref.accession";
 
-    my ($taxWhere, $taxJoin, $taxCols) = get_tax_filter_sql($taxSearch, $unirefVersion, $taxFilterByExclude, $isTaxSearch);
+    my ($familyWhere, $familyJoin) = get_family_filter_sql($familyFilter);
 
-    print "SQL SELECT accession $unirefCol $taxCols FROM annotations $unirefJoin $taxJoin WHERE accession = 'ID' $fragmentWhere $taxWhere\n";
+    my ($taxWhere, $taxJoin, $taxCols) = get_tax_filter_sql($taxSearch, $unirefVersion, $isTaxSearch);
+
+    print "SQL SELECT annotations.accession $unirefCol $taxCols FROM annotations $unirefJoin $taxJoin $familyJoin WHERE accession = 'ID' $fragmentWhere $taxWhere $familyWhere\n";
 
     my $full = {};
     my $unirefMap = {50 => {}, 90 => {}};
@@ -260,7 +262,7 @@ sub exclude_ids {
         #my @group = splice(@ids, 0, $batchSize);
         #my $whereIds = join(",", map { "'$_'" } @group);
         #my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
-        my $sql = "SELECT annotations.accession AS accession $unirefCol $taxCols FROM annotations $unirefJoin $taxJoin WHERE $idWhereField = '$id' $fragmentWhere $taxWhere";
+        my $sql = "SELECT annotations.accession AS accession $unirefCol $taxCols FROM annotations $unirefJoin $taxJoin $familyJoin WHERE $idWhereField = '$id' $fragmentWhere $taxWhere $familyWhere";
         #print "$sql\n";
         #
         my $sth = $dbh->prepare($sql);
@@ -311,7 +313,6 @@ sub exclude_ids {
 sub get_tax_filter_sql {
     my $taxSearch = shift;
     my $unirefVersion = shift;
-    my $taxFilterByExclude = shift;
     my $isTaxSearch = shift;
 
     my $taxSearchWhere = "";
@@ -319,17 +320,7 @@ sub get_tax_filter_sql {
     my $taxCols = "";
     if ($isTaxSearch) {
         $taxSearchJoin = "LEFT JOIN taxonomy AS T ON annotations.taxonomy_id = T.taxonomy_id";
-        my $cond = "";
-        if ($unirefVersion and $taxFilterByExclude) {
-            my @taxCols;
-            foreach my $cat (get_tax_search_fields($taxSearch)) {
-                push @taxCols, "T.$cat AS T_$cat";
-            }
-            $taxCols = join(", ", @taxCols);
-            $taxCols = ", $taxCols" if $taxCols;
-        } else {
-            $cond = flatten_tax_search($taxSearch, "");
-        }
+        my $cond = flatten_tax_search($taxSearch, "");
         $taxSearchWhere = "AND ($cond)" if $cond;
     }
 
@@ -337,6 +328,28 @@ sub get_tax_filter_sql {
 }
 
 
+sub get_family_filter_sql {
+    my $familyFilter = shift // {};
+
+    my $familyJoin = "";
+    my $familyWhere = "";
+    if ($familyFilter) {
+        my @where;
+        foreach my $familyType (keys %$familyFilter) {
+            $familyJoin .= " LEFT JOIN $familyType ON annotations.accession = $familyType.accession";
+            my $where = join(" OR ", map { "$familyType.id = '$_'" } @{ $familyFilter->{$familyType} });
+            push @where, $where;
+        }
+        my $where = join(" OR ", @where);
+        if ($where) {
+            $familyWhere = "AND ($where)";
+        } else {
+            $familyJoin = "";
+        }
+    }
+
+    return ($familyWhere, $familyJoin);
+}
 
 
 

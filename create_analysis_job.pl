@@ -33,7 +33,7 @@ use Constants;
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash);
+    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -66,6 +66,7 @@ my $result = GetOptions(
     "keep-xgmml"            => \$cleanup,
     "tax-search=s"          => \$taxSearch,
     "tax-search-hash=s"     => \$taxSearchHash,
+    "remove-fragments"      => \$removeFragments,
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -149,6 +150,7 @@ $analysisDir .= "-minn" if $useAnnoSpec;
 $analysisDir .= "-mine" if $useMinEdgeAttr;
 $analysisDir .= "-nc" if $computeNc;
 $analysisDir .= "-$taxSearchHash" if $taxSearchHash;
+$analysisDir .= "-nf" if $removeFragments;
 
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
@@ -189,6 +191,8 @@ my $filteredBlastFile = "$analysisDir/2.out";
 my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
 my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
 my $annoSpecFile = "$generateDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
+my $evalueTableInputFile = "$baseAnalysisDir/blast_hits.tab"; # BLAST jobs only
+my $evalueTableOutputFile = "$analysisDir/blast_evalue.txt";
 
 ####################################################################################################
 # RETRIEVE ANNOTATIONS (STRUCT.OUT) FOR SSN
@@ -225,16 +229,17 @@ my $analysisMetaFile = $userHeaderFile;
 my $idListOption = "";
 
 my $taxDepId;
-if ($taxSearch) {
+if ($taxSearch or $removeFragments) {
     $analysisMetaFile = "$analysisDir/filtered.meta";
-    my $taxSearchOption = "--tax-filter \"$taxSearch\"";
+    my $taxSearchOption = $taxSearch ? "--tax-filter \"$taxSearch\"" : "";
+    my $removeFragmentsOption = $removeFragments ? "--remove-fragments" : "";
     $idListOption = "--filter-id-list $analysisDir/filtered.ids";
     $B = $S->getBuilder();
     $B->resource(1, 1, "5gb");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load $efiDbMod");
-    $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption --config $configFile");
+    $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption $removeFragmentsOption --config $configFile");
     $B->jobName("${jobNamePrefix}get_filtered_ids");
     $B->renderToFile("$analysisDir/get_filtered_ids.sh");
     my $jobId = $S->submit("$analysisDir/get_filtered_ids.sh", $dryrun);
@@ -252,6 +257,9 @@ $B->addAction("module load $perlMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs --meta-file $analysisMetaFile $annoSpecOption -config=$configFile");
+if (-e $evalueTableInputFile and -s $evalueTableInputFile > 0) {
+    $B->addAction("$toolpath/make_blast_evalue_table.pl --input $evalueTableInputFile --meta-file $filteredAnnoFile --output $evalueTableOutputFile");
+}
 $B->jobName("${jobNamePrefix}get_annotations");
 $B->renderToFile("$analysisDir/get_annotations.sh");
 my $annojob = $S->submit("$analysisDir/get_annotations.sh", $dryrun);

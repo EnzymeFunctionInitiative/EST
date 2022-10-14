@@ -38,25 +38,27 @@ sub new {
 # Public
 sub configure {
     my $self = shift;
-    my %args = @_;
+    my $args = shift;
 
-    die "No accession ID file provided" if not $args{id_file} or not -f $args{id_file};
+    die "No accession ID file provided" if not $args->{id_file} or not -f $args->{id_file};
 
-    $self->{config}->{id_file} = $args{id_file};
-    $self->{config}->{domain_family} = $args{domain_family};
-    $self->{config}->{uniref_version} = ($args{uniref_version} and ($args{uniref_version} == 50 or $args{uniref_version} == 90)) ? $args{uniref_version} : "";
-    $self->{config}->{domain_region} = $args{domain_region};
-    $self->{config}->{exclude_fragments} = $args{exclude_fragments};
-    $self->{config}->{tax_search} = $args{tax_search};
-    $self->{config}->{tax_invert} = $args{tax_invert} // 0;
-    $self->{config}->{legacy_anno} = $args{legacy_anno} // 0;
-    $self->{config}->{sunburst_tax_output} = $args{sunburst_tax_output};
+    $self->{config}->{id_file} = $args->{id_file};
+    $self->{config}->{domain_family} = $args->{domain_family};
+    $self->{config}->{uniref_version} = ($args->{uniref_version} and ($args->{uniref_version} == 50 or $args->{uniref_version} == 90)) ? $args->{uniref_version} : "";
+    $self->{config}->{domain_region} = $args->{domain_region};
+    $self->{config}->{exclude_fragments} = $args->{exclude_fragments};
+    $self->{config}->{tax_search} = $args->{tax_search};
+    $self->{config}->{tax_invert} = $args->{tax_invert} // 0;
+    $self->{config}->{legacy_anno} = $args->{legacy_anno} // 0;
+    $self->{config}->{sunburst_tax_output} = $args->{sunburst_tax_output};
+    $self->{config}->{family_filter} = $args->{family_filter};
 }
 
 
 # Public
 # Look in @ARGV
-sub getAccessionCmdLineArgs {
+sub loadParameters {
+    my $inputConfig = shift // {};
 
     my ($idFile, $noMatchFile);
     my $result = GetOptions(
@@ -67,7 +69,16 @@ sub getAccessionCmdLineArgs {
     $idFile = "" if not $idFile;
     $noMatchFile = "" if not $noMatchFile;
 
-    return (id_file => $idFile, no_match_file => $noMatchFile);
+    my %args = (id_file => $idFile, no_match_file => $noMatchFile);
+    $args{domain_family}        = $inputConfig->{domain_family};
+    $args{domain_region}        = $inputConfig->{domain_region};
+    $args{uniref_version}       = $inputConfig->{uniref_version};
+    $args{exclude_fragments}    = $inputConfig->{exclude_fragments};
+    $args{tax_search}           = $inputConfig->{tax_search};
+    $args{sunburst_tax_output}  = $inputConfig->{sunburst_tax_output};
+    $args{family_filter}        = $inputConfig->{family_filter};
+
+    return \%args;
 }
 
 
@@ -105,10 +116,11 @@ sub parseFile {
 
     my $unirefIds = {};
 
-    if ($self->{config}->{exclude_fragments} or $self->{config}->{tax_search}) {
+    if ($self->{config}->{exclude_fragments} or $self->{config}->{tax_search} or $self->{config}->{family_filter}) {
         my $doTaxFilter = $self->{config}->{tax_search} ? 1 : 0;
+        my $doFamilyFilter = $self->{config}->{family_filter} ? 1 : 0;
 
-        my ($filteredIds, $unirefIdsList) = $self->excludeIds($self->{data}->{uniprot_ids}, $doTaxFilter, $self->{config}->{tax_search});
+        my ($filteredIds, $unirefIdsList) = $self->excludeIds($self->{data}->{uniprot_ids}, $doTaxFilter, $doFamilyFilter);
         $self->{data}->{uniprot_ids} = $filteredIds;
         $unirefIds = $unirefIdsList;
 

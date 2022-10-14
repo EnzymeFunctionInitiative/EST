@@ -22,7 +22,6 @@ use BlastUtil;
 my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
 my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert);
-my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "tmp|tmpdir=s"      => \$tmpdir,
@@ -54,7 +53,6 @@ my $result = GetOptions(
     "db-type=s"         => \$dbType, # uniprot, uniref50, uniref90  default to uniprot; if uniref expand IDs to include UniRef members as node attribute
     "tax-search=s"      => \$taxSearch,
     "tax-search-invert" => \$taxSearchInvert,
-    "legacy-anno"       => \$legacyAnno, # Remove the legacy after summer 2022
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -222,7 +220,11 @@ $B->addAction("    echo \"BLAST failed; likely due to file format.\"");
 $B->addAction("    echo \$OUT > $outputDir/1.out.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
+#queryId, subjectId, percIdentity, alnLength, mismatchCount, gapOpenCount, queryStart, queryEnd, subjectStart, subjectEnd, eVal, bitScore
+#zINPUTSEQ  tr|A0A1U8QII3|A0A1U8QII3_EMENI  42.65   408     218     6       1       397     1       403     2e-99    311
+#zINPUTSEQ	tr|A0A2V5H9D2|A0A2V5H9D2_ASPV1	100.00	398	 796
 $B->addAction("cat $outputDir/initblast.out |grep -v '#'|cut -f 1,2,3,4,12 |sort -k5,5nr >$outputDir/blastfinal.tab");
+$B->addAction("cat $outputDir/initblast.out |grep -v '#'|cut -f 2,11 |sort -k2nr > $outputDir/blast_hits.tab");
 $B->addAction("SZ=`stat -c%s $outputDir/blastfinal.tab`");
 $B->addAction("if [[ \$SZ == 0 ]]; then");
 $B->addAction("    echo \"BLAST Failed. Check input sequence.\"");
@@ -260,7 +262,6 @@ push @args, "-max-results $maxBlastResults" if $maxBlastResults;
 push @args, "-exclude-fragments" if $excludeFragments;
 push @args, $taxOpt if $taxOpt;
 push @args, "--blast-uniref-version $blastUnirefVersion" if $blastUnirefVersion;
-push @args, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
 
 
 $B = $S->getBuilder();
@@ -273,10 +274,9 @@ $B->addAction("$efiEstTools/get_sequences_option_a.pl " . join(" ", @args));
 
 {
     my $taxOutputFile = "$outputDir/tax.json";
-    my $legacyAnnoArg = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
     my $sourceFileArg = "--accession-file $accOutFile";
     my $useUnirefArg = "--use-uniref" . ($blastUnirefVersion ? " --uniref-version $blastUnirefVersion" : "");
-    $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg $legacyAnnoArg"); # Remove the legacy after summer 2022
+    $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg"); # Remove the legacy after summer 2022
 }
 
 $B->jobName("${jobNamePrefix}get_seq_meta");

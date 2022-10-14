@@ -70,9 +70,8 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter);
 my ($runSerial, $baseOutputDir, $largeMem);
-my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -123,7 +122,7 @@ my $result = GetOptions(
     "large-mem"         => \$largeMem,
     "tax-search-only"   => \$taxSearchOnly,
     "source-tax=s"      => \$sourceTax,
-    "legacy-anno"       => \$legacyAnno, # Remove the legacy after summer 2022
+    "family-filter=s"   => \$familyFilter,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -554,15 +553,16 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     } elsif ($fastaFile and $fastaFileOption) {
         $retrScript .= "c.pl";
         push @args, $fastaFileOption;
+        push @args, "--family-filter \"$familyFilter\"" if $familyFilter;
     } elsif ($accessionFile) {
         $retrScript .= "d.pl";
         push @args, "-uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
         push @args, $accessionFileOption;
         push @args, $noMatchFileOption;
+        push @args, "--family-filter \"$familyFilter\"" if $familyFilter;
     }
 
     push @args, "-exclude-fragments" if $excludeFragments;
-    push @args, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
 
     #push @args, "--tax-search \"$taxSearch\" --tax-output $taxOutputFile" if $taxSearch;
     my $taxOpt = $taxSearch ? "--tax-search \"$taxSearch\"" : "";
@@ -585,8 +585,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         #my $sourceFileArg = $accessionFile ? "--metadata-file $metadataFile" : "--accession-file $accOutFile";
         #my $sourceFileArg = "--accession-file $accOutFile";
         my $sourceFileArg = "--sunburst-id-file $sunburstTaxOutput";
-        my $legacyAnnoArg = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
-        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $legacyAnnoArg"); # Remove the legacy after summer 2022
+        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile"); # Remove the legacy after summer 2022
     }
 
     my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");

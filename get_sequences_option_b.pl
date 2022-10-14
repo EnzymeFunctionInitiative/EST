@@ -20,9 +20,9 @@ use EST::Setup;
 use EST::Family;
 
 
-my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj, $otherConfig) = setupConfig();
+my ($inputConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = setupConfig();
 
-if (not exists $familyConfig->{data}) {
+if (not exists $inputConfig->{data}) {
     print "ERROR: No family provided.\n";
     exit(1);
 }
@@ -35,8 +35,8 @@ $statsObj->configureSourceTypes(
 );
 
 
-my $famData = new EST::Family(dbh => $dbh, db_version => $otherConfig->{db_version});
-$famData->configure($familyConfig);
+my $famData = new EST::Family(dbh => $dbh, db_version => $inputConfig->{db_version});
+$famData->configure($inputConfig);
 
 $famData->retrieveFamilyAccessions();
 
@@ -53,11 +53,11 @@ $seqObj->retrieveAndSaveSequences($familyIds); # file path is configured by setu
 $accObj->saveSequenceIds($familyIds); # file path is configured by setupConfig
 my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap);
 $statsObj->saveSequenceStatistics($mergedMetadata, {}, $familyStats, {});
-$famData->saveSunburstIdsToFile($familyConfig->{config}->{sunburst_output_file});
+$famData->saveSunburstIdsToFile($inputConfig->{config}->{sunburst_output_file});
 
-if ($otherConfig->{uniprot_domain_length_file}) {
+if ($inputConfig->{uniprot_domain_length_file}) {
     my $histo = new EST::LengthHistogram;
     $histo->addData($familyFullDomainIds);
-    $histo->saveToFile($otherConfig->{uniprot_domain_length_file});
+    $histo->saveToFile($inputConfig->{uniprot_domain_length_file});
 }
 

@@ -22,17 +22,18 @@ use FileUtil;
 
 
 
-my ($inputFile, $outputFile, $outputIdList, $configFile, $taxFilter);
+my ($inputFile, $outputFile, $outputIdList, $configFile, $taxFilter, $removeFragments);
 my $result = GetOptions(
     "meta-file=s"           => \$inputFile,
     "filtered-meta-file=s"  => \$outputFile,
     "config=s"              => \$configFile,
     "tax-filter=s"          => \$taxFilter,
+    "remove-fragments"      => \$removeFragments,
     "filter-id-list=s"      => \$outputIdList,
 );
 
 
-die "Require --tax-search" if not $taxFilter;
+die "Require --tax-search or --remove-fragments" if (not $taxFilter and not $removeFragments);
 die "Require --filtered-meta-file output" if not $outputFile;
 die "Require --meta-file input file" if not $inputFile or not -f $inputFile;
 
@@ -53,7 +54,9 @@ my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
 
 
-my $taxData = parse_tax_search($taxFilter);
+my $taxData = 0;
+$taxData = parse_tax_search($taxFilter) if $taxData;
+
 my ($meta, $origIdOrder) = FileUtil::read_struct_file($inputFile); # Hashref of IDs to metadata
 
 my $uniref50Key = "UniRef50_IDs";
@@ -81,9 +84,9 @@ foreach my $id (keys %$meta) {
 }
 
 
-my $filterFragments = 0;
-my $taxFilterByExclude = 0;
-my ($idsToUse, $unirefMapping) = exclude_ids($dbh, $filterFragments, $ids, $taxData, $unirefVersion, $taxFilterByExclude);
+my $filterFragments = $removeFragments ? 1 : 0;
+my $familyFilter = 0;
+my ($idsToUse, $unirefMapping) = exclude_ids($dbh, $filterFragments, $ids, $taxData, $unirefVersion, $familyFilter);
 
 
 my $newMeta = {};

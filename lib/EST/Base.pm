@@ -81,9 +81,13 @@ sub excludeIds {
     my $self = shift;
     my $ids = shift;
     my $useTax = shift // 1;
+    my $useFamilyFilter = shift // 0;
+
     my $taxSearch = $useTax ? $self->{config}->{tax_search} : 0;
+    my $familyFilter = $useFamilyFilter ? $self->{config}->{family_filter} : 0;
     my $unirefVersion = $self->{config}->{uniref_version};
-    return exclude_ids($self->{dbh}, $self->{config}->{exclude_fragments}, $ids, $taxSearch, $unirefVersion, 0);
+
+    return exclude_ids($self->{dbh}, $self->{config}->{exclude_fragments}, $ids, $taxSearch, $unirefVersion, $familyFilter);
 }
 
 

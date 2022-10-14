@@ -41,31 +41,18 @@ sub hasUniRef {
 
 
 # Look on the command line @ARGV for family configuration parameters.
-sub loadFamilyParameters {
+sub loadParameters {
     my ($ipro, $pfam, $gene3d, $ssf);
-    my ($useDomain, $fraction, $maxSequence, $maxFullFam);
-    my ($unirefVersion);
-    my ($domainFamily, $domainRegion, $excludeFragments);
-    my ($taxSearch, $taxExcludeByFilter, $minSeqLen, $maxSeqLen, $sunburstTaxOutput);
+    my ($fraction, $maxSequence, $maxFullFam);
 
     my $result = GetOptions(
         "ipro=s"                => \$ipro,
         "pfam=s"                => \$pfam,
         "gene3d=s"              => \$gene3d,
         "ssf=s"                 => \$ssf,
+        "fraction=i"            => \$fraction,
         "max-sequence=s"        => \$maxSequence,
         "max-full-fam-ur90=i"   => \$maxFullFam,
-        "domain=s"              => \$useDomain,
-        "domain-family=s"       => \$domainFamily, # Option D
-        "domain-region=s"       => \$domainRegion, # Option D
-        "fraction=i"            => \$fraction,
-        "uniref-version=s"      => \$unirefVersion,
-        "exclude-fragments"     => \$excludeFragments,
-        "tax-search=s"          => \$taxSearch,
-        "tax-search-filter-by-exclude" => \$taxExcludeByFilter, # For UniRef, retrieve by UniProt IDs then exclude UniRef and UniProt IDs based on the filter criteria
-        "sunburst-tax-output=s" => \$sunburstTaxOutput,
-        "min-seq-len=i"         => \$minSeqLen,
-        "max-seq-len=i"         => \$maxSeqLen,
     );
 
     my $data = {interpro => [], pfam => [], gene3d => [], ssf => []};
@@ -89,39 +76,21 @@ sub loadFamilyParameters {
     my $numFam = scalar @{$data->{interpro}} + scalar @{$data->{pfam}} + scalar @{$data->{gene3d}} + scalar @{$data->{ssf}};
 
     my $config = {};
-    $config->{fraction} =       (defined $fraction and $fraction !~ m/\D/ and $fraction > 0) ? $fraction : 1;
-    $config->{use_domain} =     (defined $useDomain and $useDomain eq "on");
-    $config->{uniref_version} = defined $unirefVersion ? $unirefVersion : "";
-    $config->{max_seq} =        defined $maxSequence ? $maxSequence : 0;
-    $config->{max_full_fam} =   defined $maxFullFam ? $maxFullFam : 0;
-    $config->{domain_family} =  ($config->{use_domain} and $domainFamily) ? $domainFamily : "";
-    $config->{domain_region} =  ($config->{use_domain} and $domainRegion) ? $domainRegion : "";
-    $config->{exclude_fragments}    = $excludeFragments;
-    $config->{tax_search} =     "";
-    $config->{min_seq_len} =    (defined $minSeqLen and $minSeqLen > 0) ? $minSeqLen : "";
-    $config->{max_seq_len} =    (defined $maxSeqLen and $maxSeqLen > 0) ? $maxSeqLen : "";
-    $config->{sunburst_tax_output} = $sunburstTaxOutput // "";
+    $config->{fraction}         = (defined $fraction and $fraction !~ m/\D/ and $fraction > 0) ? $fraction : 1;
+    $config->{max_seq}          = defined $maxSequence ? $maxSequence : 0;
+    $config->{max_full_fam}     = defined $maxFullFam ? $maxFullFam : 0;
+    $config->{data}             = $data if $numFam;
 
-    if ($taxSearch) {
-        my $search = parse_tax_search($taxSearch);
-        $config->{tax_search} = $search;
-        $config->{tax_filter_by_exclude} = $taxExcludeByFilter ? 1 : 0;
-    }
-
-    if ($numFam) {
-        return {data => $data, config => $config};
-    } else {
-        return {config => $config};
-    }
+    return $config;
 }
 
 
 sub configure {
     my $self = shift;
-    my $config = shift;
+    my $inputConfig = shift;
 
-    $self->{family} = $config->{data};
-    $self->{config} = $config->{config};
+    $self->{family} = $inputConfig->{data};
+    $self->{config} = $inputConfig;
 }
 
 

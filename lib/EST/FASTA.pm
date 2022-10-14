@@ -36,20 +36,24 @@ sub new {
 # Public
 sub configure {
     my $self = shift;
-    my %args = @_;
+    my $args = shift // {};
 
-    die "No FASTA file provided" if not $args{fasta_file} or not -f $args{fasta_file};
+    die "No FASTA file provided" if not $args->{fasta_file} or not -f $args->{fasta_file};
 
-    $self->{config}->{use_headers} = exists $args{use_headers} ? $args{use_headers} : 0;
-    $self->{config}->{fasta_file} = $args{fasta_file};
-    $self->{config}->{tax_search} = $args{tax_search};
-    $self->{config}->{sunburst_tax_output} = $args{sunburst_tax_output};
+    $self->{config}->{use_headers} = exists $args->{use_headers} ? $args->{use_headers} : 0;
+    $self->{config}->{fasta_file} = $args->{fasta_file};
+    $self->{config}->{tax_search} = $args->{tax_search};
+    $self->{config}->{sunburst_tax_output} = $args->{sunburst_tax_output};
+    $self->{config}->{family_filter} = $args->{family_filter};
+
+    print Dumper($args);
 }
 
 
 # Public
 # Look in @ARGV
-sub getFastaCmdLineArgs {
+sub loadParameters {
+    my $inputConfig = shift // {};
 
     my ($fastaFileIn, $useHeaders);
     my $result = GetOptions(
@@ -60,7 +64,14 @@ sub getFastaCmdLineArgs {
     $useHeaders = defined $useHeaders ? 1 : 0;
     $fastaFileIn = "" if not $fastaFileIn;
 
-    return (fasta_file => $fastaFileIn, use_headers => $useHeaders);
+    my %fastaArgs = (fasta_file => $fastaFileIn, use_headers => $useHeaders);
+    $fastaArgs{tax_search}          = $inputConfig->{tax_search};
+    $fastaArgs{sunburst_tax_output} = $inputConfig->{sunburst_tax_output};
+    $fastaArgs{family_filter}       = $inputConfig->{family_filter};
+
+    print Dumper(\%fastaArgs);
+
+    return \%fastaArgs;
 }
 
 
@@ -175,8 +186,12 @@ sub parseFile {
 
     my @fastaUniprotMatch = sort keys %$upMeta;
     my $numRemoved = 0;
-    if ($self->{config}->{tax_search}) {
-        my ($filteredIds, $unirefMapping) = $self->excludeIds($upMeta, 1, $self->{config}->{tax_search});
+    print "WHAT\n";
+    if ($self->{config}->{tax_search} or $self->{config}->{family_filter}) {
+        my $doTaxFilter = $self->{config}->{tax_search} ? 1 : 0;
+        my $doFamilyFilter = $self->{config}->{family_filter} ? 1 : 0;
+        print "$doTaxFilter|$doFamilyFilter|\n";
+        my ($filteredIds, $unirefMapping) = $self->excludeIds($upMeta, $doTaxFilter, $doFamilyFilter);
         foreach my $origId (@fastaUniprotMatch) {
             if (not $filteredIds->{$origId}) {
                 $numRemoved++;

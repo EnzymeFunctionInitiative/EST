@@ -36,24 +36,25 @@ sub new {
 # Public
 sub configure {
     my $self = shift;
-    my %args = @_;
+    my $args = shift;
 
-    die "No BLAST results file provided" if not $args{blast_file} or not -f $args{blast_file};
-    die "No input FASTA query file provided" if not $args{query_file} or not -f $args{query_file};
+    die "No BLAST results file provided" if not $args->{blast_file} or not -f $args->{blast_file};
+    die "No input FASTA query file provided" if not $args->{query_file} or not -f $args->{query_file};
 
-    $self->{config}->{blast_file} = $args{blast_file};
-    $self->{config}->{query_file} = $args{query_file};
-    $self->{config}->{max_results} = $args{max_results} ? $args{max_results} : 1000;
+    $self->{config}->{blast_file} = $args->{blast_file};
+    $self->{config}->{query_file} = $args->{query_file};
+    $self->{config}->{max_results} = $args->{max_results} ? $args->{max_results} : 1000;
     # Comes from family config
-    $self->{config}->{blast_uniref_version} = ($args{blast_uniref_version} and ($args{blast_uniref_version} == 50 or $args{blast_uniref_version} == 90)) ? $args{blast_uniref_version} : "";
-    $self->{config}->{tax_search} = $args{tax_search};
-    $self->{config}->{sunburst_tax_output} = $args{sunburst_tax_output};
+    $self->{config}->{blast_uniref_version} = ($args->{blast_uniref_version} and ($args->{blast_uniref_version} == 50 or $args->{blast_uniref_version} == 90)) ? $args->{blast_uniref_version} : "";
+    $self->{config}->{tax_search} = $args->{tax_search};
+    $self->{config}->{sunburst_tax_output} = $args->{sunburst_tax_output};
 }
 
 
 # Public
 # Look in @ARGV
-sub getBLASTCmdLineArgs {
+sub loadParameters {
+    my $inputConfig = shift // {};
 
     my ($blastFile, $nResults, $queryFile, $blastUnirefVersion);
     my $result = GetOptions(
@@ -68,7 +69,12 @@ sub getBLASTCmdLineArgs {
     $queryFile = "" if not $queryFile;
     $blastUnirefVersion = "" if not $blastUnirefVersion;
 
-    return (blast_file => $blastFile, max_results => $nResults, query_file => $queryFile, blast_uniref_version => $blastUnirefVersion);
+    my %blastArgs = (blast_file => $blastFile, max_results => $nResults, query_file => $queryFile, blast_uniref_version => $blastUnirefVersion);
+    #$blastArgs{uniref_version} = $inputConfig->{uniref_version};
+    $blastArgs{tax_search} = $inputConfig->{tax_search};
+    $blastArgs{sunburst_tax_output} = $inputConfig->{sunburst_tax_output};
+
+    return \%blastArgs;
 }
 
 
