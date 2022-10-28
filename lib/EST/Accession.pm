@@ -52,6 +52,7 @@ sub configure {
     $self->{config}->{legacy_anno} = $args->{legacy_anno} // 0;
     $self->{config}->{sunburst_tax_output} = $args->{sunburst_tax_output};
     $self->{config}->{family_filter} = $args->{family_filter};
+    $self->{config}->{debug_sql} = $args->{debug_sql};
 }
 
 
@@ -117,6 +118,7 @@ sub parseFile {
     my $unirefIds = {};
 
     if ($self->{config}->{exclude_fragments} or $self->{config}->{tax_search} or $self->{config}->{family_filter}) {
+        print "Doing Filtering\n";
         my $doTaxFilter = $self->{config}->{tax_search} ? 1 : 0;
         my $doFamilyFilter = $self->{config}->{family_filter} ? 1 : 0;
 

@@ -71,7 +71,7 @@ my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $frac
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter);
-my ($runSerial, $baseOutputDir, $largeMem);
+my ($runSerial, $baseOutputDir, $largeMem, $debug);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -123,6 +123,7 @@ my $result = GetOptions(
     "tax-search-only"   => \$taxSearchOnly,
     "source-tax=s"      => \$sourceTax,
     "family-filter=s"   => \$familyFilter,
+    "debug"             => \$debug,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -297,6 +298,7 @@ if (not defined $incfrac) {
 $excludeFragments = defined($excludeFragments);
 $runSerial = defined($runSerial) ? $runSerial : "";
 $useFastaHeaders = ($taxSearchOnly or $useFastaHeaders);
+$debug = 0 if not defined $debug;
 
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
@@ -546,6 +548,8 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         push @args, $domFamArg if $domFamArg;
         push @args, $domRegionArg if $domainRegion;
     }
+
+    push @args, "--debug-sql" if $debug;
 
     my $retrScript = "get_sequences_option_";
     if (not $fastaFile and not $accessionFile) {

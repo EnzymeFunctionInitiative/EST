@@ -39,7 +39,7 @@ sub setupConfig {
     my ($batchSize);
     my ($unirefDomLenOutput, $uniprotDomLenOutput, $useDomain, $legacyAnno);
     my ($domainFamily, $domainRegion);
-    my ($unirefVersion);
+    my ($unirefVersion, $debugSql);
     my ($excludeFragments, $taxSearch, $taxExcludeByFilter, $minSeqLen, $maxSeqLen, $sunburstTaxOutput, $familyFilter);
 
     my $result = GetOptions(
@@ -57,6 +57,7 @@ sub setupConfig {
         "domain-region=s"                   => \$domainRegion, # Option D
 
         "uniref-version=s"                  => \$unirefVersion,
+        "debug-sql"                         => \$debugSql,
 
         "exclude-fragments"                 => \$excludeFragments,
         "tax-search=s"                      => \$taxSearch,
@@ -110,6 +111,7 @@ sub setupConfig {
     $config->{min_seq_len}          = (defined $minSeqLen and $minSeqLen > 0) ? $minSeqLen : "";
     $config->{max_seq_len}          = (defined $maxSeqLen and $maxSeqLen > 0) ? $maxSeqLen : "";
     $config->{sunburst_tax_output}  = $sunburstTaxOutput // "";
+    $config->{debug_sql}            = defined $debugSql ? 1 : 0;
 
     if ($taxSearch) {
         my $search = parse_tax_search($taxSearch);
