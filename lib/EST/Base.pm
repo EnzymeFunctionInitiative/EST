@@ -87,7 +87,7 @@ sub excludeIds {
     my $familyFilter = $useFamilyFilter ? $self->{config}->{family_filter} : 0;
     my $unirefVersion = $self->{config}->{uniref_version};
 
-    return exclude_ids($self->{dbh}, $self->{config}->{exclude_fragments}, $ids, $taxSearch, $unirefVersion, $familyFilter);
+    return exclude_ids($self->{dbh}, $self->{config}->{exclude_fragments}, $ids, $taxSearch, $unirefVersion, $familyFilter, $self->{config}->{debug_sql});
 }
 
 

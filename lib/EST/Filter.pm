@@ -320,7 +320,7 @@ sub exclude_ids {
         #my $whereIds = join(",", map { "'$_'" } @group);
         #my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
         my $sql = "SELECT annotations.accession AS accession $unirefCol $taxCols FROM annotations $unirefJoin $taxJoin $familyJoin WHERE $idWhereField = '$id' $fragmentWhere $taxWhere $familyWhere";
-        #print "$sql\n";
+        print "FILTER $sql\n" if $debugSql;
         #
         my $sth = $dbh->prepare($sql);
         $sth->execute;

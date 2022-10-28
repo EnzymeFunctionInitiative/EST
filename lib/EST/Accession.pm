@@ -78,6 +78,7 @@ sub loadParameters {
     $args{tax_search}           = $inputConfig->{tax_search};
     $args{sunburst_tax_output}  = $inputConfig->{sunburst_tax_output};
     $args{family_filter}        = $inputConfig->{family_filter};
+    $args{debug_sql}            = $inputConfig->{debug_sql};
 
     return \%args;
 }
@@ -125,13 +126,22 @@ sub parseFile {
         my ($filteredIds, $unirefIdsList) = $self->excludeIds($self->{data}->{uniprot_ids}, $doTaxFilter, $doFamilyFilter);
         $self->{data}->{uniprot_ids} = $filteredIds;
         $unirefIds = $unirefIdsList;
+        printIds($filteredIds, "FILTERED_IDS") if $self->{config}->{debug_sql};
+        printIds($unirefIds->{50}, "UNIREF50_IDS") if $self->{config}->{debug_sql};
+        printIds($unirefIds->{90}, "UNIREF90_IDS") if $self->{config}->{debug_sql};
 
         my $data = $self->{data};
         # Remove any metdata for nodes that were filtered out
         map { delete $data->{meta}->{$_} if not $data->{uniprot_ids}->{$_}; } keys %{ $data->{meta} };
     } else {
+        print "Getting UniRef IDs (no filtering)\n";
         $unirefIds = $self->retrieveUniRefIds();
+        printIds($self->{data}->{uniprot_ids}, "NO_FILTERED_IDS") if $self->{config}->{debug_sql};
+        printIds($unirefIds->{50}, "NO_FILTERED_UNIREF50_IDS") if $self->{config}->{debug_sql};
+        printIds($unirefIds->{90}, "NO_FILTERED_UNIREF90_IDS") if $self->{config}->{debug_sql};
     }
+
+    die "Stopping retrieval due to debug flag" if $self->{config}->{debug_sql};
 
     $self->addSunburstIds($self->{data}->{uniprot_ids}, $unirefIds);
 
@@ -144,6 +154,15 @@ sub parseFile {
     }
 
     $self->{stats}->{num_ids} = scalar keys %rawIds;
+}
+
+
+sub printIds {
+    my $hash = shift;
+    my $prefix = shift // "ID";
+    foreach my $key (sort keys %$hash) {
+        print "$prefix: $key\n";
+    }
 }
 
 
