@@ -109,12 +109,12 @@ sub saveToJson {
 
     open my $fh, ">", $outputFile;
 
+    my $json = JSON->new->canonical(1);
     #DEBUG
     if ($self->{debug}) {
-        my $json = JSON->new;
         print $fh $json->pretty->encode($taxStuff);
     } else {
-        print $fh encode_json($taxStuff);
+        print $fh $json->encode($taxStuff);
     }
 
     close $fh;
