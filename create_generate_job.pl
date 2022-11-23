@@ -70,9 +70,8 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax);
-my ($runSerial, $baseOutputDir, $largeMem);
-my $legacyAnno; # Remove the legacy after summer 2022
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
+my ($runSerial, $baseOutputDir, $largeMem, $debug);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -123,7 +122,9 @@ my $result = GetOptions(
     "large-mem"         => \$largeMem,
     "tax-search-only"   => \$taxSearchOnly,
     "source-tax=s"      => \$sourceTax,
-    "legacy-anno"       => \$legacyAnno, # Remove the legacy after summer 2022
+    "family-filter=s"   => \$familyFilter,
+    "extra-ram:i"       => \$extraRam,
+    "debug"             => \$debug,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -298,6 +299,7 @@ if (not defined $incfrac) {
 $excludeFragments = defined($excludeFragments);
 $runSerial = defined($runSerial) ? $runSerial : "";
 $useFastaHeaders = ($taxSearchOnly or $useFastaHeaders);
+$debug = 0 if not defined $debug;
 
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
@@ -374,6 +376,10 @@ my $filtSeqFile = "$outputDir/$filtSeqFilename";
 
 my $lenUniprotFile = "$outputDir/length_uniprot.tab"; # full lengths of all UniProt sequences (expanded from UniRef if necessary)
 my $lenUniprotDomFile = "$outputDir/length_uniprot_domain.tab"; # domain lengths of all UniProt sequences (expanded from UniRef if necessary)
+my $lenUniref90File = "$outputDir/length_uniref90.tab"; # full lengths of UR cluster ID sequences
+my $lenUniref90DomFile = "$outputDir/length_uniref90_domain.tab"; # domain lengths of UR cluster ID sequences
+my $lenUniref50File = "$outputDir/length_uniref50.tab"; # full lengths of UR cluster ID sequences
+my $lenUniref50DomFile = "$outputDir/length_uniref50_domain.tab"; # domain lengths of UR cluster ID sequences
 my $lenUnirefFile = "$outputDir/length_uniref.tab"; # full lengths of UR cluster ID sequences
 my $lenUnirefDomFile = "$outputDir/length_uniref_domain.tab"; # domain lengths of UR cluster ID sequences
 #my $uniprotSeqLenFile = "$outputDir/uniprot_length.tab"; # For UniRef option, this is the lengths of all the sequences in the family not just the seed sequences
@@ -382,6 +388,10 @@ my $lenUnirefDomFile = "$outputDir/length_uniref_domain.tab"; # domain lengths o
 my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 
 $seqCountFile = "$outputDir/acc_counts" if not $seqCountFile;
+
+my $taxOutputFile = "$outputDir/tax.json";
+my $sunburstTaxOutput = "$outputDir/sunburst.raw";
+
 
 # Error checking for user supplied dat and fa files
 my $accessionFileOption = "";
@@ -519,8 +529,9 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     my @args = (
         "-config=$configFile", "-error-file $errorFile",
         "-seq-count-output $seqCountFile", "-sequence-output $allSeqFile", "-accession-output $accOutFile",
-        "-meta-file $metadataFile",
+        "-meta-file $metadataFile", $minSeqLenOpt, $maxSeqLenOpt
     );
+    push @args, "--sunburst-tax-output $sunburstTaxOutput";
     
     push @args, "-pfam $pfam" if $pfam;
     push @args, "-ipro $ipro" if $ipro;
@@ -539,25 +550,28 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         push @args, $domRegionArg if $domainRegion;
     }
 
+    push @args, "--debug-sql" if $debug;
+
     my $retrScript = "get_sequences_option_";
     if (not $fastaFile and not $accessionFile) {
         $retrScript .= "b.pl";
     } elsif ($fastaFile and $fastaFileOption) {
         $retrScript .= "c.pl";
         push @args, $fastaFileOption;
+        push @args, "--family-filter \"$familyFilter\"" if $familyFilter;
     } elsif ($accessionFile) {
         $retrScript .= "d.pl";
         push @args, "-uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
         push @args, $accessionFileOption;
         push @args, $noMatchFileOption;
+        push @args, "--family-filter \"$familyFilter\"" if $familyFilter;
     }
 
     push @args, "-exclude-fragments" if $excludeFragments;
-    push @args, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
 
-    my $taxOutputFile = "$outputDir/tax.json";
     #push @args, "--tax-search \"$taxSearch\" --tax-output $taxOutputFile" if $taxSearch;
-    push @args, "--tax-search \"$taxSearch\"" if $taxSearch;
+    my $taxOpt = $taxSearch ? "--tax-search \"$taxSearch\"" : "";
+    push @args, $taxOpt if $taxOpt;
 
     if ($accessionFile and $sourceTax) {
         my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
@@ -571,30 +585,30 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         #my $useUnirefArg = (not $fastaFile and not $accessionFile) ? "--use-uniref" : "";
         # If a uniref version is specified, assume that the input IDs are that version, expand them, and then get
         # the taxonomy for that and all uniref IDs.  If a uniref version is not specified, then get the taxonomy for that and all uniref IDs.
-        my $useUnirefArg = (not $fastaFile) ? ("--use-uniref" . ($unirefVersion ? " --uniref-version $unirefVersion" : "")) : "";
+        #my $useUnirefArg = (not $fastaFile) ? ("--use-uniref" . ($unirefVersion ? " --uniref-version $unirefVersion" : "")) : "";
         #$B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile --metadata-file $metadataFile --config $configFile $useUnirefArg");
         #my $sourceFileArg = $accessionFile ? "--metadata-file $metadataFile" : "--accession-file $accOutFile";
-        my $sourceFileArg = "--accession-file $accOutFile";
-        my $legacyAnnoArg = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
-        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile $useUnirefArg $legacyAnnoArg"); # Remove the legacy after summer 2022
+        #my $sourceFileArg = "--accession-file $accOutFile";
+        my $sourceFileArg = "--sunburst-id-file $sunburstTaxOutput";
+        $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile"); # Remove the legacy after summer 2022
     }
 
     my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
     push @lenUniprotArgs, "-output $lenUniprotFile";
     push @lenUniprotArgs, "-expand-uniref" if $unirefVersion;
-    push @lenUniprotArgs, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
+    push @lenUniprotArgs, "--output-uniref50-len $lenUniref50File --output-uniref90-len $lenUniref90File" if $taxSearchOnly;
     $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUniprotArgs));
     
-    if ($unirefVersion) {
+    if ($unirefVersion and not $taxSearchOnly) {
         my @lenUnirefArgs = ("-struct $metadataFile", "-config $configFile");
         push @lenUnirefArgs, "-output $lenUnirefFile";
-        push @lenUnirefArgs, "--legacy-anno" if $legacyAnno; # Remove the legacy after summer 2022
         $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUnirefArgs));
     }
 
     # Annotation retrieval (getannotations.pl) now happens in the SNN/analysis step.
 
     if ($taxSearchOnly) {
+        createGraphJob($B, undef, "50+90", 0, 1);
         $B->addAction("formatdb -i $allSeqFile -n database -p T -o T ");
         $B->addAction("touch $outputDir/1.out.completed");
     }
@@ -883,7 +897,8 @@ push @allJobIds, $prevJobId;
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-my $sortRam = $largeMem ? "700gb" : "370gb";
+my $sortRam = $largeMem ? ((defined $extraRam and length $extraRam) ? $extraRam : 700) : 70;
+$sortRam = "${sortRam}gb";
 $B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
@@ -1006,82 +1021,9 @@ print "Simplegraphs job is:\n $simplegraphjob\n" if not $runSerial;
 #
 $B = $S->getBuilder();
 
-my ($smallWidth, $smallHeight) = (700, 315);
-
-#create information for R to make graphs and then have R make them
-$B->queue($memqueue);
-$B->dependency(0, $prevJobId);
-$B->mailEnd();
-$B->setScriptAbortOnError(0); # don't abort on error
-$B->addAction("module load oldapps") if $oldapps;
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load $efiDbMod");
-if (defined $LegacyGraphs) {
-    my $evalueFile = "$outputDir/evalue.tab";
-    my $defaultLengthFile = "$outputDir/length.tab";
-    $B->resource(1, 1, "50gb");
-    $B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
-    $B->addAction("module load $perlMod");
-    $B->addAction("module load $rMod");
-    $B->addAction("mkdir -p $outputDir/rdata");
-    # Lengths are retrieved in a previous step.
-    $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -incfrac $incfrac -evalue-file $evalueFile");
-    $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
-    $B->addAction("if [ -z \"\$FIRST\" ]; then");
-    $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
-    $B->addAction("    touch $outputDir/graphs.failed");
-    $B->addAction("    touch  $outputDir/1.out.completed");
-    $B->addAction("    exit 0 #Exit with no error");
-    $B->addAction("fi");
-    $B->addAction("FIRST=`head -1 \$FIRST`");
-    $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
-    $B->addAction("LAST=`head -1 \$LAST`");
-    $B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length_sm.png \$FIRST \$LAST \$MAXALIGN $jobId $smallWidth $smallHeight");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-    my %lenFiles = ($lenUniprotFile => {title => "", file => "length_histogram_uniprot"});
-    $lenFiles{$lenUniprotFile}->{title} = "UniProt, Full Length" if $unirefVersion or $domain eq "on";
-    $lenFiles{$lenUniprotDomFile} = {title => "UniProt, Domain", file => "length_histogram_uniprot_domain"} if $domain eq "on";
-    $lenFiles{$lenUnirefFile} = {title => "UniRef$unirefVersion Cluster IDs, Full Length", file => "length_histogram_uniref"} if $unirefVersion;
-    $lenFiles{$lenUnirefDomFile} = {title => "UniRef$unirefVersion Cluster IDs, Domain", file => "length_histogram_uniref_domain"} if $unirefVersion and $domain eq "on";
-    foreach my $file (keys %lenFiles) {
-        my $title = $lenFiles{$file}->{title} ? "\"(" . $lenFiles{$file}->{title} . ")\"" : "\"\"";
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}.png $jobId $title");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}_sm.png $jobId $title $smallWidth $smallHeight");
-    }
-} else {
-    $B->addAction("module load $pythonMod");
-    $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $allSeqFile -i $incfrac");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r hdf5 $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r hdf5 $outputDir/rdata.hdf5 $outputDir/percent_identity_sm.png $jobId $smallWidth $smallHeight");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r hdf5 $outputDir/rdata.hdf5 $outputDir/length_histogram.png $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r hdf5 $outputDir/rdata.hdf5 $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId");
-    $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
-}
-$B->addAction("touch  $outputDir/1.out.completed");
-if ($removeTempFiles) {
-    $B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
-    $B->addAction("rm -rf $blastOutputDir");
-    $B->addAction("rm -rf $fracOutputDir");
-    $B->addAction("rm -rf $outputDir/rdata");
-    #$B->addAction("rm $outputDir/database.* $outputDir/format.log"); # Needed for taxonomy
-    $B->addAction("rm $outputDir/sequences.fa.clstr");
-}
-$B->addAction("echo 100 > $progressFile");
-$B->jobName("${jobNamePrefix}graphs");
-$B->renderToFile(getRenderFilePath("$scriptDir/graphs.sh"));
-
-my $graphjob = $S->submit("$scriptDir/graphs.sh");
-chomp $graphjob;
-print "Graph job is:\n $graphjob\n" if not $runSerial;
-($prevJobId) = split /\./, $graphjob;
+my $separateJob = 1;
+my $lengthHistoOnly = 0;
+$prevJobId = createGraphJob($B, $prevJobId, $unirefVersion, $separateJob, $lengthHistoOnly);
 
 push @allJobIds, $prevJobId;
 
@@ -1116,6 +1058,104 @@ sub initSerialScript {
 }
 
 
+sub createGraphJob {
+    my $B = shift;
+    my $prevJobId = shift // 0;
+    my $urVersion = shift // 0;
+    my $separateJob = shift // 0;
+    my $lengthHistoOnly = shift // 0;
 
+    my ($smallWidth, $smallHeight) = (700, 315);
+    
+    #create information for R to make graphs and then have R make them
+    $B->queue($memqueue);
+    $B->dependency(0, $prevJobId) if $prevJobId;
+    $B->mailEnd();
+    $B->setScriptAbortOnError(0); # don't abort on error
+    $B->addAction("module load oldapps") if $oldapps;
+    $B->addAction("module load $efiEstMod");
+    $B->addAction("module load $efiDbMod");
+    if (defined $LegacyGraphs) {
+        my $evalueFile = "$outputDir/evalue.tab";
+        my $defaultLengthFile = "$outputDir/length.tab";
+        $B->resource(1, 1, "50gb");
+        $B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
+        $B->addAction("module load $perlMod");
+        $B->addAction("module load $rMod");
+        if (not $lengthHistoOnly) {
+            $B->addAction("mkdir -p $outputDir/rdata");
+            # Lengths are retrieved in a previous step.
+            $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -incfrac $incfrac -evalue-file $evalueFile");
+            $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
+            $B->addAction("if [ -z \"\$FIRST\" ]; then");
+            $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
+            $B->addAction("    touch $outputDir/graphs.failed");
+            $B->addAction("    touch  $outputDir/1.out.completed");
+            $B->addAction("    exit 0 #Exit with no error");
+            $B->addAction("fi");
+            $B->addAction("FIRST=`head -1 \$FIRST`");
+            $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
+            $B->addAction("LAST=`head -1 \$LAST`");
+            $B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
+            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN $jobId");
+            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length_sm.png \$FIRST \$LAST \$MAXALIGN $jobId $smallWidth $smallHeight");
+            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST $jobId");
+            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
+            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
+            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+        }
+        my %lenFiles = ($lenUniprotFile => {title => "", file => "length_histogram_uniprot"});
+        $lenFiles{$lenUniprotFile}->{title} = "UniProt, Full Length" if $urVersion or $domain eq "on";
+        $lenFiles{$lenUniprotDomFile} = {title => "UniProt, Domain", file => "length_histogram_uniprot_domain"} if $domain eq "on";
+        if ($urVersion) {
+            if ($urVersion eq "50+90") {
+                $lenFiles{$lenUniref50File} = {title => "UniRef50 Cluster IDs, Full Length", file => "length_histogram_uniref50"};
+                $lenFiles{$lenUniref50DomFile} = {title => "UniRef50 Cluster IDs, Domain", file => "length_histogram_uniref50_domain"} if $domain eq "on";
+                $lenFiles{$lenUniref90File} = {title => "UniRef90 Cluster IDs, Full Length", file => "length_histogram_uniref90"};
+                $lenFiles{$lenUniref90DomFile} = {title => "UniRef90 Cluster IDs, Domain", file => "length_histogram_uniref90_domain"} if $domain eq "on";
+            } else {
+                $lenFiles{$lenUnirefFile} = {title => "UniRef$urVersion Cluster IDs, Full Length", file => "length_histogram_uniref"};
+                $lenFiles{$lenUnirefDomFile} = {title => "UniRef$urVersion Cluster IDs, Domain", file => "length_histogram_uniref_domain"} if $domain eq "on";
+            }
+        }
+        foreach my $file (keys %lenFiles) {
+            my $title = $lenFiles{$file}->{title} ? "\"(" . $lenFiles{$file}->{title} . ")\"" : "\"\"";
+            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}.png $jobId $title");
+            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}_sm.png $jobId $title $smallWidth $smallHeight");
+        }
+    } else {
+        $B->addAction("module load $pythonMod");
+        $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $allSeqFile -i $incfrac");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r hdf5 $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r hdf5 $outputDir/rdata.hdf5 $outputDir/percent_identity_sm.png $jobId $smallWidth $smallHeight");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r hdf5 $outputDir/rdata.hdf5 $outputDir/length_histogram.png $jobId");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r hdf5 $outputDir/rdata.hdf5 $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId");
+        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+    }
+    if ($separateJob) {
+        if ($removeTempFiles) {
+            $B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
+            $B->addAction("rm -rf $blastOutputDir");
+            $B->addAction("rm -rf $fracOutputDir");
+            $B->addAction("rm -rf $outputDir/rdata");
+            #$B->addAction("rm $outputDir/database.* $outputDir/format.log"); # Needed for taxonomy
+            $B->addAction("rm $outputDir/sequences.fa.clstr");
+        }
+        $B->addAction("touch  $outputDir/1.out.completed");
+        $B->addAction("echo 100 > $progressFile");
+        $B->jobName("${jobNamePrefix}graphs");
+        $B->renderToFile(getRenderFilePath("$scriptDir/graphs.sh"));
+        my $graphjob = $S->submit("$scriptDir/graphs.sh");
+        chomp $graphjob;
+        print "Graph job is:\n $graphjob\n" if not $runSerial;
+        my ($graphJobId) = split /\./, $graphjob;
+        return $graphJobId;
+    } else {
+        return 0;
+    }
+}
 
 

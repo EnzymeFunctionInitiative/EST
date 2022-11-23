@@ -9,17 +9,18 @@ use lib "$FindBin::Bin/lib";
 use AlignmentScore;
 
 
-my ($inputBlast, $outputBlast, $filter, $minLen, $maxLen, $minVal, $inputFasta, $outputFasta, $domainLenMeta);
+my ($inputBlast, $outputBlast, $filter, $minLen, $maxLen, $minVal, $inputFasta, $outputFasta, $domainLenMeta, $idListFile);
 my $result = GetOptions(
-    "blastin=s"     => \$inputBlast,
-    "blastout=s"    => \$outputBlast,
-    "filter=s"      => \$filter,
-    "minlen=s"      => \$minLen,
-    "maxlen=s"      => \$maxLen,
-    "minval=s"      => \$minVal,
-    "fastain=s"     => \$inputFasta,
-    "fastaout=s"    => \$outputFasta,
-    "domain-meta=s" => \$domainLenMeta,
+    "blastin=s"         => \$inputBlast,
+    "blastout=s"        => \$outputBlast,
+    "filter=s"          => \$filter,
+    "minlen=s"          => \$minLen,
+    "maxlen=s"          => \$maxLen,
+    "minval=s"          => \$minVal,
+    "fastain=s"         => \$inputFasta,
+    "fastaout=s"        => \$outputFasta,
+    "domain-meta=s"     => \$domainLenMeta,
+    "filter-id-list=s"  => \$idListFile,
 );
 
 my %sequences;
@@ -59,6 +60,10 @@ if (not $filterEvalue and not $filterBitscore and not $filterPid) {
 }
 
 
+my $idList = {};
+if ($idListFile) {
+    $idList = getIdsFromFile($idListFile);
+}
 
 
 
@@ -72,6 +77,9 @@ while (my $line = <BLAST>) {
     my @parts = split /\t/, $line;
     #   0     1     2     3      4          5      6
     my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen) = @parts;
+
+    # Exclude if taxonomy filtering is in effect and one or other of the blast results is filtered out
+    next if ($idListFile and (not $idList->{$qid} or not $idList->{$sid}));
 
     if ($filterEvalue) {
         my $alignmentScore = compute_ascore(@parts);
@@ -106,20 +114,21 @@ my %lenMap;
 while (my $line = <FASTAIN>) {
     chomp $line;
     if ($line =~ /^>/) {
-        if (length $sequence >= $minLen and (length $sequence <= $maxLen or $maxLen == 0)) { 
+        if ($key and length $sequence >= $minLen and (length $sequence <= $maxLen or $maxLen == 0)) { 
             print FASTAOUT "$key\n", join("\n", @seqLines), "\n\n";
             $key =~ s/^\>(.+?):\d+:\d+$/$1/;
             $lenMap{$key} = length $sequence;
         }
-        $key = $line;
+        (my $upId = $line) =~ s/^>([A-Z0-9]+).*$/$1/;
+        $key = (not $idListFile or $idList->{$upId}) ? $line : "";
         $sequence = "";
         @seqLines = ();
-    } else {
+    } elsif ($key) {
         $sequence .= $line;
         push @seqLines, $line;
     }
 }
-print FASTAOUT "$key\n", join("\n", @seqLines), "\n\n";
+print FASTAOUT "$key\n", join("\n", @seqLines), "\n\n" if $key;
 close FASTAOUT;
 close FASTAIN;
 
@@ -132,4 +141,25 @@ if ($domainLenMeta) {
     }
     close META;
 }
+
+
+
+
+sub getIdsFromFile {
+    my $idListFile = shift;
+
+    my %idList;
+
+    open my $fh, "<", $idListFile or die "Unable to open id list file $idListFile: $!";
+    while (<$fh>) {
+        chomp;
+        next if m/^\s*$/;
+        $idList{$_} = 1;
+    }
+    close $fh;
+
+    return \%idList;
+}
+
+
 

@@ -33,8 +33,7 @@ use Constants;
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks, $cleanup);
-my $legacyAnno; # Remove the legacy after summer 2022
+    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -65,7 +64,10 @@ my $result = GetOptions(
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "config"                => \$configFile,        # config file path, if not given will look for EFICONFIG env var
     "keep-xgmml"            => \$cleanup,
-    "legacy-anno"           => \$legacyAnno, # Remove the legacy after summer 2022
+    "tax-search=s"          => \$taxSearch,
+    "tax-search-hash=s"     => \$taxSearchHash,
+    "remove-fragments"      => \$removeFragments,
+    "debug"                 => \$debug,
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -103,14 +105,13 @@ $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 $useAnnoSpec = defined $useAnnoSpec ? 1 : 0;
 $useMinEdgeAttr = defined $useMinEdgeAttr ? 1 : 0;
 $computeNc = defined $computeNc ? 1 : 0;
+$debug = 0 if not defined $debug;
 
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_" if $safeTitle;
-
-if (defined $jobId and $jobId) {
-    $safeTitle = $jobId . "_" . $safeTitle;
-}
+$safeTitle = $jobId . "_" . $safeTitle if defined $jobId and $jobId;
+$safeTitle .= "${taxSearchHash}_" if $taxSearchHash;
 
 if (defined $maxfull and $maxfull !~ /^\d+$/) {
     die "maxfull must be an integer\n";
@@ -150,6 +151,8 @@ $analysisDir .= "-$cdhitOpt" if $cdhitOpt eq "sb" or $cdhitOpt eq "est+";
 $analysisDir .= "-minn" if $useAnnoSpec;
 $analysisDir .= "-mine" if $useMinEdgeAttr;
 $analysisDir .= "-nc" if $computeNc;
+$analysisDir .= "-$taxSearchHash" if $taxSearchHash;
+$analysisDir .= "-nf" if $removeFragments;
 
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
@@ -190,6 +193,8 @@ my $filteredBlastFile = "$analysisDir/2.out";
 my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
 my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
 my $annoSpecFile = "$generateDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
+my $evalueTableInputFile = "$baseAnalysisDir/blast_hits.tab"; # BLAST jobs only
+my $evalueTableOutputFile = "$analysisDir/blast_evalue.txt";
 
 ####################################################################################################
 # RETRIEVE ANNOTATIONS (STRUCT.OUT) FOR SSN
@@ -211,20 +216,53 @@ ANNO
 
 my $hasDomain = checkForDomain("$generateDir/1.out");
 
-my $legacyAnnoArgs = $legacyAnno ? "--legacy-anno" : ""; # Remove the legacy after summer 2022
-my $userHeaderFileOption = "-meta-file $userHeaderFile";
+
+
 my $annoSpecOption = $useAnnoSpec ? " -anno-spec-file $annoSpecFile" : "";
 my $lenArgs = "-min-len $minlen -max-len $maxlen";
 # Don't filter out UniRef cluster members if this is a domain job.
 $lenArgs = "" if $hasDomain;
 my $annoDep = 0;
 mkdir $analysisDir or die "could not make analysis folder $analysisDir\n" if not $dryrun;
+
+# If a taxonomy search parameter has been added, then we need to filter the annotations by the taxonomy filter,
+# and then come up with a list of IDs (that is a subset of what the normal 2.out file would contain).
+my $analysisMetaFile = $userHeaderFile;
+my $idListOption = "";
+
+my $taxDepId;
+if ($taxSearch or $removeFragments) {
+    $analysisMetaFile = "$analysisDir/filtered.meta";
+    my $taxSearchOption = $taxSearch ? "--tax-filter \"$taxSearch\"" : "";
+    my $removeFragmentsOption = $removeFragments ? "--remove-fragments" : "";
+    my $debugFlag = $debug ? "--debug" : "";
+    $idListOption = "--filter-id-list $analysisDir/filtered.ids";
+    $B = $S->getBuilder();
+    $B->resource(1, 1, "5gb");
+    $B->addAction("module load $perlMod");
+    $B->addAction("module load $efiEstMod");
+    $B->addAction("module load $efiDbMod");
+    $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption $removeFragmentsOption --config $configFile $debugFlag");
+    $B->jobName("${jobNamePrefix}get_filtered_ids");
+    $B->renderToFile("$analysisDir/get_filtered_ids.sh");
+    my $jobId = $S->submit("$analysisDir/get_filtered_ids.sh", $dryrun);
+    chomp $jobId;
+    print "ID list job is:\n $jobId\n";
+    my @parts = split /\./, $jobId;
+    $taxDepId = $parts[0];
+}
+
+
 $B = $S->getBuilder();
+$B->dependency(0, $taxDepId) if $taxDepId;
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $perlMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
-$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs $userHeaderFileOption $annoSpecOption -config=$configFile $legacyAnnoArgs"); # Remove the legacy after summer 2022
+$B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs --meta-file $analysisMetaFile $annoSpecOption -config=$configFile");
+if (-e $evalueTableInputFile and -s $evalueTableInputFile > 0) {
+    $B->addAction("$toolpath/make_blast_evalue_table.pl --input $evalueTableInputFile --meta-file $filteredAnnoFile --output $evalueTableOutputFile");
+}
 $B->jobName("${jobNamePrefix}get_annotations");
 $B->renderToFile("$analysisDir/get_annotations.sh");
 my $annojob = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
@@ -248,7 +286,7 @@ if ($customClusterDir and $customClusterFile) {
     $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
 } else {
     my $domMetaArg = ($unirefVersion and $hasDomain) ? "-domain-meta $filteredAnnoFile" : "";
-    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen $domMetaArg");
+    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen $domMetaArg $idListOption");
 }
 if ($hasParent) {
     $B->addAction("cp $parentDir/*.png $baseAnalysisDir/");

@@ -20,7 +20,7 @@ use EST::Family;
 use EST::BLAST;
 
 
-my ($familyConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj, $otherConfig) = setupConfig();
+my ($inputConfig, $dbh, $configFile, $seqObj, $accObj, $metaObj, $statsObj) = setupConfig();
 
 $metaObj->configureSourceTypes(
     EFI::Annotations::FIELD_SEQ_SRC_VALUE_FAMILY,
@@ -37,24 +37,24 @@ my $familyIds = {};
 my $familyMetadata = {};
 my $familyStats = {};
 my $unirefMap = {};
+my $familyObject;
 
-if (exists $familyConfig->{data}) {
-    my $famData = new EST::Family(dbh => $dbh, db_version => $otherConfig->{db_version});
-    $famData->configure($familyConfig);
+if (exists $inputConfig->{data}) {
+    my $famData = new EST::Family(dbh => $dbh, db_version => $inputConfig->{db_version});
+    $famData->configure($inputConfig);
     $famData->retrieveFamilyAccessions();
     $familyIds = $famData->getSequenceIds();
     $familyMetadata = $famData->getMetadata();
     $familyStats = $famData->getStatistics();
     $unirefMap = $famData->getUniRefMapping();
+    $familyObject = $famData;
 }
 
 
 
-my %blastArgs = EST::BLAST::getBLASTCmdLineArgs();
-#$blastArgs{uniref_version} = $familyConfig->{config}->{uniref_version};
-$blastArgs{tax_search} = $familyConfig->{config}->{tax_search};
+my $blastArgs = EST::BLAST::loadParameters($inputConfig);
 my $blastData = new EST::BLAST(dbh => $dbh);
-$blastData->configure(%blastArgs);
+$blastData->configure($blastArgs);
 $blastData->parseFile();
 
 my $userIds = $blastData->getSequenceIds();
@@ -73,4 +73,7 @@ $seqObj->retrieveAndSaveSequences($familyIds, $userIds, $userSeq, $unirefMap); #
 $accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
 my $mergedMetadata = $metaObj->saveSequenceMetadata($familyMetadata, $userMetadata, $unirefMap, $inputIdSource);
 $statsObj->saveSequenceStatistics($mergedMetadata, $userMetadata, $familyStats, $userStats);
+
+$blastData->setFamilySunburstIds($familyObject) if $familyObject;
+$blastData->saveSunburstIdsToFile($blastArgs->{sunburst_tax_output});
 

@@ -11,6 +11,7 @@ use warnings;
 use strict;
 
 use Getopt::Long qw(:config pass_through);
+use Data::Dumper;
 
 use parent qw(EST::Base);
 
@@ -35,23 +36,25 @@ sub new {
 # Public
 sub configure {
     my $self = shift;
-    my %args = @_;
+    my $args = shift;
 
-    die "No BLAST results file provided" if not $args{blast_file} or not -f $args{blast_file};
-    die "No input FASTA query file provided" if not $args{query_file} or not -f $args{query_file};
+    die "No BLAST results file provided" if not $args->{blast_file} or not -f $args->{blast_file};
+    die "No input FASTA query file provided" if not $args->{query_file} or not -f $args->{query_file};
 
-    $self->{config}->{blast_file} = $args{blast_file};
-    $self->{config}->{query_file} = $args{query_file};
-    $self->{config}->{max_results} = $args{max_results} ? $args{max_results} : 1000;
+    $self->{config}->{blast_file} = $args->{blast_file};
+    $self->{config}->{query_file} = $args->{query_file};
+    $self->{config}->{max_results} = $args->{max_results} ? $args->{max_results} : 1000;
     # Comes from family config
-    $self->{config}->{blast_uniref_version} = ($args{blast_uniref_version} and ($args{blast_uniref_version} == 50 or $args{blast_uniref_version} == 90)) ? $args{blast_uniref_version} : "";
-    $self->{config}->{tax_search} = $args{tax_search};
+    $self->{config}->{blast_uniref_version} = ($args->{blast_uniref_version} and ($args->{blast_uniref_version} == 50 or $args->{blast_uniref_version} == 90)) ? $args->{blast_uniref_version} : "";
+    $self->{config}->{tax_search} = $args->{tax_search};
+    $self->{config}->{sunburst_tax_output} = $args->{sunburst_tax_output};
 }
 
 
 # Public
 # Look in @ARGV
-sub getBLASTCmdLineArgs {
+sub loadParameters {
+    my $inputConfig = shift // {};
 
     my ($blastFile, $nResults, $queryFile, $blastUnirefVersion);
     my $result = GetOptions(
@@ -66,7 +69,12 @@ sub getBLASTCmdLineArgs {
     $queryFile = "" if not $queryFile;
     $blastUnirefVersion = "" if not $blastUnirefVersion;
 
-    return (blast_file => $blastFile, max_results => $nResults, query_file => $queryFile, blast_uniref_version => $blastUnirefVersion);
+    my %blastArgs = (blast_file => $blastFile, max_results => $nResults, query_file => $queryFile, blast_uniref_version => $blastUnirefVersion);
+    #$blastArgs{uniref_version} = $inputConfig->{uniref_version};
+    $blastArgs{tax_search} = $inputConfig->{tax_search};
+    $blastArgs{sunburst_tax_output} = $inputConfig->{sunburst_tax_output};
+
+    return \%blastArgs;
 }
 
 
@@ -97,7 +105,8 @@ sub parseFile {
     }
 
     if ($self->{config}->{tax_search}) {
-        $ids = $self->excludeIds($ids);
+        my ($filteredIds, $unirefIdsList) = $self->excludeIds($ids, 1, $self->{config}->{tax_search});
+        $ids = $filteredIds;
     }
 
     $self->{data}->{uniprot_ids} = $ids;
@@ -109,9 +118,44 @@ sub parseFile {
         $self->retrieveUniRefMetadata();
     }
 
+    $self->addSunburstIds();
+
     $self->{stats} = {num_blast_retr => scalar keys %$ids};
 
     close BLAST_FILE;
+}
+
+
+sub addSunburstIds {
+    my $self = shift;
+
+    my $unirefMapping = $self->retrieveUniRefIds();
+
+    my $sunburstIds = $self->{sunburst_ids}->{user_ids};
+
+    foreach my $id (keys %$unirefMapping) {
+        $sunburstIds->{$id} = {uniref50 => $unirefMapping->{$id}->[0], uniref90 => $unirefMapping->{$id}->[1]};
+    }
+}
+
+
+sub retrieveUniRefIds {
+    my $self = shift;
+
+    my $whereField = "accession";
+
+    my $data = {};
+
+    foreach my $id (keys %{$self->{data}->{uniprot_ids}}) {
+        my $sql = "SELECT * FROM uniref WHERE $whereField = '$id'";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        if (my $row = $sth->fetchrow_hashref) {
+            $data->{$id} = [$row->{uniref50_seed}, $row->{uniref90_seed}];
+        }
+    }
+
+    return $data;
 }
 
 
