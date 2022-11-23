@@ -195,7 +195,7 @@ sub getDomainFromDb {
 
     my $spCol = $self->{config}->{fraction} > 1 ? ", $annoTable.swissprot_status" : "";
     my $fragWhere = ($self->{config}->{exclude_fragments} and $self->dbSupportsFragment()) ? " AND $annoTable.is_fragment = 0" : "";
-    my ($taxSearchWhere, $taxSearchJoin, $taxCols) = $self->getTaxSearchSql($taxSearch, $unirefVersion, $taxFilterByExclude, $isTaxSearch);
+    my ($taxSearchWhere, $taxSearchJoin, $taxCols) = $self->getTaxSearchSql($taxSearch, $unirefVersion, $isTaxSearch);
     my ($seqLenFiltWhere) = $self->getSeqLenSql($domReg, $annoTable, \$seqLenCol);
 
     # For sunbursts
@@ -316,10 +316,9 @@ sub getTaxSearchSql {
     my $self = shift;
     my $taxSearch = shift;
     my $unirefVersion = shift;
-    my $taxFilterByExclude = shift;
     my $isTaxSearch = shift;
 
-    my ($taxSearchWhere, $taxSearchJoin, $taxCols) = get_tax_filter_sql($taxSearch, $unirefVersion, $taxFilterByExclude, $isTaxSearch);
+    my ($taxSearchWhere, $taxSearchJoin, $taxCols) = get_tax_filter_sql($taxSearch, $unirefVersion, $isTaxSearch);
 
     return ($taxSearchWhere, $taxSearchJoin, $taxCols);
 }

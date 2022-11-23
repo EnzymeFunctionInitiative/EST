@@ -55,7 +55,7 @@ my $dbh = $db->getHandle();
 
 
 my $taxData = 0;
-$taxData = parse_tax_search($taxFilter) if $taxData;
+$taxData = parse_tax_search($taxFilter) if $taxFilter;
 
 my ($meta, $origIdOrder) = FileUtil::read_struct_file($inputFile); # Hashref of IDs to metadata
 

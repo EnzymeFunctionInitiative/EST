@@ -70,8 +70,8 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter);
-my ($runSerial, $baseOutputDir, $largeMem);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
+my ($runSerial, $baseOutputDir, $largeMem, $debug);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -123,6 +123,8 @@ my $result = GetOptions(
     "tax-search-only"   => \$taxSearchOnly,
     "source-tax=s"      => \$sourceTax,
     "family-filter=s"   => \$familyFilter,
+    "extra-ram:i"       => \$extraRam,
+    "debug"             => \$debug,
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -297,6 +299,7 @@ if (not defined $incfrac) {
 $excludeFragments = defined($excludeFragments);
 $runSerial = defined($runSerial) ? $runSerial : "";
 $useFastaHeaders = ($taxSearchOnly or $useFastaHeaders);
+$debug = 0 if not defined $debug;
 
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
@@ -546,6 +549,8 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         push @args, $domFamArg if $domFamArg;
         push @args, $domRegionArg if $domainRegion;
     }
+
+    push @args, "--debug-sql" if $debug;
 
     my $retrScript = "get_sequences_option_";
     if (not $fastaFile and not $accessionFile) {
@@ -892,7 +897,8 @@ push @allJobIds, $prevJobId;
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-my $sortRam = $largeMem ? "700gb" : "70gb";
+my $sortRam = $largeMem ? ((defined $extraRam and length $extraRam) ? $extraRam : 700) : 70;
+$sortRam = "${sortRam}gb";
 $B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");

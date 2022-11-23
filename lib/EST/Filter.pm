@@ -86,8 +86,7 @@ sub get_predefined_function {
         my $fn = sub {
             my $idTax = shift;
             if (($idTax->{domain} and ($idTax->{domain} =~ m/bacteria/ or $idTax->{domain} =~ m/archaea/)) or
-                ($idTax->{phylum} and ($idTax->{phylum} =~ m/Ascomycota/ or $idTax->{phylum} =~ m/Basidiomycota/ or $idTax->{phylum} =~ m/Fungi incertae sedis/ or $idTax->{phylum} =~ m/unclassified fungi/)) or
-                ($idTax->{species} and  $idTax->{species} =~ m/metagenome/))
+                ($idTax->{phylum} and ($idTax->{phylum} =~ m/Ascomycota/ or $idTax->{phylum} =~ m/Basidiomycota/ or $idTax->{phylum} =~ m/Fungi incertae sedis/ or $idTax->{phylum} =~ m/unclassified fungi/)))
             {
                 return 1;
             } else {
@@ -95,9 +94,9 @@ sub get_predefined_function {
             }
         };
 
-        my $sql = "<PFX>domain LIKE '\%bacteria\%' OR <PFX>domain LIKE '\%archaea\%' OR <PFX>phylum LIKE '\%Ascomycota\%' OR <PFX>phylum LIKE '\%Basidiomycota\%' OR <PFX>phylum LIKE '\%Fungi incertae sedis\%' OR <PFX>phylum LIKE '\%unclassified fungi\%' OR <PFX>species LIKE '\%metagenome\%'";
+        my $sql = "<PFX>domain LIKE '\%bacteria\%' OR <PFX>domain LIKE '\%archaea\%' OR <PFX>phylum LIKE '\%Ascomycota\%' OR <PFX>phylum LIKE '\%Basidiomycota\%' OR <PFX>phylum LIKE '\%Fungi incertae sedis\%' OR <PFX>phylum LIKE '\%unclassified fungi\%'";
 
-        my $fields = ["domain", "phylum", "species"];
+        my $fields = ["domain", "phylum"];
 
         return {
             code => $fn,
@@ -159,6 +158,63 @@ sub get_predefined_function {
         };
 
         my $sql = "<PFX>domain LIKE '\%viruses\%'";
+
+        my $fields = ["domain"];
+
+        return {
+            code => $fn,
+            sql => $sql,
+            fields => $fields,
+        };
+    } elsif ($name eq "bacteria") {
+        my $fn = sub {
+            my $idTax = shift;
+            if ($idTax->{domain} and $idTax->{domain} =~ m/bacteria/i) {
+                return 1;
+            } else {
+                return 0;
+            }
+        };
+
+        my $sql = "<PFX>domain LIKE '\%bacteria\%'";
+
+        my $fields = ["domain"];
+
+        return {
+            code => $fn,
+            sql => $sql,
+            fields => $fields,
+        };
+    } elsif ($name eq "archaea") {
+        my $fn = sub {
+            my $idTax = shift;
+            if ($idTax->{domain} and $idTax->{domain} =~ m/archaea/i) {
+                return 1;
+            } else {
+                return 0;
+            }
+        };
+
+        my $sql = "<PFX>domain LIKE '\%archaea\%'";
+
+        my $fields = ["domain"];
+
+        return {
+            code => $fn,
+            sql => $sql,
+            fields => $fields,
+        };
+    } elsif ($name eq "eukaryota") {
+        my $fn = sub {
+            my $idTax = shift;
+            if ($idTax->{domain} and $idTax->{domain} =~ m/eukaryota/i) {
+                return 1;
+            } else {
+                return 0;
+            }
+        };
+
+        my $sql = "<PFX>domain LIKE '\%eukaryota\%'";
 
         my $fields = ["domain"];
 
@@ -232,6 +288,7 @@ sub exclude_ids {
     my $taxSearch = shift // "";
     my $unirefVersion = shift // 0;
     my $familyFilter = shift // 0;
+    my $debugSql = shift // 0;
 
     my $isTaxSearch = $taxSearch ? 1 : 0;
 
@@ -263,7 +320,7 @@ sub exclude_ids {
         #my $whereIds = join(",", map { "'$_'" } @group);
         #my $sql = "SELECT accession FROM annotations $taxJoin WHERE accession IN ($whereIds) $fragmentWhere $taxWhere";
         my $sql = "SELECT annotations.accession AS accession $unirefCol $taxCols FROM annotations $unirefJoin $taxJoin $familyJoin WHERE $idWhereField = '$id' $fragmentWhere $taxWhere $familyWhere";
-        #print "$sql\n";
+        print "FILTER $sql\n" if $debugSql;
         #
         my $sth = $dbh->prepare($sql);
         $sth->execute;

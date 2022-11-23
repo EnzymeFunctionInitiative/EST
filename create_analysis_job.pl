@@ -33,7 +33,7 @@ use Constants;
 my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments);
+    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -67,6 +67,7 @@ my $result = GetOptions(
     "tax-search=s"          => \$taxSearch,
     "tax-search-hash=s"     => \$taxSearchHash,
     "remove-fragments"      => \$removeFragments,
+    "debug"                 => \$debug,
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
@@ -104,6 +105,7 @@ $cdhitUseAccurateAlgo = defined $cdhitUseAccurateAlgo ? 1 : 0;
 $useAnnoSpec = defined $useAnnoSpec ? 1 : 0;
 $useMinEdgeAttr = defined $useMinEdgeAttr ? 1 : 0;
 $computeNc = defined $computeNc ? 1 : 0;
+$debug = 0 if not defined $debug;
 
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
@@ -233,13 +235,14 @@ if ($taxSearch or $removeFragments) {
     $analysisMetaFile = "$analysisDir/filtered.meta";
     my $taxSearchOption = $taxSearch ? "--tax-filter \"$taxSearch\"" : "";
     my $removeFragmentsOption = $removeFragments ? "--remove-fragments" : "";
+    my $debugFlag = $debug ? "--debug" : "";
     $idListOption = "--filter-id-list $analysisDir/filtered.ids";
     $B = $S->getBuilder();
     $B->resource(1, 1, "5gb");
     $B->addAction("module load $perlMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load $efiDbMod");
-    $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption $removeFragmentsOption --config $configFile");
+    $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption $removeFragmentsOption --config $configFile $debugFlag");
     $B->jobName("${jobNamePrefix}get_filtered_ids");
     $B->renderToFile("$analysisDir/get_filtered_ids.sh");
     my $jobId = $S->submit("$analysisDir/get_filtered_ids.sh", $dryrun);
