@@ -70,7 +70,7 @@ my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile,
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
-my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter);
+my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
 my ($runSerial, $baseOutputDir, $largeMem, $debug);
 my $result = GetOptions(
     "np=i"              => \$np,
@@ -123,6 +123,7 @@ my $result = GetOptions(
     "tax-search-only"   => \$taxSearchOnly,
     "source-tax=s"      => \$sourceTax,
     "family-filter=s"   => \$familyFilter,
+    "extra-ram:i"       => \$extraRam,
     "debug"             => \$debug,
 );
 
@@ -896,7 +897,8 @@ push @allJobIds, $prevJobId;
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-my $sortRam = $largeMem ? "700gb" : "70gb";
+my $sortRam = $largeMem ? ((defined $extraRam and length $extraRam) ? $extraRam : 700) : 70;
+$sortRam = "${sortRam}gb";
 $B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);
 #$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
