@@ -20,13 +20,13 @@ use EFI::Util qw(usesSlurm);
 
 my $estPath = $FindBin::Bin;
 
-my ($ssnIn, $baseDir, $outputName, $resultsDirName);
+my ($ssnIn, $jobDir, $outputName, $resultsDirName);
 my ($scheduler, $dryRun, $queue, $jobId, $configFile, $ramReservation, $dumpOnly);
 my $result = GetOptions(
     "ssn-in=s"                  => \$ssnIn,
     "output-name=s"             => \$outputName,
-    "output-path=s"             => \$baseDir, # top-level job directory
-    "out-dir=s"                 => \$resultsDirName, # name of results sub-dir (e.g. output)
+    "job-dir=s"                 => \$jobDir, # top-level job directory
+    "results-dir-name=s"        => \$resultsDirName, # name of results sub-dir (e.g. output)
     "dump-only"                 => \$dumpOnly,
     "scheduler=s"               => \$scheduler,
     "dry-run"                   => \$dryRun,
@@ -54,8 +54,9 @@ USAGE
 my $extraPerl = "$ENV{EFI_PERL_ENV}";
 
 
-$baseDir = $ENV{PWD} if not $baseDir;
-my $outputPath = "$baseDir/$resultsDirName";
+$jobDir = $ENV{PWD} if not $jobDir;
+$resultsDirName = "output" if not $resultsDirName;
+my $outputPath = "$jobDir/$resultsDirName";
 mkdir $outputPath;
 
 $queue = $ENV{EFI_QUEUE} if not $queue;
@@ -84,7 +85,7 @@ my $ssnInZip = $ssnIn;
 if ($ssnInZip =~ /\.zip$/i) {
     my ($fn, $fp, $fx) = fileparse($ssnIn);
     my $fname = "$fn.xgmml";
-    $ssnIn = "$baseDir/$fname";
+    $ssnIn = "$jobDir/$fname";
 }
 
 my $ssnOut = "$outputPath/ssn.xgmml";

@@ -65,18 +65,18 @@ use lib "$FindBin::Bin/lib";
 use Constants;
 
 
-my ($np, $queue, $outputDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, $accessionFile, $taxid);
+my ($np, $queue, $resultsDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, $accessionFile, $taxid);
 my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
-my ($runSerial, $baseOutputDir, $largeMem, $debug);
+my ($runSerial, $jobDir, $largeMem, $debug);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
-    "tmp|dir-name=s"    => \$outputDirName,
-    "job-dir=s"         => \$baseOutputDir,
+    "results-dir-name=s"=> \$resultsDirName,
+    "job-dir=s"         => \$jobDir,
     "evalue=s"          => \$evalue,
     "incfrac=f"         => \$incfrac,
     "ipro=s"            => \$ipro,
@@ -228,11 +228,6 @@ if (not defined $memqueue) {
     }
 }
 
-# Working directory must be defined
-if (not defined $outputDirName) {
-    $outputDirName = "output";
-}
-
 # Default e value must also be set for blast, default set if not specified
 if (not defined $evalue) {
     print "-evalue not specified, using default of 5\n";
@@ -316,8 +311,9 @@ if ($runSerial) {
 
 
 
-$baseOutputDir = ($baseOutputDir and -d $baseOutputDir) ? $baseOutputDir : $ENV{PWD};
-my $outputDir = "$baseOutputDir/$outputDirName";
+$jobDir = $ENV{PWD} if not $jobDir;
+$resultsDirName = "output" if not $resultsDirName;
+my $outputDir = "$jobDir/$resultsDirName";
 
 my $pythonMod = getLmod("Python/2", "Python");
 my $gdMod = getLmod("GD.*Perl", "GD");
@@ -343,14 +339,13 @@ print "no-match-file is $noMatchFile\n";
 print "np is $np\n";
 print "queue is $queue\n";
 print "memqueue is $memqueue\n";
-print "tmpdir is $outputDir\n";
 print "evalue is $evalue\n";
 print "config is $configFile\n";
 print "maxsequence is $maxsequence\n";
 print "incfrac is $incfrac\n";
 print "seq-count-file is $seqCountFile\n";
-print "base output directory is $baseOutputDir\n";
-print "output directory is $outputDirName\n";
+print "base output directory is $jobDir\n";
+print "results directory name is $resultsDirName\n";
 print "uniref-version is $unirefVersion\n";
 print "manualcdhit is $manualCdHit\n";
 print "Python module is $pythonMod\n";
@@ -404,14 +399,14 @@ if (defined $accessionFile and -e $accessionFile) {
     if ($sourceTax) {
         $taxSourceAccessionFile = $accessionFile;
         my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
-        $accessionFile = $baseOutputDir . "/$taxJobId.txt";
+        $accessionFile = $jobDir . "/$taxJobId.txt";
     } elsif (not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/)) {
-        $accessionFile = $baseOutputDir . "/$accessionFile";
+        $accessionFile = $jobDir . "/$accessionFile";
     }
     $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
-    $noMatchFile = $baseOutputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
+    $noMatchFile = $outputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFileOption = "-no-match-file $noMatchFile";
 } else {
     $accessionFile = "";
@@ -421,7 +416,7 @@ my $accessionFileZip = $accessionFile;
 if ($accessionFileZip =~ /\.zip$/i) {
     my ($fn, $fp, $fx) = fileparse($accessionFile);
     my $fname = "$fn.txt";
-    $accessionFile = "$baseOutputDir/$fname";
+    $accessionFile = "$jobDir/$fname";
 }
 
 
@@ -436,7 +431,7 @@ if ($accessionFileZip =~ /\.zip$/i) {
 
 my $fastaFileOption = "";
 if (defined $fastaFile and -e $fastaFile) {
-    $fastaFile = "$baseOutputDir/$fastaFile" if not ($fastaFile=~/^\// or $fastaFile=~/^~/);
+    $fastaFile = "$jobDir/$fastaFile" if not ($fastaFile=~/^\// or $fastaFile=~/^~/);
     $fastaFileOption = "-fasta-file $fastaFile";
     $fastaFileOption = "-use-fasta-headers " . $fastaFileOption if defined $useFastaHeaders;
 } else {
@@ -465,7 +460,7 @@ $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not 
 my $usesSlurm = $schedType eq "slurm";
 
 
-my $logDir = "$baseOutputDir/log";
+my $logDir = "$jobDir/log";
 mkdir $logDir;
 $logDir = "" if not -d $logDir;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
@@ -478,7 +473,7 @@ my $jobNamePrefix = $jobId ? $jobId . "_" : "";
 my $progressFile = "$outputDir/progress";
 initSerialScript() if $runSerial;
 
-my $scriptDir = "$baseOutputDir/scripts";
+my $scriptDir = "$jobDir/scripts";
 mkdir $scriptDir;
 $scriptDir = $outputDir if not -d $scriptDir;
 

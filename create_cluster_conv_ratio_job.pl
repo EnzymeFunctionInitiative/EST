@@ -21,14 +21,14 @@ use EFI::Util qw(usesSlurm);
 
 my $estPath = $FindBin::Bin;
 
-my ($ssnIn, $baseDir, $outputFile, $resultsDirName);
+my ($ssnIn, $jobDir, $outputFile, $resultsDirName);
 my ($scheduler, $dryRun, $queue, $jobId, $configFile, $ramReservation, $ascore, $idListIn, $fastaIn);
 my $result = GetOptions(
     "ssn-in=s"                  => \$ssnIn,
     "id-list-in=s"              => \$idListIn,
     "fasta-in=s"                => \$fastaIn,
-    "output-path=s"             => \$baseDir,
-    "out-dir=s"                 => \$resultsDirName, # name of results sub-dir (e.g. output)
+    "job-dir=s"                 => \$jobDir,
+    "results-dir-name=s"        => \$resultsDirName, # name of results sub-dir (e.g. output)
     "output-file=s"             => \$outputFile,
     "scheduler=s"               => \$scheduler,
     "dry-run"                   => \$dryRun,
@@ -55,8 +55,9 @@ USAGE
 ;
 
 
-$baseDir = $ENV{PWD} if not $baseDir;
-my $outputPath = "$baseDir/$resultsDirName";
+$jobDir = $ENV{PWD} if not $jobDir;
+$resultsDirName = "output" if not $resultsDirName;
+my $outputPath = "$jobDir/$resultsDirName";
 mkdir $outputPath;
 
 $queue = $ENV{EFI_QUEUE} if not $queue;
@@ -88,7 +89,7 @@ my $ssnInZip = $ssnIn;
 if ($ssnInZip =~ /\.zip$/i) {
     my ($fn, $fp, $fx) = fileparse($ssnIn);
     my $fname = "$fn.xgmml";
-    $ssnIn = "$baseDir/$fname";
+    $ssnIn = "$jobDir/$fname";
 }
 
 my $jobNamePrefix = $jobId ? "${jobId}_" : "";

@@ -30,16 +30,17 @@ use lib "$FindBin::Bin/lib";
 use Constants;
 
 
-my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
+my ($filter, $minval, $queue, $resultsDirName, $jobDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $outDir);
+    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $analysisDir);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
     "queue=s"               => \$queue,
-    "tmp=s"                 => \$relativeGenerateDir,
-    "out-dir=s"             => \$outDir, # Path of output directory, relative to top-level generate job
+    "job-dir=s"             => \$jobDir,
+    "results-dir-name=s"    => \$resultsDirName,
+    "output-dir=s"          => \$analysisDir, # Path of output directory, relative to top-level generate job
     "maxlen=i"              => \$maxlen,
     "minlen=i"              => \$minlen,
     "title=s"               => \$title,
@@ -79,9 +80,13 @@ my $efiEstMod = $ENV{EFI_EST_MOD};
 my $efiDbMod = $ENV{EFI_DB_MOD};
 (my $perlMod = $ENV{LOADEDMODULES}) =~ s/^.*\b(perl)\b.*$/$1/i;
 
+$jobDir = $ENV{PWD} if not $jobDir;
+$resultsDirName = "output" if not $resultsDirName;
+my $generateDir = "$jobDir/$resultsDirName";
+
 my $dbver = "";
-if (-f "$relativeGenerateDir/database_version") {
-    $dbver = `head -1 $relativeGenerateDir/database_version`;
+if (-f "$generateDir/database_version") {
+    $dbver = `head -1 $generateDir/database_version`;
     chomp $dbver;
 }
 if (not $dbver) {
@@ -121,10 +126,6 @@ if (defined $maxfull and $maxfull !~ /^\d+$/) {
 }
 
 
-if (not defined $relativeGenerateDir) {
-    die "A temporary directory specified by -tmp is required for the program to run";
-}
-
 if (not defined $configFile or not -f $configFile) {
     if (exists $ENV{EFI_CONFIG}) {
         $configFile = $ENV{EFI_CONFIG};
@@ -137,20 +138,14 @@ cluster_configure($config, config_file_path => $configFile);
 
 my $hasParent = defined $parentId and $parentId > 0 and defined $parentDir and -d $parentDir;
 
-my $baseOutputDir = $ENV{PWD};
-my $generateDir = "$baseOutputDir/$relativeGenerateDir";
-my $baseAnalysisDir = $generateDir;
 if ($hasParent) {
     $generateDir = $parentDir;
 }
 
-my $analysisDir = "";
-if ($outDir) {
-    $analysisDir = $outDir;
-} else {
-    $analysisDir = "$baseAnalysisDir/$filter-$minval-$minlen-$maxlen";
-    if ($customClusterDir and $customClusterFile and -f "$baseAnalysisDir/$customClusterDir/$customClusterFile") {
-        $analysisDir = "$baseAnalysisDir/$customClusterDir";
+if (not $analysisDir) {
+    $analysisDir = "$generateDir/$filter-$minval-$minlen-$maxlen";
+    if ($customClusterDir and $customClusterFile and -f "$generateDir/$customClusterDir/$customClusterFile") {
+        $analysisDir = "$generateDir/$customClusterDir";
     }
     $analysisDir .= "-$cdhitOpt" if $cdhitOpt eq "sb" or $cdhitOpt eq "est+";
     $analysisDir .= "-minn" if $useAnnoSpec;
@@ -184,7 +179,7 @@ if ($unirefVersion) {
     $unirefOption = "-uniref-version $unirefVersion";
 }
 
-my $logDir = "$baseOutputDir/log";
+my $logDir = "$jobDir/log";
 mkdir $logDir if not $dryrun;
 $logDir = "" if not -d $logDir;
 
@@ -200,7 +195,7 @@ my $filteredBlastFile = "$analysisDir/2.out";
 my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
 my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
 my $annoSpecFile = "$generateDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
-my $evalueTableInputFile = "$baseAnalysisDir/blast_hits.tab"; # BLAST jobs only
+my $evalueTableInputFile = "$generateDir/blast_hits.tab"; # BLAST jobs only
 my $evalueTableOutputFile = "$analysisDir/blast_evalue.txt";
 
 ####################################################################################################
@@ -294,7 +289,7 @@ if ($customClusterDir and $customClusterFile) {
     $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen $domMetaArg $idListOption");
 }
 if ($hasParent) {
-    $B->addAction("cp $parentDir/*.png $baseAnalysisDir/");
+    $B->addAction("cp $parentDir/*.png $generateDir/");
 }
 
 $B->jobName("${jobNamePrefix}filterblast");
