@@ -61,7 +61,8 @@ my @unkIds = grep m/^z/, keys %$annoMap; # unknown IDs (e.g. zzz*)
 
 my @seedIds;
 my @uniprotIds;
-if ($expandUniref and not $outputUniref90) {
+#if ($expandUniref and not $outputUniref90) {
+if ($expandUniref) {
     foreach my $clId (@metaIds) {
         my $ids = exists $annoMap->{$clId}->{UniRef90_IDs} ? $annoMap->{$clId}->{UniRef90_IDs} :
                   exists $annoMap->{$clId}->{UniRef50_IDs} ? $annoMap->{$clId}->{UniRef50_IDs} : "";
@@ -93,26 +94,44 @@ if ($outputUniref90) {
 
 my %histoHasUniref90;
 my %histoHasUniref50;
+my @uniprotVals;
+my @uniref50Vals;
+my @uniref90Vals;
 
 while (@uniprotIds) {
     my @batch = splice(@uniprotIds, 0, 50);
     my $queryIds = join("','", @batch);
     my $sql = "SELECT $whereField AS acc, $seqLenField $allUnirefField FROM annotations AS A $allUnirefJoin WHERE $whereField IN ('$queryIds')";
+#    print "SQL $sql\n";
     my $sth = $dbh->prepare($sql);
     $sth->execute;
     while (my $row = $sth->fetchrow_hashref) {
         my $len = $row->{seq_len};
+#        print "\t$row->{acc}\t$row->{uniref50_seed}\t$row->{uniref90_seed}\t$len\n";
         $histo->addData($len);
-        if ($row->{uniref50_seed}) {
-            $histoUniref50->addData($len) if not $histoHasUniref50{$row->{uniref50_seed}};
+        push @uniprotVals, $len;
+        if ($row->{uniref50_seed} and not $histoHasUniref50{$row->{uniref50_seed}}) {
+            $histoUniref50->addData($len);
+            push @uniref50Vals, $len;
             $histoHasUniref50{$row->{uniref50_seed}} = 1;
         }
-        if ($row->{uniref90_seed}) {
-            $histoUniref90->addData($len) if not $histoHasUniref90{$row->{uniref90_seed}};
+        if ($row->{uniref90_seed} and not $histoHasUniref90{$row->{uniref90_seed}}) {
+            $histoUniref90->addData($len);
+            push @uniref90Vals, $len;
             $histoHasUniref90{$row->{uniref90_seed}} = 1;
         }
     }
 }
+
+my %u;
+map { $u{$_} = 1; } @uniprotVals;
+print "Num UP=" . scalar(@uniprotVals) . " unique=" . scalar(keys(%u)) . "\n";;
+my %u1;
+map { $u1{$_} = 1; } @uniref50Vals;
+print "Num UR50=" . scalar(@uniref50Vals) . " unique=" . scalar(keys(%u1)) . "\n";;
+my %u2;
+map { $u2{$_} = 1; } @uniref90Vals;
+print "Num UR90=" . scalar(@uniref90Vals) . " unique=" . scalar(keys(%u2)) . "\n";;
 
 foreach my $id (@unkIds) {
     my $len = $annoMap->{$id}->{$seqLenField};

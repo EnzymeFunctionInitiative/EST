@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 
 BEGIN {
-    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
-    use lib $ENV{EFISHARED};
+    die "Please load efishared before runing this script" if not $ENV{EFI_SHARED};
+    use lib $ENV{EFI_SHARED};
 }
 
 #version 0.9.2 no changes
@@ -21,7 +21,7 @@ use strict;
 use warnings;
 
 use FindBin;
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through);
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm);
 use EFI::Config qw(cluster_configure);
@@ -30,15 +30,17 @@ use lib "$FindBin::Bin/lib";
 use Constants;
 
 
-my ($filter, $minval, $queue, $relativeGenerateDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
+my ($filter, $minval, $queue, $resultsDirName, $jobDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug);
+    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $analysisDir);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
     "queue=s"               => \$queue,
-    "tmp=s"                 => \$relativeGenerateDir,
+    "job-dir=s"             => \$jobDir,
+    "results-dir-name=s"    => \$resultsDirName,
+    "output-dir=s"          => \$analysisDir, # Path of output directory, relative to top-level generate job
     "maxlen=i"              => \$maxlen,
     "minlen=i"              => \$minlen,
     "title=s"               => \$title,
@@ -62,7 +64,7 @@ my $result = GetOptions(
     "no-repnode"            => \$noRepNodeNetworks,
     "scheduler=s"           => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"                => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
-    "config"                => \$configFile,        # config file path, if not given will look for EFICONFIG env var
+    "config"                => \$configFile,        # config file path, if not given will look for EFI_CONFIG env var
     "keep-xgmml"            => \$cleanup,
     "tax-search=s"          => \$taxSearch,
     "tax-search-hash=s"     => \$taxSearchHash,
@@ -70,17 +72,21 @@ my $result = GetOptions(
     "debug"                 => \$debug,
 );
 
-die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFIEST} or not $ENV{EFIESTMOD} or not $ENV{EFIDBMOD};
+die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFI_EST} or not $ENV{EFI_EST_MOD} or not $ENV{EFI_DB_MOD};
 die "The Perl environment must be loaded in order to run $0" if $ENV{LOADEDMODULES} !~ m/\bperl\b/i; # Ensure that the Perl module is loaded (e.g. module load Perl)
 
-my $toolpath = $ENV{EFIEST};
-my $efiEstMod = $ENV{EFIESTMOD};
-my $efiDbMod = $ENV{EFIDBMOD};
+my $toolpath = $ENV{EFI_EST};
+my $efiEstMod = $ENV{EFI_EST_MOD};
+my $efiDbMod = $ENV{EFI_DB_MOD};
 (my $perlMod = $ENV{LOADEDMODULES}) =~ s/^.*\b(perl)\b.*$/$1/i;
 
+$jobDir = $ENV{PWD} if not $jobDir;
+$resultsDirName = "output" if not $resultsDirName;
+my $generateDir = "$jobDir/$resultsDirName";
+
 my $dbver = "";
-if (-f "$relativeGenerateDir/database_version") {
-    $dbver = `head -1 $relativeGenerateDir/database_version`;
+if (-f "$generateDir/database_version") {
+    $dbver = `head -1 $generateDir/database_version`;
     chomp $dbver;
 }
 if (not $dbver) {
@@ -120,13 +126,9 @@ if (defined $maxfull and $maxfull !~ /^\d+$/) {
 }
 
 
-if (not defined $relativeGenerateDir) {
-    die "A temporary directory specified by -tmp is required for the program to run";
-}
-
 if (not defined $configFile or not -f $configFile) {
-    if (exists $ENV{EFICONFIG}) {
-        $configFile = $ENV{EFICONFIG};
+    if (exists $ENV{EFI_CONFIG}) {
+        $configFile = $ENV{EFI_CONFIG};
     } else {
         die "--config file parameter is not specified.  module load efiest_v2 should take care of this.";
     }
@@ -136,23 +138,23 @@ cluster_configure($config, config_file_path => $configFile);
 
 my $hasParent = defined $parentId and $parentId > 0 and defined $parentDir and -d $parentDir;
 
-my $baseOutputDir = $ENV{PWD};
-my $generateDir = "$baseOutputDir/$relativeGenerateDir";
-my $baseAnalysisDir = $generateDir;
 if ($hasParent) {
     $generateDir = $parentDir;
 }
 
-my $analysisDir = "$baseAnalysisDir/$filter-$minval-$minlen-$maxlen";
-if ($customClusterDir and $customClusterFile and -f "$baseAnalysisDir/$customClusterDir/$customClusterFile") {
-    $analysisDir = "$baseAnalysisDir/$customClusterDir";
+if (not $analysisDir) {
+    $analysisDir = "$generateDir/$filter-$minval-$minlen-$maxlen";
+    if ($customClusterDir and $customClusterFile and -f "$generateDir/$customClusterDir/$customClusterFile") {
+        $analysisDir = "$generateDir/$customClusterDir";
+    }
+    $analysisDir .= "-$cdhitOpt" if $cdhitOpt eq "sb" or $cdhitOpt eq "est+";
+    $analysisDir .= "-minn" if $useAnnoSpec;
+    $analysisDir .= "-mine" if $useMinEdgeAttr;
+    $analysisDir .= "-nc" if $computeNc;
+    $analysisDir .= "-$taxSearchHash" if $taxSearchHash;
+    $analysisDir .= "-nf" if $removeFragments;
 }
-$analysisDir .= "-$cdhitOpt" if $cdhitOpt eq "sb" or $cdhitOpt eq "est+";
-$analysisDir .= "-minn" if $useAnnoSpec;
-$analysisDir .= "-mine" if $useMinEdgeAttr;
-$analysisDir .= "-nc" if $computeNc;
-$analysisDir .= "-$taxSearchHash" if $taxSearchHash;
-$analysisDir .= "-nf" if $removeFragments;
+
 
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
@@ -177,7 +179,7 @@ if ($unirefVersion) {
     $unirefOption = "-uniref-version $unirefVersion";
 }
 
-my $logDir = "$baseOutputDir/log";
+my $logDir = "$jobDir/log";
 mkdir $logDir if not $dryrun;
 $logDir = "" if not -d $logDir;
 
@@ -193,7 +195,7 @@ my $filteredBlastFile = "$analysisDir/2.out";
 my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
 my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
 my $annoSpecFile = "$generateDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
-my $evalueTableInputFile = "$baseAnalysisDir/blast_hits.tab"; # BLAST jobs only
+my $evalueTableInputFile = "$generateDir/blast_hits.tab"; # BLAST jobs only
 my $evalueTableOutputFile = "$analysisDir/blast_evalue.txt";
 
 ####################################################################################################
@@ -223,7 +225,7 @@ my $lenArgs = "-min-len $minlen -max-len $maxlen";
 # Don't filter out UniRef cluster members if this is a domain job.
 $lenArgs = "" if $hasDomain;
 my $annoDep = 0;
-mkdir $analysisDir or die "could not make analysis folder $analysisDir\n" if not $dryrun;
+mkdir $analysisDir or die "could not make analysis folder $analysisDir (we're in $ENV{PWD})\n" if not $dryrun;
 
 # If a taxonomy search parameter has been added, then we need to filter the annotations by the taxonomy filter,
 # and then come up with a list of IDs (that is a subset of what the normal 2.out file would contain).
@@ -239,7 +241,6 @@ if ($taxSearch or $removeFragments) {
     $idListOption = "--filter-id-list $analysisDir/filtered.ids";
     $B = $S->getBuilder();
     $B->resource(1, 1, "5gb");
-    $B->addAction("module load $perlMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load $efiDbMod");
     $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption $removeFragmentsOption --config $configFile $debugFlag");
@@ -256,7 +257,6 @@ if ($taxSearch or $removeFragments) {
 $B = $S->getBuilder();
 $B->dependency(0, $taxDepId) if $taxDepId;
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $perlMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs --meta-file $analysisMetaFile $annoSpecOption -config=$configFile");
@@ -280,7 +280,7 @@ $annoDep = $parts[0];
 $B = $S->getBuilder();
 $B->dependency(0, $annoDep) if $annoDep;
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $perlMod");
+$B->addAction("module load $efiEstMod");
 if ($customClusterDir and $customClusterFile) {
     $B->addAction("$toolpath/filter_custom.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -custom-cluster-file $analysisDir/$customClusterFile");
     $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
@@ -289,7 +289,7 @@ if ($customClusterDir and $customClusterFile) {
     $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen $domMetaArg $idListOption");
 }
 if ($hasParent) {
-    $B->addAction("cp $parentDir/*.png $baseAnalysisDir/");
+    $B->addAction("cp $parentDir/*.png $generateDir/");
 }
 
 $B->jobName("${jobNamePrefix}filterblast");
@@ -308,8 +308,7 @@ $B = $S->getBuilder();
 $B->dependency(0, $filterjobline[0]);
 $B->resource(1, 1, "30gb");
 $B->addAction("module load $efiEstMod");
-$B->addAction("module load $perlMod");
-$B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
+$B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
 my $ncFile = "$analysisDir/${safeTitle}full_ssn_nc";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
@@ -341,8 +340,7 @@ if (not $noRepNodeNetworks) {
     $B->dependency(0, $filterjobline[0]);
     $B->resource(1, 1, "30gb");
     $B->addAction("module load $efiEstMod");
-    $B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
-    #$B->addAction("module load cd-hit");
+    $B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
     $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
     if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
         $B->addAction("WORDOPT=5");

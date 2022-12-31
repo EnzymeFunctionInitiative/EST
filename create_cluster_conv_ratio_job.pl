@@ -8,8 +8,9 @@ BEGIN {
 use strict;
 use warnings;
 
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through);
 use FindBin;
+use File::Basename;
 use Digest::MD5;
 
 use lib $FindBin::Bin . "/lib";
@@ -20,13 +21,14 @@ use EFI::Util qw(usesSlurm);
 
 my $estPath = $FindBin::Bin;
 
-my ($ssnIn, $outputPath, $outputFile);
+my ($ssnIn, $jobDir, $outputFile, $resultsDirName);
 my ($scheduler, $dryRun, $queue, $jobId, $configFile, $ramReservation, $ascore, $idListIn, $fastaIn);
 my $result = GetOptions(
     "ssn-in=s"                  => \$ssnIn,
     "id-list-in=s"              => \$idListIn,
     "fasta-in=s"                => \$fastaIn,
-    "output-path=s"             => \$outputPath,
+    "job-dir=s"                 => \$jobDir,
+    "results-dir-name=s"        => \$resultsDirName, # name of results sub-dir (e.g. output)
     "output-file=s"             => \$outputFile,
     "scheduler=s"               => \$scheduler,
     "dry-run"                   => \$dryRun,
@@ -53,7 +55,11 @@ USAGE
 ;
 
 
-$outputPath = $ENV{PWD} if not $outputPath;
+$jobDir = $ENV{PWD} if not $jobDir;
+$resultsDirName = "output" if not $resultsDirName;
+my $outputPath = "$jobDir/$resultsDirName";
+mkdir $outputPath;
+
 $queue = $ENV{EFI_QUEUE} if not $queue;
 $configFile = $ENV{EFI_CONFIG} if not $configFile or not -f $configFile;
 if (not $configFile or not -f $configFile) {
@@ -62,6 +68,7 @@ if (not $configFile or not -f $configFile) {
 my $estModule = $ENV{EFI_EST_MOD};
 my $efiEstTools = $ENV{EFI_EST};
 my $efiDbMod = $ENV{EFI_DB_MOD};
+my $extraPerl = "$ENV{EFI_PERL_ENV}";
 
 if ($ssnIn) {
     $ssnIn = "$ENV{PWD}/$ssnIn" if $ssnIn !~ m/^\//;
@@ -79,7 +86,11 @@ $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not 
 
 
 my $ssnInZip = $ssnIn;
-$ssnIn =~ s/\.zip$/.xgmml/i if $ssnInZip =~ /\.zip$/i;
+if ($ssnInZip =~ /\.zip$/i) {
+    my ($fn, $fp, $fx) = fileparse($ssnIn);
+    my $fname = "$fn.xgmml";
+    $ssnIn = "$jobDir/$fname";
+}
 
 my $jobNamePrefix = $jobId ? "${jobId}_" : "";
 my $outIdList = "$outputPath/id_list.txt";
@@ -120,9 +131,9 @@ mkdir $clusterDir;
 
 $B->resource(1, 1, "${ramReservation}gb");
 $B->addAction("source /etc/profile");
-$B->addAction("module load Perl");
 $B->addAction("module load $estModule");
 $B->addAction("module load $efiDbMod");
+$B->addAction("source $extraPerl");
 $B->addAction("cd $outputPath");
 if ($ssnIn) {
     $B->addAction("$estPath/unzip_file.pl --in $ssnInZip --out $ssnIn") if $ssnInZip =~ /\.zip/i;

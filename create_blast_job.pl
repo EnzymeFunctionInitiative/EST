@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 
 BEGIN {
-    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
-    use lib $ENV{EFISHARED};
+    die "Please load efishared before runing this script" if not $ENV{EFI_SHARED};
+    use lib $ENV{EFI_SHARED};
 }
 
 use warnings;
@@ -10,7 +10,7 @@ use strict;
 
 use FindBin;
 use File::Basename;
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through);
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm getLmod);
 use EFI::Config qw(cluster_configure);
@@ -55,16 +55,16 @@ my $result = GetOptions(
     "tax-search-invert" => \$taxSearchInvert,
 );
 
-die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
+die "Environment variables not set properly: missing EFI_DB variable" if not exists $ENV{EFI_DB};
 
-my $efiEstTools = $ENV{EFIEST};
-my $efiEstMod = $ENV{EFIESTMOD};
-my $efiDbMod = $ENV{EFIDBMOD};
-my $databaseDir = $ENV{EFIDBPATH};
-my $dbVer = $ENV{EFIDB};
+my $efiEstTools = $ENV{EFI_EST};
+my $efiEstMod = $ENV{EFI_EST_MOD};
+my $efiDbMod = $ENV{EFI_DB_MOD};
+my $databaseDir = $ENV{EFI_DB_DIR};
+my $dbVer = $ENV{EFI_DB};
 
 if (not $configFile or not -f $configFile) {
-    $configFile = $ENV{EFICONFIG};
+    $configFile = $ENV{EFI_CONFIG};
 }
 
 die "-config file argument is required" if not $configFile or not -f $configFile;
@@ -93,6 +93,7 @@ my $perpass = 1000;
 my $incfrac = 1; # was 0.95
 my $maxhits = 5000;
 my $sortdir = '/scratch';
+$maxBlastResults = 100 if not $maxBlastResults;
 
 if (not defined $evalue and defined $famEvalue) {
     $evalue = $famEvalue;
@@ -152,7 +153,8 @@ if (not defined $memqueue) {
     $memqueue = "efi";
 }
 
-$seqCountFile = "$outputDir/acc_counts.txt" if not $seqCountFile;
+$seqCountFile = "acc_counts.txt" if not $seqCountFile;
+$seqCountFile = "$outputDir/$seqCountFile" if $seqCountFile !~ m%^/%;
 
 
 # Set up the scheduler API so we can work with Torque or Slurm.
@@ -170,9 +172,7 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
 $excludeFragments = defined($excludeFragments);
 
 my $pythonMod = getLmod("Python/2", "Python");
-my $gdMod = "GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1"; #getLmod("GD.*Perl", "GD");
-my $perlMod = "Perl";
-my $rMod = "R";
+my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1";
 
 
 my $logDir = "$baseOutputDir/log";
@@ -476,8 +476,6 @@ $B->mailEnd();
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $gdMod");
-$B->addAction("module load $perlMod");
-$B->addAction("module load $rMod");
 $B->addAction("mkdir $outputDir/rdata");
 $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
 $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
