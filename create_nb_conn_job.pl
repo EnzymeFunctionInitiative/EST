@@ -9,7 +9,9 @@ use strict;
 use warnings;
 
 use Getopt::Long;
+use Getopt::Long qw(:config pass_through);
 use FindBin;
+use File::Basename;
 use lib $FindBin::Bin . "/lib";
 
 use EFI::SchedulerApi;
@@ -18,12 +20,13 @@ use EFI::Util qw(usesSlurm);
 
 my $estPath = $FindBin::Bin;
 
-my ($ssnIn, $outputPath, $outputName);
+my ($ssnIn, $baseDir, $outputName, $resultsDirName);
 my ($scheduler, $dryRun, $queue, $jobId, $configFile, $ramReservation, $dumpOnly);
 my $result = GetOptions(
     "ssn-in=s"                  => \$ssnIn,
     "output-name=s"             => \$outputName,
-    "output-path=s"             => \$outputPath,
+    "output-path=s"             => \$baseDir, # top-level job directory
+    "out-dir=s"                 => \$resultsDirName, # name of results sub-dir (e.g. output)
     "dump-only"                 => \$dumpOnly,
     "scheduler=s"               => \$scheduler,
     "dry-run"                   => \$dryRun,
@@ -48,7 +51,13 @@ USAGE
 ;
 
 
-$outputPath = $ENV{PWD} if not $outputPath;
+my $extraPerl = "$ENV{EFI_PERL_ENV}";
+
+
+$baseDir = $ENV{PWD} if not $baseDir;
+my $outputPath = "$baseDir/$resultsDirName";
+mkdir $outputPath;
+
 $queue = $ENV{EFI_QUEUE} if not $queue;
 $configFile = $ENV{EFI_CONFIG} if not $configFile or not -f $configFile;
 if (not $configFile or not -f $configFile) {
@@ -72,7 +81,11 @@ $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not 
 $outputName =~ s/[^a-zA-Z0-9\-_,\.]/_/g;
 
 my $ssnInZip = $ssnIn;
-$ssnIn =~ s/\.zip$/.xgmml/i if $ssnInZip =~ /\.zip$/i;
+if ($ssnInZip =~ /\.zip$/i) {
+    my ($fn, $fp, $fx) = fileparse($ssnIn);
+    my $fname = "$fn.xgmml";
+    $ssnIn = "$baseDir/$fname";
+}
 
 my $ssnOut = "$outputPath/ssn.xgmml";
 my $ssnOutZip = "$outputPath/ssn.zip";
@@ -99,9 +112,9 @@ my $B = $SS->getBuilder();
 
 $B->resource(1, 1, "${ramReservation}gb");
 $B->addAction("source /etc/profile");
-$B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
-$B->addAction("module load Perl");
 $B->addAction("module load $estModule");
+$B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
+$B->addAction("source $extraPerl");
 $B->addAction("cd $outputPath");
 $B->addAction("$estPath/unzip_file.pl --in $ssnInZip --out $ssnIn") if $ssnInZip =~ /\.zip/i;
 $B->addAction("$estPath/dump_connectivity.pl --input-xgmml $ssnIn --output-map $ncMap");

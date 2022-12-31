@@ -55,7 +55,7 @@ use warnings;
 use FindBin;
 use Cwd qw(abs_path);
 use File::Basename;
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through);
 use POSIX qw(ceil);
 use EFI::SchedulerApi;
 use EFI::Util qw(usesSlurm getLmod);
@@ -69,7 +69,7 @@ my ($np, $queue, $outputDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, 
 my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
-my ($scheduler, $dryrun, $oldapps, $LegacyGraphs, $configFile, $removeTempFiles);
+my ($scheduler, $dryrun, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
 my ($runSerial, $baseOutputDir, $largeMem, $debug);
 my $result = GetOptions(
@@ -112,7 +112,6 @@ my $result = GetOptions(
     "scheduler=s"       => \$scheduler,     # to set the scheduler to slurm 
     "dryrun"            => \$dryrun,        # to print all job scripts to STDOUT and not execute the job
     "cluster-node=s"    => \$clusterNode,
-    "oldapps"           => \$oldapps,       # to module load oldapps for biocluster2 testing
     "oldgraphs"         => \$LegacyGraphs,  # use the old graphing code
     "remove-temp"       => \$removeTempFiles, # add this flag to remove temp files
     "config=s"          => \$configFile,    # new-style config file
@@ -322,8 +321,8 @@ my $outputDir = "$baseOutputDir/$outputDirName";
 
 my $pythonMod = getLmod("Python/2", "Python");
 my $gdMod = getLmod("GD.*Perl", "GD");
-my $perlMod = "Perl";
-my $rMod = "R";
+#my $perlMod = "Perl";
+#my $rMod = "R";
 
 print "Blast is $blast\n";
 print "domain is $domain\n";
@@ -388,6 +387,7 @@ my $lenUnirefDomFile = "$outputDir/length_uniref_domain.tab"; # domain lengths o
 my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 
 $seqCountFile = "$outputDir/acc_counts" if not $seqCountFile;
+$seqCountFile = "$outputDir/$seqCountFile" if $seqCountFile !~ m%^/%;
 
 my $taxOutputFile = "$outputDir/tax.json";
 my $sunburstTaxOutput = "$outputDir/sunburst.raw";
@@ -398,6 +398,9 @@ my $accessionFileOption = "";
 my $noMatchFileOption = "";
 my $taxSourceAccessionFile = "";
 if (defined $accessionFile and -e $accessionFile) {
+    # If there a source tax option, we set the original file to be the json from the tax job.
+    # Then the accessionFile becomes the output file from the get_tax_tree.pl script below,
+    # before the tool chain starts.
     if ($sourceTax) {
         $taxSourceAccessionFile = $accessionFile;
         my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
@@ -416,8 +419,9 @@ if (defined $accessionFile and -e $accessionFile) {
 
 my $accessionFileZip = $accessionFile;
 if ($accessionFileZip =~ /\.zip$/i) {
-    $accessionFile =~ s/\.zip$/.txt/i;
-    $accessionFileOption =~ s/\.zip$/.txt/i;
+    my ($fn, $fp, $fx) = fileparse($accessionFile);
+    my $fname = "$fn.txt";
+    $accessionFile = "$baseOutputDir/$fname";
 }
 
 
@@ -441,8 +445,9 @@ if (defined $fastaFile and -e $fastaFile) {
 
 my $fastaFileZip = $fastaFile;
 if ($fastaFileZip =~ /\.zip$/i) {
-    $fastaFile =~ s/\.zip$/.fasta/i;
-    $fastaFileOption =~ s/\.zip$/.fasta/i;
+    my ($fn, $fp, $fx) = fileparse($fastaFile);
+    my $fname = "$fn.fasta";
+    $fastaFile = "$outputDir/$fname";
 }
 
 
@@ -458,11 +463,6 @@ system("echo $1 >$outputDir/database_version");
 my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
 my $usesSlurm = $schedType eq "slurm";
-if (defined($oldapps)) {
-    $oldapps = $usesSlurm;
-} else {
-    $oldapps = 0;
-}
 
 
 my $logDir = "$baseOutputDir/log";
@@ -501,21 +501,24 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
 
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("module unload MariaDB");
-    $B->addAction("module load MariaDB/10.1.31-IGB-gcc-4.9.4");
+    $B->addAction("module load MariaDB/10.3.17-IGB-gcc-8.2.0");
     $B->addAction("cd $outputDir");
     $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
     $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
-    if ($fastaFile) {
-        $B->addAction("dos2unix -q $fastaFile");
-        $B->addAction("mac2unix -q $fastaFile");
+    if ($fastaFile and not $sourceTax) {
+        $B->addAction("sed -i 's/\\n\\r\$/\\n/' $fastaFile");
+        $B->addAction("sed -i 's/\\r\$/\\n/' $fastaFile");
+        #$B->addAction("dos2unix -q $fastaFile");
+        #$B->addAction("mac2unix -q $fastaFile");
     }
-    if ($accessionFile) {
-        $B->addAction("dos2unix -q $accessionFile");
-        $B->addAction("mac2unix -q $accessionFile");
+    if ($accessionFile and not $sourceTax) {
+        $B->addAction("sed -i 's/\\n\\r\$/\\n/' $accessionFile");
+        $B->addAction("sed -i 's/\\r\$/\\n/' $accessionFile");
+        #$B->addAction("dos2unix -q $accessionFile");
+        #$B->addAction("mac2unix -q $accessionFile");
     }
     # Don't enforce the limit here if we are using manual cd-hit parameters below (the limit
     # is checked below after cd-hit).
@@ -631,7 +634,6 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 # Tax id code is different, so it is exclusive
 } elsif ($taxid) {
 
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
     $B->addAction("cd $outputDir");
@@ -673,7 +675,6 @@ $B->mailEnd() if defined $cdHitOnly;
 # If we only want to do CD-HIT jobs then do that here.
 if ($cdHitOnly) {
     $B->resource(1, 24, "10GB");
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiDbMod");
     $B->addAction("module load $efiEstMod");
     #$B->addAction("module load blast");
@@ -701,7 +702,6 @@ if ($cdHitOnly) {
 
 $B->resource(1, 1, "10gb");
 
-$B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("module load blast");
@@ -770,7 +770,6 @@ $B = $S->getBuilder();
 
 $B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
-$B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("cd $outputDir");
@@ -807,13 +806,11 @@ $B->resource(1, 24, "14G") if $blast =~ /diamond/i;
 $B->resource(1, 24, "14G") if $blast =~ /blast\+/i;
 
 $B->addAction("export BLASTDB=$outputDir");
-#$B->addAction("module load oldapps") if $oldapps;
 #$B->addAction("module load blast+");
 #$B->addAction("blastp -query  $fracOutputDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 if ($blast eq "blast") {
-    $B->addAction("module load oldapps") if $oldapps;
     #$B->addAction("module load blast");
     if ($runSerial) {
         open my $fh, ">", "$scriptDir/blast.sh";
@@ -827,20 +824,16 @@ if ($blast eq "blast") {
         $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
     }
 } elsif ($blast eq "blast+") {
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load BLAST+");
     $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
 } elsif ($blast eq "blast+simple") {
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load BLAST+");
     $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -outfmt \"6\" -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
 } elsif ($blast eq "diamond") {
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load DIAMOND");
     $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $filtSeqFile -d $outputDir/database -a $blastOutputDir/blastout.daa");
     $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
 } elsif ($blast eq "diamondsensitive") {
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load DIAMOND");
     $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout.daa");
     $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
@@ -926,7 +919,6 @@ $B = $S->getBuilder();
 
 $B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
-$B->addAction("module load oldapps") if $oldapps;
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
@@ -977,7 +969,6 @@ push @allJobIds, $convRatioJobLine[0];
 
 $B->queue($memqueue);
 $B->dependency(0, $prevJobId);
-$B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-align.pl -blastout $outputDir/1.out -align $outputDir/alignment_length.png");
@@ -991,7 +982,6 @@ print "Quartile Align job is:\n $quartalignjob\n" if not $runSerial;
 $B->queue($memqueue);
 $B->dependency(0, $prevJobId);
 $B->addAction("#PBS -m e");
-$B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-perid.pl -blastout $outputDir/1.out -pid $outputDir/percent_identity.png");
@@ -1004,7 +994,6 @@ print "Quartiles Percent Identity job is:\n $quartpidjob\n" if not $runSerial;
 
 $B->queue($memqueue);
 $B->dependency(0, $prevJobId);
-$B->addAction("module load oldapps\n" if $oldapps);
 $B->addAction("module load $efiDbMod");
 $B->addAction("module load $efiEstMod");
 $B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $allSeqFile -lengths $outputDir/length_histogram.png -incfrac $incfrac");
@@ -1072,16 +1061,15 @@ sub createGraphJob {
     $B->dependency(0, $prevJobId) if $prevJobId;
     $B->mailEnd();
     $B->setScriptAbortOnError(0); # don't abort on error
-    $B->addAction("module load oldapps") if $oldapps;
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load $efiDbMod");
     if (defined $LegacyGraphs) {
         my $evalueFile = "$outputDir/evalue.tab";
         my $defaultLengthFile = "$outputDir/length.tab";
         $B->resource(1, 1, "50gb");
-        $B->addAction("module load GD/2.66-IGB-gcc-4.9.4-Perl-5.24.1");
-        $B->addAction("module load $perlMod");
-        $B->addAction("module load $rMod");
+        $B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
+        #$B->addAction("module load $perlMod");
+        #$B->addAction("module load $rMod");
         if (not $lengthHistoOnly) {
             $B->addAction("mkdir -p $outputDir/rdata");
             # Lengths are retrieved in a previous step.

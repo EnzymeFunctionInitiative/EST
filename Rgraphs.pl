@@ -6,12 +6,16 @@
 
 use strict;
 
+use lib '/home/groups/efi/apps/perl5/lib/perl5';
+
 use GD::Graph::boxplot;
 use GD;
 use Getopt::Long;
 use Statistics::R;
 use Data::Dumper;
 #use FileCache;
+
+
 
 #DEBUG:
 use FindBin;
