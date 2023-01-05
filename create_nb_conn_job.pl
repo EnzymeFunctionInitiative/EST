@@ -24,7 +24,7 @@ my ($ssnIn, $jobDir, $outputName, $resultsDirName);
 my ($scheduler, $dryRun, $queue, $jobId, $configFile, $ramReservation, $dumpOnly);
 my $result = GetOptions(
     "ssn-in=s"                  => \$ssnIn,
-    "output-name=s"             => \$outputName,
+    "ssn-file-name=s"           => \$outputName,
     "job-dir=s"                 => \$jobDir, # top-level job directory
     "results-dir-name=s"        => \$resultsDirName, # name of results sub-dir (e.g. output)
     "dump-only"                 => \$dumpOnly,
@@ -78,8 +78,10 @@ my $schedType = "torque";
 $schedType = "slurm" if (defined($scheduler) and $scheduler eq "slurm") or (not defined($scheduler) and usesSlurm());
 
 
-($outputName = $ssnIn) =~ s%.*?([^/]+)\.xgmml$%$1% if not $outputName;
-$outputName =~ s/[^a-zA-Z0-9\-_,\.]/_/g;
+if (not $outputName) {
+    my ($fn, $fp, $fx) = fileparse($ssnIn, ".xgmml", ".xgmml.zip", ".zip");
+    $outputName = $fn;
+}
 
 my $ssnInZip = $ssnIn;
 if ($ssnInZip =~ /\.zip$/i) {

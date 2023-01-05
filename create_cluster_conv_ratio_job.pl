@@ -29,7 +29,7 @@ my $result = GetOptions(
     "fasta-in=s"                => \$fastaIn,
     "job-dir=s"                 => \$jobDir,
     "results-dir-name=s"        => \$resultsDirName, # name of results sub-dir (e.g. output)
-    "output-file=s"             => \$outputFile,
+    "ssn-file-name=s"           => \$outputFile,
     "scheduler=s"               => \$scheduler,
     "dry-run"                   => \$dryRun,
     "queue=s"                   => \$queue,
