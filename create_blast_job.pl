@@ -19,12 +19,13 @@ use lib $FindBin::Bin . "/lib";
 use BlastUtil;
 
 
-my ($seq, $tmpdir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
+my ($seq, $resultsDirName, $jobDir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
 my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert);
 my $result = GetOptions(
     "seq=s"             => \$seq,
-    "tmp|tmpdir=s"      => \$tmpdir,
+    "results-dir-name=s"=> \$resultsDirName,
+    "job-dir=s"         => \$jobDir,
     "evalue=s"          => \$famEvalue, # Due to the way the front-end is implemented, the -evalue parameter now is used for (optional) family input BLASTs.
     "blast-evalue=s"    => \$evalue,
     "multiplexing=s"    => \$multiplexing,
@@ -72,10 +73,9 @@ my $config = {};
 cluster_configure($config, config_file_path => $configFile);
 
 
-die "-tmpdir argument is required" if not $tmpdir;
-
-my $baseOutputDir = $ENV{PWD};
-my $outputDir = "$baseOutputDir/$tmpdir";
+$jobDir = $ENV{PWD} if not $jobDir;
+$resultsDirName = "output" if not $resultsDirName;
+my $outputDir = "$jobDir/$resultsDirName";
 
 print "db is: $dbVer\n";
 mkdir $outputDir or die "Could not make directory $outputDir\n" if not -d $outputDir;
@@ -175,7 +175,7 @@ my $pythonMod = getLmod("Python/2", "Python");
 my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1";
 
 
-my $logDir = "$baseOutputDir/log";
+my $logDir = "$jobDir/log";
 mkdir $logDir;
 $logDir = "" if not -d $logDir;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
@@ -183,7 +183,7 @@ $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 my $S = new EFI::SchedulerApi(%schedArgs);
 
-my $scriptDir = "$baseOutputDir/scripts";
+my $scriptDir = "$jobDir/scripts";
 mkdir $scriptDir;
 $scriptDir = $outputDir if not -d $scriptDir;
 
