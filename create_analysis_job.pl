@@ -218,6 +218,7 @@ ANNO
 
 my $hasDomain = checkForDomain("$generateDir/1.out");
 
+my $bcCmd = "$toolpath/bc";
 
 
 my $annoSpecOption = $useAnnoSpec ? " -anno-spec-file $annoSpecFile" : "";
@@ -341,13 +342,17 @@ if (not $noRepNodeNetworks) {
     $B->resource(1, 1, "30gb");
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
-    $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" |bc -l)");
+    $B->addAction("BC_CMD=$bcCmd");
+    #$B->addAction("echo '2+2' | \$BC_CMD 2>&1");
+    #$B->addAction("if [ \$? != 0 ]; then BC_CMD=$toolpath/bc; fi");
+    $B->addAction("export BC_CMD");
+    $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" | \$BC_CMD -l)");
     if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
         $B->addAction("WORDOPT=5");
-        $B->addAction('if (( $(echo "$CDHIT < 0.81" | bc -l) )); then WORDOPT=5; fi');
-        $B->addAction('if (( $(echo "$CDHIT < 0.71" | bc -l) )); then WORDOPT=4; fi');
-        $B->addAction('if (( $(echo "$CDHIT < 0.61" | bc -l) )); then WORDOPT=3; fi');
-        $B->addAction('if (( $(echo "$CDHIT < 0.51" | bc -l) )); then WORDOPT=2; fi');
+        $B->addAction('if (( $(echo "$CDHIT < 0.81" | $BC_CMD -l) )); then WORDOPT=5; fi');
+        $B->addAction('if (( $(echo "$CDHIT < 0.71" | $BC_CMD -l) )); then WORDOPT=4; fi');
+        $B->addAction('if (( $(echo "$CDHIT < 0.61" | $BC_CMD -l) )); then WORDOPT=3; fi');
+        $B->addAction('if (( $(echo "$CDHIT < 0.51" | $BC_CMD -l) )); then WORDOPT=2; fi');
         $B->addAction('echo $WORDOPT');
         $wordOption = '-n $WORDOPT';
     } else {
