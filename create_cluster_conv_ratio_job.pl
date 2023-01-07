@@ -29,7 +29,7 @@ my $result = GetOptions(
     "fasta-in=s"                => \$fastaIn,
     "job-dir=s"                 => \$jobDir,
     "results-dir-name=s"        => \$resultsDirName, # name of results sub-dir (e.g. output)
-    "ssn-file-name=s"           => \$outputFile,
+    "file-name=s"               => \$outputFile,
     "scheduler=s"               => \$scheduler,
     "dry-run"                   => \$dryRun,
     "queue=s"                   => \$queue,
@@ -97,7 +97,10 @@ my $outIdList = "$outputPath/id_list.txt";
 
 my $clusterDir = "$outputPath/clusters";
 
-$outputFile //= "$outputPath/conv_ratio.txt";
+$outputFile = "conv_ratio.txt" if not $outputFile;
+if ($outputFile !~ m%^/%) {
+    $outputFile = "$outputPath/$outputFile";
+}
 
 my $np = 48;
 my $blasthits = 1000000;
