@@ -226,7 +226,7 @@ my $lenArgs = "-min-len $minlen -max-len $maxlen";
 # Don't filter out UniRef cluster members if this is a domain job.
 $lenArgs = "" if $hasDomain;
 my $annoDep = 0;
-mkdir $analysisDir or die "could not make analysis folder $analysisDir (we're in $ENV{PWD})\n" if not $dryrun;
+mkdir $analysisDir or die "could not make analysis folder $analysisDir (we're in $ENV{PWD})\n" if (not $dryrun and not -d $analysisDir);
 
 # If a taxonomy search parameter has been added, then we need to filter the annotations by the taxonomy filter,
 # and then come up with a list of IDs (that is a subset of what the normal 2.out file would contain).
