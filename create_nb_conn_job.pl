@@ -40,8 +40,7 @@ my $usage = <<USAGE
 usage: $0 -ssnin <filename>
 
     --ssn-in            path to file of original ssn network to process
-    --output-path       output directory
-    --output-name       name of output file
+    --results-dir-name  name of output file
     --scheduler         scheduler type (default to torque, but also can be slurm)
     --dry-run           only generate the scripts, don't submit to queue
     --queue             the cluster queue to use

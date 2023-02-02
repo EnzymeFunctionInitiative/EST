@@ -28,7 +28,7 @@ use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 
-my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile);
+my ($blast, $cdhit, $fasta, $struct, $outputFile, $title, $dbver, $maxNumEdges, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile, $isDomainJob);
 my $result = GetOptions(
     "blast=s"	        => \$blast,
     "cdhit=s"	        => \$cdhit,
@@ -42,6 +42,7 @@ my $result = GetOptions(
     "include-all-sequences" => \$includeAllSeqs,
     "use-min-edge-attr" => \$useMinEdgeAttr,
     "nc-map=s"          => \$ncMapFile,
+    "is-domain"         => \$isDomainJob,
 );
 
 die "Invalid command line arguments" if not $blast or not $fasta or not $struct or not $outputFile or not $title or not $dbver or not $cdhit;
@@ -57,6 +58,9 @@ if (defined $maxNumEdges) {
 $includeSeqs = 0 if not defined $includeSeqs;
 $includeAllSeqs = 0 if not defined $includeAllSeqs;
 $useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
+
+my @domAttr = ($isDomainJob ? ("domain", "DOM_yes") : ());
+
 
 my $anno = new EFI::Annotations;
 
@@ -194,7 +198,7 @@ if ($cdhit=~/cdhit\.*([\d\.]+)\.clstr$/) {
 
 $writer->comment("Database: $dbver");
 #write the top container
-$writer->startTag('graph', 'label' => "$title", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
+$writer->startTag('graph', 'label' => "$title", 'xmlns' => 'http://www.cs.rpi.edu/XGMML', @domAttr);
 
 my %clusterdata=();
 my $count=0;

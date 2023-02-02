@@ -30,7 +30,7 @@ use lib "$FindBin::Bin/lib";
 use Constants;
 
 
-my ($filter, $minval, $queue, $resultsDirName, $jobDir, $maxlen, $minlen, $title, $maxfull, $jobId, $lengthOverlap,
+my ($filter, $minval, $queue, $resultsDirName, $jobDir, $maxlen, $minlen, $title, $maxfull, $jobId, $generateJobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
     $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $analysisDir);
@@ -38,14 +38,15 @@ my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
     "queue=s"               => \$queue,
-    "job-dir=s"             => \$jobDir,
-    "results-dir-name=s"    => \$resultsDirName,
-    "output-dir=s"          => \$analysisDir, # Path of output directory, relative to top-level generate job
+    "job-dir=s"             => \$jobDir, # generate job dir
+    "results-dir-name=s"    => \$resultsDirName, # the results sub-dir within generate job dir (e.g. output)
+    "output-path=s"         => \$analysisDir, # full path of output directory
     "maxlen=i"              => \$maxlen,
     "minlen=i"              => \$minlen,
     "title=s"               => \$title,
     "maxfull=i"             => \$maxfull,
     "job-id=s"              => \$jobId,
+    "generate-job-id=s"     => \$generateJobId,
     "lengthdif=i"           => \$lengthOverlap,
     "custom-cluster-file=s" => \$customClusterFile,
     "custom-cluster-dir=s"  => \$customClusterDir,
@@ -74,6 +75,7 @@ my $result = GetOptions(
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFI_EST} or not $ENV{EFI_EST_MOD} or not $ENV{EFI_DB_MOD};
 die "The Perl environment must be loaded in order to run $0" if $ENV{LOADEDMODULES} !~ m/\bperl\b/i; # Ensure that the Perl module is loaded (e.g. module load Perl)
+
 
 my $toolpath = $ENV{EFI_EST};
 my $efiEstMod = $ENV{EFI_EST_MOD};
@@ -116,7 +118,7 @@ $debug = 0 if not defined $debug;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_" if $safeTitle;
-$safeTitle = $jobId . "_" . $safeTitle if defined $jobId and $jobId;
+$safeTitle = $generateJobId . "_" . $safeTitle if defined $generateJobId and $generateJobId;
 $safeTitle .= "${taxSearchHash}_" if $taxSearchHash;
 
 if (defined $maxfull and $maxfull !~ /^\d+$/) {
@@ -171,7 +173,7 @@ if ($cdhitOpt eq "sb") {
     $algoOption = "-g 1";
 }
 
-my $jobNamePrefix = (defined $jobId and $jobId) ? $jobId . "_" : ""; 
+my $jobNamePrefix = (defined $generateJobId and $generateJobId) ? $generateJobId . "_" : ""; 
 
 
 my $unirefOption = "";
@@ -301,6 +303,8 @@ print "Filterblast job is:\n $filterjob\n";
 my @filterjobline = split /\./, $filterjob;
 
 
+my $xgmmlDomainArgs = $hasDomain ? "--is-domain" : "";
+
 #submit the job for generating the full xgmml file
 #since struct.out is created in the first half, the full and repnode networks can all be generated at the same time
 #depends on ffilterblast
@@ -316,7 +320,7 @@ my $seqsArg = $includeSeqs ? "-include-sequences" : "";
 $seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
 $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc;
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg $xgmmlDomainArgs " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
 $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");
@@ -373,7 +377,7 @@ if (not $noRepNodeNetworks) {
         $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab --cdhit $cdhitFile.clstr"); 
         $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
     }
-    $B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
+    $B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg $xgmmlDomainArgs " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
     $B->addAction("zip -j $outFile.zip $outFile");
     $B->jobName("${jobNamePrefix}cdhit");
     $B->renderToFile("$analysisDir/cdhit.sh");

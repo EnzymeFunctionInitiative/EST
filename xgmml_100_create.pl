@@ -32,7 +32,7 @@ use lib "$FindBin::Bin/lib";
 use AlignmentScore;
 
 
-my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile, $legacyAnno);
+my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile, $isDomainJob);
 my $result = GetOptions(
     "blast=s"               => \$inputBlast,
     "fasta=s"               => \$inputFasta,
@@ -45,7 +45,7 @@ my $result = GetOptions(
     "include-all-sequences" => \$includeAllSeqs,
     "use-min-edge-attr"     => \$useMinEdgeAttr,
     "nc-map=s"              => \$ncMapFile,
-    "legacy-anno"           => \$legacyAnno,
+    "is-domain"             => \$isDomainJob,
 );
 
 die "Missing -blast command line argument" if not $inputBlast;
@@ -62,6 +62,7 @@ $includeAllSeqs = 0         if not defined $includeAllSeqs;
 $maxNumEdges = 10000000     if not defined $maxNumEdges;
 $useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
 
+my @domAttr = ($isDomainJob ? ("domain", "DOM_yes") : ());
 
 
 my ($edge, $node) = (0, 0);
@@ -125,8 +126,6 @@ close FASTA;
 print time . " Finished reading in uniprot numbers\n";
 
 my $seqLenField = "seq_len";
-# Remove the legacy after summer 2022
-$seqLenField = "Sequence_Length" if $legacyAnno;
 
 # Column headers and order in output file.
 my @metas;
@@ -210,7 +209,7 @@ my $metaline = join ',', @metas;
 print time ." Metadata keys are $metaline\n";
 print time ." Start nodes\n";
 $writer->comment("Database: $dbver");
-$writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML');
+$writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML', @domAttr);
 foreach my $element (@uprotnumbers) {
     #print "$element\n";;
     my $origelement = $element;
