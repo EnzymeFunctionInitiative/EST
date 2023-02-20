@@ -211,7 +211,6 @@ print time ." Start nodes\n";
 $writer->comment("Database: $dbver");
 $writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML', @domAttr);
 foreach my $element (@uprotnumbers) {
-    #print "$element\n";;
     my $origelement = $element;
     $node++;
     $writer->startTag('node', 'id' => $element, 'label' => $element);
@@ -223,7 +222,7 @@ foreach my $element (@uprotnumbers) {
         my $displayName = $annoData->{$key}->{display};
         if ($isList{$key}) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-            my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
+            my (@pieces) = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
             foreach my $piece (@pieces) {
                 $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
                 my $type = $anno->get_attribute_type($key);
