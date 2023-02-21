@@ -132,7 +132,7 @@ my @metas;
 my %hasMetas;
 my %isList;
 my $hasSeqs = 0;
-print time . " Read in annotation data\n";
+print time . " Read in annotation data $annoFile\n";
 #if struct file (annotation information) exists, use that to generate annotation information
 if (-e $annoFile) {
     print "populating annotation structure from file\n";
@@ -160,7 +160,7 @@ if (-e $annoFile) {
                 $uprot{$id}{$key} = \@tmpline;
             } else {
                 my @vals = uniq sort split(m/\^/, $value);
-                @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if scalar @vals > 1;
+                @vals = grep not m/^\s*$/, grep not m/^None$/, @vals if scalar @vals > 1;
                 if (scalar @vals > 1) {
                     $isList{$key} = 1;
                     $uprot{$id}{$key} = \@vals;
@@ -201,10 +201,12 @@ if ($#metas < 0) {
     }
 }
 
+
 my $annoData = EFI::Annotations::get_annotation_data();
 @metas = EFI::Annotations::sort_annotations($annoData, @metas);
 
 my $metaline = join ',', @metas;
+
 
 print time ." Metadata keys are $metaline\n";
 print time ." Start nodes\n";
@@ -218,11 +220,10 @@ foreach my $element (@uprotnumbers) {
         $element = $1;
     }
     foreach my $key (@metas) {
-        #print "\t$key\t$uprot{$element}{$key}\n";
         my $displayName = $annoData->{$key}->{display};
         if ($isList{$key}) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-            my (@pieces) = ref $uprot{$element}{$key} ne "ARRAY" ? $uprot{$element}{$key} : @{$uprot{$element}{$key}};
+            my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? ($uprot{$element}{$key} // "") : @{$uprot{$element}{$key}};
             foreach my $piece (@pieces) {
                 $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
                 my $type = $anno->get_attribute_type($key);

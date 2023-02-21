@@ -319,6 +319,7 @@ my $ncFile = "$analysisDir/${safeTitle}full_ssn_nc";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
 $seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
+$B->addAction("sleep 10"); # To allow the file system to make all of the necessary writes before we read the files
 $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc;
 $B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg $xgmmlDomainArgs " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
 $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
@@ -377,6 +378,7 @@ if (not $noRepNodeNetworks) {
         $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab --cdhit $cdhitFile.clstr"); 
         $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
     }
+    $B->addAction("sleep 10"); # To allow the file system to make all of the necessary writes before we read the files
     $B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg $xgmmlDomainArgs " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
     $B->addAction("zip -j $outFile.zip $outFile");
     $B->jobName("${jobNamePrefix}cdhit");
