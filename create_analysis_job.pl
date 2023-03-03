@@ -115,6 +115,7 @@ $useMinEdgeAttr = defined $useMinEdgeAttr ? 1 : 0;
 $computeNc = defined $computeNc ? 1 : 0;
 $debug = 0 if not defined $debug;
 
+my @jobIds;
 
 (my $safeTitle = $title) =~ s/[^A-Za-z0-9_\-]/_/g;
 $safeTitle .= "_" if $safeTitle;
@@ -173,7 +174,7 @@ if ($cdhitOpt eq "sb") {
     $algoOption = "-g 1";
 }
 
-my $jobNamePrefix = (defined $generateJobId and $generateJobId) ? $generateJobId . "_" : ""; 
+my $jobNamePrefix = ($jobId ? "${jobId}_" : "") . ($generateJobId ? "${generateJobId}_" : ""); 
 
 
 my $unirefOption = "";
@@ -250,10 +251,11 @@ if ($taxSearch or $removeFragments) {
     $B->jobName("${jobNamePrefix}get_filtered_ids");
     $B->renderToFile("$analysisDir/get_filtered_ids.sh");
     my $jobId = $S->submit("$analysisDir/get_filtered_ids.sh", $dryrun);
-    chomp $jobId;
-    print "ID list job is:\n $jobId\n";
-    my @parts = split /\./, $jobId;
-    $taxDepId = $parts[0];
+    chomp($jobId);
+    $jobId = getJobId($jobId);
+    push @jobIds, $jobId;
+    print "ID list job is:\n$jobId\n";
+    $taxDepId = $jobId;
 }
 
 
@@ -268,11 +270,11 @@ if (-e $evalueTableInputFile and -s $evalueTableInputFile > 0) {
 }
 $B->jobName("${jobNamePrefix}get_annotations");
 $B->renderToFile("$analysisDir/get_annotations.sh");
-my $annojob = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
-chomp $annojob;
-print "Annotations job is:\n $annojob\n";
-my @parts = split /\./, $annojob;
-$annoDep = $parts[0];
+my $annoJobId = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
+chomp($annoJobId);
+$annoJobId = getJobId($annoJobId);
+push @jobIds, $annoJobId;
+print "Annotations job is:\n$annoJobId\n";
 
 
 
@@ -281,7 +283,7 @@ $annoDep = $parts[0];
 #
 
 $B = $S->getBuilder();
-$B->dependency(0, $annoDep) if $annoDep;
+$B->dependency(0, $annoJobId) if $annoDep;
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 if ($customClusterDir and $customClusterFile) {
@@ -297,10 +299,11 @@ if ($hasParent) {
 
 $B->jobName("${jobNamePrefix}filterblast");
 $B->renderToFile("$analysisDir/filterblast.sh");
-my $filterjob = $S->submit("$analysisDir/filterblast.sh", $dryrun);
-chomp $filterjob;
-print "Filterblast job is:\n $filterjob\n";
-my @filterjobline = split /\./, $filterjob;
+my $filterJobId = $S->submit("$analysisDir/filterblast.sh", $dryrun);
+chomp($filterJobId);
+$filterJobId = getJobId($filterJobId);
+push @jobIds, $filterJobId;
+print "Filterblast job is:\n$filterJobId\n";
 
 
 my $xgmmlDomainArgs = $hasDomain ? "--is-domain" : "";
@@ -310,7 +313,7 @@ my $xgmmlDomainArgs = $hasDomain ? "--is-domain" : "";
 #depends on ffilterblast
 
 $B = $S->getBuilder();
-$B->dependency(0, $filterjobline[0]);
+$B->dependency(0, $filterJobId);
 $B->resource(1, 1, "30gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
@@ -319,7 +322,7 @@ my $ncFile = "$analysisDir/${safeTitle}full_ssn_nc";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
 $seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
-$B->addAction("sleep 10"); # To allow the file system to make all of the necessary writes before we read the files
+$B->addAction("sleep 60"); # To allow the file system to make all of the necessary writes before we read the files
 $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc;
 $B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg $xgmmlDomainArgs " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
 $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
@@ -330,20 +333,19 @@ $B->renderToFile("$analysisDir/fullxgmml.sh");
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
 
 my $fulljob = $S->submit("$analysisDir/fullxgmml.sh", $dryrun, $schedType);
-chomp $fulljob;
-print "Full xgmml job is:\n $fulljob\n";
-
-my @fulljobline = split /\./, $fulljob;
+chomp($fulljob);
+$fulljob = getJobId($fulljob);
+push @jobIds, $fulljob;
+print "Full xgmml job is:\n$fulljob\n";
 
 #submit series of repnode network calculations
 #depends on filterblast
 
-my $depId = $fulljobline[0];
-
+my $depId = $fulljob;
 if (not $noRepNodeNetworks) {
     $B = $S->getBuilder();
     $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
-    $B->dependency(0, $filterjobline[0]);
+    $B->dependency(0, $filterJobId);
     $B->resource(1, 1, "30gb");
     $B->addAction("module load $efiEstMod");
     $B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
@@ -386,11 +388,11 @@ if (not $noRepNodeNetworks) {
     
     #submit the filter script, job dependences should keep it from running till all blast out files are combined
     my $repnodejob = $S->submit("$analysisDir/cdhit.sh", $dryrun, $schedType);
-    chomp $repnodejob;
-    print "Repnodes job is:\n $repnodejob\n";
-
-    my @repnodejobline = split /\./, $repnodejob;
-    $depId = $repnodejobline[0];
+    chomp($repnodejob);
+    $repnodejob = getJobId($repnodejob);
+    push @jobIds, $repnodejob;
+    print "Repnodes job is:\n$repnodejob\n";
+    $depId = $repnodejob;
 }
 
 #test to fix dependancies
@@ -406,14 +408,15 @@ $B->renderToFile("$analysisDir/fix.sh");
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 
 my $fixjob = $S->submit("$analysisDir/fix.sh", $dryrun, $schedType);
-chomp $fixjob;
-print "Fix job is:\n $fixjob\n";
-my @fixjobline = split /\./, $fixjob;
+chomp($fixjob);
+$fixjob = getJobId($fixjob);
+push @jobIds, $fixjob;
+print "Fix job is:\n$fixjob\n";
 
 #submit series of repnode network calculations
 #depends on filterblast
 $B = $S->getBuilder();
-$B->dependency(0, $fulljobline[0] . ":" . $fixjobline[0]);
+$B->dependency(0, "$fulljob:$fixjob");
 $B->resource(1, 1, "5gb");
 #$B->dependency(0, $fulljobline[0]); 
 $B->mailEnd();
@@ -425,8 +428,12 @@ $B->renderToFile("$analysisDir/stats.sh");
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 my $statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
-chomp $statjob;
-print "Stats job is:\n $statjob\n";
+chomp($statjob);
+$statjob = getJobId($statjob);
+push @jobIds, $statjob;
+print "Stats job is:\n$statjob\n";
+
+print "All analysis job IDs:\n" . join(",", @jobIds), "\n";
 
 
 
@@ -437,7 +444,15 @@ sub checkForDomain {
     my $line = <FILE>;
     close FILE;
 
+    return 0 if not $line;
     return $line =~ m/^\S+:\d+:\d+/;
+}
+
+
+sub getJobId {
+    my $submitResult = shift;
+    my @parts = split /\./, $submitResult;
+    return $parts[0];
 }
 
 

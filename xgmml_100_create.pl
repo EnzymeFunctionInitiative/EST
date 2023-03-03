@@ -160,7 +160,7 @@ if (-e $annoFile) {
                 $uprot{$id}{$key} = \@tmpline;
             } else {
                 my @vals = uniq sort split(m/\^/, $value);
-                @vals = grep not m/^\s*$/, grep not m/^None$/, @vals if scalar @vals > 1;
+                @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if scalar @vals > 1;
                 if (scalar @vals > 1) {
                     $isList{$key} = 1;
                     $uprot{$id}{$key} = \@vals;
@@ -223,7 +223,12 @@ foreach my $element (@uprotnumbers) {
         my $displayName = $annoData->{$key}->{display};
         if ($isList{$key}) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-            my @pieces = ref $uprot{$element}{$key} ne "ARRAY" ? ($uprot{$element}{$key} // "") : @{$uprot{$element}{$key}};
+            my @pieces;
+            if (ref $uprot{$element}{$key} eq "ARRAY") {
+                @pieces = @{$uprot{$element}{$key}};
+            } elsif ($uprot{$element}{$key}) {
+                @pieces = ($uprot{$element}{$key});
+            }
             foreach my $piece (@pieces) {
                 $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
                 my $type = $anno->get_attribute_type($key);
