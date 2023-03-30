@@ -1,0 +1,20 @@
+
+export EFI_EST_MOD=
+export EFIESTMOD=$EFI_EST_MOD
+
+export EFI_PASS=1000
+export EFIPASS=$EFI_PASS
+
+export EFI_NP=64
+export EFI_QUEUE=
+export EFI_MEMQUEUE=
+export EFI_LEGACY_GRAPHS=1
+
+# Edit path to app dir
+export EFI_EST=
+export EFIEST=$EFI_EST
+
+# Edit path to EST config file
+export EFI_CONFIG=
+export EFICONFIG=$EFI_CONFIG
+
