@@ -71,7 +71,7 @@ my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $frac
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
-my ($runSerial, $jobDir, $largeMem, $debug);
+my ($runSerial, $jobDir, $debug);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -118,7 +118,6 @@ my $result = GetOptions(
     "exclude-fragments" => \$excludeFragments,
     "serial-script=s"   => \$runSerial,     # run in serial mode
     "tax-search=s"      => \$taxSearch,
-    "large-mem"         => \$largeMem,
     "tax-search-only"   => \$taxSearchOnly,
     "source-tax=s"      => \$sourceTax,
     "family-filter=s"   => \$familyFilter,
@@ -885,7 +884,7 @@ push @allJobIds, $prevJobId;
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-my $sortRam = $largeMem ? ((defined $extraRam and length $extraRam) ? $extraRam : 700) : 70;
+my $sortRam = $extraRam ? $extraRam : 150;
 $sortRam = "${sortRam}gb";
 $B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);
@@ -1008,7 +1007,6 @@ $B = $S->getBuilder();
 my $separateJob = 1;
 my $lengthHistoOnly = 0;
 $prevJobId = createGraphJob($B, $prevJobId, $unirefVersion, $separateJob, $lengthHistoOnly);
-
 push @allJobIds, $prevJobId;
 
 
@@ -1020,7 +1018,21 @@ $B->addAction("rm -f $sortdir/$sortPrefix*");
 $B->jobName("${jobNamePrefix}cleanuperr");
 $B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
 my $cleanupErrJob = $S->submit("$scriptDir/cleanuperr.sh");
+$prevJobId = getJobId($cleanupErrJob);
 
+push @allJobIds, $prevJobId;
+
+print "All Job IDs:\n" . join(",", @allJobIds) . "\n";
+
+
+
+
+
+sub getJobId {
+    my $submitResult = shift;
+    my @parts = split /\./, $submitResult;
+    return $parts[0];
+}
 
 
 sub getRenderFilePath {

@@ -141,5 +141,5 @@ my $jobScript = "$outputPath/$jobName.sh";
 $B->jobName($jobName);
 $B->renderToFile($jobScript);
 $jobId = $SS->submit($jobScript);
-print "Compute NC job is:\n $jobId";
+print "Compute NC job is:\n$jobId\n";
 

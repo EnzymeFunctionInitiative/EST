@@ -203,8 +203,9 @@ BlastUtil::save_input_sequence($queryFile, $seq, $inputId);
 
 print "\nBlast for similar sequences and sort based off bitscore\n";
 
+my @jobIds;
+
 my $submitResult;
-my $dependencyId;
 my $B = $S->getBuilder();
 
 #TODO: handle fragment database
@@ -236,7 +237,8 @@ $B->renderToFile("$scriptDir/initial_blast.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/initial_blast.sh"));
 print "initial blast job is:\n $submitResult\n";
-$dependencyId = getJobId($submitResult);
+my $initBlastJobId = getJobId($submitResult);
+push @jobIds, $initBlastJobId;
 
 
 
@@ -265,7 +267,7 @@ push @args, "--blast-uniref-version $blastUnirefVersion" if $blastUnirefVersion;
 
 
 $B = $S->getBuilder();
-$B->dependency(0, $dependencyId); 
+$B->dependency(0, $initBlastJobId); 
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
@@ -284,14 +286,15 @@ $B->renderToFile("$scriptDir/get_sequences.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/get_sequences.sh"));
 print "get_sequences job is:\n $submitResult\n";
-$dependencyId = getJobId($submitResult);
+my $getSeqJobId = getJobId($submitResult);
+push @jobIds, $getSeqJobId;
 
 
 
 #if multiplexing is on, run an initial cdhit to get a reduced set of "more" unique sequences
 #if not, just copy allsequences.fa to sequences.fa so next part of program is set up right
 $B = $S->getBuilder();
-$B->dependency(0, $dependencyId);
+$B->dependency(0, $getSeqJobId);
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
@@ -307,7 +310,8 @@ $B->renderToFile("$scriptDir/multiplex.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/multiplex.sh"));
 print "multiplex job is:\n $submitResult\n";
-$dependencyId = getJobId($submitResult);
+my $multiplexJobId = getJobId($submitResult);
+push @jobIds, $multiplexJobId;
 
 
 
@@ -316,7 +320,7 @@ my $blastOutDir = "$outputDir/blast";
 #break sequenes.fa into $np parts for blast
 $B = $S->getBuilder();
 
-$B->dependency(0, $dependencyId);
+$B->dependency(0, $multiplexJobId);
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("mkdir $blastOutDir");
@@ -342,12 +346,13 @@ $B->renderToFile("$scriptDir/fracfile.sh");
 chomp($submitResult = $S->submit("$scriptDir/fracfile.sh"));
 print "fracfile job is: $submitResult\n";
 my $fracJobId = getJobId($submitResult);
+push @jobIds, $fracJobId;
 
 
 
 #make the blast database and put it into the temp directory
 $B = $S->getBuilder();
-$B->dependency(0, $dependencyId);
+$B->dependency(0, $fracJobId);
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 $B->addAction("module load $efiDbMod");
@@ -359,6 +364,7 @@ $B->renderToFile("$scriptDir/createdb.sh");
 chomp($submitResult = $S->submit("$scriptDir/createdb.sh"));
 print "createdb job is:\n $submitResult\n";
 my $createDbJobId = getJobId($submitResult);
+push @jobIds, $createDbJobId;
 
 
 
@@ -382,14 +388,15 @@ $B->renderToFile("$scriptDir/blastqsub.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/blastqsub.sh"));
 print "blast job is:\n $submitResult\n";
-$dependencyId = getJobId($submitResult);
+my $blastJobId = getJobId($submitResult);
+push @jobIds, $blastJobId;
 
 
 
 
 #join all the blast outputs back together
 $B = $S->getBuilder();
-$B->dependency(1, $dependencyId); 
+$B->dependency(1, $blastJobId); 
 $B->resource(1, 1, "5gb");
 $B->addAction("cat $blastOutDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$outputDir/blastfinal.tab");
 $B->addAction("rm  $blastOutDir/blastout-*.tab");
@@ -399,7 +406,8 @@ $B->renderToFile("$scriptDir/catjob.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/catjob.sh"));
 print "Cat job is:\n $submitResult\n";
-$dependencyId = getJobId($submitResult);
+my $catJobId = getJobId($submitResult);
+push @jobIds, $catJobId;
 
 
 
@@ -407,7 +415,7 @@ $dependencyId = getJobId($submitResult);
 #Remove like vs like and reverse matches
 $B = $S->getBuilder();
 $B->queue($memqueue);
-$B->dependency(0, $dependencyId); 
+$B->dependency(0, $catJobId); 
 $B->resource(1, 4, "370gb");
 $B->addAction("module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
@@ -420,7 +428,8 @@ $B->renderToFile("$scriptDir/blastreduce.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/blastreduce.sh"));
 print "Blastreduce job is:\n $submitResult\n";
-$dependencyId = getJobId($submitResult);
+my $reduceJobId = getJobId($submitResult);
+push @jobIds, $reduceJobId;
 
 
 
@@ -428,7 +437,7 @@ $dependencyId = getJobId($submitResult);
 
 $B = $S->getBuilder();
 $B->queue($memqueue);
-$B->dependency(0, $dependencyId); 
+$B->dependency(0, $reduceJobId); 
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 if ($multiplexing eq "on") {
@@ -445,7 +454,8 @@ $B->renderToFile("$scriptDir/demux.sh");
 
 chomp($submitResult = $S->submit("$scriptDir/demux.sh"));
 print "Demux job is:\n $submitResult\n";
-$dependencyId = getJobId($submitResult);
+my $demuxJobId = getJobId($submitResult);
+push @jobIds, $demuxJobId;
 
 
 
@@ -453,7 +463,7 @@ $dependencyId = getJobId($submitResult);
 # Compute convergence ratio, before demultiplex
 #
 $B = $S->getBuilder();
-$B->dependency(0, $dependencyId);
+$B->dependency(0, $demuxJobId);
 $B->resource(1, 1, "5gb");
 $B->addAction("NSEQ=`grep \\> $filtSeqFile | wc -l`");
 $B->addAction("$efiEstTools/calc_blast_stats.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -unique-seq-file $filtSeqFile -seq-count-output $seqCountFile");
@@ -462,6 +472,7 @@ $B->renderToFile("$scriptDir/conv_ratio.sh");
 chomp(my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh"));
 print "Convergence ratio job is:\n $convRatioJob\n";
 my $convRatioJobId = getJobId($convRatioJob);
+push @jobIds, $convRatioJobId;
 
 
 my ($smallWidth, $smallHeight) = (700, 315);
@@ -470,7 +481,7 @@ my $evalueFile = "$outputDir/evalue.tab";
 $B = $S->getBuilder();
 $B->setScriptAbortOnError(0); # don't abort on error
 $B->queue($memqueue);
-$B->dependency(0, $dependencyId); 
+$B->dependency(0, $demuxJobId); 
 $B->resource(1, 1, "100gb");
 $B->mailEnd();
 $B->addAction("module load $efiEstMod");
@@ -499,6 +510,7 @@ $B->renderToFile("$scriptDir/graphs.sh");
 chomp($submitResult = $S->submit("$scriptDir/graphs.sh"));
 print "Graph job is:\n $submitResult\n";
 my $graphJobId = getJobId($submitResult);
+push @jobIds, $graphJobId;
 
 
 if ($removeTempFiles) {
@@ -521,8 +533,11 @@ if ($removeTempFiles) {
     $B->jobName("${jobNamePrefix}cleanup");
     $B->renderToFile("$scriptDir/cleanup.sh");
     my $cleanupJob = $S->submit("$scriptDir/cleanup.sh");
+    my $cleanupJobId = getJobId($submitResult);
+    push @jobIds, $cleanupJobId;
 }
 
+push "All job IDs:\n" . join(",", @jobIds) . "\n";
 
 
 sub getJobId {

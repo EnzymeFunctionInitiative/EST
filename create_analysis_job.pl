@@ -228,7 +228,6 @@ my $annoSpecOption = $useAnnoSpec ? " -anno-spec-file $annoSpecFile" : "";
 my $lenArgs = "-min-len $minlen -max-len $maxlen";
 # Don't filter out UniRef cluster members if this is a domain job.
 $lenArgs = "" if $hasDomain;
-my $annoDep = 0;
 mkdir $analysisDir or die "could not make analysis folder $analysisDir (we're in $ENV{PWD})\n" if (not $dryrun and not -d $analysisDir);
 
 # If a taxonomy search parameter has been added, then we need to filter the annotations by the taxonomy filter,
@@ -283,7 +282,7 @@ print "Annotations job is:\n$annoJobId\n";
 #
 
 $B = $S->getBuilder();
-$B->dependency(0, $annoJobId) if $annoDep;
+$B->dependency(0, $annoJobId) if $annoJobId;
 $B->resource(1, 1, "5gb");
 $B->addAction("module load $efiEstMod");
 if ($customClusterDir and $customClusterFile) {
@@ -322,7 +321,6 @@ my $ncFile = "$analysisDir/${safeTitle}full_ssn_nc";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
 $seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
-$B->addAction("sleep 60"); # To allow the file system to make all of the necessary writes before we read the files
 $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc;
 $B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg $xgmmlDomainArgs " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
 $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;

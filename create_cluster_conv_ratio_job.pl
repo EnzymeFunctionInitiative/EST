@@ -131,6 +131,8 @@ my $blastJobPrefix = "CR_$blastJobId";
 
 mkdir $clusterDir;
 
+my @jobIds;
+
 $B->resource(1, 1, "${ramReservation}gb");
 $B->addAction("source /etc/profile");
 $B->addAction("module load $estModule");
@@ -160,7 +162,8 @@ my $jobScript = "$outputPath/$jobName.sh";
 $B->jobName("$jobNamePrefix$jobName");
 $B->renderToFile($jobScript);
 my $prevJobId = $SS->submit($jobScript);
-print "Get and split FASTA job is:\n $prevJobId";
+print "Get and split FASTA job is:\n$prevJobId\n";
+push @jobIds, $prevJobId;
 
 
 $B = $SS->getBuilder();
@@ -193,7 +196,10 @@ $jobScript = "$outputPath/$jobName.sh";
 $B->jobName("$jobNamePrefix$jobName");
 $B->renderToFile($jobScript);
 $prevJobId = $SS->submit($jobScript);
-print "Wait for BLAST job is:\n $prevJobId";
+push @jobIds, $prevJobId;
+print "Wait for BLAST job is:\n$prevJobId\n";
+
+print "All Job IDs:\n" . join(",", @jobIds) . "\n";
 
 
 

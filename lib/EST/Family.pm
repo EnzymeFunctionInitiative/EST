@@ -271,7 +271,7 @@ sub getDomainFromDb {
                 $count++;
             }
 
-            $self->addSunburstIds($uniprotId, $row, $uniref50IdMap, $uniref90IdMap, $uniprotIdMap);
+            $self->addSunburstIds($uniprotId, $row, $uniref50IdMap, $uniref90IdMap, $uniprotIdMap) if ($isFraction or $isSwissProt);
         }
         $sth->finish;
     }
