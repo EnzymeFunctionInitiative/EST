@@ -450,8 +450,9 @@ mkdir $outputDir;
 
 # Write out the database version to a file
 $efiDbMod=~/(\d+)$/;
-print "database version is $1 of $efiDbMod\n";
-system("echo $1 >$outputDir/database_version");
+my $dbVer = $1 // "";
+print "database version is $dbVer of $efiDbMod\n";
+system("echo $dbVer >$outputDir/database_version");
 
 # Set up the scheduler API so we can work with Torque or Slurm.
 my $schedType = "torque";

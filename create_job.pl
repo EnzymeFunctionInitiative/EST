@@ -45,9 +45,9 @@ if ($type eq "generate") {
 
     my $result = `$cmd`;
 
-    print "RESULT: $result\n";
+    #print STDERR "RESULT: $result\n";
 
-    print "$jobScript\n";
+    print "$jobScript";
 } else {
     die "Unsupported command $type";
 }
