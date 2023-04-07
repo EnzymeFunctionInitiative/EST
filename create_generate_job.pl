@@ -71,7 +71,7 @@ my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $frac
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
-my ($runSerial, $jobDir, $debug);
+my ($runSerial, $useNoModules, $jobDir, $debug);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -122,6 +122,7 @@ my $result = GetOptions(
     "source-tax=s"      => \$sourceTax,
     "family-filter=s"   => \$familyFilter,
     "extra-ram:i"       => \$extraRam,
+    "no-modules"        => \$useNoModules,
     "debug"             => \$debug,
 );
 
@@ -293,6 +294,7 @@ $excludeFragments = defined($excludeFragments);
 $runSerial = defined($runSerial) ? $runSerial : "";
 $useFastaHeaders = ($taxSearchOnly or $useFastaHeaders);
 $debug = 0 if not defined $debug;
+my $useModuleSystem = not $useNoModules;
 
 # We will keep the domain option on
 #$domain = "off"     if $unirefVersion and not $forceDomain;
@@ -496,10 +498,10 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 
     my $maxFullFamOption = $maxFullFam ? "-max-full-fam-ur90 $maxFullFam" : "";
 
-    $B->addAction("module load $efiDbMod");
-    $B->addAction("module load $efiEstMod");
-    $B->addAction("module unload MariaDB");
-    $B->addAction("module load MariaDB/10.3.17-IGB-gcc-8.2.0");
+    addModule($B, "module load $efiDbMod");
+    addModule($B, "module load $efiEstMod");
+    addModule($B, "module unload MariaDB");
+    addModule($B, "module load MariaDB/10.3.17-IGB-gcc-8.2.0");
     $B->addAction("cd $outputDir");
     $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
     $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
@@ -629,8 +631,8 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
 # Tax id code is different, so it is exclusive
 } elsif ($taxid) {
 
-    $B->addAction("module load $efiDbMod");
-    $B->addAction("module load $efiEstMod");
+    addModule($B, "module load $efiDbMod");
+    addModule($B, "module load $efiEstMod");
     $B->addAction("cd $outputDir");
     $B->addAction("$efiEstTools/get_sequences_by_tax_id.pl -fasta allsequences.fa -struct $structFile -taxid $taxid -config=$configFile");
     if ($fastaFile=~/\w+/) {
@@ -670,9 +672,9 @@ $B->mailEnd() if defined $cdHitOnly;
 # If we only want to do CD-HIT jobs then do that here.
 if ($cdHitOnly) {
     $B->resource(1, 24, "10GB");
-    $B->addAction("module load $efiDbMod");
-    $B->addAction("module load $efiEstMod");
-    #$B->addAction("module load blast");
+    addModule($B, "module load $efiDbMod");
+    addModule($B, "module load $efiEstMod");
+    #addModule($B, "module load blast");
     $B->addAction("cd $outputDir");
 
     my @seqId = split /,/, $sim;
@@ -697,9 +699,9 @@ if ($cdHitOnly) {
 
 $B->resource(1, 1, "10gb");
 
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
-#$B->addAction("module load blast");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
+#addModule($B, "module load blast");
 $B->addAction("cd $outputDir");
 
 if ($multiplexing eq "on") {
@@ -765,11 +767,11 @@ $B = $S->getBuilder();
 
 $B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("cd $outputDir");
 if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
-    $B->addAction("module load diamond");
+    addModule($B, "module load diamond");
     $B->addAction("diamond makedb --in $filtSeqFilename -d database");
 } else {
     $B->addAction("formatdb -i $filtSeqFilename -n database -p T -o T ");
@@ -801,16 +803,16 @@ $B->resource(1, 24, "14G") if $blast =~ /diamond/i;
 $B->resource(1, 24, "14G") if $blast =~ /blast\+/i;
 
 $B->addAction("export BLASTDB=$outputDir");
-#$B->addAction("module load blast+");
+#addModule($B, "module load blast+");
 #$B->addAction("blastp -query  $fracOutputDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
 if ($blast eq "blast") {
-    #$B->addAction("module load blast");
+    #addModule($B, "module load blast");
     if ($runSerial) {
         open my $fh, ">", "$scriptDir/blast.sh";
         print $fh "#!/bin/bash\n";
-        print $fh "module load $efiEstMod\n";
+        print $fh getModuleEntry("module load $efiEstMod\n");
         print $fh "blastall -p blastp -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-\$1.fa.tab -i $fracOutputDir/fracfile-\$1.fa\n";
         close $fh;
         chmod 0755, "$scriptDir/blast.sh";
@@ -819,17 +821,17 @@ if ($blast eq "blast") {
         $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
     }
 } elsif ($blast eq "blast+") {
-    $B->addAction("module load BLAST+");
+    addModule($B, "module load BLAST+");
     $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
 } elsif ($blast eq "blast+simple") {
-    $B->addAction("module load BLAST+");
+    addModule($B, "module load BLAST+");
     $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -outfmt \"6\" -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
 } elsif ($blast eq "diamond") {
-    $B->addAction("module load DIAMOND");
+    addModule($B, "module load DIAMOND");
     $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $filtSeqFile -d $outputDir/database -a $blastOutputDir/blastout.daa");
     $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
 } elsif ($blast eq "diamondsensitive") {
-    $B->addAction("module load DIAMOND");
+    addModule($B, "module load DIAMOND");
     $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout.daa");
     $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
 } else {
@@ -914,8 +916,8 @@ $B = $S->getBuilder();
 
 $B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
 if ($multiplexing eq "on" and not $manualCdHit and not $noDemuxArg) {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $filtSeqFile.clstr");
@@ -964,8 +966,8 @@ push @allJobIds, $convRatioJobLine[0];
 
 $B->queue($memqueue);
 $B->dependency(0, $prevJobId);
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-align.pl -blastout $outputDir/1.out -align $outputDir/alignment_length.png");
 $B->renderToFile(getRenderFilePath("$scriptDir/quartalign.sh"));
 
@@ -977,8 +979,8 @@ print "Quartile Align job is:\n $quartalignjob\n" if not $runSerial;
 $B->queue($memqueue);
 $B->dependency(0, $prevJobId);
 $B->addAction("#PBS -m e");
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("$efiEstTools/quart-perid.pl -blastout $outputDir/1.out -pid $outputDir/percent_identity.png");
 $B->renderToFile(getRenderFilePath("$scriptDir/quartpid.sh"));
 
@@ -989,8 +991,8 @@ print "Quartiles Percent Identity job is:\n $quartpidjob\n" if not $runSerial;
 
 $B->queue($memqueue);
 $B->dependency(0, $prevJobId);
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $allSeqFile -lengths $outputDir/length_histogram.png -incfrac $incfrac");
 $B->renderToFile(getRenderFilePath("$scriptDir/simplegraphs.sh"));
 
@@ -1069,15 +1071,15 @@ sub createGraphJob {
     $B->dependency(0, $prevJobId) if $prevJobId;
     $B->mailEnd();
     $B->setScriptAbortOnError(0); # don't abort on error
-    $B->addAction("module load $efiEstMod");
-    $B->addAction("module load $efiDbMod");
+    addModule($B, "module load $efiEstMod");
+    addModule($B, "module load $efiDbMod");
     if (defined $LegacyGraphs) {
         my $evalueFile = "$outputDir/evalue.tab";
         my $defaultLengthFile = "$outputDir/length.tab";
         $B->resource(1, 1, "50gb");
-        $B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
-        #$B->addAction("module load $perlMod");
-        #$B->addAction("module load $rMod");
+        addModule($B, "module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
+        #addModule($B, "module load $perlMod");
+        #addModule($B, "module load $rMod");
         if (not $lengthHistoOnly) {
             $B->addAction("mkdir -p $outputDir/rdata");
             # Lengths are retrieved in a previous step.
@@ -1120,7 +1122,7 @@ sub createGraphJob {
             $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}_sm.png $jobId $title $smallWidth $smallHeight");
         }
     } else {
-        $B->addAction("module load $pythonMod");
+        addModule($B, "module load $pythonMod");
         $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $allSeqFile -i $incfrac");
         $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId");
         $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
@@ -1154,4 +1156,15 @@ sub createGraphJob {
     }
 }
 
+
+sub addModule {
+    my $B = shift;
+    my $moduleStr = shift;
+    $B->addAction($moduleStr) if $useModuleSystem;
+}
+
+sub getModuleEntry  {
+    my $moduleStr = shift;
+    return $useModuleSystem ? $moduleStr : "";
+}
 

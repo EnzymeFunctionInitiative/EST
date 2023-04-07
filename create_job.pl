@@ -8,11 +8,12 @@ use Getopt::Long;
 use FindBin;
 
 
-my ($jobDir, $jobId, $jsonStr);
+my ($jobDir, $jobId, $jsonStr, $envScripts);
 my $result = GetOptions(
     "job-dir=s"         => \$jobDir,
     "job-id=s"          => \$jobId,
     "params=s"          => \$jsonStr,
+    "env-scripts=s"     => \$envScripts,
 );
 
 die "Need --job-dir" if not $jobDir or not -d $jobDir;
@@ -29,6 +30,8 @@ my $data = decode_json($jsonStr);
 my $type = $data->{type};
 die "Need json type" if not $type;
 
+my @envScripts = split(m/,/, $envScripts//"");
+
 if ($type eq "generate") {
     my $famStr = $data->{family};
     my @fams = split(",", $famStr);
@@ -40,12 +43,19 @@ if ($type eq "generate") {
     push @args, ("--serial-script", $jobScript);
     push @args, ("--pfam", $pfamFams) if $pfamFams;
     push @args, ("--ipro", $iproFams) if $iproFams;
+    push @args, ("--no-modules");
 
+    my $temp = "$jobScript.tmp";
+    open my $fh, ">", $temp;
+    $fh->print("#!/bin/bash\n");
+    map { $fh->print("source $_\n"); } @envScripts;
     my $cmd = "$FindBin::Bin/create_generate_job.pl " . join(" ", @args);
+    $fh->print("$cmd\n");
+    close $fh;
 
-    my $result = `$cmd`;
+    my $result = `/bin/bash $temp`;
 
-    #print STDERR "RESULT: $result\n";
+    print STDERR "RESULT: $result\n";
 
     print "$jobScript";
 } else {
