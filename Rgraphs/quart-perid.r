@@ -1,4 +1,3 @@
-library("rhdf5")
 library(Hmisc)
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -13,29 +12,16 @@ start = 0
 stop = 0
 a_scores = vector()
 
-if (type == "hdf5") {
-    start <- h5read(data_file,"/stats/start")
-    stop <- h5read(data_file,"/stats/stop")
+data_dir = data_file
+data_files = list.files(path = data_dir, pattern = "perid")
+a_scores = sapply(data_files, function(x) { as.numeric(substr(x, nchar(x)-5+1, nchar(x))) }, USE.NAMES = FALSE)
 
-    start = start[1][1]
-    stop = stop[1][1]
+start = as.integer(args[4])
+stop = as.integer(args[5])
 
-    newdata = t(rep(NA,stop))
+newdata = t(rep(NA,length(data_files)))
 
-    arg_offset = 3
-} else {
-
-    data_dir = data_file
-    data_files = list.files(path = data_dir, pattern = "perid")
-    a_scores = sapply(data_files, function(x) { as.numeric(substr(x, nchar(x)-5+1, nchar(x))) }, USE.NAMES = FALSE)
-
-    start = as.integer(args[4])
-    stop = as.integer(args[5])
-
-    newdata = t(rep(NA,length(data_files)))
-
-    arg_offset = 5
-}
+arg_offset = 5
 
 
 jobnum = ""
