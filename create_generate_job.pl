@@ -316,8 +316,8 @@ $jobDir = $ENV{PWD} if not $jobDir;
 $resultsDirName = "output" if not $resultsDirName;
 my $outputDir = "$jobDir/$resultsDirName";
 
-my $pythonMod = getLmod("Python/2", "Python");
-my $gdMod = getLmod("GD.*Perl", "GD");
+my $pythonMod = "Python"; #getLmod("Python/2", "Python");
+my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1"); #getLmod("GD.*Perl", "GD");
 #my $perlMod = "Perl";
 #my $rMod = "R";
 
@@ -1077,7 +1077,7 @@ sub createGraphJob {
         my $evalueFile = "$outputDir/evalue.tab";
         my $defaultLengthFile = "$outputDir/length.tab";
         $B->resource(1, 1, "50gb");
-        addModule($B, "module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
+        addModule($B, "module load $gdMod");
         #addModule($B, "module load $perlMod");
         #addModule($B, "module load $rMod");
         if (not $lengthHistoOnly) {

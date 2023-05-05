@@ -21,7 +21,7 @@ use BlastUtil;
 
 my ($seq, $resultsDirName, $jobDir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert, $runSerial, $useNoModules);
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "results-dir-name=s"=> \$resultsDirName,
@@ -54,6 +54,8 @@ my $result = GetOptions(
     "db-type=s"         => \$dbType, # uniprot, uniref50, uniref90  default to uniprot; if uniref expand IDs to include UniRef members as node attribute
     "tax-search=s"      => \$taxSearch,
     "tax-search-invert" => \$taxSearchInvert,
+    "serial-script=s"   => \$runSerial,     # run in serial mode
+    "no-modules"        => \$useNoModules,
 );
 
 die "Environment variables not set properly: missing EFI_DB variable" if not exists $ENV{EFI_DB};
@@ -171,7 +173,8 @@ if (defined $fraction and $fraction !~ /^\d+$/ and $fraction <= 0) {
 
 $excludeFragments = defined($excludeFragments);
 
-my $pythonMod = getLmod("Python/2", "Python");
+my $useModuleSystem = not $useNoModules;
+
 my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1";
 
 
@@ -181,7 +184,9 @@ $logDir = "" if not -d $logDir;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1, "35gb"], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
+$schedArgs{run_serial} = $runSerial ? 1 : 0;
 my $S = new EFI::SchedulerApi(%schedArgs);
+initSerialScript() if $runSerial;
 
 my $scriptDir = "$jobDir/scripts";
 mkdir $scriptDir;
@@ -211,8 +216,8 @@ my $B = $S->getBuilder();
 #TODO: handle fragment database
 $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
 $B->resource(1, 1, "70gb");
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("blastall -p blastp -i $outputDir/query.fa -d $blastDb -m 8 -e $evalue -b $maxBlastResults -o $outputDir/initblast.out");
 $B->addAction("OUT=\$?");
@@ -233,7 +238,7 @@ $B->addAction("    touch $outputDir/1.out.failed");
 $B->addAction("    exit 1");
 $B->addAction("fi");
 $B->jobName("${jobNamePrefix}initial_blast");
-$B->renderToFile("$scriptDir/initial_blast.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/initial_blast.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/initial_blast.sh"));
 print "initial blast job is:\n $submitResult\n";
@@ -269,8 +274,8 @@ push @args, "--blast-uniref-version $blastUnirefVersion" if $blastUnirefVersion;
 $B = $S->getBuilder();
 $B->dependency(0, $initBlastJobId); 
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("$efiEstTools/get_sequences_option_a.pl " . join(" ", @args));
 
@@ -282,7 +287,7 @@ $B->addAction("$efiEstTools/get_sequences_option_a.pl " . join(" ", @args));
 }
 
 $B->jobName("${jobNamePrefix}get_seq_meta");
-$B->renderToFile("$scriptDir/get_sequences.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/get_sequences.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/get_sequences.sh"));
 print "get_sequences job is:\n $submitResult\n";
@@ -296,8 +301,8 @@ push @jobIds, $getSeqJobId;
 $B = $S->getBuilder();
 $B->dependency(0, $getSeqJobId);
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
 #  $B->addAction("module load blast");
 $B->addAction("cd $outputDir");
 if ($multiplexing eq "on") {
@@ -306,7 +311,7 @@ if ($multiplexing eq "on") {
     $B->addAction("cp $allSeqFile $filtSeqFile");
 }
 $B->jobName("${jobNamePrefix}multiplex");
-$B->renderToFile("$scriptDir/multiplex.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/multiplex.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/multiplex.sh"));
 print "multiplex job is:\n $submitResult\n";
@@ -322,7 +327,7 @@ $B = $S->getBuilder();
 
 $B->dependency(0, $multiplexJobId);
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("mkdir $blastOutDir");
 $B->addAction("NP=$np");
 $B->addAction("sleep 10"); # Here to avoid a syncing issue we had with the grep on the next line.
@@ -341,7 +346,7 @@ $B->addAction("fi");
 $B->addAction("echo \"Using \$NP parts with \$NSEQ sequences\"");
 $B->addAction("$efiEstTools/split_fasta.pl -parts \$NP -tmp $blastOutDir -source $filtSeqFile");
 $B->jobName("${jobNamePrefix}fracfile");
-$B->renderToFile("$scriptDir/fracfile.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/fracfile.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/fracfile.sh"));
 print "fracfile job is: $submitResult\n";
@@ -354,12 +359,12 @@ push @jobIds, $fracJobId;
 $B = $S->getBuilder();
 $B->dependency(0, $fracJobId);
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
 $B->addAction("cd $outputDir");
 $B->addAction("formatdb -i $filtSeqFilename -n database -p T -o T ");
 $B->jobName("${jobNamePrefix}createdb");
-$B->renderToFile("$scriptDir/createdb.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/createdb.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/createdb.sh"));
 print "createdb job is:\n $submitResult\n";
@@ -373,17 +378,27 @@ $B = $S->getBuilder();
 $B->jobArray("1-$np"); # We reserve $np slots.  However, due to the new way that fracefile works, some of those may complete immediately.
 $B->resource(1, 1, "10gb");
 $B->dependency(0, $createDbJobId . ":" . $fracJobId);
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("export BLASTDB=$outputDir");
 #$B->addAction("module load blast+");
 #$B->addAction("blastp -query  $blastOutDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
-$B->addAction("module load $efiDbMod");
-$B->addAction("INFILE=\"$blastOutDir/fracfile-{JOB_ARRAYID}.fa\"");
-$B->addAction("if [[ -f \$INFILE && -s \$INFILE ]]; then");
-$B->addAction("    blastall -p blastp -i \$INFILE -d $outputDir/database -m 8 -e $famEvalue -b $blasthits -o $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab");
-$B->addAction("fi");
+addModule($B, "module load $efiDbMod");
+if ($runSerial) {
+    open my $fh, ">", "$scriptDir/blast.sh";
+    print $fh "#!/bin/bash\n";
+    print $fh getModuleEntry("module load $efiEstMod\n");
+    print $fh "blastall -p blastp -d $outputDir/database -m 8 -e $famEvalue -b $blasthits -o $blastOutDir/blastout-\$1.fa.tab -i $blastOutDir/fracfile-\$1.fa\n";
+    close $fh;
+    chmod 0755, "$scriptDir/blast.sh";
+    $B->addAction("echo {1..$np} | xargs -n 1 -P $np $scriptDir/blast.sh");
+} else {
+    $B->addAction("INFILE=\"$blastOutDir/fracfile-{JOB_ARRAYID}.fa\"");
+    $B->addAction("if [[ -f \$INFILE && -s \$INFILE ]]; then");
+    $B->addAction("    blastall -p blastp -i \$INFILE -d $outputDir/database -m 8 -e $famEvalue -b $blasthits -o $blastOutDir/blastout-{JOB_ARRAYID}.fa.tab");
+    $B->addAction("fi");
+}
 $B->jobName("${jobNamePrefix}blastqsub");
-$B->renderToFile("$scriptDir/blastqsub.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/blastqsub.sh"));
 
 
 chomp($submitResult = $S->submit("$scriptDir/blastqsub.sh"));
@@ -402,7 +417,7 @@ $B->addAction("cat $blastOutDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$
 $B->addAction("rm  $blastOutDir/blastout-*.tab");
 $B->addAction("rm  $blastOutDir/fracfile-*.fa");
 $B->jobName("${jobNamePrefix}catjob");
-$B->renderToFile("$scriptDir/catjob.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/catjob.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/catjob.sh"));
 print "Cat job is:\n $submitResult\n";
@@ -417,14 +432,14 @@ $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, $catJobId); 
 $B->resource(1, 4, "370gb");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiEstMod");
 #$B->addAction("mv $outputDir/blastfinal.tab $outputDir/unsorted.blastfinal.tab");
 $B->addAction("$efiEstTools/alphabetize.pl -in $outputDir/blastfinal.tab -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
 $B->addAction("sort --parallel 4 -T $sortdir -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
 $B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -fasta $filtSeqFile -out $outputDir/unsorted.1.out");
 $B->addAction("sort --parallel 4 -T $sortdir -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
 $B->jobName("${jobNamePrefix}blastreduce");
-$B->renderToFile("$scriptDir/blastreduce.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/blastreduce.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/blastreduce.sh"));
 print "Blastreduce job is:\n $submitResult\n";
@@ -439,7 +454,7 @@ $B = $S->getBuilder();
 $B->queue($memqueue);
 $B->dependency(0, $reduceJobId); 
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiEstMod");
 if ($multiplexing eq "on") {
     $B->addAction("mv $outputDir/1.out $outputDir/mux.out");
     $B->addAction("$efiEstTools/demux.pl -blastin $outputDir/mux.out -blastout $outputDir/1.out -cluster $filtSeqFile.clstr");
@@ -450,7 +465,7 @@ if ($multiplexing eq "on") {
 #$B->addAction("rm $outputDir/*blastfinal.tab");
 #$B->addAction("rm $outputDir/mux.out");
 $B->jobName("${jobNamePrefix}demux");
-$B->renderToFile("$scriptDir/demux.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/demux.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/demux.sh"));
 print "Demux job is:\n $submitResult\n";
@@ -468,7 +483,7 @@ $B->resource(1, 1, "5gb");
 $B->addAction("NSEQ=`grep \\> $filtSeqFile | wc -l`");
 $B->addAction("$efiEstTools/calc_blast_stats.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -unique-seq-file $filtSeqFile -seq-count-output $seqCountFile");
 $B->jobName("${jobNamePrefix}conv_ratio");
-$B->renderToFile("$scriptDir/conv_ratio.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/conv_ratio.sh"));
 chomp(my $convRatioJob = $S->submit("$scriptDir/conv_ratio.sh"));
 print "Convergence ratio job is:\n $convRatioJob\n";
 my $convRatioJobId = getJobId($convRatioJob);
@@ -484,9 +499,9 @@ $B->queue($memqueue);
 $B->dependency(0, $demuxJobId); 
 $B->resource(1, 1, "100gb");
 $B->mailEnd();
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load $efiDbMod");
-$B->addAction("module load $gdMod");
+addModule($B, "module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
+addModule($B, "module load $gdMod");
 $B->addAction("mkdir $outputDir/rdata");
 $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
 $B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
@@ -505,7 +520,7 @@ $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/leng
 $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
 $B->addAction("touch  $outputDir/1.out.completed");
 $B->jobName("${jobNamePrefix}graphs");
-$B->renderToFile("$scriptDir/graphs.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/graphs.sh"));
 
 chomp($submitResult = $S->submit("$scriptDir/graphs.sh"));
 print "Graph job is:\n $submitResult\n";
@@ -531,13 +546,13 @@ if ($removeTempFiles) {
     $B->addAction("rm -f $filtSeqFile.*");
     $B->addAction("rm $outputDir/sequences.fa.clstr");
     $B->jobName("${jobNamePrefix}cleanup");
-    $B->renderToFile("$scriptDir/cleanup.sh");
+    $B->renderToFile(getRenderFilePath("$scriptDir/cleanup.sh"));
     my $cleanupJob = $S->submit("$scriptDir/cleanup.sh");
     my $cleanupJobId = getJobId($submitResult);
     push @jobIds, $cleanupJobId;
 }
 
-push "All job IDs:\n" . join(",", @jobIds) . "\n";
+print "All job IDs:\n" . join(",", @jobIds) . "\n";
 
 
 sub getJobId {
@@ -546,4 +561,34 @@ sub getJobId {
     return $parts[0];
 }
 
+
+sub getRenderFilePath {
+    if (not $runSerial) {
+        return $_[0];
+    } else {
+        (my $fname = $_[0]) =~ s%^.*?([^/]+)\.sh$%$1%;
+        return ($runSerial, "#\n#\n#\n#\n#$fname");
+    }
+}
+
+
+sub initSerialScript {
+    open my $fh, ">", $runSerial or die "Unable to write to serial-script $runSerial: $!";
+    print $fh "#!/bin/bash\n";
+    close $fh;
+
+    chmod 0755, $runSerial;
+}
+
+
+sub addModule {
+    my $B = shift;
+    my $moduleStr = shift;
+    $B->addAction($moduleStr) if $useModuleSystem;
+}
+
+sub getModuleEntry  {
+    my $moduleStr = shift;
+    return $useModuleSystem ? $moduleStr : "";
+}
 
