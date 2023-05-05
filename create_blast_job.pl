@@ -21,7 +21,7 @@ use BlastUtil;
 
 my ($seq, $resultsDirName, $jobDir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert, $runSerial, $useNoModules);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert, $runSerial, $useNoModules, $envScripts);
 my $result = GetOptions(
     "seq=s"             => \$seq,
     "results-dir-name=s"=> \$resultsDirName,
@@ -56,6 +56,7 @@ my $result = GetOptions(
     "tax-search-invert" => \$taxSearchInvert,
     "serial-script=s"   => \$runSerial,     # run in serial mode
     "no-modules"        => \$useNoModules,
+    "env-scripts=s"     => \$envScripts,
 );
 
 die "Environment variables not set properly: missing EFI_DB variable" if not exists $ENV{EFI_DB};
@@ -138,7 +139,8 @@ if (defined $sim) {
 
 #you also have to specify the number of processors for blast
 if (not defined $np) {
-    die "You must spedify the -np variable\n";
+    $np = 48;
+    #die "You must spefify the -np variable\n";
 }
 
 if (not defined $blasthits) {
@@ -186,7 +188,10 @@ $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 $schedArgs{run_serial} = $runSerial ? 1 : 0;
 my $S = new EFI::SchedulerApi(%schedArgs);
-initSerialScript() if $runSerial;
+
+my $B = $S->getBuilder();
+
+initSerialScript($B) if $runSerial;
 
 my $scriptDir = "$jobDir/scripts";
 mkdir $scriptDir;
@@ -211,7 +216,6 @@ print "\nBlast for similar sequences and sort based off bitscore\n";
 my @jobIds;
 
 my $submitResult;
-my $B = $S->getBuilder();
 
 #TODO: handle fragment database
 $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
@@ -573,9 +577,14 @@ sub getRenderFilePath {
 
 
 sub initSerialScript {
+    my $B = shift;
+
     open my $fh, ">", $runSerial or die "Unable to write to serial-script $runSerial: $!";
     print $fh "#!/bin/bash\n";
     close $fh;
+
+    my @envScripts = split(m/,/, ($envScripts//""));
+    map { $B->addAction("source $_") } @envScripts;
 
     chmod 0755, $runSerial;
 }

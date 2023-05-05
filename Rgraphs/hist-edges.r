@@ -1,4 +1,3 @@
-library("rhdf5")
 
 args <- commandArgs(trailingOnly = TRUE)
 type = args[1]
@@ -11,25 +10,12 @@ data_dir = ""
 start = 0
 stop = 0
 
-if (type == "hdf5") {
-    plot_data = h5read(data_file,"/edgehisto")
-    start <- h5read(data_file,"/stats/start")
-    stop <- h5read(data_file,"/stats/stop")
+raw_data = read.delim(data_file, header=FALSE, sep="\t", check.names = FALSE)
+cols = raw_data[, 1]
+plot_data = t(raw_data[, -1])
 
-    start = start[1][1]
-    stop = stop[1][1]
+arg_offset = 3
 
-    cols = seq(start,stop-1)
-
-    arg_offset = 3
-} else {
-
-    raw_data = read.delim(data_file, header=FALSE, sep="\t", check.names = FALSE)
-    cols = raw_data[, 1]
-    plot_data = t(raw_data[, -1])
-
-    arg_offset = 3
-}
 
 jobnum = ""
 if (length(args) > arg_offset) {

@@ -22,6 +22,7 @@ die "Need --params json" if not $jsonStr;
 $jobId = "job" if not $jobId;
 
 
+$jsonStr =~ s/^'(.+)'$/$1/;
 my $data = decode_json($jsonStr);
 
 
@@ -33,15 +34,19 @@ die "Need json type" if not $type;
 my @envScripts = split(m/,/, $envScripts//"");
 
 my $script = "";
-my $jobScript = "$jobDir/run_job.sh";
+my $runJobScript = "$jobDir/run_job.sh";
+my $createJobScript = "$jobDir/create_job.sh";
+
 my @args = join(" ", "--job-dir", $jobDir, "--job-id", $jobId);
-push @args, ("--serial-script", $jobScript);
+push @args, ("--serial-script", $runJobScript);
 push @args, ("--no-modules");
 push @args, "--exclude-fragments" if $data->{exclude_fragments};
+push @args, ("--np", $data->{np}) if $data->{np};
+push @args, ("--env-scripts", $envScripts) if $envScripts;
 
 
 
-if ($type eq "generate") {
+if ($type eq "family") {
     my $famStr = $data->{family};
     my @fams = split(",", $famStr);
     my $pfamFams = join(",", grep { m/^pf/i } @fams);
@@ -64,19 +69,20 @@ if ($type eq "generate") {
 
 
 
-my $temp = "$jobScript.tmp";
-open my $fh, ">", $temp;
+open my $fh, ">", $createJobScript;
 $fh->print("#!/bin/bash\n");
 map { $fh->print("source $_\n"); } @envScripts;
 my $cmd = "$FindBin::Bin/$script " . join(" ", @args);
 $fh->print("$cmd\n");
 close $fh;
 
-my $result = `/bin/bash $temp`;
+print STDERR "CMD: $cmd\n";
 
-print STDERR "RESULT: $result\n";
+my $createResult = `/bin/bash $createJobScript`;
 
-print "$jobScript";
+print STDERR "RESULT: $createResult\n";
+
+print $runJobScript;
 
 
 

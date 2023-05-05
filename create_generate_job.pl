@@ -71,7 +71,7 @@ my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $frac
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
-my ($runSerial, $useNoModules, $jobDir, $debug);
+my ($runSerial, $useNoModules, $jobDir, $debug, $envScripts);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -123,6 +123,7 @@ my $result = GetOptions(
     "family-filter=s"   => \$familyFilter,
     "extra-ram:i"       => \$extraRam,
     "no-modules"        => \$useNoModules,
+    "env-scripts=s"     => \$envScripts,
     "debug"             => \$debug,
 );
 
@@ -317,7 +318,7 @@ $resultsDirName = "output" if not $resultsDirName;
 my $outputDir = "$jobDir/$resultsDirName";
 
 my $pythonMod = "Python"; #getLmod("Python/2", "Python");
-my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1"); #getLmod("GD.*Perl", "GD");
+my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1"; #getLmod("GD.*Perl", "GD");
 #my $perlMod = "Perl";
 #my $rMod = "R";
 
@@ -471,9 +472,12 @@ $schedArgs{node} = $clusterNode if $clusterNode;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 $schedArgs{run_serial} = $runSerial ? 1 : 0;
 my $S = new EFI::SchedulerApi(%schedArgs);
+
+my $B = $S->getBuilder();
+
 my $jobNamePrefix = $jobId ? $jobId . "_" : "";
 my $progressFile = "$outputDir/progress";
-initSerialScript() if $runSerial;
+initSerialScript($B) if $runSerial;
 
 my $scriptDir = "$jobDir/scripts";
 mkdir $scriptDir;
@@ -489,7 +493,6 @@ $sortPrefix .= $a[rand(@a)] for 1..5;
 ########################################################################################################################
 # Get sequences and annotations.  This creates fasta and struct.out files.
 #
-my $B = $S->getBuilder();
 $B->resource(1, 1, "5gb");
 $B->mailEnd() if $taxSearchOnly;
 my $prevJobId;
@@ -1049,9 +1052,14 @@ sub getRenderFilePath {
 
 
 sub initSerialScript {
+    my $B = shift;
+
     open my $fh, ">", $runSerial or die "Unable to write to serial-script $runSerial: $!";
     print $fh "#!/bin/bash\n";
     close $fh;
+
+    my @envScripts = split(m/,/, ($envScripts//""));
+    map { $B->addAction("source $_") } @envScripts;
 
     chmod 0755, $runSerial;
 }
