@@ -141,7 +141,7 @@ if (defined $sim) {
 
 #you also have to specify the number of processors for blast
 if (not defined $np) {
-    $np = 48;
+    $np = $ENV{EFI_NP} // 48;
     #die "You must spefify the -np variable\n";
 }
 
