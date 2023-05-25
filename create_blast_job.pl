@@ -585,7 +585,7 @@ $B->addAction("zip -j $outputDir/data_transfer.zip " . join(" ", @transferFiles)
 $B->jobName("${jobNamePrefix}cleanuperr");
 $B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
 my $cleanupErrJob = $S->submit("$scriptDir/cleanuperr.sh");
-$prevJobId = getJobId($cleanupErrJob);
+my $prevJobId = getJobId($cleanupErrJob);
 push @jobIds, $prevJobId;
 
 print "All job IDs:\n" . join(",", @jobIds) . "\n";
