@@ -202,6 +202,7 @@ $scriptDir = $outputDir if not -d $scriptDir;
 $maxFullFamily = 0 if not $maxFullFamily;
 
 my $jobNamePrefix = $jobId ? $jobId . "_" : ""; 
+$jobId = $jobId // "";
 
 my $allSeqFilename = "allsequences.fa";
 my $allSeqFile = "$outputDir/$allSeqFilename";
@@ -214,13 +215,13 @@ my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 if ($seq and (not $queryFile or not -f $queryFile)) {
     $queryFile = "$outputDir/query.fa";
     BlastUtil::save_input_sequence($queryFile, $seq, $inputId);
-} elsif (not $seq or not -f $queryFile) { # File may be specified but not exist
+} elsif (not $seq and not -f $queryFile) { # File may be specified but not exist
     die "Requires either --seq <SEQUENCE> or --seq-file path_to_file_containing_sequence";
 } else {
     # Copy the data from the input query file to the new one.
     open my $fh, "<", $queryFile;
     my $fileSeq = "";
-    while (<$fh>) { $fileSeq += $_; }
+    while (<$fh>) { $fileSeq .= $_; }
     close $fh;
 
     my $newQueryFile = "$outputDir/query.fa";
