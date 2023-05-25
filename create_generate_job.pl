@@ -71,7 +71,7 @@ my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $frac
 my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
-my ($runSerial, $useNoModules, $jobDir, $debug, $envScripts);
+my ($runSerial, $useNoModules, $jobDir, $debug, $envScripts, $zipTransfer);
 my $result = GetOptions(
     "np=i"              => \$np,
     "queue=s"           => \$queue,
@@ -125,6 +125,7 @@ my $result = GetOptions(
     "no-modules"        => \$useNoModules,
     "env-scripts=s"     => \$envScripts,
     "debug"             => \$debug,
+    "zip-transfer"      => \$zipTransfer,   # If this is true, exchange data with the special compressed file data_transfer.zip rather than using individual files.
 );
 
 die "Environment variables not set properly: missing EFIDB variable" if not exists $ENV{EFIDB};
@@ -1018,9 +1019,12 @@ push @allJobIds, $prevJobId;
 
 $B = $S->getBuilder();
 
+my @transferFiles = ("$outputDir/1.out", "$outputDir/allsequences.fa", "$outputDir/". EFI::Config::FASTA_META_FILENAME);
+
 $B->resource(1, 1, "1gb");
 $B->dependency(1, \@allJobIds);
-$B->addAction("rm -f $sortdir/$sortPrefix*");
+$B->addAction("rm -f $sortdir/*");
+$B->addAction("zip -j $outputDir/data_transfer.zip " . join(" ", @transferFiles)) if $zipTransfer;
 $B->jobName("${jobNamePrefix}cleanuperr");
 $B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
 my $cleanupErrJob = $S->submit("$scriptDir/cleanuperr.sh");

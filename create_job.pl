@@ -43,6 +43,7 @@ push @args, ("--no-modules");
 push @args, "--exclude-fragments" if $data->{exclude_fragments};
 push @args, ("--np", $data->{np}) if $data->{np};
 push @args, ("--env-scripts", $envScripts) if $envScripts;
+push @args, ("--zip-transfer");
 
 
 
@@ -58,11 +59,22 @@ if ($type eq "family") {
     $script = "create_generate_job.pl";
 } elsif ($type eq "blast") {
     my $seq = $data->{seq} // "";
-    die "BLAST requires seq" if not $seq;
+    my $seqFile = $data->{seq_file} // "";
+    die "BLAST requires seq" if not $seq and not $seqFile;
 
-    push @args, ("--seq", $seq);
+    push @args, ("--seq", $seq) if $seq;
+    push @args, ("--seq-file", $seqFile) if ($seqFile and not $seq);
 
     $script = "create_blast_job.pl";
+} elsif ($type eq "analysis") {
+    push @args, ("--filter", $data->{filter}) if $data->{filter};
+    push @args, ("--minval", $data->{ascore}) if $data->{ascore};
+    push @args, ("--minlen", $data->{minlen}) if $data->{minlen};
+    push @args, ("--maxlen", $data->{maxlen}) if $data->{maxlen};
+    push @args, ("--output-path", $data->{a_job_dir}) if $data->{a_job_dir}; # analysis output dir
+    push @args, ("--uniref-version", $data->{uniref_version}) if $data->{uniref_version};
+
+    $script = "create_analysis_job.pl";
 } else {
     die "Unsupported command $type";
 }

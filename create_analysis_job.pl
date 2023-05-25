@@ -33,7 +33,7 @@ use Constants;
 my ($filter, $minval, $queue, $resultsDirName, $jobDir, $maxlen, $minlen, $title, $maxfull, $jobId, $generateJobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $analysisDir);
+    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $analysisDir, $runSerial, $envScripts, $useNoModules);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -70,6 +70,9 @@ my $result = GetOptions(
     "tax-search=s"          => \$taxSearch,
     "tax-search-hash=s"     => \$taxSearchHash,
     "remove-fragments"      => \$removeFragments,
+    "serial-script=s"       => \$runSerial,     # run in serial mode
+    "env-scripts=s"         => \$envScripts,
+    "no-modules"            => \$useNoModules,
     "debug"                 => \$debug,
 );
 
@@ -186,11 +189,20 @@ my $logDir = "$jobDir/log";
 mkdir $logDir if not $dryrun;
 $logDir = "" if not -d $logDir;
 
+my $useModuleSystem = not $useNoModules;
+
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
 my $S = new EFI::SchedulerApi(%schedArgs);
+
+
 my $B;
+
+if ($runSerial) {
+    $B = $S->getBuilder();
+    initSerialScript($B);
+} 
 
 print "Data from runs will be saved to $analysisDir\n";
 
@@ -244,11 +256,11 @@ if ($taxSearch or $removeFragments) {
     $idListOption = "--filter-id-list $analysisDir/filtered.ids";
     $B = $S->getBuilder();
     $B->resource(1, 1, "5gb");
-    $B->addAction("module load $efiEstMod");
-    $B->addAction("module load $efiDbMod");
+    addModule($B, "module load $efiEstMod");
+    addModule($B, "module load $efiDbMod");
     $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption $removeFragmentsOption --config $configFile $debugFlag");
     $B->jobName("${jobNamePrefix}get_filtered_ids");
-    $B->renderToFile("$analysisDir/get_filtered_ids.sh");
+    $B->renderToFile(getRenderFilePath("$analysisDir/get_filtered_ids.sh"));
     my $jobId = $S->submit("$analysisDir/get_filtered_ids.sh", $dryrun);
     chomp($jobId);
     $jobId = getJobId($jobId);
@@ -261,14 +273,14 @@ if ($taxSearch or $removeFragments) {
 $B = $S->getBuilder();
 $B->dependency(0, $taxDepId) if $taxDepId;
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load $efiDbMod");
+addModule($B, "module load $efiEstMod");
+addModule($B, "module load $efiDbMod");
 $B->addAction("$toolpath/get_annotations.pl -out $filteredAnnoFile $unirefOption $lenArgs --meta-file $analysisMetaFile $annoSpecOption -config=$configFile");
 if (-e $evalueTableInputFile and -s $evalueTableInputFile > 0) {
     $B->addAction("$toolpath/make_blast_evalue_table.pl --input $evalueTableInputFile --meta-file $filteredAnnoFile --output $evalueTableOutputFile");
 }
 $B->jobName("${jobNamePrefix}get_annotations");
-$B->renderToFile("$analysisDir/get_annotations.sh");
+$B->renderToFile(getRenderFilePath("$analysisDir/get_annotations.sh"));
 my $annoJobId = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
 chomp($annoJobId);
 $annoJobId = getJobId($annoJobId);
@@ -284,7 +296,7 @@ print "Annotations job is:\n$annoJobId\n";
 $B = $S->getBuilder();
 $B->dependency(0, $annoJobId) if $annoJobId;
 $B->resource(1, 1, "5gb");
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiEstMod");
 if ($customClusterDir and $customClusterFile) {
     $B->addAction("$toolpath/filter_custom.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -custom-cluster-file $analysisDir/$customClusterFile");
     $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
@@ -297,7 +309,7 @@ if ($hasParent) {
 }
 
 $B->jobName("${jobNamePrefix}filterblast");
-$B->renderToFile("$analysisDir/filterblast.sh");
+$B->renderToFile(getRenderFilePath("$analysisDir/filterblast.sh"));
 my $filterJobId = $S->submit("$analysisDir/filterblast.sh", $dryrun);
 chomp($filterJobId);
 $filterJobId = getJobId($filterJobId);
@@ -314,8 +326,8 @@ my $xgmmlDomainArgs = $hasDomain ? "--is-domain" : "";
 $B = $S->getBuilder();
 $B->dependency(0, $filterJobId);
 $B->resource(1, 1, "30gb");
-$B->addAction("module load $efiEstMod");
-$B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
+addModule($B, "module load $efiEstMod");
+addModule($B, "module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
 my $outFile = "$analysisDir/${safeTitle}full_ssn.xgmml";
 my $ncFile = "$analysisDir/${safeTitle}full_ssn_nc";
 my $seqsArg = $includeSeqs ? "-include-sequences" : "";
@@ -326,7 +338,7 @@ $B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $a
 $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");
-$B->renderToFile("$analysisDir/fullxgmml.sh");
+$B->renderToFile(getRenderFilePath("$analysisDir/fullxgmml.sh"));
 
 #submit generate the full xgmml script, job dependences should keep it from running till blast results have been created all blast out files are combined
 
@@ -345,20 +357,34 @@ if (not $noRepNodeNetworks) {
     $B->jobArray("40,45,50,55,60,65,70,75,80,85,90,95,100");
     $B->dependency(0, $filterJobId);
     $B->resource(1, 1, "30gb");
-    $B->addAction("module load $efiEstMod");
-    $B->addAction("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
-    $B->addAction("BC_CMD=$bcCmd");
-    #$B->addAction("echo '2+2' | \$BC_CMD 2>&1");
-    #$B->addAction("if [ \$? != 0 ]; then BC_CMD=$toolpath/bc; fi");
-    $B->addAction("export BC_CMD");
-    $B->addAction("CDHIT=\$(echo \"scale=2; {JOB_ARRAYID}/100\" | \$BC_CMD -l)");
+    addModule($B, "module load $efiEstMod");
+    addModule($B, "module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1");
+
+    my $varName = "{JOB_ARRAYID}";
+    my $cdhitFh;
+    my $writeFn = sub { $B->addAction($_[0]); };
+
+    if ($runSerial) {
+        open $cdhitFh , ">", "$analysisDir/cdhit_subtask.sh";
+        print $cdhitFh "#!/bin/bash\n";
+        print $cdhitFh getModuleEntry("module load $efiEstMod\n");
+        print $cdhitFh getModuleEntry("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1\n");
+        $varName = "\$1";
+        $writeFn = sub {
+            $cdhitFh->print($_[0], "\n");
+        };
+    }
+
+    &$writeFn("BC_CMD=$bcCmd");
+    &$writeFn("export BC_CMD");
+    &$writeFn("CDHIT=\$(echo \"scale=2; $varName/100\" | \$BC_CMD -l)");
     if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
-        $B->addAction("WORDOPT=5");
-        $B->addAction('if (( $(echo "$CDHIT < 0.81" | $BC_CMD -l) )); then WORDOPT=5; fi');
-        $B->addAction('if (( $(echo "$CDHIT < 0.71" | $BC_CMD -l) )); then WORDOPT=4; fi');
-        $B->addAction('if (( $(echo "$CDHIT < 0.61" | $BC_CMD -l) )); then WORDOPT=3; fi');
-        $B->addAction('if (( $(echo "$CDHIT < 0.51" | $BC_CMD -l) )); then WORDOPT=2; fi');
-        $B->addAction('echo $WORDOPT');
+        &$writeFn("WORDOPT=5");
+        &$writeFn('if (( $(echo "$CDHIT < 0.81" | $BC_CMD -l) )); then WORDOPT=5; fi');
+        &$writeFn('if (( $(echo "$CDHIT < 0.71" | $BC_CMD -l) )); then WORDOPT=4; fi');
+        &$writeFn('if (( $(echo "$CDHIT < 0.61" | $BC_CMD -l) )); then WORDOPT=3; fi');
+        &$writeFn('if (( $(echo "$CDHIT < 0.51" | $BC_CMD -l) )); then WORDOPT=2; fi');
+        &$writeFn('echo $WORDOPT');
         $wordOption = '-n $WORDOPT';
     } else {
         $wordOption = "-n 2"; # Default option
@@ -370,19 +396,26 @@ if (not $noRepNodeNetworks) {
     }
     
     my $cdhitFile = "$analysisDir/cdhit\$CDHIT";
-    $B->addAction("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $cdhitFile -c \$CDHIT -d 0 $algoOption $bandwidthOption");
+    &$writeFn("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $cdhitFile -c \$CDHIT -d 0 $algoOption $bandwidthOption");
     $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
     $ncFile = "";
     if ($computeNc) {
         $ncFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn_nc";
-        $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab --cdhit $cdhitFile.clstr"); 
-        $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
+        &$writeFn("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab --cdhit $cdhitFile.clstr"); 
+        &$writeFn("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
     }
-    $B->addAction("sleep 10"); # To allow the file system to make all of the necessary writes before we read the files
-    $B->addAction("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg $xgmmlDomainArgs " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
-    $B->addAction("zip -j $outFile.zip $outFile");
+    &$writeFn("sleep 10"); # To allow the file system to make all of the necessary writes before we read the files
+    &$writeFn("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg $xgmmlDomainArgs " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
+    &$writeFn("zip -j $outFile.zip $outFile");
+
+    if ($runSerial) {
+        close $cdhitFh;
+        chmod 0755, "$analysisDir/cdhit.sh";
+        $B->addAction("seq 40 5 100 | xargs -n 1 -P 1 $analysisDir/cdhit.sh");
+    }
+
     $B->jobName("${jobNamePrefix}cdhit");
-    $B->renderToFile("$analysisDir/cdhit.sh");
+    $B->renderToFile(getRenderFilePath("$analysisDir/cdhit.sh"));
     
     #submit the filter script, job dependences should keep it from running till all blast out files are combined
     my $repnodejob = $S->submit("$analysisDir/cdhit.sh", $dryrun, $schedType);
@@ -398,10 +431,10 @@ if (not $noRepNodeNetworks) {
 $B = $S->getBuilder();
 $B->resource(1, 1, "1gb");
 $B->dependency(1, $depId);
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("sleep 5");
 $B->jobName("${jobNamePrefix}fix");
-$B->renderToFile("$analysisDir/fix.sh");
+$B->renderToFile(getRenderFilePath("$analysisDir/fix.sh"));
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 
@@ -418,11 +451,11 @@ $B->dependency(0, "$fulljob:$fixjob");
 $B->resource(1, 1, "5gb");
 #$B->dependency(0, $fulljobline[0]); 
 $B->mailEnd();
-$B->addAction("module load $efiEstMod");
+addModule($B, "module load $efiEstMod");
 $B->addAction("$toolpath/stats.pl -run-dir $analysisDir -out $analysisDir/stats.tab");
 $B->addAction("rm $analysisDir/*.xgmml") if $cleanup;
 $B->jobName("${jobNamePrefix}stats");
-$B->renderToFile("$analysisDir/stats.sh");
+$B->renderToFile(getRenderFilePath("$analysisDir/stats.sh"));
 
 #submit the filter script, job dependences should keep it from running till all blast out files are combined
 my $statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
@@ -451,6 +484,42 @@ sub getJobId {
     my $submitResult = shift;
     my @parts = split /\./, $submitResult;
     return $parts[0];
+}
+
+
+sub getRenderFilePath {
+    if (not $runSerial) {
+        return $_[0];
+    } else {
+        (my $fname = $_[0]) =~ s%^.*?([^/]+)\.sh$%$1%;
+        return ($runSerial, "#\n#\n#\n#\n#$fname");
+    }
+}
+
+
+sub initSerialScript {
+    my $B = shift;
+
+    open my $fh, ">", $runSerial or die "Unable to write to serial-script $runSerial: $!";
+    print $fh "#!/bin/bash\n";
+    close $fh;
+
+    my @envScripts = split(m/,/, ($envScripts//""));
+    map { $B->addAction("source $_") } @envScripts;
+
+    chmod 0755, $runSerial;
+}
+
+
+sub addModule {
+    my $B = shift;
+    my $moduleStr = shift;
+    $B->addAction($moduleStr) if $useModuleSystem;
+}
+
+sub getModuleEntry  {
+    my $moduleStr = shift;
+    return $useModuleSystem ? $moduleStr : "";
 }
 
 

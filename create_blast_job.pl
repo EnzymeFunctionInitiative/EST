@@ -19,11 +19,12 @@ use lib $FindBin::Bin . "/lib";
 use BlastUtil;
 
 
-my ($seq, $resultsDirName, $jobDir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
+my ($seq, $queryFile, $resultsDirName, $jobDir, $famEvalue, $evalue, $multiplexing, $lengthdif, $sim, $np, $blasthits, $queue, $memqueue);
 my ($maxBlastResults, $seqCountFile, $ipro, $pfam, $unirefVersion, $unirefExpand, $fraction, $maxFullFamily, $LegacyGraphs);
-my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert, $runSerial, $useNoModules, $envScripts);
+my ($jobId, $inputId, $removeTempFiles, $scheduler, $dryrun, $configFile, $excludeFragments, $dbType, $taxSearch, $taxSearchInvert, $runSerial, $useNoModules, $envScripts, $zipTransfer);
 my $result = GetOptions(
     "seq=s"             => \$seq,
+    "seq-file=s"        => \$queryFile,
     "results-dir-name=s"=> \$resultsDirName,
     "job-dir=s"         => \$jobDir,
     "evalue=s"          => \$famEvalue, # Due to the way the front-end is implemented, the -evalue parameter now is used for (optional) family input BLASTs.
@@ -57,6 +58,7 @@ my $result = GetOptions(
     "serial-script=s"   => \$runSerial,     # run in serial mode
     "no-modules"        => \$useNoModules,
     "env-scripts=s"     => \$envScripts,
+    "zip-transfer"      => \$zipTransfer,   # If this is true, exchange data with the special compressed file data_transfer.zip rather than using individual files.
 );
 
 die "Environment variables not set properly: missing EFI_DB variable" if not exists $ENV{EFI_DB};
@@ -201,7 +203,6 @@ $maxFullFamily = 0 if not $maxFullFamily;
 
 my $jobNamePrefix = $jobId ? $jobId . "_" : ""; 
 
-my $queryFile = "$outputDir/query.fa";
 my $allSeqFilename = "allsequences.fa";
 my $allSeqFile = "$outputDir/$allSeqFilename";
 my $filtSeqFilename = "sequences.fa";
@@ -209,7 +210,23 @@ my $filtSeqFile = "$outputDir/$filtSeqFilename";
 my $accOutFile = "$outputDir/accessions.txt";
 my $metadataFile = "$outputDir/" . EFI::Config::FASTA_META_FILENAME;
 
-BlastUtil::save_input_sequence($queryFile, $seq, $inputId);
+# Assume $queryFile is in the output directory if $queryFile is specified
+if ($seq and (not $queryFile or not -f $queryFile)) {
+    $queryFile = "$outputDir/query.fa";
+    BlastUtil::save_input_sequence($queryFile, $seq, $inputId);
+} elsif (not $seq or not -f $queryFile) { # File may be specified but not exist
+    die "Requires either --seq <SEQUENCE> or --seq-file path_to_file_containing_sequence";
+} else {
+    # Copy the data from the input query file to the new one.
+    open my $fh, "<", $queryFile;
+    my $fileSeq = "";
+    while (<$fh>) { $fileSeq += $_; }
+    close $fh;
+
+    my $newQueryFile = "$outputDir/query.fa";
+    BlastUtil::save_input_sequence($newQueryFile, $fileSeq, $inputId);
+    $queryFile = $newQueryFile;
+}
 
 print "\nBlast for similar sequences and sort based off bitscore\n";
 
@@ -555,6 +572,21 @@ if ($removeTempFiles) {
     my $cleanupJobId = getJobId($submitResult);
     push @jobIds, $cleanupJobId;
 }
+
+
+$B = $S->getBuilder();
+
+my @transferFiles = ("$outputDir/1.out", "$outputDir/allsequences.fa", "$outputDir/". EFI::Config::FASTA_META_FILENAME, "$outputDir/blast_hits.tab");
+
+$B->resource(1, 1, "1gb");
+$B->dependency(1, \@jobIds);
+$B->addAction("rm -f $sortdir/*");
+$B->addAction("zip -j $outputDir/data_transfer.zip " . join(" ", @transferFiles)) if $zipTransfer;
+$B->jobName("${jobNamePrefix}cleanuperr");
+$B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
+my $cleanupErrJob = $S->submit("$scriptDir/cleanuperr.sh");
+$prevJobId = getJobId($cleanupErrJob);
+push @jobIds, $prevJobId;
 
 print "All job IDs:\n" . join(",", @jobIds) . "\n";
 
