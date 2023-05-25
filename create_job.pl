@@ -60,7 +60,7 @@ if ($type eq "family") {
 } elsif ($type eq "blast") {
     my $seq = $data->{seq} // "";
     my $seqFile = $data->{seq_file} // "";
-    die "BLAST requires seq" if not $seq and not $seqFile;
+    die "BLAST requires seq $jsonStr" if (not $seq and not $seqFile);
 
     push @args, ("--seq", $seq) if $seq;
     push @args, ("--seq-file", $seqFile) if ($seqFile and not $seq);
