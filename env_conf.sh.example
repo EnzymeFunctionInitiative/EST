@@ -5,7 +5,7 @@ export EFIESTMOD=$EFI_EST_MOD
 export EFI_PASS=1000
 export EFIPASS=$EFI_PASS
 
-export EFI_NP=64
+export EFI_NP=
 export EFI_QUEUE=
 export EFI_MEMQUEUE=
 export EFI_LEGACY_GRAPHS=1
