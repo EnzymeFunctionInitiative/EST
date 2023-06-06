@@ -181,6 +181,12 @@ my $useModuleSystem = not $useNoModules;
 
 my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1";
 
+if ($runSerial) {
+    use EFI::Util::System;
+    my $specs = getSystemSpec();
+    $np = $specs->{num_cpu} / 2;
+}
+
 
 my $logDir = "$jobDir/log";
 mkdir $logDir;

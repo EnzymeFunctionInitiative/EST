@@ -48,7 +48,7 @@ push @args, ("--zip-transfer");
 
 
 if ($type eq "family") {
-    my $famStr = $data->{family};
+    my $famStr = uc $data->{family};
     my @fams = split(",", $famStr);
     my $pfamFams = join(",", grep { m/^pf/i } @fams);
     my $iproFams = join(",", grep { m/^ipr/i } @fams);

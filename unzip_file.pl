@@ -35,16 +35,19 @@ my $tempDir = "$outFile.tempunzip";
 
 mkdir $tempDir or die "Unable to extract the zip file to $tempDir: $!";
 
-my $cmd = "unzip $zipFile -d $tempDir";
+my $cmd = "UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip $zipFile -d $tempDir";
 my ($out, $err) = capture {
     system($cmd);
 };
 
-die "There was an error executing $cmd: $err" if $err;
-
 my $firstFile = "";
 
 find(\&wanted, $tempDir);
+
+if ($err) {
+    print "There was a recoverable zip error executing $cmd: $err" if -f $firstFile;
+    die "There was a non-recoverable error executing $cmd: $err" if not -f $firstFile;
+}
 
 if (-f $outFile) {
     unlink $outFile or die "Unable to remove existing destination file $outFile: $!";
