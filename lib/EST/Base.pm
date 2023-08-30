@@ -91,5 +91,29 @@ sub excludeIds {
 }
 
 
+sub retrieveUniRefIds {
+    my $self = shift;
+    my $ids = shift;
+
+    my $version = $self->{config}->{uniref_version};
+
+    my $unirefIds = {50 => {}, 90 => {}};
+
+    my $whereField = $version =~ m/^\d+$/ ? "uniref${version}_seed" : "accession";
+
+    foreach my $id (@$ids) { # uniprot_ids is uniref if the job is uniref
+        my $sql = "SELECT * FROM uniref WHERE $whereField = '$id'";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @{ $unirefIds->{50}->{$row->{uniref50_seed}} }, $row->{accession};
+            push @{ $unirefIds->{90}->{$row->{uniref90_seed}} }, $row->{accession};
+        }
+    }
+
+    return $unirefIds;
+}
+
+
 1;
 

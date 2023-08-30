@@ -43,6 +43,7 @@ sub configure {
     die "No accession ID file provided" if not $args->{id_file} or not -f $args->{id_file};
 
     $self->{config}->{id_file} = $args->{id_file};
+    $self->{config}->{tax_only} = $args->{tax_only};
     $self->{config}->{domain_family} = $args->{domain_family};
     $self->{config}->{uniref_version} = ($args->{uniref_version} and ($args->{uniref_version} == 50 or $args->{uniref_version} == 90)) ? $args->{uniref_version} : "";
     $self->{config}->{domain_region} = $args->{domain_region};
@@ -61,16 +62,17 @@ sub configure {
 sub loadParameters {
     my $inputConfig = shift // {};
 
-    my ($idFile, $noMatchFile);
+    my ($idFile, $noMatchFile, $taxOnly);
     my $result = GetOptions(
         "accession-file|id-file=s"      => \$idFile,
         "no-match-file=s"               => \$noMatchFile,
+        "taxonomy-only"                 => \$taxOnly,
     );
 
     $idFile = "" if not $idFile;
     $noMatchFile = "" if not $noMatchFile;
 
-    my %args = (id_file => $idFile, no_match_file => $noMatchFile);
+    my %args = (id_file => $idFile, no_match_file => $noMatchFile, tax_only => $taxOnly);
     $args{domain_family}        = $inputConfig->{domain_family};
     $args{domain_region}        = $inputConfig->{domain_region};
     $args{uniref_version}       = $inputConfig->{uniref_version};
@@ -135,7 +137,7 @@ sub parseFile {
         map { delete $data->{meta}->{$_} if not $data->{uniprot_ids}->{$_}; } keys %{ $data->{meta} };
     } else {
         print "Getting UniRef IDs (no filtering)\n";
-        $unirefIds = $self->retrieveUniRefIds();
+        $unirefIds = $self->retrieveUniRefIds([keys %{$self->{data}->{uniprot_ids}}]);
         printIds($self->{data}->{uniprot_ids}, "NO_FILTERED_IDS") if $self->{config}->{debug_sql};
         printIds($unirefIds->{50}, "NO_FILTERED_UNIREF50_IDS") if $self->{config}->{debug_sql};
         printIds($unirefIds->{90}, "NO_FILTERED_UNIREF90_IDS") if $self->{config}->{debug_sql};
@@ -187,29 +189,6 @@ sub addSunburstIds {
         $sunburstIds->{$id}->{uniref50} = "" if not exists $sunburstIds->{$id}->{uniref50};
         $sunburstIds->{$id}->{uniref90} = "" if not exists $sunburstIds->{$id}->{uniref90};
     }
-}
-
-
-sub retrieveUniRefIds {
-    my $self = shift;
-
-    my $version = $self->{config}->{uniref_version};
-
-    my $unirefIds = {50 => {}, 90 => {}};
-
-    my $whereField = $version =~ m/^\d+$/ ? "uniref${version}_seed" : "accession";
-
-    foreach my $id (keys %{$self->{data}->{uniprot_ids}}) { # uniprot_ids is uniref if the job is uniref
-        my $sql = "SELECT * FROM uniref WHERE $whereField = '$id'";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute;
-        while (my $row = $sth->fetchrow_hashref) {
-            push @{ $unirefIds->{50}->{$row->{uniref50_seed}} }, $row->{accession};
-            push @{ $unirefIds->{90}->{$row->{uniref90_seed}} }, $row->{accession};
-        }
-    }
-
-    return $unirefIds;
 }
 
 
@@ -464,7 +443,12 @@ sub getUserUniRefIds {
 sub getSequenceIds {
     my $self = shift;
 
-    return $self->{data}->{uniprot_ids}; # contains domain info, if applicable.
+    if ($self->{tax_only}) {
+        # Happens to contain all of the IDs needed for the sunbursts.
+        return $self->{sunburst_ids}->{user_ids};
+    } else {
+        return $self->{data}->{uniprot_ids}; # contains domain info, if applicable.
+    }
 }
 
 

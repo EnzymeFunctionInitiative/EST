@@ -40,13 +40,12 @@ sub configure {
 
     die "No FASTA file provided" if not $args->{fasta_file} or not -f $args->{fasta_file};
 
-    $self->{config}->{use_headers} = exists $args->{use_headers} ? $args->{use_headers} : 0;
+    $self->{config}->{use_sequences} = exists $args->{use_sequences} ? $args->{use_sequences} : 1;
     $self->{config}->{fasta_file} = $args->{fasta_file};
     $self->{config}->{tax_search} = $args->{tax_search};
     $self->{config}->{sunburst_tax_output} = $args->{sunburst_tax_output};
     $self->{config}->{family_filter} = $args->{family_filter};
-
-    print Dumper($args);
+    $self->{config}->{uniref_version} = ($args->{uniref_version} and ($args->{uniref_version} == 50 or $args->{uniref_version} == 90)) ? $args->{uniref_version} : "";
 }
 
 
@@ -55,21 +54,20 @@ sub configure {
 sub loadParameters {
     my $inputConfig = shift // {};
 
-    my ($fastaFileIn, $useHeaders);
+    my ($fastaFileIn, $lookupSequences);
     my $result = GetOptions(
         "fasta-file=s"          => \$fastaFileIn,
-        "use-fasta-headers"     => \$useHeaders,
+        "dont-use-sequences"    => \$lookupSequences,
     );
 
-    $useHeaders = defined $useHeaders ? 1 : 0;
+    $lookupSequences = defined $lookupSequences ? 0 : 1;
     $fastaFileIn = "" if not $fastaFileIn;
 
-    my %fastaArgs = (fasta_file => $fastaFileIn, use_headers => $useHeaders);
+    my %fastaArgs = (fasta_file => $fastaFileIn, use_sequences => $lookupSequences);
     $fastaArgs{tax_search}          = $inputConfig->{tax_search};
     $fastaArgs{sunburst_tax_output} = $inputConfig->{sunburst_tax_output};
     $fastaArgs{family_filter}       = $inputConfig->{family_filter};
-
-    print Dumper(\%fastaArgs);
+    $fastaArgs{uniref_version}      = $inputConfig->{uniref_version};
 
     return \%fastaArgs;
 }
@@ -79,7 +77,8 @@ sub loadParameters {
 sub parseFile {
     my $self = shift;
     my $fastaFile = shift || $self->{config}->{fasta_file};
-    my $useHeaders = shift || $self->{config}->{use_headers};
+
+    my $useHeaders = 1;
 
     if (not $fastaFile or not -f $fastaFile or not defined $useHeaders) {
         warn "Unable to parse FASTA file: invalid parameters";
@@ -121,16 +120,23 @@ sub parseFile {
                     $id = makeSequenceId($seqCount);
                     push(@{$seqMeta->{$seqCount}->{description}}, $result->{raw_headers}); # substr($result->{raw_headers}, 0, 200);
                     $seqMeta->{$seqCount}->{other_ids} = $result->{other_ids};
-                    $seq{$seqCount}->{id} = $id;
-                    $seq{$seqCount}->{seq} = $line . "\n";
+                    #$seq{$seqCount}->{id} = $id;
+                    #$seq{$seqCount}->{seq} = $line . "\n";
                     $lastId = $seqCount;
                 } else {
-                    $id = "NIPROT";
                     $hasUniprot = 1;
-                    $lastId = -1;
-                    $numMultUniprotIdSeq += scalar @{ $result->{uniprot_ids} } - 1;
+                    #$lastId = -1;
+                    my @uniprotIds = @{ $result->{uniprot_ids} };
+                    $numMultUniprotIdSeq += @uniprotIds - 1;
                     my $desc = substr((split(m/>/, $result->{raw_headers}))[0], 0, 150);
-                    foreach my $res (@{ $result->{uniprot_ids} }) {
+
+                    $id = $lastId = $uniprotIds[0] ? $uniprotIds[0]->{uniprot_id} : "";
+                    $seqMeta->{$id} = {
+                        other_ids => $result->{other_ids},
+                        description => $desc,
+                    } if $id;
+
+                    foreach my $res (@uniprotIds) {
                         $upMeta->{$res->{uniprot_id}} = {
                             query_id => $res->{other_id},
                             other_ids => $result->{other_ids},
@@ -139,12 +145,15 @@ sub parseFile {
                     }
                 }
 
+                $seq{$lastId}->{id} = $id;
+                $seq{$lastId}->{seq} = $line . "\n";
+
                 $seqCount++;
                 $headerLine = 1;
 
             # Here we have encountered a sequence line.
             } elsif ($result->{state} eq EFI::Fasta::Headers::SEQUENCE) {
-                $seq{$lastId}->{seq} .= $line . "\n" if $lastId >= 0;
+                $seq{$lastId}->{seq} .= $line . "\n" if $lastId;
             }
         # Option C
         } else {
@@ -186,7 +195,6 @@ sub parseFile {
 
     my @fastaUniprotMatch = sort keys %$upMeta;
     my $numRemoved = 0;
-    print "WHAT\n";
     if ($self->{config}->{tax_search} or $self->{config}->{family_filter}) {
         my $doTaxFilter = $self->{config}->{tax_search} ? 1 : 0;
         my $doFamilyFilter = $self->{config}->{family_filter} ? 1 : 0;
@@ -213,6 +221,11 @@ sub parseFile {
     $self->{data}->{uniprot_meta} = $upMeta; # Metadata for IDs that had a UniProt match
     $self->{data}->{uniprot_ids} = \@fastaUniprotMatch;
 
+    my $unirefMapping = $self->retrieveUniRefIds($self->{data}->{uniprot_ids});
+    if ($self->{config}->{uniref_version}) {
+        $self->retrieveUniRefMetadata($unirefMapping);
+    }
+
     $self->{stats}->{orig_count} = $seqCount;
     $self->{stats}->{num_headers} = $headerCount;
     $self->{stats}->{num_multi_id} = $numMultUniprotIdSeq;
@@ -220,52 +233,63 @@ sub parseFile {
     $self->{stats}->{num_unmatched} = $seqCount + $numMultUniprotIdSeq - $self->{stats}->{num_matched};
     $self->{stats}->{num_filter_removed} = $numRemoved;
 
-    $self->addSunburstIds();
+    $self->addSunburstIds($unirefMapping);
 
     return 1;
 }
 
 
+sub retrieveUniRefMetadata {
+    my $self = shift;
+    my $unirefIds = shift;
+
+    my $uniprotIds = $self->{data}->{uniprot_ids};
+    my $unirefVersion = $self->{config}->{uniref_version};
+
+    my $metaKey = "UniRef${unirefVersion}_IDs";
+    foreach my $id (@$uniprotIds) {
+        my $unirefId = $unirefIds->{$unirefVersion}->{$id};
+        if ($unirefId) {
+            push @{$self->{data}->{uniprot_meta}->{$id}->{$metaKey}}, @$unirefId;
+        } else {
+            print "Unable to find UniProt ID $id in UniRef list\n";
+        }
+    }
+}
+
+
+
 sub addSunburstIds {
     my $self = shift;
-
-    my $unirefMapping = $self->retrieveUniRefIds();
+    my $unirefMapping = shift;
 
     my $sunburstIds = $self->{sunburst_ids}->{user_ids};
 
-    foreach my $id (keys %$unirefMapping) {
-        $sunburstIds->{$id} = {uniref50 => $unirefMapping->{$id}->[0], uniref90 => $unirefMapping->{$id}->[1]};
-    }
-}
-
-
-sub retrieveUniRefIds {
-    my $self = shift;
-
-    my $whereField = "accession";
-
-    my $data = {};
-
-    foreach my $id (@{$self->{data}->{uniprot_ids}}) {
-        my $sql = "SELECT * FROM uniref WHERE $whereField = '$id'";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute;
-        if (my $row = $sth->fetchrow_hashref) {
-            $data->{$id} = [$row->{uniref50_seed}, $row->{uniref90_seed}];
+    my @uniprotIds;
+    foreach my $ver (keys %$unirefMapping) {
+        foreach my $unirefId (keys %{ $unirefMapping->{$ver} }) {
+            my @ids = @{ $unirefMapping->{$ver}->{$unirefId} };
+            push @uniprotIds, @ids;
+            map { $sunburstIds->{$_}->{"uniref${ver}"} = $unirefId; } @ids;
         }
     }
 
-    return $data;
+    foreach my $id (@uniprotIds) {
+        $sunburstIds->{$id} = {uniref50 => "", uniref90 => ""} if not $sunburstIds->{$id};
+        $sunburstIds->{$id}->{uniref50} = "" if not exists $sunburstIds->{$id}->{uniref50};
+        $sunburstIds->{$id}->{uniref90} = "" if not exists $sunburstIds->{$id}->{uniref90};
+    }
 }
 
 
+
 # Public
-sub getUnmatchedSequences {
+sub getSequences {
     my $self = shift;
 
     my %seq;
     map {
-        $seq{$_} = $self->{data}->{seq}->{$_} if $_ =~ m/^z/;
+        $seq{$_} = $self->{data}->{seq}->{$_}; # if $_ =~ m/^z/;
         } keys %{$self->{data}->{seq}};
     return \%seq;
 }
@@ -273,6 +297,10 @@ sub getUnmatchedSequences {
 
 sub getSequenceIds {
     my $self = shift;
+
+    if ($self->{config}->{use_sequences}) {
+        return {};
+    }
 
     my $ids = {};
     foreach my $id (@{$self->{data}->{uniprot_ids}}) {
@@ -303,7 +331,11 @@ sub getMetadata {
         $meta->{$id} = $self->{data}->{uniprot_meta}->{$id};
     }
     foreach my $id (keys %{ $self->{data}->{seq_meta} }) {
-        $meta->{$id} = $self->{data}->{seq_meta}->{$id};
+        if ($meta->{$id}) {
+            $meta->{$id}->{seq_len} = $self->{data}->{seq_meta}->{$id}->{seq_len};
+        } else {
+            $meta->{$id} = $self->{data}->{seq_meta}->{$id};
+        }
     }
 
     return $meta;

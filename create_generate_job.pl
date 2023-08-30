@@ -562,10 +562,11 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     } elsif ($fastaFile and $fastaFileOption) {
         $retrScript .= "c.pl";
         push @args, $fastaFileOption;
+        push @args, "--uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
         push @args, "--family-filter \"$familyFilter\"" if $familyFilter;
     } elsif ($accessionFile) {
         $retrScript .= "d.pl";
-        push @args, "-uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
+        push @args, "--uniref-version $unirefVersion" if $unirefVersion and not($pfam or $ipro or $ssf or $gene3d); # Don't add this arg if the family is included, because the arg is already included in the family section
         push @args, $accessionFileOption;
         push @args, $noMatchFileOption;
         push @args, "--family-filter \"$familyFilter\"" if $familyFilter;
@@ -597,10 +598,11 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         $B->addAction("$efiEstTools/get_taxonomy.pl --output-file $taxOutputFile $sourceFileArg --config $configFile"); # Remove the legacy after summer 2022
     }
 
-    my @lenUniprotArgs = ("-struct $metadataFile", "-config $configFile");
-    push @lenUniprotArgs, "-output $lenUniprotFile";
-    push @lenUniprotArgs, "-expand-uniref" if $unirefVersion;
+    my @lenUniprotArgs = ("--metadata-file $metadataFile", "--config $configFile");
+    push @lenUniprotArgs, "--output $lenUniprotFile";
+    push @lenUniprotArgs, "--expand-uniref" if $unirefVersion;
     push @lenUniprotArgs, "--output-uniref50-len $lenUniref50File --output-uniref90-len $lenUniref90File" if $taxSearchOnly;
+    push @lenUniprotArgs, "--use-metadata-file-seq-len" if $fastaFile and $fastaFileOption;
     $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUniprotArgs));
     
     if ($unirefVersion and not $taxSearchOnly) {

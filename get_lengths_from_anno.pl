@@ -23,19 +23,20 @@ use EST::LengthHistogram;
 
 
 my ($annoFile, $configFile, $incfrac);
-my ($outputFile, $expandUniref, $outputUniref50, $outputUniref90);
+my ($outputFile, $expandUniref, $outputUniref50, $outputUniref90, $useMetaFileSeqLen);
 my $result = GetOptions(
-    "struct=s"              => \$annoFile,
-    "config=s"              => \$configFile,
-    "incfrac=f"             => \$incfrac,
-    "output=s"              => \$outputFile,
-    "expand-uniref"         => \$expandUniref,
-    "output-uniref90-len=s" => \$outputUniref90,
-    "output-uniref50-len=s" => \$outputUniref50,
+    "struct|metadata-file=s"    => \$annoFile,
+    "config=s"                  => \$configFile,
+    "incfrac=f"                 => \$incfrac,
+    "output=s"                  => \$outputFile,
+    "expand-uniref"             => \$expandUniref,
+    "output-uniref90-len=s"     => \$outputUniref90,
+    "output-uniref50-len=s"     => \$outputUniref50,
+    "use-metadata-file-seq-len" => \$useMetaFileSeqLen,
 );
 
 
-die "Requires input --struct argument for annotation IDs" if not $annoFile or not -f $annoFile;
+die "Requires input --metadata argument for annotation IDs" if not $annoFile or not -f $annoFile;
 die "Requires output length file argument" if not $outputFile;
 
 
@@ -102,13 +103,11 @@ while (@uniprotIds) {
     my @batch = splice(@uniprotIds, 0, 50);
     my $queryIds = join("','", @batch);
     my $sql = "SELECT $whereField AS acc, $seqLenField $allUnirefField FROM annotations AS A $allUnirefJoin WHERE $whereField IN ('$queryIds')";
-#    print "SQL $sql\n";
     my $sth = $dbh->prepare($sql);
     $sth->execute;
     while (my $row = $sth->fetchrow_hashref) {
         my $len = $row->{seq_len};
-#        print "\t$row->{acc}\t$row->{uniref50_seed}\t$row->{uniref90_seed}\t$len\n";
-        $histo->addData($len);
+        $histo->addData($len) if not $useMetaFileSeqLen;
         push @uniprotVals, $len;
         if ($row->{uniref50_seed} and not $histoHasUniref50{$row->{uniref50_seed}}) {
             $histoUniref50->addData($len);
@@ -133,7 +132,9 @@ my %u2;
 map { $u2{$_} = 1; } @uniref90Vals;
 print "Num UR90=" . scalar(@uniref90Vals) . " unique=" . scalar(keys(%u2)) . "\n";;
 
-foreach my $id (@unkIds) {
+my @sequenceIds = @unkIds;
+push @sequenceIds, @metaIds if $useMetaFileSeqLen;
+foreach my $id (@sequenceIds) {
     my $len = $annoMap->{$id}->{$seqLenField};
     $histo->addData($len);
 }

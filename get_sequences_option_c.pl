@@ -61,7 +61,7 @@ $fastaData->parseFile();
 my $userIds = $fastaData->getSequenceIds();
 my $userMetadata = $fastaData->getMetadata();
 my $userStats = $fastaData->getStatistics();
-my $userSeq = $fastaData->getUnmatchedSequences();
+my $userSeq = $fastaData->getSequences();
 
 $seqObj->retrieveAndSaveSequences($familyIds, $userIds, $userSeq, $unirefMap); # file path is configured by setupConfig
 $accObj->saveSequenceIds($familyIds, $userIds, $unirefMap); # file path is configured by setupConfig
