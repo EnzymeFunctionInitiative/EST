@@ -564,7 +564,7 @@ if ($removeTempFiles) {
     $B->addAction("rm -rf $outputDir/blast");
     $B->addAction("rm -f $outputDir/blastfinal.tab");
     $B->addAction("rm -f $outputDir/alphabetized.blastfinal.tab");
-    $B->addAction("rm -f $outputDir/database.*");
+    #$B->addAction("rm -f $outputDir/database.*");
     $B->addAction("rm -f $outputDir/initblast.out");
     $B->addAction("rm -f $outputDir/sorted.alphabetized.blastfinal.tab");
     $B->addAction("rm -f $outputDir/unsorted.1.out");
