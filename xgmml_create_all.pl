@@ -22,6 +22,7 @@ use Getopt::Long;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
 use IO::File;
+use Fcntl qw(:flock);
 use XML::Writer;
 use XML::LibXML;
 use FindBin;
@@ -106,6 +107,7 @@ close FASTA;
 
 my $parser = XML::LibXML->new();
 my $fh = new IO::File(">$outputFile");
+flock($fh, LOCK_EX);
 my $writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $fh);
 
 #if struct file (annotation information) exists, use that to generate annotation information

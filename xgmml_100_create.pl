@@ -20,6 +20,7 @@ use warnings;
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
 use IO::File;
+use Fcntl qw(:flock);
 use XML::Writer;
 use XML::LibXML;
 use Getopt::Long;
@@ -85,6 +86,7 @@ if (int($numEdges) > $maxNumEdges) {
 
 my $parser = XML::LibXML->new();
 my $outputFh = new IO::File(">$outputSsn");
+flock($outputFh, LOCK_EX);
 my $writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
 
 my $anno = new EFI::Annotations;
@@ -296,4 +298,7 @@ print time . " Finished writing edges\n";
 $writer->endTag;
 print "finished writing xgmml file\n";
 print "\t$node\t$edge\n";
+
+$outputFh->close();
+
 
