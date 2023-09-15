@@ -5,9 +5,6 @@ BEGIN {
     use lib $ENV{EFI_SHARED};
 }
 
-#version 0.9.2 no changes
-#version 0.9.7 added options and code for working with Slurm scheduler
-
 #this program will analyze data from a folder created in the generatedata step, the most important parts being the 1.out and struct.out files
 
 #this program creates scripts and submits them on clusters with torque schedulers
@@ -33,7 +30,8 @@ use Constants;
 my ($filter, $minval, $queue, $resultsDirName, $jobDir, $maxlen, $minlen, $title, $maxfull, $jobId, $generateJobId, $lengthOverlap,
     $customClusterFile, $customClusterDir, $scheduler, $dryrun, $configFile, $parentId, $parentDir, $cdhitUseAccurateAlgo,
     $cdhitBandwidth, $cdhitDefaultWord, $cdhitOpt, $includeSeqs, $includeAllSeqs, $unirefVersion, $useAnnoSpec, $useMinEdgeAttr,
-    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $analysisDir, $runSerial, $envScripts, $useNoModules);
+    $computeNc, $noRepNodeNetworks, $cleanup, $taxSearch, $taxSearchHash, $removeFragments, $debug, $analysisDir, $runSerial, $envScripts, $useNoModules,
+    $transferFile);
 my $result = GetOptions(
     "filter=s"              => \$filter,
     "minval=s"              => \$minval,
@@ -74,6 +72,7 @@ my $result = GetOptions(
     "env-scripts=s"         => \$envScripts,
     "no-modules"            => \$useNoModules,
     "debug"                 => \$debug,
+    "zip-transfer=s"        => \$transferFile,
 );
 
 die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFI_EST} or not $ENV{EFI_EST_MOD} or not $ENV{EFI_DB_MOD};
@@ -206,12 +205,27 @@ if ($runSerial) {
 
 print "Data from runs will be saved to $analysisDir\n";
 
+my $inputFilesDir = $generateDir;
+if ($transferFile) {
+    $B = $S->getBuilder();
+    $B->resource(1, 1, "5gb");
+    $B->addAction("unzip $transferFile -d $analysisDir/");
+    $B->renderToFile(getRenderFilePath("$analysisDir/transfer.sh"));
+    my $jobId = $S->submit("$analysisDir/transfer.sh", $dryrun);
+    chomp($jobId);
+    $jobId = getJobId($jobId);
+    push @jobIds, $jobId;
+    $inputFilesDir = $analysisDir;
+}
+
 my $filteredBlastFile = "$analysisDir/2.out";
 my $filteredAnnoFile = "$analysisDir/struct.filtered.out";
-my $userHeaderFile = "$generateDir/" . EFI::Config::FASTA_META_FILENAME;
-my $annoSpecFile = "$generateDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
-my $evalueTableInputFile = "$generateDir/blast_hits.tab"; # BLAST jobs only
 my $evalueTableOutputFile = "$analysisDir/blast_evalue.txt";
+my $userHeaderFile = "$inputFilesDir/" . EFI::Config::FASTA_META_FILENAME;
+my $annoSpecFile = "$inputFilesDir/" . EFI::Config::ANNOTATION_SPEC_FILENAME;
+my $evalueTableInputFile = "$inputFilesDir/blast_hits.tab"; # BLAST jobs only
+my $inputResultsFile = "$inputFilesDir/1.out";
+my $inputSequencesFile = "$inputFilesDir/allsequences.fa";
 
 ####################################################################################################
 # RETRIEVE ANNOTATIONS (STRUCT.OUT) FOR SSN
@@ -231,7 +245,7 @@ ANNO
     close SPEC;
 }
 
-my $hasDomain = checkForDomain("$generateDir/1.out");
+my $hasDomain = checkForDomain($inputResultsFile);
 
 my $bcCmd = "$toolpath/bc";
 
@@ -260,6 +274,7 @@ if ($taxSearch or $removeFragments) {
     addModule($B, "module load $efiDbMod");
     $B->addAction("$toolpath/get_filtered_ids.pl --meta-file $userHeaderFile --filtered-meta-file $analysisMetaFile $idListOption $taxSearchOption $removeFragmentsOption --config $configFile $debugFlag");
     $B->jobName("${jobNamePrefix}get_filtered_ids");
+    $B->dependency(0, $jobIds[$#jobIds]) if $transferFile;
     $B->renderToFile(getRenderFilePath("$analysisDir/get_filtered_ids.sh"));
     my $jobId = $S->submit("$analysisDir/get_filtered_ids.sh", $dryrun);
     chomp($jobId);
@@ -298,11 +313,11 @@ $B->dependency(0, $annoJobId) if $annoJobId;
 $B->resource(1, 1, "5gb");
 addModule($B, "module load $efiEstMod");
 if ($customClusterDir and $customClusterFile) {
-    $B->addAction("$toolpath/filter_custom.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -custom-cluster-file $analysisDir/$customClusterFile");
-    $B->addAction("cp $generateDir/allsequences.fa $analysisDir/sequences.fa");
+    $B->addAction("$toolpath/filter_custom.pl -blastin $inputResultsFile -blastout $filteredBlastFile -custom-cluster-file $analysisDir/$customClusterFile");
+    $B->addAction("cp $inputSequencesFile $analysisDir/sequences.fa");
 } else {
     my $domMetaArg = ($unirefVersion and $hasDomain) ? "-domain-meta $filteredAnnoFile" : "";
-    $B->addAction("$toolpath/filter_blast.pl -blastin $generateDir/1.out -blastout $filteredBlastFile -fastain $generateDir/allsequences.fa -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen $domMetaArg $idListOption");
+    $B->addAction("$toolpath/filter_blast.pl -blastin $inputResultsFile -blastout $filteredBlastFile -fastain $inputSequencesFile -fastaout $analysisDir/sequences.fa -filter $filter -minval $minval -maxlen $maxlen -minlen $minlen $domMetaArg $idListOption");
 }
 if ($hasParent) {
     $B->addAction("cp $parentDir/*.png $generateDir/");
