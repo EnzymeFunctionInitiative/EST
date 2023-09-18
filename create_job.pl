@@ -73,6 +73,7 @@ if ($type eq "family") {
     push @args, ("--maxlen", $data->{maxlen}) if $data->{maxlen};
     push @args, ("--output-path", $data->{a_job_dir}) if $data->{a_job_dir}; # analysis output dir
     push @args, ("--uniref-version", $data->{uniref_version}) if $data->{uniref_version};
+    push @args, ("--zip-transfer", $data->{zip_transfer}) if $data->{zip_transfer};
 
     $script = "create_analysis_job.pl";
 } else {
