@@ -75,14 +75,12 @@ my $result = GetOptions(
     "zip-transfer=s"        => \$transferFile,
 );
 
-die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFI_EST} or not $ENV{EFI_EST_MOD} or not $ENV{EFI_DB_MOD};
-die "The Perl environment must be loaded in order to run $0" if $ENV{LOADEDMODULES} !~ m/\bperl\b/i; # Ensure that the Perl module is loaded (e.g. module load Perl)
+die "The efiest and efidb environments must be loaded in order to run $0" if not $ENV{EFI_EST} or not $ENV{EFI_DB};
 
 
 my $toolpath = $ENV{EFI_EST};
 my $efiEstMod = $ENV{EFI_EST_MOD};
 my $efiDbMod = $ENV{EFI_DB_MOD};
-(my $perlMod = $ENV{LOADEDMODULES}) =~ s/^.*\b(perl)\b.*$/$1/i;
 
 $jobDir = $ENV{PWD} if not $jobDir;
 $resultsDirName = "output" if not $resultsDirName;
