@@ -191,21 +191,18 @@ my $useModuleSystem = not $useNoModules;
 my %schedArgs = (type => $schedType, queue => $queue, resource => [1, 1], dryrun => $dryrun);
 $schedArgs{output_base_dirpath} = $logDir if $logDir;
 $schedArgs{extra_path} = $config->{cluster}->{extra_path} if $config->{cluster}->{extra_path};
+$schedArgs{run_serial} = $runSerial ? 1 : 0;
 my $S = new EFI::SchedulerApi(%schedArgs);
 
+my $B = $S->getBuilder();
 
-my $B;
+initSerialScript($B) if $runSerial;
 
-if ($runSerial) {
-    $B = $S->getBuilder();
-    initSerialScript($B);
-} 
 
 print "Data from runs will be saved to $analysisDir\n";
 
 my $inputFilesDir = $generateDir;
 if ($transferFile) {
-    $B = $S->getBuilder();
     $B->resource(1, 1, "5gb");
     $B->addAction("unzip $transferFile -d $analysisDir/");
     $B->renderToFile(getRenderFilePath("$analysisDir/transfer.sh"));
@@ -214,6 +211,8 @@ if ($transferFile) {
     $jobId = getJobId($jobId);
     push @jobIds, $jobId;
     $inputFilesDir = $analysisDir;
+
+    $B = $S->getBuilder();
 }
 
 my $filteredBlastFile = "$analysisDir/2.out";
@@ -266,7 +265,7 @@ if ($taxSearch or $removeFragments) {
     my $removeFragmentsOption = $removeFragments ? "--remove-fragments" : "";
     my $debugFlag = $debug ? "--debug" : "";
     $idListOption = "--filter-id-list $analysisDir/filtered.ids";
-    $B = $S->getBuilder();
+    #$B = $S->getBuilder();
     $B->resource(1, 1, "5gb");
     addModule($B, "module load $efiEstMod");
     addModule($B, "module load $efiDbMod");
@@ -278,12 +277,13 @@ if ($taxSearch or $removeFragments) {
     chomp($jobId);
     $jobId = getJobId($jobId);
     push @jobIds, $jobId;
-    print "ID list job is:\n$jobId\n";
+    print "ID list job is:\n$jobId\n" if not $runSerial;
     $taxDepId = $jobId;
+
+    $B = $S->getBuilder();
 }
 
 
-$B = $S->getBuilder();
 $B->dependency(0, $taxDepId) if $taxDepId;
 $B->resource(1, 1, "5gb");
 addModule($B, "module load $efiEstMod");
@@ -298,7 +298,7 @@ my $annoJobId = $S->submit("$analysisDir/get_annotations.sh", $dryrun);
 chomp($annoJobId);
 $annoJobId = getJobId($annoJobId);
 push @jobIds, $annoJobId;
-print "Annotations job is:\n$annoJobId\n";
+print "Annotations job is:\n$annoJobId\n" if not $runSerial;
 
 
 
@@ -327,7 +327,7 @@ my $filterJobId = $S->submit("$analysisDir/filterblast.sh", $dryrun);
 chomp($filterJobId);
 $filterJobId = getJobId($filterJobId);
 push @jobIds, $filterJobId;
-print "Filterblast job is:\n$filterJobId\n";
+print "Filterblast job is:\n$filterJobId\n" if not $runSerial;
 
 
 my $xgmmlDomainArgs = $hasDomain ? "--is-domain" : "";
@@ -359,7 +359,7 @@ my $fulljob = $S->submit("$analysisDir/fullxgmml.sh", $dryrun, $schedType);
 chomp($fulljob);
 $fulljob = getJobId($fulljob);
 push @jobIds, $fulljob;
-print "Full xgmml job is:\n$fulljob\n";
+print "Full xgmml job is:\n$fulljob\n" if not $runSerial;
 
 #submit series of repnode network calculations
 #depends on filterblast
@@ -435,7 +435,7 @@ if (not $noRepNodeNetworks) {
     chomp($repnodejob);
     $repnodejob = getJobId($repnodejob);
     push @jobIds, $repnodejob;
-    print "Repnodes job is:\n$repnodejob\n";
+    print "Repnodes job is:\n$repnodejob\n" if not $runSerial;
     $depId = $repnodejob;
 }
 
@@ -455,7 +455,7 @@ my $fixjob = $S->submit("$analysisDir/fix.sh", $dryrun, $schedType);
 chomp($fixjob);
 $fixjob = getJobId($fixjob);
 push @jobIds, $fixjob;
-print "Fix job is:\n$fixjob\n";
+print "Fix job is:\n$fixjob\n" if not $runSerial;
 
 #submit series of repnode network calculations
 #depends on filterblast
@@ -475,7 +475,7 @@ my $statjob = $S->submit("$analysisDir/stats.sh", $dryrun, $schedType);
 chomp($statjob);
 $statjob = getJobId($statjob);
 push @jobIds, $statjob;
-print "Stats job is:\n$statjob\n";
+print "Stats job is:\n$statjob\n" if not $runSerial;
 
 print "All analysis job IDs:\n" . join(",", @jobIds), "\n";
 
