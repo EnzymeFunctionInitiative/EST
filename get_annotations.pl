@@ -106,7 +106,7 @@ my $anno = new EFI::Annotations;
 
 my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
-$dbh->do('SET @@group_concat_max_len = 3000'); # Increase the amount of elements that can be concat together (to avoid truncation)
+$dbh->do('SET @@group_concat_max_len = 3000') if ($db->{db}->{dbi} and $db->{db}->{dbi} eq "mysql" and $db->{db}->{name} !~ m/\.sqlite/ and (not $ENV{EFI_DB} or $ENV{EFI_DB} =~ m/\.sqlite/)); # Increase the amount of elements that can be concat together (to avoid truncation)
 
 open OUT, ">$annoOut" or die "cannot write struct.out file $annoOut\n";
 
