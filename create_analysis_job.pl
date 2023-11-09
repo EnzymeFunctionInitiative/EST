@@ -103,7 +103,7 @@ $minlen = 0                 unless defined $minlen;
 $maxlen = 50000             unless defined $maxlen;
 $filter = "bit"             unless defined $filter;
 $minval = 0                 unless defined $minval;
-$title = "Untitled"         unless defined $title;
+$title = ""                 unless defined $title;
 $queue = "efi"              unless defined $queue;
 $lengthOverlap = 1          unless (defined $lengthOverlap and $lengthOverlap);
 $cdhitBandwidth = ""        unless defined $cdhitBandwidth;
@@ -125,6 +125,8 @@ my @jobIds;
 $safeTitle .= "_" if $safeTitle;
 $safeTitle = $generateJobId . "_" . $safeTitle if defined $generateJobId and $generateJobId;
 $safeTitle .= "${taxSearchHash}_" if $taxSearchHash;
+
+$title = "Untitled" if not $title; # Assign here because we need to use it for safeTitle first
 
 if (defined $maxfull and $maxfull !~ /^\d+$/) {
     die "maxfull must be an integer\n";
@@ -351,7 +353,7 @@ my $seqsArg = $includeSeqs ? "-include-sequences" : "";
 $seqsArg .= " -include-all-sequences" if $includeAllSeqs;
 my $useMinArg = $useMinEdgeAttr ? "-use-min-edge-attr" : "";
 $B->addAction("$toolpath/dump_connectivity.pl --input-blast $filteredBlastFile --output-map $ncFile.tab") if $computeNc;
-$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg $xgmmlDomainArgs " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
+$B->addAction("$toolpath/xgmml_100_create.pl -blast=$filteredBlastFile -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -output $outFile -title=\"$title\" -maxfull $maxfull -dbver $dbver $seqsArg $useMinArg $xgmmlDomainArgs " . (($ncFile and $computeNc) ? "--nc-map $ncFile.tab" : ""));
 $B->addAction("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png") if $computeNc;
 $B->addAction("zip -j $outFile.zip $outFile");
 $B->jobName("${jobNamePrefix}fullxgmml");
@@ -422,7 +424,7 @@ if (not $noRepNodeNetworks) {
         &$writeFn("$toolpath/make_color_ramp.pl --input $ncFile.tab --output $ncFile.png");
     }
     &$writeFn("sleep 10"); # To allow the file system to make all of the necessary writes before we read the files
-    &$writeFn("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -out $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg $xgmmlDomainArgs " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
+    &$writeFn("$toolpath/xgmml_create_all.pl -blast $filteredBlastFile -cdhit $cdhitFile.clstr -fasta $analysisDir/sequences.fa -struct $filteredAnnoFile -output $outFile -title=\"$title\" -dbver $dbver -maxfull $maxfull $seqsArg $useMinArg $xgmmlDomainArgs " . ($ncFile ? "--nc-map $ncFile.tab" : ""));
     &$writeFn("zip -j $outFile.zip $outFile");
 
     if ($runSerial) {
@@ -470,7 +472,7 @@ $B->resource(1, 1, "5gb");
 $B->mailEnd();
 addModule($B, "module load $efiEstMod");
 $B->addAction("$toolpath/stats.pl -run-dir $analysisDir -out $analysisDir/stats.tab");
-$B->addAction("rm $analysisDir/*.xgmml") if $cleanup;
+$B->addAction("rm $analysisDir/*.xgmml $analysisDir/cdhit*") if $cleanup;
 $B->jobName("${jobNamePrefix}stats");
 $B->renderToFile(getRenderFilePath("$analysisDir/stats.sh"));
 
