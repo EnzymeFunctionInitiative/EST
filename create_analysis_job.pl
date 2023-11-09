@@ -92,7 +92,11 @@ if (-f "$generateDir/database_version") {
     chomp $dbver;
 }
 if (not $dbver) {
-    ($dbver = $efiDbMod) =~ s/\D//g;
+    if ($efiDbMod) {
+        ($dbver = $efiDbMod) =~ s/\D//g;
+    } else {
+        $dbver = 1;
+    }
 }
 
 $minlen = 0                 unless defined $minlen;
@@ -244,7 +248,7 @@ ANNO
 
 my $hasDomain = checkForDomain($inputResultsFile);
 
-my $bcCmd = "$toolpath/bc";
+my $bcCmd = "/usr/bin/bc";
 
 
 my $annoSpecOption = $useAnnoSpec ? " -anno-spec-file $annoSpecFile" : "";
@@ -377,8 +381,9 @@ if (not $noRepNodeNetworks) {
     my $cdhitFh;
     my $writeFn = sub { $B->addAction($_[0]); };
 
+    my $cdhitSubtask = "$analysisDir/cdhit_subtask.sh";
     if ($runSerial) {
-        open $cdhitFh , ">", "$analysisDir/cdhit_subtask.sh";
+        open $cdhitFh , ">", $cdhitSubtask;
         print $cdhitFh "#!/bin/bash\n";
         print $cdhitFh getModuleEntry("module load $efiEstMod\n");
         print $cdhitFh getModuleEntry("module load GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1\n");
@@ -388,8 +393,7 @@ if (not $noRepNodeNetworks) {
         };
     }
 
-    &$writeFn("BC_CMD=$bcCmd");
-    &$writeFn("export BC_CMD");
+    &$writeFn("export BC_CMD=$bcCmd");
     &$writeFn("CDHIT=\$(echo \"scale=2; $varName/100\" | \$BC_CMD -l)");
     if ($cdhitOpt eq "sb" or $cdhitOpt eq "est+") {
         &$writeFn("WORDOPT=5");
@@ -423,8 +427,8 @@ if (not $noRepNodeNetworks) {
 
     if ($runSerial) {
         close $cdhitFh;
-        chmod 0755, "$analysisDir/cdhit.sh";
-        $B->addAction("seq 40 5 100 | xargs -n 1 -P 1 $analysisDir/cdhit.sh");
+        chmod 0755, $cdhitSubtask;
+        $B->addAction("seq 40 5 100 | xargs -n 1 -P 1 $cdhitSubtask");
     }
 
     $B->jobName("${jobNamePrefix}cdhit");
