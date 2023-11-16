@@ -383,8 +383,11 @@ if (not $noRepNodeNetworks) {
     my $cdhitFh;
     my $writeFn = sub { $B->addAction($_[0]); };
 
+    my $cdhitFile = "$analysisDir/cdhit\$CDHIT";
+    my $stdoutRedirOption = "";
     my $cdhitSubtask = "$analysisDir/cdhit_subtask.sh";
     if ($runSerial) {
+        $stdoutRedirOption = "> $cdhitFile.log";
         open $cdhitFh , ">", $cdhitSubtask;
         print $cdhitFh "#!/bin/bash\n";
         print $cdhitFh getModuleEntry("module load $efiEstMod\n");
@@ -414,8 +417,7 @@ if (not $noRepNodeNetworks) {
         $lengthOverlapOption = "-s $lengthOverlap";
     }
     
-    my $cdhitFile = "$analysisDir/cdhit\$CDHIT";
-    &$writeFn("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $cdhitFile -c \$CDHIT -d 0 $algoOption $bandwidthOption");
+    &$writeFn("cd-hit $wordOption $lengthOverlapOption -i $analysisDir/sequences.fa -o $cdhitFile -c \$CDHIT -d 0 $algoOption $bandwidthOption $stdoutRedirOption");
     $outFile = "$analysisDir/${safeTitle}repnode-\${CDHIT}_ssn.xgmml";
     $ncFile = "";
     if ($computeNc) {
