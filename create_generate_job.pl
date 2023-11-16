@@ -1040,7 +1040,7 @@ my @transferFiles = ("$outputDir/1.out", "$outputDir/allsequences.fa", "$outputD
 
 $B->resource(1, 1, "1gb");
 $B->dependency(1, \@allJobIds);
-$B->addAction("rm -f $sortdir/*");
+#$B->addAction("rm -f $sortdir/*");
 $B->addAction("zip -j $outputDir/data_transfer.zip " . join(" ", @transferFiles)) if $zipTransfer;
 $B->jobName("${jobNamePrefix}cleanuperr");
 $B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
@@ -1168,7 +1168,7 @@ sub createGraphJob {
             $B->addAction("rm -rf $blastOutputDir");
             $B->addAction("rm -rf $fracOutputDir");
             $B->addAction("rm -rf $outputDir/rdata");
-            #$B->addAction("rm $outputDir/database.* $outputDir/format.log"); # Needed for taxonomy
+            #$B->addAction("rm $blastDb.* $outputDir/format.log"); # Needed for taxonomy
             $B->addAction("rm $outputDir/sequences.fa.clstr");
         }
         $B->addAction("touch  $outputDir/1.out.completed");
