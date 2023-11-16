@@ -87,7 +87,7 @@ my $result = GetOptions(
     "gene3d=s"          => \$gene3d,
     "ssf=s"             => \$ssf,
     "blasthits=i"       => \$blasthits,
-    "memqueue=s"        => \$memqueue,
+    "memqueue|mem-queue=s"  => \$memqueue,
     "maxsequence=s"     => \$maxsequence,
     "max-full-family=i" => \$maxFullFam,
     "userfasta=s"       => \$fastaFile,
@@ -908,7 +908,7 @@ push @allJobIds, $prevJobId;
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-my $sortRam = $extraRam ? $extraRam : 150;
+my $sortRam = $extraRam ? $extraRam : 250;
 $sortRam = "${sortRam}gb";
 $B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);

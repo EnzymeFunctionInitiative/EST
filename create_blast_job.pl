@@ -35,7 +35,7 @@ my $result = GetOptions(
     "np=i"              => \$np,
     "blasthits=i"       => \$blasthits,
     "queue=s"           => \$queue,
-    "memqueue=s"        => \$memqueue,
+    "memqueue|mem-queue=s"  => \$memqueue,
     "nresults=i"        => \$maxBlastResults,
     "seq-count-file=s"  => \$seqCountFile,
     "ipro=s"            => \$ipro,
