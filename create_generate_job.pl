@@ -66,9 +66,9 @@ use Constants;
 
 
 my ($np, $queue, $resultsDirName, $evalue, $incfrac, $ipro, $pfam, $accessionId, $accessionFile, $taxid);
-my ($gene3d, $ssf, $blasthits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
+my ($gene3d, $ssf, $blasthits, $searchSens, $searchHits, $memqueue, $maxsequence, $maxFullFam, $fastaFile, $useFastaHeaders);
 my ($seqCountFile, $lengthdif, $noMatchFile, $sim, $multiplexing, $domain, $fraction);
-my ($blast, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
+my ($searchProgram, $jobId, $unirefVersion, $noDemuxArg, $cdHitOnly);
 my ($scheduler, $dryrun, $LegacyGraphs, $configFile, $removeTempFiles);
 my ($minSeqLen, $maxSeqLen, $forceDomain, $domainFamily, $clusterNode, $domainRegion, $excludeFragments, $taxSearch, $taxSearchOnly, $sourceTax, $familyFilter, $extraRam);
 my ($runSerial, $useNoModules, $jobDir, $debug, $envScripts, $zipTransfer);
@@ -102,7 +102,9 @@ my $result = GetOptions(
     "domain-region=s"   => \$domainRegion,
     "force-domain=i"    => \$forceDomain,
     "fraction=i"        => \$fraction,
-    "blast=s"           => \$blast,
+    "search-program=s"  => \$searchProgram,
+    "search-sens=f"     => \$searchSens,
+    "search-hits=i"     => \$searchHits,
     "job-id=i"          => \$jobId,
     "no-demux"          => \$noDemuxArg,
     "min-seq-len=i"     => \$minSeqLen,
@@ -136,10 +138,11 @@ my $efiDbMod = $ENV{EFIDBMOD};
 my $sortdir = '/scratch';
 
 #defaults and error checking for choosing of blast program
-if (defined $blast and $blast ne "blast" and $blast ne "blast+" and $blast ne "blast+simple" and $blast ne "diamond" and $blast ne 'diamondsensitive') {
-    die "blast program value of $blast is not valid, must be blast, blast+, diamondsensitive, or diamond\n";
-} elsif (not defined $blast) {
-    $blast = "blast";
+$searchProgram = lc($searchProgram // "");
+if ($searchProgram and $searchProgram ne "blast" and $searchProgram ne "blast+" and $searchProgram ne "blast+simple" and $searchProgram ne "diamond" and $searchProgram ne "diamondsensitive" and $searchProgram ne "mmseqs2") {
+    die "blast program value of $searchProgram is not valid, must be blast, blast+, diamondsensitive, diamond, or mmseqs2\n";
+} elsif (not $searchProgram) {
+    $searchProgram = "blast";
 }
 
 # Defaults and error checking for splitting sequences into domains
@@ -260,10 +263,11 @@ $manualCdHit = 1 if (not defined $cdHitOnly and ($lengthdif < 1 or $sim < 1) and
 $seqCountFile = ""  if not defined $seqCountFile;
 $cdHitOnly = ""     if not defined $cdHitOnly;
 
-$np = ceil($np / 24) if ($blast=~/diamond/);
+$np = ceil($np / 24) if ($searchProgram=~/diamond/);
 
 # Max number of hits for an individual sequence, normally set ot max value
 $blasthits = 1000000 if not (defined $blasthits);
+$blasthits = $searchHits ? $searchHits : $blasthits;
 
 # Wet input families to zero if they are not specified
 $pfam = 0           if not defined $pfam;
@@ -323,7 +327,7 @@ my $gdMod = "GD/2.73-IGB-gcc-8.2.0-Perl-5.28.1"; #getLmod("GD.*Perl", "GD");
 #my $perlMod = "Perl";
 #my $rMod = "R";
 
-print "Blast is $blast\n";
+print "Blast is $searchProgram\n";
 print "domain is $domain\n";
 print "domain-family is $domainFamily\n";
 print "fraction is $fraction\n";
@@ -536,7 +540,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
         "-meta-file $metadataFile", $minSeqLenOpt, $maxSeqLenOpt
     );
     push @args, "--sunburst-tax-output $sunburstTaxOutput";
-    
+
     push @args, "-pfam $pfam" if $pfam;
     push @args, "-ipro $ipro" if $ipro;
     push @args, "-ssf $ssf" if $ssf;
@@ -604,7 +608,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     push @lenUniprotArgs, "--output-uniref50-len $lenUniref50File --output-uniref90-len $lenUniref90File" if $taxSearchOnly;
     push @lenUniprotArgs, "--use-metadata-file-seq-len" if $fastaFile and $fastaFileOption;
     $B->addAction("$efiEstTools/get_lengths_from_anno.pl " . join(" ", @lenUniprotArgs));
-    
+
     if ($unirefVersion and not $taxSearchOnly) {
         my @lenUnirefArgs = ("-struct $metadataFile", "-config $configFile");
         push @lenUnirefArgs, "-output $lenUnirefFile";
@@ -746,51 +750,78 @@ print "mux job is:\n $muxjob\n" if not $runSerial;
 push @allJobIds, $prevJobId;
 
 
-########################################################################################################################
-# Break sequenes.fa into parts so we can run blast in parallel.
-#
-$B = $S->getBuilder();
-$B->resource(1, 1, "5gb");
+my $blastDb = "$outputDir/database";
+if ($searchProgram eq "mmseqs2") {
 
-$B->dependency(0, $prevJobId);
-$B->addAction("mkdir -p $fracOutputDir");
-$B->addAction("$efiEstTools/split_fasta.pl -parts $np -tmp $fracOutputDir -source $filtSeqFile");
-$B->jobName("${jobNamePrefix}fracfile");
-$B->renderToFile(getRenderFilePath("$scriptDir/fracfile.sh"));
+    $B = $S->getBuilder();
+    $B->resource(1, 1, "50gb");
 
-my $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
-chomp $fracfilejob;
-print "fracfile job is:\n $fracfilejob\n" if not $runSerial;
-($prevJobId) = split /\./, $fracfilejob;
+    my $dbOutDir = "$outputDir/mmseqs2_tmp";
+    $blastDb = "$dbOutDir/database";
+    $B->dependency(0, $prevJobId);
+    addModule($B, "module load MMseqs2");
+    $B->addAction("mkdir $dbOutDir");
+    $B->addAction("mmseqs createdb $filtSeqFile $blastDb");
+    $B->addAction("mmseqs createindex $blastDb idx");
+    $B->jobName("${jobNamePrefix}createdb");
+    $B->renderToFile(getRenderFilePath("$scriptDir/createdb.sh"));
 
-push @allJobIds, $prevJobId;
+    my $createdbjob = $S->submit("$scriptDir/createdb.sh");
+    chomp $createdbjob;
+    print "createdb job is:\n $createdbjob\n" if not $runSerial;
+    ($prevJobId) = split /\./, $createdbjob;
 
+    push @allJobIds, $prevJobId;
 
-########################################################################################################################
-# Make the blast database and put it into the temp directory
-#
-$B = $S->getBuilder();
-
-$B->dependency(0, $prevJobId);
-$B->resource(1, 1, "5gb");
-addModule($B, "module load $efiDbMod");
-addModule($B, "module load $efiEstMod");
-$B->addAction("cd $outputDir");
-if ($blast eq 'diamond' or $blast eq 'diamondsensitive') {
-    addModule($B, "module load diamond");
-    $B->addAction("diamond makedb --in $filtSeqFilename -d database");
 } else {
-    $B->addAction("formatdb -i $filtSeqFilename -n database -p T -o T ");
+
+    ########################################################################################################################
+    # Break sequenes.fa into parts so we can run blast in parallel.
+    #
+    $B = $S->getBuilder();
+    $B->resource(1, 1, "5gb");
+
+    $B->dependency(0, $prevJobId);
+    $B->addAction("mkdir -p $fracOutputDir");
+    $B->addAction("$efiEstTools/split_fasta.pl -parts $np -tmp $fracOutputDir -source $filtSeqFile");
+    $B->jobName("${jobNamePrefix}fracfile");
+    $B->renderToFile(getRenderFilePath("$scriptDir/fracfile.sh"));
+
+    my $fracfilejob = $S->submit("$scriptDir/fracfile.sh");
+    chomp $fracfilejob;
+    print "fracfile job is:\n $fracfilejob\n" if not $runSerial;
+    ($prevJobId) = split /\./, $fracfilejob;
+
+    push @allJobIds, $prevJobId;
+
+
+    ########################################################################################################################
+    # Make the blast database and put it into the temp directory
+    #
+    $B = $S->getBuilder();
+
+    $B->dependency(0, $prevJobId);
+    $B->resource(1, 1, "5gb");
+    addModule($B, "module load $efiDbMod");
+    addModule($B, "module load $efiEstMod");
+    $B->addAction("cd $outputDir");
+    if ($searchProgram eq 'diamond' or $searchProgram eq 'diamondsensitive') {
+        addModule($B, "module load diamond");
+        $B->addAction("diamond makedb --in $filtSeqFilename -d database");
+    } else {
+        $B->addAction("formatdb -i $filtSeqFilename -n database -p T -o T ");
+    }
+    $B->jobName("${jobNamePrefix}createdb");
+    $B->renderToFile(getRenderFilePath("$scriptDir/createdb.sh"));
+
+    my $createdbjob = $S->submit("$scriptDir/createdb.sh");
+    chomp $createdbjob;
+    print "createdb job is:\n $createdbjob\n" if not $runSerial;
+    ($prevJobId) = split /\./, $createdbjob;
+
+    push @allJobIds, $prevJobId;
 }
-$B->jobName("${jobNamePrefix}createdb");
-$B->renderToFile(getRenderFilePath("$scriptDir/createdb.sh"));
 
-my $createdbjob = $S->submit("$scriptDir/createdb.sh");
-chomp $createdbjob;
-print "createdb job is:\n $createdbjob\n" if not $runSerial;
-($prevJobId) = split /\./, $createdbjob;
-
-push @allJobIds, $prevJobId;
 
 
 ########################################################################################################################
@@ -802,44 +833,56 @@ $B = $S->getBuilder();
 mkdir $blastOutputDir;
 
 $B->setScriptAbortOnError(0); # Disable SLURM aborting on errors, since we want to catch the BLAST error and report it to the user nicely
-$B->jobArray("1-$np") if $blast eq "blast";
+$B->jobArray("1-$np") if $searchProgram eq "blast";
 $B->dependency(0, $prevJobId);
-$B->resource(1, 1, "5gb");
-$B->resource(1, 24, "14G") if $blast =~ /diamond/i;
-$B->resource(1, 24, "14G") if $blast =~ /blast\+/i;
+$B->resource(1, 1, "5gb") if $searchProgram eq "blast";
+$B->resource(1, $np, "50G") if $searchProgram eq "mmseqs2";
+$B->resource(1, $np, "14G") if $searchProgram =~ /diamond/i;
+$B->resource(1, $np, "14G") if $searchProgram =~ /blast\+/i;
 
 $B->addAction("export BLASTDB=$outputDir");
 #addModule($B, "module load blast+");
 #$B->addAction("blastp -query  $fracOutputDir/fracfile-{JOB_ARRAYID}.fa  -num_threads 2 -db database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6 qseqid sseqid bitscore evalue qlen slen length qstart qend sstart send pident nident\" -num_descriptions 5000 -num_alignments 5000 -out $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab -evalue $evalue");
 addModule($B, "module load $efiDbMod");
 addModule($B, "module load $efiEstMod");
-if ($blast eq "blast") {
+my $outputFiles = "";
+if ($searchProgram eq "blast") {
     #addModule($B, "module load blast");
     if ($runSerial) {
         open my $fh, ">", "$scriptDir/blast.sh";
         print $fh "#!/bin/bash\n";
         print $fh getModuleEntry("module load $efiEstMod\n");
-        print $fh "blastall -p blastp -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-\$1.fa.tab -i $fracOutputDir/fracfile-\$1.fa\n";
+        print $fh "blastall -p blastp -d $blastDb -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-\$1.fa.tab -i $fracOutputDir/fracfile-\$1.fa\n";
         close $fh;
         chmod 0755, "$scriptDir/blast.sh";
         $B->addAction("echo {1..$np} | xargs -n 1 -P $np $scriptDir/blast.sh");
     } else {
-        $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
+        $B->addAction("blastall -p blastp -i $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $blastDb -m 8 -e $evalue -b $blasthits -o $blastOutputDir/blastout-{JOB_ARRAYID}.fa.tab");
     }
-} elsif ($blast eq "blast+") {
+    $outputFiles = "$blastOutputDir/blastout-*.tab";
+} elsif ($searchProgram eq "blast+") {
     addModule($B, "module load BLAST+");
-    $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
-} elsif ($blast eq "blast+simple") {
+    $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $blastDb -gapopen 11 -gapextend 1 -comp_based_stats 2 -use_sw_tback -outfmt \"6\" -max_hsps 1 -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
+} elsif ($searchProgram eq "blast+simple") {
     addModule($B, "module load BLAST+");
-    $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $outputDir/database -outfmt \"6\" -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
-} elsif ($blast eq "diamond") {
+    $B->addAction("blastp -query $filtSeqFile -num_threads $np -db $blastDb -outfmt \"6\" -num_descriptions $blasthits -num_alignments $blasthits -out $blastFinalFile -evalue $evalue");
+} elsif ($searchProgram eq "diamond") {
     addModule($B, "module load DIAMOND");
-    $B->addAction("diamond blastp -p 24 -e $evalue -k $blasthits -C $blasthits -q $filtSeqFile -d $outputDir/database -a $blastOutputDir/blastout.daa");
+    $B->addAction("diamond blastp -p $np -e $evalue -k $blasthits -C $blasthits -q $filtSeqFile -d $blastDb -a $blastOutputDir/blastout.daa");
     $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
-} elsif ($blast eq "diamondsensitive") {
+} elsif ($searchProgram eq "diamondsensitive") {
     addModule($B, "module load DIAMOND");
-    $B->addAction("diamond blastp --sensitive -p 24 -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $outputDir/database -a $blastOutputDir/blastout.daa");
+    $B->addAction("diamond blastp --sensitive -p $np -e $evalue -k $blasthits -C $blasthits -q $fracOutputDir/fracfile-{JOB_ARRAYID}.fa -d $blastDb -a $blastOutputDir/blastout.daa");
     $B->addAction("diamond view -o $blastFinalFile -f tab -a $blastOutputDir/blastout.daa");
+} elsif ($searchProgram eq "mmseqs2") {
+    addModule($B, "module load MMseqs2");
+    my $mmOutFile = "$outputDir/search_res";
+    $searchSens = "7" if not $searchSens;
+    my $maxSeqs = $searchHits ? "--max-seqs $searchHits" : "";
+    $B->addAction("mmseqs search --threads $np -s $searchSens $maxSeqs $blastDb $blastDb $mmOutFile.out idx");
+    #$B->addAction("mmseqs search --threads $np -s $searchSens $maxSeqs $filtSeqFile $blastDb $mmOutFile.out idx");
+    $B->addAction("mmseqs convertalis $blastDb $blastDb $mmOutFile.out $mmOutFile.m8");
+    $outputFiles = "$mmOutFile.m8";
 } else {
     die "Blast control not set properly.  Can only be blast, blast+, or diamond.\n";
 }
@@ -869,8 +912,7 @@ $B = $S->getBuilder();
 
 $B->resource(1, 1, "5gb");
 $B->dependency(1, $prevJobId);
-$B->addAction("cat $blastOutputDir/blastout-*.tab |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile")
-    if $blast eq "blast";
+$B->addAction("cat $outputFiles |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile") if $outputFiles;
 $B->addAction("SZ=`stat -c%s $blastFinalFile`");
 $B->addAction("if [[ \$SZ == 0 ]]; then");
 $B->addAction("    echo \"BLAST Failed. Check input file.\"");
@@ -885,6 +927,7 @@ print "Cat job is:\n $catjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $catjob;
 
 push @allJobIds, $prevJobId;
+
 
 
 ########################################################################################################################
@@ -951,7 +994,7 @@ push @allJobIds, $prevJobId;
 $B = $S->getBuilder();
 $B->dependency(0, $prevJobId);
 $B->resource(1, 1, "5gb");
-        
+
 $B->addAction("$efiEstTools/calc_blast_stats.pl -edge-file $outputDir/1.out -seq-file $allSeqFile -unique-seq-file $filtSeqFile -seq-count-output $seqCountFile");
 $B->jobName("${jobNamePrefix}conv_ratio");
 $B->renderToFile(getRenderFilePath("$scriptDir/conv_ratio.sh"));
@@ -1079,7 +1122,7 @@ sub createGraphJob {
     my $lengthHistoOnly = shift // 0;
 
     my ($smallWidth, $smallHeight) = (700, 315);
-    
+
     #create information for R to make graphs and then have R make them
     $B->queue($memqueue);
     $B->dependency(0, $prevJobId) if $prevJobId;
