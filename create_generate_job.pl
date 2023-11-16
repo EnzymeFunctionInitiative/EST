@@ -87,7 +87,7 @@ my $result = GetOptions(
     "gene3d=s"          => \$gene3d,
     "ssf=s"             => \$ssf,
     "blasthits=i"       => \$blasthits,
-    "memqueue=s"        => \$memqueue,
+    "memqueue|mem-queue=s"  => \$memqueue,
     "maxsequence=s"     => \$maxsequence,
     "max-full-family=i" => \$maxFullFam,
     "userfasta=s"       => \$fastaFile,
@@ -395,6 +395,14 @@ my $taxOutputFile = "$outputDir/tax.json";
 my $sunburstTaxOutput = "$outputDir/sunburst.raw";
 
 
+
+my $accessionFileZip = $accessionFile;
+my ($afn, $afp, $afx) = fileparse($accessionFile);
+my $afname = "$afn.txt";
+my $targetAccessionFile = "$jobDir/$afname";
+if ($accessionFileZip =~ /\.zip$/i) {
+    $accessionFile = $targetAccessionFile;
+}
 # Error checking for user supplied dat and fa files
 my $accessionFileOption = "";
 my $noMatchFileOption = "";
@@ -407,23 +415,19 @@ if (defined $accessionFile and -e $accessionFile) {
         $taxSourceAccessionFile = $accessionFile;
         my ($taxJobId, $taxTreeId, $taxIdType) = split(m/,/, $sourceTax);
         $accessionFile = $jobDir . "/$taxJobId.txt";
+        $accessionFileOption = "-accession-file $accessionFile";
     } elsif (not ($accessionFile =~ /^\//i or $accessionFile =~ /^~/)) {
         $accessionFile = $jobDir . "/$accessionFile";
+        $accessionFileOption = "-accession-file $accessionFile";
+    } else {
+        $accessionFileOption = "-accession-file $targetAccessionFile";
     }
-    $accessionFileOption = "-accession-file $accessionFile";
 
     $noMatchFile = "$outputDir/" . EFI::Config::NO_ACCESSION_MATCHES_FILENAME if !$noMatchFile;
     $noMatchFile = $outputDir . "/$noMatchFile" if not ($noMatchFile =~ /^\// or $noMatchFile =~ /^~/);
     $noMatchFileOption = "-no-match-file $noMatchFile";
 } else {
     $accessionFile = "";
-}
-
-my $accessionFileZip = $accessionFile;
-if ($accessionFileZip =~ /\.zip$/i) {
-    my ($fn, $fp, $fx) = fileparse($accessionFile);
-    my $fname = "$fn.txt";
-    $accessionFile = "$jobDir/$fname";
 }
 
 
@@ -436,21 +440,22 @@ if ($accessionFileZip =~ /\.zip$/i) {
 ##    $metadataFile = "";
 #}
 
+my $fastaFileZip = $fastaFile;
+my ($ffn, $ffp, $ffx) = fileparse($fastaFile);
+my $fastaFname = "$ffn.fasta";
+my $targetFastaFile = "$jobDir/$fastaFname";
+if ($fastaFileZip =~ /\.zip$/i) {
+    $fastaFile = $targetFastaFile;
+}
 my $fastaFileOption = "";
 if (defined $fastaFile and -e $fastaFile) {
     $fastaFile = "$jobDir/$fastaFile" if not ($fastaFile=~/^\// or $fastaFile=~/^~/);
-    $fastaFileOption = "-fasta-file $fastaFile";
+    $fastaFileOption = "-fasta-file $targetFastaFile";
     $fastaFileOption = "-use-fasta-headers " . $fastaFileOption if defined $useFastaHeaders;
 } else {
     $fastaFile = "";
 }
 
-my $fastaFileZip = $fastaFile;
-if ($fastaFileZip =~ /\.zip$/i) {
-    my ($fn, $fp, $fx) = fileparse($fastaFile);
-    my $fname = "$fn.fasta";
-    $fastaFile = "$outputDir/$fname";
-}
 
 
 # Create tmp directories
@@ -514,14 +519,24 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     $B->addAction("unzip -p $fastaFileZip > $fastaFile") if $fastaFileZip =~ /\.zip$/i;
     $B->addAction("unzip -p $accessionFileZip > $accessionFile") if $accessionFileZip =~ /\.zip$/i;
     if ($fastaFile and not $sourceTax) {
-        $B->addAction("sed -i 's/\\n\\r\$/\\n/' $fastaFile");
-        $B->addAction("sed -i 's/\\r\$/\\n/' $fastaFile");
+        if ($fastaFileZip !~ /\.zip$/i) {
+            $B->addAction("sed 's/\\n\\r/\\n/g' $fastaFile | sed 's/\\r/\\n/g' > $targetFastaFile");
+            $fastaFile = $targetFastaFile;
+        } else {
+            $B->addAction("sed -i 's/\\n\\r/\\n/' $fastaFile");
+            $B->addAction("sed -i 's/\\r/\\n/' $fastaFile");
+        }
         #$B->addAction("dos2unix -q $fastaFile");
         #$B->addAction("mac2unix -q $fastaFile");
     }
     if ($accessionFile and not $sourceTax) {
-        $B->addAction("sed -i 's/\\n\\r\$/\\n/' $accessionFile");
-        $B->addAction("sed -i 's/\\r\$/\\n/' $accessionFile");
+        if ($accessionFileZip !~ /\.zip$/i) {
+            $B->addAction("sed 's/\\n\\r/\\n/' $accessionFile | sed 's/\\r/\\n/' > $targetAccessionFile");
+            $accessionFile = $targetAccessionFile;
+        } else {
+            $B->addAction("sed -i 's/\\n\\r/\\n/' $accessionFile");
+            $B->addAction("sed -i 's/\\r/\\n/' $accessionFile");
+        }
         #$B->addAction("dos2unix -q $accessionFile");
         #$B->addAction("mac2unix -q $accessionFile");
     }
@@ -936,7 +951,7 @@ push @allJobIds, $prevJobId;
 $B = $S->getBuilder();
 
 $B->queue($memqueue);
-my $sortRam = $extraRam ? $extraRam : 150;
+my $sortRam = $extraRam ? $extraRam : 250;
 $sortRam = "${sortRam}gb";
 $B->resource(1, 4, $sortRam);
 $B->dependency(0, $prevJobId);
@@ -1068,7 +1083,7 @@ my @transferFiles = ("$outputDir/1.out", "$outputDir/allsequences.fa", "$outputD
 
 $B->resource(1, 1, "1gb");
 $B->dependency(1, \@allJobIds);
-$B->addAction("rm -f $sortdir/*");
+#$B->addAction("rm -f $sortdir/*");
 $B->addAction("zip -j $outputDir/data_transfer.zip " . join(" ", @transferFiles)) if $zipTransfer;
 $B->jobName("${jobNamePrefix}cleanuperr");
 $B->renderToFile(getRenderFilePath("$scriptDir/cleanuperr.sh"));
@@ -1196,7 +1211,7 @@ sub createGraphJob {
             $B->addAction("rm -rf $blastOutputDir");
             $B->addAction("rm -rf $fracOutputDir");
             $B->addAction("rm -rf $outputDir/rdata");
-            #$B->addAction("rm $outputDir/database.* $outputDir/format.log"); # Needed for taxonomy
+            #$B->addAction("rm $blastDb.* $outputDir/format.log"); # Needed for taxonomy
             $B->addAction("rm $outputDir/sequences.fa.clstr");
         }
         $B->addAction("touch  $outputDir/1.out.completed");
