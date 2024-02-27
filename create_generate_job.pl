@@ -1213,6 +1213,7 @@ sub createGraphJob {
             $B->addAction("rm -rf $outputDir/rdata");
             #$B->addAction("rm $blastDb.* $outputDir/format.log"); # Needed for taxonomy
             $B->addAction("rm $outputDir/sequences.fa.clstr");
+            $B->addAction("rm $outputDir/length_uni*.tab $outputDir/progress $outputDir/edge.tab $outputDir/formatdb.log");
         }
         $B->addAction("touch  $outputDir/1.out.completed");
         $B->addAction("echo 100 > $progressFile");
