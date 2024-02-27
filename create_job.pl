@@ -43,7 +43,6 @@ push @args, ("--no-modules");
 push @args, "--exclude-fragments" if $data->{exclude_fragments};
 push @args, ("--np", $data->{np}) if $data->{np};
 push @args, ("--env-scripts", $envScripts) if $envScripts;
-push @args, ("--zip-transfer");
 
 
 
@@ -55,6 +54,7 @@ if ($type eq "family") {
 
     push @args, ("--pfam", $pfamFams) if $pfamFams;
     push @args, ("--ipro", $iproFams) if $iproFams;
+    push @args, ("--zip-transfer");
 
     $script = "create_generate_job.pl";
 } elsif ($type eq "blast") {
@@ -64,6 +64,7 @@ if ($type eq "family") {
 
     push @args, ("--seq", $seq) if $seq;
     push @args, ("--seq-file", $seqFile) if ($seqFile and not $seq);
+    push @args, ("--zip-transfer");
 
     $script = "create_blast_job.pl";
 } elsif ($type eq "analysis") {
