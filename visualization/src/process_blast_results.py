@@ -83,7 +83,7 @@ def filter_outlying_groups(df, min_num_edges, min_num_groups):
     
     return groups_to_keep
 
-def compute_summary_states(groups, field):
+def compute_summary_stats(groups, field):
     """
     computes summary and stores in dict so that it can be plotted with axs.bxp
     
@@ -124,8 +124,10 @@ def draw_boxplot(dd, pos, title, xlabel, ylabel, output_filename, output_filetyp
         title (str) - plot title
         xlabel (str) - x-axis label
         ylabel (str) - y-axis label
-        output_filename - file name to save plot image to. extension dictates format
-        dpis - if provided, a list of DPI values at which to render images
+        output_filename - file name to save plot image to, without extention
+        output_filetype - file type to create. Should be a valid extention
+        dpis (dict[str, int])- if provided, a dict image suffixes and DPI values at which to render images. These
+                               are in addition to the default 96dpi image
 
     """
     print(f"Drawing boxplot '{title}'")
@@ -136,7 +138,7 @@ def draw_boxplot(dd, pos, title, xlabel, ylabel, output_filename, output_filetyp
         medianprops=dict(color="blue", linewidth=1),
         capprops=dict(marker="o", color="gray", markersize=.005))
 
-    label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype)
+    label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis)
 
 def draw_histogram(df, pos, x_field, height_field, title, xlabel, ylabel, output_filename, output_filetype, dpis=None):
     """
@@ -150,14 +152,16 @@ def draw_histogram(df, pos, x_field, height_field, title, xlabel, ylabel, output
         title (str) - plot title
         xlabel (str) - x-axis label
         ylabel (str) - y-axis label
-        output_filename - file name to save plot image to. extension dictates format
-        dpis - if provided, a list of DPI values at which to render images
+        output_filename - file name to save plot image to, without extention
+        output_filetype - file type to create. Should be a valid extention
+        dpis (dict[str, int])- if provided, a dict image suffixes and DPI values at which to render images. These
+                               are in addition to the default 96dpi image
     """
     print(f"Drawing histogram '{title}'")
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(18, 9))
     axs.bar(x=df[x_field], height=df[height_field], edgecolor="blue", facecolor="red", linewidth=0.5, width=.8)
 
-    label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype)
+    label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis)
 
 def main(blast_output, job_id, min_edges, min_groups):
     #
@@ -190,27 +194,26 @@ def main(blast_output, job_id, min_edges, min_groups):
     print("Filtering sequences")
     groups_to_keep = filter_outlying_groups(df, min_edges, min_groups)
     groups = df.groupby("alignment_score").filter(lambda x: x.name in groups_to_keep).groupby(by="alignment_score")
-    df_counts = df.groupby(by="alignment_length").count().reset_index()
     
     #
     # Compute data for plot rendering and render plots
     #
-    
+    dpis={"small": 48}
     # alignment length box plot data
-    dd, pos = compute_summary_states(groups, "alignment_length")
-    draw_boxplot(dd, pos, f"Alignment Length vs Alignment Score for Job {args.job_id}", 
-                "Alignment Score", "Alignment Length", "boxplot_length", "png")
+    dd, pos = compute_summary_stats(groups, "alignment_length")
+    draw_boxplot(dd, pos, f"Alignment Length vs Alignment Score for Job {job_id}",
+                "Alignment Score", "Alignment Length", "boxplot_length", "png", dpis=dpis)
     
     # percent identical box plot data
-    dd, pos = compute_summary_states(groups, "percent_identical")
-    draw_boxplot(dd, pos, f"Percent Identical vs Alignment Score for Job {args.job_id}", 
-                "Alignment Score", "Percent Identical", "boxplot_pid", "png")
+    dd, pos = compute_summary_stats(groups, "percent_identical")
+    draw_boxplot(dd, pos, f"Percent Identical vs Alignment Score for Job {job_id}",
+                "Alignment Score", "Percent Identical", "boxplot_pid", "png", dpis=dpis)
     
     # counts per alignment score histogram data - reset_index() moves scores from the index to a column
     # then `alignment_length` contains counts
     df_edges = groups["alignment_length"].count().reset_index()
     draw_histogram(df_edges, df_edges.index, "alignment_score", "alignment_length", f"Number of Edges at Alignment Score for Job {args.job_id}", 
-                "Alignment Score", "Number of Edges", "edge_hist", "png")
+                "Alignment Score", "Number of Edges", "edge_hist", "png", dpis=dpis)
 
 if __name__ == "__main__":
     args = parse_args()
