@@ -57,11 +57,14 @@ def count_lengths(fasta_file: str, frac: float) -> pd.DataFrame:
     return df
 
 
-if __name__ == "__main__":
-    args = parse_args()
-    df = count_lengths(args.fasta, args.frac)   
+def main(fasta_file, job_id, frac, output_filename, output_filetype):
+    df = count_lengths(fasta_file, frac)
 
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(18, 9))
     axs.bar(x=df["length"], height=df["count"], edgecolor="blue", facecolor="red", linewidth=0.5, width=.8)
-    label_and_render_plot(fig, axs, df["length"], f"Sequence Count vs Length for Job {args.job_id}", 
-                        "Sequence Length", "Number of Sequences", "uniprot_lengths", "png", dpis={"small": 48})
+    label_and_render_plot(fig, axs, df["length"], f"Sequence Count vs Length for Job {job_id}",
+                        "Sequence Length", "Number of Sequences", output_filename, output_filetype, dpis={"small": 48})
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args.fasta, args.job_id, args.frac)
