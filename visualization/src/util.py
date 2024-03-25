@@ -24,15 +24,22 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
     axs.set_ylabel(ylabel)
     axs.spines[['right', 'top']].set_visible(False)
 
-    # let's aim for about 30 xticks, in line with default min groups
+    # let's aim for about 30 xticks at 96dpi and interoplate using that
+    # this number is in line with default min groups
     pos = list(pos)
     spacing = int(max(len(pos) / 30, 1))
-    new_ticks = range(pos[0],pos[-1], spacing)# pos[0::spacing]
+    new_ticks = range(pos[0],pos[-1], spacing)
     axs.set_xticks(ticks=new_ticks, labels=new_ticks)
     axs.set_xlim(0, pos[-1]+1)
+    fig.savefig(f"{output_filename}.{output_filetype}", dpi=96)
 
     if type(dpis) == dict:
         for name, dpi in dpis.items():
+            # scale x ticks based on resolution, since this part is intended
+            # for rendering previews, cap number of labels at 30
+            # (this means all resolutions passed in should be < 96)
+            scaling_factor = min(30.0/96.0 * dpi, 30)
+            spacing = int(max(len(pos) / scaling_factor, 1))
+            new_ticks = range(pos[0],pos[-1], spacing)
+            axs.set_xticks(ticks=new_ticks, labels=new_ticks)
             fig.savefig(f"{output_filename}_{name}.{output_filetype}", dpi=dpi)
-
-    fig.savefig(f"{output_filename}.{output_filetype}", dpi=96)
