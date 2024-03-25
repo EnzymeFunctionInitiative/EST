@@ -4,12 +4,10 @@ computes cumulative-sum table for alignment scores
 """
 
 import argparse
-import os
-import sys
 
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from util import label_and_render_plot
 

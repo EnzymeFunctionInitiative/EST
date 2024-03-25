@@ -3,8 +3,8 @@ Plot data from lenght_uniprot.tab
 """
 import argparse
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from util import label_and_render_plot
 
