@@ -1,3 +1,4 @@
+biopython==1.83
 contourpy==1.2.0
 cycler==0.12.1
 fonttools==4.50.0
