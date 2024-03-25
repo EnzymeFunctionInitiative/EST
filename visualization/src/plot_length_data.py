@@ -15,6 +15,8 @@ def parse_args():
     parser.add_argument("--fasta", type=str, required=True, help="FASTA file containing all sequences")
     parser.add_argument("--job-id", required=True, help="Job ID number for BLAST output file")
     parser.add_argument("--frac", type=float, default=1, help="Percent of length values to include in plot")
+    parser.add_argument("--plot-filename", type=str, required=True, help="Filename, without extention, to write the plots to")
+    parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
     
     args = parser.parse_args()
     return args
@@ -67,4 +69,4 @@ def main(fasta_file, job_id, frac, output_filename, output_filetype):
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args.fasta, args.job_id, args.frac)
+    main(args.fasta, args.job_id, args.frac, args.plot_filename, args.output_type)

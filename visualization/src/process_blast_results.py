@@ -21,6 +21,10 @@ def parse_args():
     parser.add_argument("--min-groups", 
                         type=int, default=30, 
                         help="Minimum number of alignment-score groups to retain in output")
+    parser.add_argument("--length-plot-filename", type=str, required=True, help="Filename, without extention, to write the alignment length boxplots to")
+    parser.add_argument("--pid-plot-filename", type=str, required=True, help="Filename, without extention, to write the percent identity boxplots to")
+    parser.add_argument("--edge-hist-filename", type=str, required=True, help="Filename, without extention, to write the edge count histograms to")
+    parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
     
     args = parser.parse_args()
     return args
@@ -161,7 +165,7 @@ def draw_histogram(df, pos, x_field, height_field, title, xlabel, ylabel, output
 
     label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis)
 
-def main(blast_output, job_id, min_edges, min_groups):
+def main(blast_output, job_id, min_edges, min_groups, length_filename, pid_filename, edge_filename, output_format):
     #
     # Load data
     #
@@ -181,7 +185,7 @@ def main(blast_output, job_id, min_edges, min_groups):
     print("Generating alignment score cumulative sum output table")
     df_alignment_score_table = df.groupby(by="alignment_score")["alignment_length"].count().reset_index()
     df_alignment_score_table["cumulative_sum"] = df_alignment_score_table.loc[::-1,"alignment_length"].cumsum()[::-1]
-    df_alignment_score_table.to_csv("alignment_score.tsv", sep="\t", index=False, header=False)
+    df_alignment_score_table.to_csv(f"alignment_score_{job_id}.tsv", sep="\t", index=False, header=False)
     # free this df to save memory
     del df_alignment_score_table
 
@@ -200,19 +204,20 @@ def main(blast_output, job_id, min_edges, min_groups):
     # alignment length box plot data
     dd, pos = compute_summary_stats(groups, "alignment_length")
     draw_boxplot(dd, pos, f"Alignment Length vs Alignment Score for Job {job_id}",
-                "Alignment Score", "Alignment Length", "boxplot_length", "png", dpis=dpis)
+                "Alignment Score", "Alignment Length", length_filename, output_format, dpis=dpis)
     
     # percent identical box plot data
     dd, pos = compute_summary_stats(groups, "percent_identical")
     draw_boxplot(dd, pos, f"Percent Identical vs Alignment Score for Job {job_id}",
-                "Alignment Score", "Percent Identical", "boxplot_pid", "png", dpis=dpis)
+                "Alignment Score", "Percent Identical", pid_filename, output_format, dpis=dpis)
     
     # counts per alignment score histogram data - reset_index() moves scores from the index to a column
     # then `alignment_length` contains counts
     df_edges = groups["alignment_length"].count().reset_index()
     draw_histogram(df_edges, df_edges.index, "alignment_score", "alignment_length", f"Number of Edges at Alignment Score for Job {args.job_id}", 
-                "Alignment Score", "Number of Edges", "edge_hist", "png", dpis=dpis)
+                "Alignment Score", "Number of Edges", edge_filename, output_format, dpis=dpis)
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args.blast_output, args.job_id, args.min_edges, args.min_groups)
+    main(args.blast_output, args.job_id, args.min_edges, args.min_groups,
+         args.length_plot_filename, args.pid_plot_filename, args.edge_hist_filename, args.output_type)
