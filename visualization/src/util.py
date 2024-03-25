@@ -1,7 +1,7 @@
 """
 Utilities and helper functions
 """
-
+import math
 
 def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis=None):
     """
@@ -27,11 +27,11 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
     # let's aim for about 30 xticks at 96dpi and interoplate using that
     # this number is in line with default min groups
     pos = list(pos)
-    spacing = int(max(len(pos) / 30, 1))
+    spacing = (max(math.ceil((pos[-1] - pos[0]) / 30), 1))
     new_ticks = range(pos[0],pos[-1], spacing)
     axs.set_xticks(ticks=new_ticks, labels=new_ticks)
-    axs.set_xlim(0, pos[-1]+1)
-    fig.savefig(f"{output_filename}.{output_filetype}", dpi=96)
+    axs.set_xlim(max(0, pos[0]-spacing), pos[-1]+1)
+    fig.savefig(f"{output_filename}.{output_filetype}", bbox_inches='tight', dpi=96)
 
     if type(dpis) == dict:
         for name, dpi in dpis.items():
@@ -39,7 +39,7 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
             # for rendering previews, cap number of labels at 30
             # (this means all resolutions passed in should be < 96)
             scaling_factor = min(30.0/96.0 * dpi, 30)
-            spacing = int(max(len(pos) / scaling_factor, 1))
+            spacing = (max(math.ceil((pos[-1] - pos[0]) / 30), 1))
             new_ticks = range(pos[0],pos[-1], spacing)
             axs.set_xticks(ticks=new_ticks, labels=new_ticks)
-            fig.savefig(f"{output_filename}_{name}.{output_filetype}", dpi=dpi)
+            fig.savefig(f"{output_filename}_{name}.{output_filetype}", bbox_inches='tight', dpi=dpi)
