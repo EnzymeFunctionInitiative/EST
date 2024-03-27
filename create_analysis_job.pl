@@ -333,7 +333,6 @@ my $filterJobId = $S->submit("$analysisDir/filterblast.sh", $dryrun);
 chomp($filterJobId);
 $filterJobId = getJobId($filterJobId);
 push @jobIds, $filterJobId;
-print "Filterblast job is:\n$filterJobId\n" if not $runSerial;
 
 
 my $xgmmlDomainArgs = $hasDomain ? "--is-domain" : "";

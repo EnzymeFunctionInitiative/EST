@@ -146,7 +146,7 @@ sub getNumTasks {
     my $ids = shift;
     my $sizes = shift;
 
-    my $np = 24;
+    my $np = 48;
     my $ram = 30;
 
     # First is largest

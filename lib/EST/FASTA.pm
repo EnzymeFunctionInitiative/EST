@@ -185,7 +185,7 @@ sub parseFile {
     }
 
     foreach my $idx (keys %seq) {
-        (my $seq = $seq{$idx}->{seq}) =~ s/\s//gs;
+        (my $seq = $seq{$idx}->{seq}) =~ s/[\s\-]//gs;
         $seqMeta->{$idx}->{seq_len} = length $seq;
     }
 
