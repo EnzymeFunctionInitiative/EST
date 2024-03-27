@@ -187,8 +187,6 @@ def delete_outlying_groups(metadata: dict[int, Group], groups_to_delete: set) ->
         Metadata dict with groups removed
     """
     for group in groups_to_delete:
-        os.remove(metadata[group].length_filename)
-        os.remove(metadata[group].pident_filename)
         del metadata[group]
     return metadata
 
@@ -220,7 +218,7 @@ def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_fi
     print("computing groups to discard")
     groups_to_delete = compute_outlying_groups(metadata, min_edges, min_groups)
 
-    print(f"deleting {len(groups_to_delete)} groups")
+    print(f"removing {len(groups_to_delete)} groups")
     metadata = delete_outlying_groups(metadata, groups_to_delete)
 
     # plot alignment_length
