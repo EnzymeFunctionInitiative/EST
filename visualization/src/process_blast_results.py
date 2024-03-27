@@ -25,7 +25,7 @@ def parse_args():
                         type=int, default=30, 
                         help="Minimum number of alignment-score groups to retain in output")
     parser.add_argument("--length-plot-filename", type=str, required=True, help="Filename, without extention, to write the alignment length boxplots to")
-    parser.add_argument("--pid-plot-filename", type=str, required=True, help="Filename, without extention, to write the percent identity boxplots to")
+    parser.add_argument("--pident-plot-filename", type=str, required=True, help="Filename, without extention, to write the percent identity boxplots to")
     parser.add_argument("--edge-hist-filename", type=str, required=True, help="Filename, without extention, to write the edge count histograms to")
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
     
@@ -138,13 +138,13 @@ def compute_summary_statistic_for_group(filename: str) -> dict[str, float]:
 
 def compute_summary_statistics(metadata: dict[int, Group], field: str) -> tuple[list[dict[str, float]], list[int]]:
     """
-    Computes five-number summaries for the indicated field, either "length_filename" or "perid_filename"
+    Computes five-number summaries for the indicated field, either "length_filename" or "pident_filename"
 
     Parameters:
     ---
         metadata (dict[int, Group]) - cache metadata from `group_output_data`
         
-        field (str) - either "length_filename" or "perid_filename"
+        field (str) - either "length_filename" or "pident_filename"
 
     Returns:
     ---
@@ -174,7 +174,7 @@ def delete_outlying_groups(metadata: dict[int, Group], groups_to_delete: set) ->
     """
     for group in groups_to_delete:
         os.remove(metadata[group].length_filename)
-        os.remove(metadata[group].perid_filename)
+        os.remove(metadata[group].pident_filename)
         del metadata[group]
     return metadata
 
@@ -194,7 +194,7 @@ def get_edge_hist_data(metadata: dict[int, Group]) -> tuple[list[int], list[int]
     heights = [metadata[k].edge_count for k in xpos]
     return xpos, heights
 
-def main(blast_output, job_id, min_edges, min_groups, length_filename, pid_filename, edge_filename, output_format, delete_cache=True):
+def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_filename, edge_filename, output_format, delete_cache=True):
     # compute groups and trim outliers
     print("grouping output data")
     metadata, cachedir = group_output_data(blast_output)
@@ -213,9 +213,9 @@ def main(blast_output, job_id, min_edges, min_groups, length_filename, pid_filen
 
     # percent identical box plot data
     print("Computing boxplot stats for percent identical")
-    perid_dd, perid_xpos = compute_summary_statistics(metadata, "perid_filename")
-    draw_boxplot(perid_dd, perid_xpos, f"Percent Identical vs Alignment Score for Job {job_id}",
-                "Alignment Score", "Percent Identical", pid_filename, output_format)
+    pident_dd, pident_xpos = compute_summary_statistics(metadata, "pident_filename")
+    draw_boxplot(pident_dd, pident_xpos, f"Percent Identical vs Alignment Score for Job {job_id}",
+                "Alignment Score", "Percent Identical", pident_filename, output_format)
     
     # draw edge length histogram
     print("Extracting histogram data")
@@ -230,4 +230,4 @@ def main(blast_output, job_id, min_edges, min_groups, length_filename, pid_filen
 if __name__ == "__main__":
     args = parse_args()
     main(args.blast_output, args.job_id, args.min_edges, args.min_groups,
-         args.length_plot_filename, args.pid_plot_filename, args.edge_hist_filename, args.output_type)
+         args.length_plot_filename, args.pident_plot_filename, args.edge_hist_filename, args.output_type)

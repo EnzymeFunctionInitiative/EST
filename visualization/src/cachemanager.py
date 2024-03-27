@@ -2,7 +2,7 @@ import os
 from collections import namedtuple, OrderedDict
 from typing import Any
 
-Group = namedtuple("Group", ["edge_count", "length_filename", "perid_filename"])
+Group = namedtuple("Group", ["edge_count", "length_filename", "pident_filename"])
 
 class CacheManager():
     """
@@ -35,7 +35,7 @@ class CacheManager():
         self._fh_dump_size = filehandle_dump_size
 
         self.LENGTH = "length"
-        self.PERID = "perid"
+        self.PERID = "pident"
 
         assert max_filehandles > filehandle_dump_size
 
@@ -160,13 +160,13 @@ class CacheManager():
 
         Returns:
         ---
-            A dict of {alignment_score: Group("edge_count", "length_filename", "perid_filename")}
+            A dict of {alignment_score: Group("edge_count", "length_filename", "pident_filename")}
         """
         metadata = {}
         for k in self.edge_counts.keys():
             g = Group(edge_count=self.edge_counts[k],
                       length_filename=self.get_cache_filename(self.format_key(self.LENGTH, k)),
-                      perid_filename=self.get_cache_filename(self.format_key(self.PERID, k))
+                      pident_filename=self.get_cache_filename(self.format_key(self.PERID, k))
                       )
             metadata[k] = g 
         return metadata
