@@ -208,17 +208,17 @@ def get_edge_hist_data(metadata: dict[int, Group]) -> tuple[list[int], list[int]
 
 def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_filename, edge_filename, evalue_tab_filename, output_format, delete_cache=True):
     # compute groups and trim outliers
-    print("grouping output data")
+    print("Grouping output data")
     metadata, cachedir = group_output_data(blast_output)
 
     # save evalue table
     print("Saving edge count cumulative sum table")
     save_edge_counts(metadata, evalue_tab_filename)
 
-    print("computing groups to discard")
+    print("Computing groups to discard")
     groups_to_delete = compute_outlying_groups(metadata, min_edges, min_groups)
 
-    print(f"removing {len(groups_to_delete)} groups")
+    print(f"Removing {len(groups_to_delete)} groups")
     metadata = delete_outlying_groups(metadata, groups_to_delete)
 
     # plot alignment_length
