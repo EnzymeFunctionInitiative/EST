@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument("--length-plot-filename", type=str, required=True, help="Filename, without extention, to write the alignment length boxplots to")
     parser.add_argument("--pident-plot-filename", type=str, required=True, help="Filename, without extention, to write the percent identity boxplots to")
     parser.add_argument("--edge-hist-filename", type=str, required=True, help="Filename, without extention, to write the edge count histograms to")
-    parser.add_argument("--evalue-tab-file", type=str, required=True, help="Filename to save evalue cumulative sum table to")
+    parser.add_argument("--evalue-tab-filename", type=str, required=True, help="Filename to save evalue cumulative sum table to")
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
 
     args = parser.parse_args()
@@ -246,4 +246,5 @@ def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_fi
 if __name__ == "__main__":
     args = parse_args()
     main(args.blast_output, args.job_id, args.min_edges, args.min_groups,
-        args.length_plot_filename, args.pident_plot_filename, args.edge_hist_filename, args.evalue_tab_file, args.output_type)
+        args.length_plot_filename, args.pident_plot_filename, args.edge_hist_filename, args.evalue_tab_filename,
+        args.output_type)
