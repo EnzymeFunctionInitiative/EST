@@ -7,8 +7,6 @@ This code replaces several perl + R scripts previously used to generate plots. S
 - A histogram of alignment score vs edge count
 - A tabular file of sorted alignment score values with a cumulative sum
 
-It uses a pandas dataframe to do calculations. This makes it fast, but also very memory-hungry.
-
 `plot_length_data.py` renders a length histogram from a FASTA file
 
 ## Usage
