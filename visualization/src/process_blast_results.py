@@ -27,8 +27,9 @@ def parse_args():
     parser.add_argument("--length-plot-filename", type=str, required=True, help="Filename, without extention, to write the alignment length boxplots to")
     parser.add_argument("--pident-plot-filename", type=str, required=True, help="Filename, without extention, to write the percent identity boxplots to")
     parser.add_argument("--edge-hist-filename", type=str, required=True, help="Filename, without extention, to write the edge count histograms to")
+    parser.add_argument("--evalue-tab-file", type=str, required=True, help="Filename to save evalue cumulative sum table to")
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
-    
+
     args = parser.parse_args()
     return args
 
@@ -60,7 +61,6 @@ def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
 
                 cm.append(alignment_score, alignment_length, percent_identical)
 
-            cm.save_edge_counts("evalue.tab")
             metadata = cm.get_edge_counts_and_filenames()
     
     return metadata, cachedir
@@ -111,6 +111,20 @@ def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int
     groups_to_keep = set(k for k, _ in sizes[lower_bound_idx:-upper_bound_idx])
 
     return set([k for k, _ in sizes]) - groups_to_keep
+
+def save_edge_counts(metadata: dict[int, Group], filename: str) -> None:
+        """
+        Saves edge counts and cumulative edge counts from metadata to a file
+
+        Parameters:
+        ---
+            metadata (dict[int, Group]) - cache metadata from `group_output_data`
+            filename (str) - Filename to which edge counts are saved
+        """
+        summed_edge_counts = {k: (metadata[k].edge_count, metadata[k].cumulative_edge_count) for k in metadata.keys()}
+        with open(filename, "w+") as f:
+            for k, t in sorted(summed_edge_counts.items()):
+                f.write(f"{k}\t{t[0]}\t{t[1]}\n")
 
 def compute_summary_statistic_for_group(filename: str) -> dict[str, float]:
     """
@@ -194,10 +208,14 @@ def get_edge_hist_data(metadata: dict[int, Group]) -> tuple[list[int], list[int]
     heights = [metadata[k].edge_count for k in xpos]
     return xpos, heights
 
-def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_filename, edge_filename, output_format, delete_cache=True):
+def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_filename, edge_filename, evalue_tab_filename, output_format, delete_cache=True):
     # compute groups and trim outliers
     print("grouping output data")
     metadata, cachedir = group_output_data(blast_output)
+
+    # save evalue table
+    print("Saving edge count cumulative sum table")
+    save_edge_counts(metadata, evalue_tab_filename)
 
     print("computing groups to discard")
     groups_to_delete = compute_outlying_groups(metadata, min_edges, min_groups)
@@ -230,4 +248,4 @@ def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_fi
 if __name__ == "__main__":
     args = parse_args()
     main(args.blast_output, args.job_id, args.min_edges, args.min_groups,
-         args.length_plot_filename, args.pident_plot_filename, args.edge_hist_filename, args.output_type)
+        args.length_plot_filename, args.pident_plot_filename, args.edge_hist_filename, args.evalue_tab_file, args.output_type)

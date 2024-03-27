@@ -2,7 +2,7 @@ import os
 from collections import namedtuple, OrderedDict
 from typing import Any
 
-Group = namedtuple("Group", ["edge_count", "length_filename", "pident_filename"])
+Group = namedtuple("Group", ["edge_count", "cumulative_edge_count", "length_filename", "pident_filename"])
 
 class CacheManager():
     """
@@ -137,21 +137,8 @@ class CacheManager():
         summed_edge_counts = {}
         for k in reversed(sorted(self.edge_counts.keys())):
             cumsum += self.edge_counts[k]
-            summed_edge_counts[k] = (self.edge_counts[k], cumsum)
+            summed_edge_counts[k] = cumsum
         return summed_edge_counts
-
-    def save_edge_counts(self, filename) -> None:
-        """
-        Saves edge counts computed by self._compte_cumlative_sum to a file
-
-        Parameters:
-        ---
-            Filename to which edge counts are saved
-        """
-        summed_edge_counts = self._compute_cumulative_sum()
-        with open(filename, "w+") as f:
-            for k, t in sorted(summed_edge_counts.items()):
-                f.write(f"{k}\t{t[0]}\t{t[1]}\n")
 
     def get_edge_counts_and_filenames(self) -> dict[int, Group]:
         """
@@ -160,11 +147,13 @@ class CacheManager():
 
         Returns:
         ---
-            A dict of {alignment_score: Group("edge_count", "length_filename", "pident_filename")}
+            A dict of {alignment_score: Group("edge_count", "cumulative_edge_count", "length_filename", "pident_filename")}
         """
         metadata = {}
+        summed_edge_counts = self._compute_cumulative_sum()
         for k in self.edge_counts.keys():
             g = Group(edge_count=self.edge_counts[k],
+                      cumulative_edge_count=summed_edge_counts[k],
                       length_filename=self.get_cache_filename(self.format_key(self.LENGTH, k)),
                       pident_filename=self.get_cache_filename(self.format_key(self.PERID, k))
                       )
