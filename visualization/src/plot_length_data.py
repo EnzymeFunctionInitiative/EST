@@ -12,7 +12,7 @@ import util
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
-    parser.add_argument("--fasta", type=str, required=True, help="FASTA file containing all sequences")
+    parser.add_argument("--lengths", type=str, required=True, help="Tab-separated file containing lengths and counts")
     parser.add_argument("--job-id", required=True, help="Job ID number for BLAST output file")
     parser.add_argument("--frac", type=float, default=1, help="Percent of length values to include in plot")
     parser.add_argument("--plot-filename", type=str, required=True, help="Filename, without extention, to write the plots to")
@@ -24,9 +24,9 @@ def parse_args():
     return args
 
 
-def count_lengths(fasta_file: str, frac: float) -> pd.DataFrame:
+def count_lengths(count_file: str, frac: float) -> pd.DataFrame:
     """
-    Aggregate length-counts of sequences in given FASTA
+    Load and trim length histogram data
 
     This function can also trim ends of the data. The method to do this
     is borrowed from the original perl code and it seems to include a
@@ -34,24 +34,14 @@ def count_lengths(fasta_file: str, frac: float) -> pd.DataFrame:
 
     Parameters:
     ---
-        fasta_file (str) - path to the FASTA file
+        count_file (str) - path to a 2 column tsv (length and count)
         frac (float) - percentage of counts to include
     
     Returns:
     ---
         A pandas DataFrame object with "count" and "length" columns
     """
-    lengths = {}
-    with open(fasta_file) as f:
-        for record in SeqIO.parse(f, "fasta"):
-            l = len(str(record.seq))
-            lengths[l] = lengths.get(l, 0) + 1
-
-    # this line converts from {length1: count1, length2: count2,...}
-    # to (length1, length2,...), (count1, count2,...) which become
-    # columns
-    lengths, counts = zip(*sorted(lengths.items()))
-    df = pd.DataFrame({"length": lengths, "count": counts})
+    df = pd.read_csv(count_file, sep="\t", names=["length", "count"])
     df['sequence_sum'] = df["count"].cumsum()
     # trim values using --frac value
     end_trim = int(df["count"].sum() * (1.0-frac) / 2.0)
@@ -61,14 +51,16 @@ def count_lengths(fasta_file: str, frac: float) -> pd.DataFrame:
     return df
 
 
-def main(fasta_file, job_id, frac, output_filename, output_filetype, proxies):
-    df = count_lengths(fasta_file, frac)
+def main(lengths_file, job_id, frac, output_filename, output_filetype, proxies):
+    print(f"Reading lengths from '{lengths_file}'")
+    df = count_lengths(lengths_file, frac)
 
+    print("Plotting histogram")
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(18, 9))
     axs.bar(x=df["length"], height=df["count"], edgecolor="blue", facecolor="red", linewidth=0.5, width=.8)
-    util.label_and_render_plot(fig, axs, df["length"], f"Sequence Count vs Length for Job {job_id}",
+    util.label_and_render_plot(fig, axs, df["length"], f"Number of Sequences at Each Length for Job ID {job_id}",
                         "Sequence Length", "Number of Sequences", output_filename, output_filetype, dpis=proxies)
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args.fasta, args.job_id, args.frac, args.plot_filename, args.output_type, args.proxies)
+    main(args.lengths, args.job_id, args.frac, args.plot_filename, args.output_type, args.proxies)
