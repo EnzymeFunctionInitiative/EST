@@ -7,7 +7,7 @@ from Bio import SeqIO
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from util import label_and_render_plot
+import util
 
 
 def parse_args():
@@ -17,8 +17,10 @@ def parse_args():
     parser.add_argument("--frac", type=float, default=1, help="Percent of length values to include in plot")
     parser.add_argument("--plot-filename", type=str, required=True, help="Filename, without extention, to write the plots to")
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
+    parser.add_argument("--proxies", metavar="KEY:VALUE", nargs="+", help="A list of name:dpi pairs for rendering smaller proxy images. Names wil be included in filenames, DPIs should be less than 96")
     
     args = parser.parse_args()
+    args.proxies = util.parse_proxies(args.proxies)
     return args
 
 
@@ -59,14 +61,14 @@ def count_lengths(fasta_file: str, frac: float) -> pd.DataFrame:
     return df
 
 
-def main(fasta_file, job_id, frac, output_filename, output_filetype):
+def main(fasta_file, job_id, frac, output_filename, output_filetype, proxies):
     df = count_lengths(fasta_file, frac)
 
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(18, 9))
     axs.bar(x=df["length"], height=df["count"], edgecolor="blue", facecolor="red", linewidth=0.5, width=.8)
-    label_and_render_plot(fig, axs, df["length"], f"Sequence Count vs Length for Job {job_id}",
-                        "Sequence Length", "Number of Sequences", output_filename, output_filetype, dpis={"small": 48})
+    util.label_and_render_plot(fig, axs, df["length"], f"Sequence Count vs Length for Job {job_id}",
+                        "Sequence Length", "Number of Sequences", output_filename, output_filetype, dpis=proxies)
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args.fasta, args.job_id, args.frac, args.plot_filename, args.output_type)
+    main(args.fasta, args.job_id, args.frac, args.plot_filename, args.output_type, args.proxies)

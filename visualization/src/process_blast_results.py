@@ -5,14 +5,14 @@ computes cumulative-sum table for alignment scores
 
 import argparse
 from math import log10
-import os
 import shutil
 from uuid import uuid4
 
 import numpy as np
 
-from plot import draw_boxplot, draw_histogram
 from cachemanager import CacheManager, Group
+from plot import draw_boxplot, draw_histogram
+from util import parse_proxies
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
@@ -29,8 +29,10 @@ def parse_args():
     parser.add_argument("--edge-hist-filename", type=str, required=True, help="Filename, without extention, to write the edge count histograms to")
     parser.add_argument("--evalue-tab-filename", type=str, required=True, help="Filename to save evalue cumulative sum table to")
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
+    parser.add_argument("--proxies", metavar="KEY:VALUE", nargs="+", help="A list of key:value pairs for rendering smaller proxy images. Keys wil be included in filenames, values should be less than 96")
 
     args = parser.parse_args()
+    args.proxies = parse_proxies(args.proxies)
     return args
 
 def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
@@ -206,7 +208,7 @@ def get_edge_hist_data(metadata: dict[int, Group]) -> tuple[list[int], list[int]
     heights = [metadata[k].edge_count for k in xpos]
     return xpos, heights
 
-def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_filename, edge_filename, evalue_tab_filename, output_format, delete_cache=True):
+def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_filename, edge_filename, evalue_tab_filename, output_format, proxies, delete_cache=True):
     # compute groups and trim outliers
     print("Grouping output data")
     metadata, cachedir = group_output_data(blast_output)
@@ -225,19 +227,19 @@ def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_fi
     print("Computing boxplot stats for alignment length")
     length_dd, length_xpos = compute_summary_statistics(metadata, "length_filename")
     draw_boxplot(length_dd, length_xpos, f"Alignment Length vs Alignment Score for Job {job_id}",
-                "Alignment Score", "Alignment Length", length_filename, output_format)
+                "Alignment Score", "Alignment Length", length_filename, output_format, dpis=proxies)
 
     # percent identical box plot data
     print("Computing boxplot stats for percent identical")
     pident_dd, pident_xpos = compute_summary_statistics(metadata, "pident_filename")
     draw_boxplot(pident_dd, pident_xpos, f"Percent Identical vs Alignment Score for Job {job_id}",
-                "Alignment Score", "Percent Identical", pident_filename, output_format)
+                "Alignment Score", "Percent Identical", pident_filename, output_format, dpis=proxies)
     
     # draw edge length histogram
     print("Extracting histogram data")
     xpos, heights = get_edge_hist_data(metadata)
     draw_histogram(xpos, heights, f"Number of Edges at Alignment Score for Job {job_id}",
-                "Alignment Score", "Number of Edges", edge_filename, output_format)
+                "Alignment Score", "Number of Edges", edge_filename, output_format, dpis=proxies)
 
     # cleanup cache dir
     if delete_cache:
@@ -247,4 +249,4 @@ if __name__ == "__main__":
     args = parse_args()
     main(args.blast_output, args.job_id, args.min_edges, args.min_groups,
         args.length_plot_filename, args.pident_plot_filename, args.edge_hist_filename, args.evalue_tab_filename,
-        args.output_type)
+        args.output_type, args.proxies)
