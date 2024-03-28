@@ -19,7 +19,7 @@ This code was develop with Python 3.10.12. Python 3.10.x should be used to run i
 
 2. Activate the environment and install required packages
    ```
-   source efi-viz/bin/activate; pip install -R requirements.txt
+   source efi-viz/bin/activate; pip install -r requirements.txt
    ```
 
 3. Generate BLAST visualizations
