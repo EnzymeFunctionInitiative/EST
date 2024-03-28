@@ -29,5 +29,5 @@ This code was develop with Python 3.10.12. Python 3.10.x should be used to run i
 
 4. Generate the uniref/uniprot length histogram
    ```
-   python3 plot_length_data.py --evalue-table length_uniprot.tab --job-id 131
+   python3 plot_length_data.py --lengths ../est_graphs/graph_data_small/length_uniprot.tab --job-id 131 --plot-filename hist
    ```
