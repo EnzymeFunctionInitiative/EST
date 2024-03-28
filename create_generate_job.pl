@@ -1020,52 +1020,6 @@ my @convRatioJobLine=split /\./, $convRatioJob;
 
 push @allJobIds, $convRatioJobLine[0];
 
-
-
-########################################################################################################################
-# Removed in favor of R, comments kept in case someone ever wants to use the pure perl solution
-=pod Start comment
-#submit the quartiles scripts, should not run until filterjob is finished
-#nothing else depends on this scipt
-
-$B->queue($memqueue);
-$B->dependency(0, $prevJobId);
-addModule($B, "module load $efiDbMod");
-addModule($B, "module load $efiEstMod");
-$B->addAction("$efiEstTools/quart-align.pl -blastout $outputDir/1.out -align $outputDir/alignment_length.png");
-$B->renderToFile(getRenderFilePath("$scriptDir/quartalign.sh"));
-
-my $quartalignjob = $S->submit("$scriptDir/quartalign.sh");
-chomp $quartalignjob;
-print "Quartile Align job is:\n $quartalignjob\n" if not $runSerial;
-
-
-$B->queue($memqueue);
-$B->dependency(0, $prevJobId);
-$B->addAction("#PBS -m e");
-addModule($B, "module load $efiDbMod");
-addModule($B, "module load $efiEstMod");
-$B->addAction("$efiEstTools/quart-perid.pl -blastout $outputDir/1.out -pid $outputDir/percent_identity.png");
-$B->renderToFile(getRenderFilePath("$scriptDir/quartpid.sh"));
-
-my $quartpidjob = $S->submit("$scriptDir/quartpid.sh");
-chomp $quartpidjob;
-print "Quartiles Percent Identity job is:\n $quartpidjob\n" if not $runSerial;
-
-
-$B->queue($memqueue);
-$B->dependency(0, $prevJobId);
-addModule($B, "module load $efiDbMod");
-addModule($B, "module load $efiEstMod");
-$B->addAction("$efiEstTools/simplegraphs.pl -blastout $outputDir/1.out -edges $outputDir/number_of_edges.png -fasta $allSeqFile -lengths $outputDir/length_histogram.png -incfrac $incfrac");
-$B->renderToFile(getRenderFilePath("$scriptDir/simplegraphs.sh"));
-
-my $simplegraphjob = $S->submit("$scriptDir/simplegraphs.sh");
-chomp $simplegraphjob;
-print "Simplegraphs job is:\n $simplegraphjob\n" if not $runSerial;
-=cut end comment
-
-
 ########################################################################################################################
 # Create information for R to make graphs and then have R make them
 #
@@ -1153,26 +1107,27 @@ sub createGraphJob {
         #addModule($B, "module load $perlMod");
         #addModule($B, "module load $rMod");
         if (not $lengthHistoOnly) {
-            $B->addAction("mkdir -p $outputDir/rdata");
-            # Lengths are retrieved in a previous step.
-            $B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -incfrac $incfrac -evalue-file $evalueFile");
-            $B->addAction("FIRST=`ls $outputDir/rdata/perid* 2>/dev/null | head -1`");
-            $B->addAction("if [ -z \"\$FIRST\" ]; then");
-            $B->addAction("    echo \"Graphs failed, there were no edges. Continuing without graphs.\"");
-            $B->addAction("    touch $outputDir/graphs.failed");
-            $B->addAction("    touch  $outputDir/1.out.completed");
-            $B->addAction("    exit 0 #Exit with no error");
+            # if the environment is not present, try to create it (this should almost never happen)
+            $B->addAction("if [ ! -r visualization/efi-viz/bin/activate ]; then");
+            $B->addAction("     echo \"Python environment not found, creating it\"")
+            $B->addAction("     python3 -mvenv visualization/efi-viz");
+            $B->addAction("     source visualization/efi-viz/bin/activate");
+            $B->addAction("     pip install -r visualization/requirements.txt");
+            # otherwise just activate
+            $B->addAction("else");
+            $B->addAction("     source visualization/efi-viz/bin/activate");
             $B->addAction("fi");
-            $B->addAction("FIRST=`head -1 \$FIRST`");
-            $B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
-            $B->addAction("LAST=`head -1 \$LAST`");
-            $B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
-            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN $jobId");
-            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length_sm.png \$FIRST \$LAST \$MAXALIGN $jobId $smallWidth $smallHeight");
-            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST $jobId");
-            $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
-            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
-            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+
+            # generate the two boxplots, evalue tsv, and edge histogram
+            # proxy options for plots are specified in command
+            $B->addAction("python process_blast_results.py" .
+                          " --blast-output $outputDir/1.out" .
+                          " --job-id $jobId".
+                          " --length-plot-filename $outputDir/alignment_length" .
+                          " --pident-plot-filename $outputDir/percent_identity" .
+                          " --edge-hist-filename $outputDir/number_of_edges" .
+                          " --evalue-tab-filename $outputDir/edge.tab" .
+                          " --proxies sm:48");
         }
         my %lenFiles = ($lenUniprotFile => {title => "", file => "length_histogram_uniprot"});
         $lenFiles{$lenUniprotFile}->{title} = "UniProt, Full Length" if $urVersion or $domain eq "on";
@@ -1188,22 +1143,18 @@ sub createGraphJob {
                 $lenFiles{$lenUnirefDomFile} = {title => "UniRef$urVersion Cluster IDs, Domain", file => "length_histogram_uniref_domain"} if $domain eq "on";
             }
         }
+        # for every length histogram tsv file, render a histogram (and proxy)
         foreach my $file (keys %lenFiles) {
             my $title = $lenFiles{$file}->{title} ? "\"(" . $lenFiles{$file}->{title} . ")\"" : "\"\"";
-            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}.png $jobId $title");
-            $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $file $outputDir/$lenFiles{$file}->{file}_sm.png $jobId $title $smallWidth $smallHeight");
+            $B->addAction("python plot_length_data.py" .
+                          " --lengths $file" .
+                          " --job-id $jobId " .
+                          " --plot-filename $outputDir/$lenFiles{$file}->{file}" .
+                          " --title-extra $title" .
+                          " --proxies sm:48");
         }
-    } else {
-        addModule($B, "module load $pythonMod");
-        $B->addAction("$efiEstTools/R-hdf-graph.py -b $outputDir/1.out -f $outputDir/rdata.hdf5 -a $allSeqFile -i $incfrac");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length.png $jobId");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r hdf5 $outputDir/rdata.hdf5 $outputDir/alignment_length_sm.png $jobId $smallWidth $smallHeight");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r hdf5 $outputDir/rdata.hdf5 $outputDir/percent_identity.png $jobId");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r hdf5 $outputDir/rdata.hdf5 $outputDir/percent_identity_sm.png $jobId $smallWidth $smallHeight");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r hdf5 $outputDir/rdata.hdf5 $outputDir/length_histogram.png $jobId");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r hdf5 $outputDir/rdata.hdf5 $outputDir/length_histogram_sm.png $jobId $smallWidth $smallHeight");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges.png $jobId");
-        $B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r hdf5 $outputDir/rdata.hdf5 $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+        # deactivate our python environment
+        $B->addAction("deactivate");
     }
     if ($separateJob) {
         if ($removeTempFiles) {

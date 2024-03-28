@@ -530,22 +530,36 @@ $B->mailEnd();
 addModule($B, "module load $efiEstMod");
 addModule($B, "module load $efiDbMod");
 addModule($B, "module load $gdMod");
-$B->addAction("mkdir $outputDir/rdata");
-$B->addAction("$efiEstTools/Rgraphs.pl -blastout $outputDir/1.out -rdata  $outputDir/rdata -edges  $outputDir/edge.tab -fasta  $allSeqFile -length  $outputDir/length.tab -incfrac $incfrac -evalue-file $evalueFile");
-$B->addAction("FIRST=`ls $outputDir/rdata/perid*| head -1`");
-$B->addAction("FIRST=`head -1 \$FIRST`");
-$B->addAction("LAST=`ls $outputDir/rdata/perid*| tail -1`");
-$B->addAction("LAST=`head -1 \$LAST`");
-$B->addAction("MAXALIGN=`head -1 $outputDir/rdata/maxyal`");
-$B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length.png \$FIRST \$LAST \$MAXALIGN $jobId");
-$B->addAction("Rscript $efiEstTools/Rgraphs/quart-align.r legacy $outputDir/rdata $outputDir/alignment_length_sm.png \$FIRST \$LAST \$MAXALIGN $jobId $smallWidth $smallHeight");
-$B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity.png \$FIRST \$LAST $jobId");
-$B->addAction("Rscript $efiEstTools/Rgraphs/quart-perid.r legacy $outputDir/rdata $outputDir/percent_identity_sm.png \$FIRST \$LAST $jobId $smallWidth $smallHeight");
-$B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges.png $jobId");
-$B->addAction("Rscript $efiEstTools/Rgraphs/hist-edges.r legacy $outputDir/edge.tab $outputDir/number_of_edges_sm.png $jobId $smallWidth $smallHeight");
+$B->addAction("if [ ! -r visualization/efi-viz/bin/activate ]; then");
+$B->addAction("     echo \"Python environment not found, creating it\"")
+$B->addAction("     python3 -mvenv visualization/efi-viz");
+$B->addAction("     source visualization/efi-viz/bin/activate");
+$B->addAction("     pip install -r visualization/requirements.txt");
+# otherwise just activate
+$B->addAction("else");
+$B->addAction("     source visualization/efi-viz/bin/activate");
+$B->addAction("fi");
+
+# generate the two boxplots, evalue tsv, and edge histogram
+# proxy options for plots are specified in command
+$B->addAction("python process_blast_results.py" .
+                " --blast-output $outputDir/1.out" .
+                " --job-id $jobId".
+                " --length-plot-filename $outputDir/alignment_length" .
+                " --pident-plot-filename $outputDir/percent_identity" .
+                " --edge-hist-filename $outputDir/number_of_edges" .
+                " --evalue-tab-filename $outputDir/edge.tab" .
+                " --proxies sm:48");
+
+# render a histogram (and proxy) of lengths
 my $lenHistText = "\" \"";
-$B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram.png $jobId $lenHistText");
-$B->addAction("Rscript $efiEstTools/Rgraphs/hist-length.r legacy $outputDir/length.tab $outputDir/length_histogram_sm.png $jobId $lenHistText $smallWidth $smallHeight");
+$B->addAction("python plot_length_data.py" .
+                          " --lengths $file" .
+                          " --job-id $jobId " .
+                          " --plot-filename $outputDir/length_histogram" .
+                          " --title-extra $lenHistText" .
+                          " --proxies sm:48");
+$B->addAction("deactivate");
 $B->addAction("touch  $outputDir/1.out.completed");
 $B->jobName("${jobNamePrefix}graphs");
 $B->renderToFile(getRenderFilePath("$scriptDir/graphs.sh"));
@@ -560,7 +574,6 @@ if ($removeTempFiles) {
     $B = $S->getBuilder();
     $B->dependency(0, $graphJobId); 
     $B->resource(1, 1, "5gb");
-    $B->addAction("rm -rf $outputDir/rdata");
     $B->addAction("rm -rf $outputDir/blast");
     $B->addAction("rm -f $outputDir/blastfinal.tab");
     $B->addAction("rm -f $outputDir/alphabetized.blastfinal.tab");
