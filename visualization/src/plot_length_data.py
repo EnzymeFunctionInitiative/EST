@@ -3,7 +3,6 @@ Plot data from lenght_uniprot.tab
 """
 import argparse
 
-from Bio import SeqIO
 import matplotlib.pyplot as plt
 import pandas as pd
 
