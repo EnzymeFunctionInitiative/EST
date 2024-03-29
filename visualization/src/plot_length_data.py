@@ -1,5 +1,5 @@
 """
-Plot data from lenght_uniprot.tab
+Plot data from length_uniprot.tab
 """
 import argparse
 
