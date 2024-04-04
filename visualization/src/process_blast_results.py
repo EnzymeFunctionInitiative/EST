@@ -10,6 +10,8 @@ from uuid import uuid4
 
 import numpy as np
 
+import pyarrow.parquet as pq
+
 from cachemanager import CacheManager, Group
 from plot import draw_boxplot, draw_histogram
 from util import parse_proxies
@@ -39,29 +41,21 @@ def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
     """
     Compute alignment score and use it to bin rows from BLAST output
 
-    Also saves edge counts to `evalue.tab`.
-
     Parameters:
     ---
-        blast_output (str) - Path to the BLAST output file
+        blast_output (str) - Path to the BLAST output Parquet file
 
     Returns:
     ---
         dictionary of alignment scores as keys and CacheManager.Group values
         string name of directory used for cache (so it can be deleted later)
     """
-    log10of2 = log10(2)
-    with open(blast_output) as f:
+    with pq.ParquetFile(blast_output, read_dictionary=["pident", "alignment_length", "alignment_score"]) as pf:
         cachedir = f"./data_{str(uuid4()).split('-')[0]}"
         with CacheManager(cachedir) as cm:
-            for line in f:
-                fields = line.strip().split("\t")
-                percent_identical = fields[2]
-                alignment_length = fields[3]
-                fields[3:] = list(map(float, fields[3:]))
-                alignment_score = int(-(log10(fields[5] * fields[6])) + fields[4] * log10of2)
-
-                cm.append(alignment_score, alignment_length, percent_identical)
+            for batch in pf.iter_batches():
+                for line in batch.to_pylist():
+                    cm.append(line["alignment_score"], line["alignment_length"], line["pident"])
 
             metadata = cm.get_edge_counts_and_filenames()
     
