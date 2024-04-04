@@ -6,8 +6,6 @@ import math
 
 import matplotlib.pyplot as plt
 
-from util import label_and_render_plot
-
 def draw_boxplot(dd, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis=None):
     """
     Render a boxplot-and-whisker plot in EFI style
