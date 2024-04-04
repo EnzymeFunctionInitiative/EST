@@ -2,10 +2,18 @@ SET memory_limit = '$mem_limit';
 SET temp_directory = '$duckdb_temp_dir';
 SET threads TO 1;
 
--- read BLAST data from transcoded parquet files, ignore sequences aligned against themselves
+-- read BLAST data from transcoded parquet files, ignore sequences aligned
+-- against themselves.
+--
+-- We need to order by several fields here so that the DISTINCT ON (qseqid,
+-- sseqid) later on picks the correct row (which appears first because of the
+-- sort) when faced with duplicates. This replicates the functionality from the
+-- Perl version of BLASTreduce. If DISTINCT ON ever stops working by picking the
+-- first occurence, this will break.
 CREATE TABLE blast_results as (
         SELECT * FROM read_parquet('$transcoded_blast_output_glob')
         WHERE NOT qseqid = sseqid
+        ORDER BY bitscore DESC, pident ASC, alignment_length ASC
 );
 
 --
@@ -47,8 +55,9 @@ SET subject_length = (SELECT sequence_length FROM sequence_lengths WHERE blast_r
 DROP TABLE sequence_lengths;
 
 --
--- Calculating new columns and sorting takes more memory. Instead we create a
--- temporary table that stores the finalized columns then select from it
+-- Calculating new columns and sorting int the same step takes more memory.
+-- Instead we create a temporary table that stores the finalized columns then
+-- select from it
 --
 CREATE TEMP TABLE unsorted AS
 SELECT DISTINCT ON(qseqid, sseqid) qseqid, 
@@ -58,10 +67,11 @@ SELECT DISTINCT ON(qseqid, sseqid) qseqid,
                                    bitscore,
                                    query_length,
                                    subject_length,
-                                   CAST(FLOOR(ABS(log10(query_length * subject_length) + (log10(2) * bitscore))) AS INT32) as alignment_score
+                                   CAST(FLOOR(-1 * log10(query_length * subject_length) + log10(2) * bitscore) AS INT32) as alignment_score
     FROM blast_results;
 
--- export table back to parquet file, sorted
+-- export table back to parquet file, sorted by alignment score descending --
+-- this allows for optimal grouping in the next stage
 COPY (
     SELECT * FROM unsorted
     ORDER BY alignment_score DESC
