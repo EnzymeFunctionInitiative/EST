@@ -13,6 +13,7 @@ def parse_args():
     parser.add_argument("--blast-output", type=str, help="Path to directory containing the BLAST output files")
     parser.add_argument("--fasta", type=str, help="Path to the FASTA file to transcode")
     parser.add_argument("--sql-template", type=str, default="reduce-template.sql", help="Path to the template sql file for reduce operations")
+    parser.add_argument("--sql-output-file", type=str, default="reduce.sql", help="Location to write the reduce SQL commands to")
     parser.add_argument("--duckdb-memory-limit", type=str, default="4GB", help="Soft limit on DuckDB memory usage")
     parser.add_argument("--duckdb-temp-dir", type=str, default="./duckdb", help="Location DuckDB should use for temporary files")
     parser.add_argument("--output-file", type=str, default="1.out.parquet", help="The final output file the aggregated BLAST output should be written to. Will be Parquet.")
@@ -118,8 +119,8 @@ def render_sql_from_template(template_file, mem_limit, duckdb_temp_dir, blast_ou
     }
     with open(template_file) as f:
         template = string.Template(f.read())
-        with open("reduce.sql", "w") as g:
-            print("Saving template to 'reduce.sql'")
+        with open(args.sql_output_file, "w") as g:
+            print(f"Saving template to '{args.sql_output_file}'")
             g.write(template.substitute(mapping))
 
 
