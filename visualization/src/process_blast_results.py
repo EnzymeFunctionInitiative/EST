@@ -4,8 +4,8 @@ computes cumulative-sum table for alignment scores
 """
 
 import argparse
-from math import log10
 import shutil
+import os
 from uuid import uuid4
 
 import numpy as np
@@ -35,7 +35,16 @@ def parse_args():
 
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
-    return args
+
+    # validate input filepaths
+    fail = False
+    if not os.path.exists(args.blast_output):
+        print(f"BLAST output '{args.blast_output}' does not exist")
+        fail = True
+    if fail:
+        exit(1)
+    else:
+        return args
 
 def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
     """

@@ -18,7 +18,22 @@ def parse_args():
     parser.add_argument("--output-file", type=str, default="1.out.parquet", help="The final output file the aggregated BLAST output should be written to. Will be Parquet.")
 
     args = parser.parse_args()
-    return args
+
+    # validate input filepaths
+    fail = False
+    if not os.path.exists(args.blast_output):
+        print(f"BLAST output '{args.blast_output}' does not exist")
+        fail = True
+    if not os.path.exists(args.fasta):
+        print(f"FASTA file '{args.fasta}' does not exist")
+        fail = True
+    if not os.path.exists(args.sql_template):
+        print(f"SQL template '{args.sql_template}' does not exist")
+        fail = True
+    if fail:
+        exit(1)
+    else:
+        return args
 
 def csv_to_parquet_file(filename: str, read_options, parse_options, convert_options) -> pq.ParquetFile:
     data = csv.open_csv(filename, read_options=read_options, parse_options=parse_options, convert_options=convert_options)

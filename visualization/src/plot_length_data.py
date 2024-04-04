@@ -2,6 +2,7 @@
 Plot data from length_uniprot.tab
 """
 import argparse
+import os
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -21,7 +22,16 @@ def parse_args():
     
     args = parser.parse_args()
     args.proxies = util.parse_proxies(args.proxies)
-    return args
+
+    # validate input filepaths
+    fail = False
+    if not os.path.exists(args.lengths):
+        print(f"Lengths file {args.lengths} does not exist")
+        fail = True
+    if fail:
+        exit(1)
+    else:
+        return args
 
 
 def count_lengths(count_file: str, frac: float) -> pd.DataFrame:
