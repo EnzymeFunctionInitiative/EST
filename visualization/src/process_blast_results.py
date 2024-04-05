@@ -59,15 +59,15 @@ def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
         dictionary of alignment scores as keys and CacheManager.Group values
         string name of directory used for cache (so it can be deleted later)
     """
-    with pq.ParquetFile(blast_output, read_dictionary=["pident", "alignment_length", "alignment_score"]) as pf:
-        cachedir = f"./data_{str(uuid4()).split('-')[0]}"
-        with CacheManager(cachedir) as cm:
-            for batch in pf.iter_batches():
-                for line in batch.to_pylist():
-                    cm.append(line["alignment_score"], line["alignment_length"], line["pident"])
+    pf = pq.ParquetFile(blast_output, read_dictionary=["pident", "alignment_length", "alignment_score"])
+    cachedir = f"./data_{str(uuid4()).split('-')[0]}"
+    with CacheManager(cachedir) as cm:
+        for batch in pf.iter_batches():
+            for line in batch.to_pylist():
+                cm.append(line["alignment_score"], line["alignment_length"], line["pident"])
 
-            metadata = cm.get_edge_counts_and_filenames()
-    
+        metadata = cm.get_edge_counts_and_filenames()
+
     return metadata, cachedir
 
 def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int, min_num_groups: int) -> set:
