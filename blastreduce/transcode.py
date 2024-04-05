@@ -38,7 +38,7 @@ def parse_args():
 
 def csv_to_parquet_file(filename: str, read_options, parse_options, convert_options) -> pq.ParquetFile:
     data = csv.open_csv(filename, read_options=read_options, parse_options=parse_options, convert_options=convert_options)
-    new_name = filename.split(".")[0] + ".parquet"
+    new_name = filename + ".parquet"
     writer = pq.ParquetWriter(new_name, data.schema)
     for batch in data:
         writer.write_batch(batch)
@@ -87,6 +87,9 @@ def csvs_to_parquets(blast_directory: str) -> pq.ParquetDataset:
                                         ])
     # glob just the .tab files for safety
     files = glob.glob(os.path.join(blast_directory, "*.fa.tab"))
+    if len(files) == 0:
+        print("No BLAST output found; exiting")
+        exit(1)
     print(f"Converting {len(files)} files")
 
     for file in files:
