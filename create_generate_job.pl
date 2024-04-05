@@ -678,7 +678,7 @@ if ($pfam or $ipro or $ssf or $gene3d or ($fastaFile=~/\w+/ and !$taxid) or $acc
     print "import job is:\n $importjob\n" if not $runSerial;
     ($prevJobId) = split /\./, $importjob;
 } else {
-    die "Error Submitting Import Job\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
+    # die "Error Submitting Import Job\nYou cannot mix ipro, pfam, ssf, and gene3d databases with taxid\n";
 }
 
 push @allJobIds, $prevJobId;
@@ -925,50 +925,25 @@ push @allJobIds, $prevJobId;
 #
 $B = $S->getBuilder();
 
-$B->resource(1, 1, "5gb");
+$B->resource(1, 1, "16gb");
 $B->dependency(1, $prevJobId);
-$B->addAction("cat $outputFiles |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile") if $outputFiles;
-$B->addAction("SZ=`stat -c%s $blastFinalFile`");
-$B->addAction("if [[ \$SZ == 0 ]]; then");
-$B->addAction("    echo \"BLAST Failed. Check input file.\"");
-$B->addAction("    touch $outputDir/blast.failed");
-$B->addAction("    exit 1");
-$B->addAction("fi");
+# $B->addAction("cat $outputFiles |grep -v '#'|cut -f 1,2,3,4,12 >$blastFinalFile") if $outputFiles;
+# $B->addAction("SZ=`stat -c%s $blastFinalFile`");
+# $B->addAction("if [[ \$SZ == 0 ]]; then");
+# $B->addAction("    echo \"BLAST Failed. Check input file.\"");
+# $B->addAction("    touch $outputDir/blast.failed");
+# $B->addAction("    exit 1");
+# $B->addAction("fi");
+addModule($B, "module load Python/3.10.1-IGB-gcc-8.2.0");
+addModule($B, "module load efiest/python_est_1.0");
+$B->addAction("~/EST/efi-env/bin/python ~/EST/blastreduce/transcode.py --blast-output $outputDir/blastout --fasta $filtSeqFile --output-file $outputDir/1.out.parquet --sql-template ~/EST/blastreduce/reduce-template.sql --sql-output-file $outputDir/reduce.sql --duckdb-temp-dir $outputDir/duckdb --duckdb-memory-limit 8GB");
+$B->addAction("/home/groups/efi/apps/bin/duckdb < $outputDir/reduce.sql");
 $B->jobName("${jobNamePrefix}catjob");
-$B->renderToFile(getRenderFilePath("$scriptDir/catjob.sh"));
-my $catjob = $S->submit("$scriptDir/catjob.sh");
+$B->renderToFile(getRenderFilePath("$scriptDir/blastreduce.sh"));
+my $catjob = $S->submit("$scriptDir/blastreduce.sh");
 chomp $catjob;
 print "Cat job is:\n $catjob\n" if not $runSerial;
 ($prevJobId) = split /\./, $catjob;
-
-push @allJobIds, $prevJobId;
-
-
-
-########################################################################################################################
-# Remove like vs like and reverse matches
-#
-$B = $S->getBuilder();
-
-$B->queue($memqueue);
-my $sortRam = $extraRam ? $extraRam : 250;
-$sortRam = "${sortRam}gb";
-$B->resource(1, 4, $sortRam);
-$B->dependency(0, $prevJobId);
-#$B->addAction("mv $blastFinalFile $outputDir/unsorted.blastfinal.tab");
-$B->addAction("$efiEstTools/alphabetize.pl -in $blastFinalFile -out $outputDir/alphabetized.blastfinal.tab -fasta $filtSeqFile");
-$B->addAction("sort --parallel 4 -T $sortdir --compress-program gzip -k1,1 -k2,2 -k5,5nr -t\$\'\\t\' $outputDir/alphabetized.blastfinal.tab > $outputDir/sorted.alphabetized.blastfinal.tab");
-$B->addAction("$efiEstTools/blastreduce-alpha.pl -blast $outputDir/sorted.alphabetized.blastfinal.tab -out $outputDir/unsorted.1.out");
-$B->addAction("sort --parallel 4 -T $sortdir --compress-program gzip -k5,5nr -t\$\'\\t\' $outputDir/unsorted.1.out >$outputDir/1.out");
-$B->addAction("echo 67 > $progressFile");
-$B->jobName("${jobNamePrefix}blastreduce");
-$B->renderToFile(getRenderFilePath("$scriptDir/blastreduce.sh"));
-
-my $blastreducejob = $S->submit("$scriptDir/blastreduce.sh");
-chomp $blastreducejob;
-print "Blastreduce job is:\n $blastreducejob\n" if not $runSerial;
-
-($prevJobId) = split /\./, $blastreducejob;
 
 push @allJobIds, $prevJobId;
 
@@ -1106,22 +1081,13 @@ sub createGraphJob {
         addModule($B, "module load $gdMod");
         #addModule($B, "module load $perlMod");
         #addModule($B, "module load $rMod");
+        addModule($B, "module load efiest/python_est_1.0");
+        addModule($B, "module load Python/3.10.1-IGB-gcc-8.2.0");
         if (not $lengthHistoOnly) {
-            # if the environment is not present, try to create it (this should almost never happen)
-            $B->addAction("if [ ! -r visualization/efi-viz/bin/activate ]; then");
-            $B->addAction("     echo \"Python environment not found, creating it\"")
-            $B->addAction("     python3 -mvenv visualization/efi-viz");
-            $B->addAction("     source visualization/efi-viz/bin/activate");
-            $B->addAction("     pip install -r visualization/requirements.txt");
-            # otherwise just activate
-            $B->addAction("else");
-            $B->addAction("     source visualization/efi-viz/bin/activate");
-            $B->addAction("fi");
-
             # generate the two boxplots, evalue tsv, and edge histogram
             # proxy options for plots are specified in command
-            $B->addAction("python process_blast_results.py" .
-                          " --blast-output $outputDir/1.out" .
+            $B->addAction("python ~/EST/visualization/src/process_blast_results.py" .
+                          " --blast-output $outputDir/1.out.parquet" .
                           " --job-id $jobId".
                           " --length-plot-filename $outputDir/alignment_length" .
                           " --pident-plot-filename $outputDir/percent_identity" .
@@ -1146,25 +1112,21 @@ sub createGraphJob {
         # for every length histogram tsv file, render a histogram (and proxy)
         foreach my $file (keys %lenFiles) {
             my $title = $lenFiles{$file}->{title} ? "\"(" . $lenFiles{$file}->{title} . ")\"" : "\"\"";
-            $B->addAction("python plot_length_data.py" .
+            $B->addAction("python ~/EST/visualization/src/plot_length_data.py" .
                           " --lengths $file" .
                           " --job-id $jobId " .
                           " --plot-filename $outputDir/$lenFiles{$file}->{file}" .
                           " --title-extra $title" .
                           " --proxies sm:48");
         }
-        # deactivate our python environment
-        $B->addAction("deactivate");
     }
     if ($separateJob) {
         if ($removeTempFiles) {
-            $B->addAction("rm $outputDir/alphabetized.blastfinal.tab $blastFinalFile $outputDir/sorted.alphabetized.blastfinal.tab $outputDir/unsorted.1.out $outputDir/mux.out");
-            $B->addAction("rm -rf $blastOutputDir");
-            $B->addAction("rm -rf $fracOutputDir");
-            $B->addAction("rm -rf $outputDir/rdata");
+            # $B->addAction("rm -rf $blastOutputDir");
+            # $B->addAction("rm -rf $fracOutputDir");
             #$B->addAction("rm $blastDb.* $outputDir/format.log"); # Needed for taxonomy
-            $B->addAction("rm $outputDir/sequences.fa.clstr");
-            $B->addAction("rm $outputDir/length_uni*.tab $outputDir/progress $outputDir/edge.tab $outputDir/formatdb.log");
+            # $B->addAction("rm $outputDir/sequences.fa.clstr");
+            # $B->addAction("rm $outputDir/length_uni*.tab $outputDir/progress $outputDir/edge.tab $outputDir/formatdb.log");
         }
         $B->addAction("touch  $outputDir/1.out.completed");
         $B->addAction("echo 100 > $progressFile");
