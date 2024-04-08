@@ -2,6 +2,7 @@
 Utilities and helper functions
 """
 
+
 def parse_proxies(proxies: list[str] | None) -> dict[str, int] | None:
     """
     Convert ["key1:value1", "key2:value2",...] into {"key1": value1, "key2": value2, ...}
@@ -16,7 +17,7 @@ def parse_proxies(proxies: list[str] | None) -> dict[str, int] | None:
     ---
         None if proxies is None, dict of string keys and int values otherwise
     """
-    if proxies == None:
+    if proxies is None:
         return None
     sizes = {}
     for proxy in proxies:

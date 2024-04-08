@@ -16,22 +16,54 @@ from cachemanager import CacheManager, Group
 from plot import draw_boxplot, draw_histogram
 from util import parse_proxies
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
     parser.add_argument("--blast-output", type=str, required=True, help="7-column output file from BLAST")
     parser.add_argument("--job-id", required=True, help="Job ID number for BLAST output file")
-    parser.add_argument("--min-edges", 
-                        type=int, default=10, 
-                        help="Minimum number of edges needed to retain an alignment-score group")
-    parser.add_argument("--min-groups", 
-                        type=int, default=30, 
-                        help="Minimum number of alignment-score groups to retain in output")
-    parser.add_argument("--length-plot-filename", type=str, required=True, help="Filename, without extention, to write the alignment length boxplots to")
-    parser.add_argument("--pident-plot-filename", type=str, required=True, help="Filename, without extention, to write the percent identity boxplots to")
-    parser.add_argument("--edge-hist-filename", type=str, required=True, help="Filename, without extention, to write the edge count histograms to")
-    parser.add_argument("--evalue-tab-filename", type=str, required=True, help="Filename to save evalue cumulative sum table to")
+    parser.add_argument(
+        "--min-edges",
+        type=int,
+        default=10,
+        help="Minimum number of edges needed to retain an alignment-score group",
+    )
+    parser.add_argument(
+        "--min-groups",
+        type=int,
+        default=30,
+        help="Minimum number of alignment-score groups to retain in output",
+    )
+    parser.add_argument(
+        "--length-plot-filename",
+        type=str,
+        required=True,
+        help="Filename, without extention, to write the alignment length boxplots to",
+    )
+    parser.add_argument(
+        "--pident-plot-filename",
+        type=str,
+        required=True,
+        help="Filename, without extention, to write the percent identity boxplots to",
+    )
+    parser.add_argument(
+        "--edge-hist-filename",
+        type=str,
+        required=True,
+        help="Filename, without extention, to write the edge count histograms to",
+    )
+    parser.add_argument(
+        "--evalue-tab-filename",
+        type=str,
+        required=True,
+        help="Filename to save evalue cumulative sum table to",
+    )
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
-    parser.add_argument("--proxies", metavar="KEY:VALUE", nargs="+", help="A list of key:value pairs for rendering smaller proxy images. Keys wil be included in filenames, values should be less than 96")
+    parser.add_argument(
+        "--proxies",
+        metavar="KEY:VALUE",
+        nargs="+",
+        help="A list of key:value pairs for rendering smaller proxy images. Keys wil be included in filenames, values should be less than 96",
+    )
 
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
@@ -45,6 +77,7 @@ def parse_args():
         exit(1)
     else:
         return args
+
 
 def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
     """
@@ -70,6 +103,7 @@ def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
 
     return metadata, cachedir
 
+
 def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int, min_num_groups: int) -> set:
     """
     Determine groups to exclude from plots
@@ -77,16 +111,16 @@ def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int
     Considers groups in sorted order and locates the first and last group which has less than
     `min_num_edges`. Cuts groups that are less than the first or greater than the last group. Some
     groups between these endpoints may still have less than `min_num_edges`. If the the number of
-    groups present after removing the outliers is less than `min_group_size`, the upper cutoff 
+    groups present after removing the outliers is less than `min_group_size`, the upper cutoff
     index is incremented until the group size meets the minimum or no more groups are left to
     include.
 
     Parameters:
     ---
         group_metadata (dict[int, Group]) - cache metadata from `group_output_data`
-        
+
         min_num_edges (int) - minimum number of edges needed to retain a group
-        
+
         min_num_groups (int) - keep at least this many groups (may override min_num_edges)
 
     Returns:
@@ -94,7 +128,7 @@ def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int
         A set of groups to exclude
     """
     sizes = [(k, group_metadata[k].edge_count) for k in sorted(group_metadata.keys())]
-    
+
     lower_bound_idx = 0
     upper_bound_idx = 0
     # find first group with at least min_num_edges edges
@@ -117,19 +151,21 @@ def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int
 
     return set([k for k, _ in sizes]) - groups_to_keep
 
-def save_edge_counts(metadata: dict[int, Group], filename: str) -> None:
-        """
-        Saves edge counts and cumulative edge counts from metadata to a file
 
-        Parameters:
-        ---
-            metadata (dict[int, Group]) - cache metadata from `group_output_data`
-            filename (str) - Filename to which edge counts are saved
-        """
-        summed_edge_counts = {k: (metadata[k].edge_count, metadata[k].cumulative_edge_count) for k in metadata.keys()}
-        with open(filename, "w+") as f:
-            for k, t in sorted(summed_edge_counts.items()):
-                f.write(f"{k}\t{t[0]}\t{t[1]}\n")
+def save_edge_counts(metadata: dict[int, Group], filename: str) -> None:
+    """
+    Saves edge counts and cumulative edge counts from metadata to a file
+
+    Parameters:
+    ---
+        metadata (dict[int, Group]) - cache metadata from `group_output_data`
+        filename (str) - Filename to which edge counts are saved
+    """
+    summed_edge_counts = {k: (metadata[k].edge_count, metadata[k].cumulative_edge_count) for k in metadata.keys()}
+    with open(filename, "w+") as f:
+        for k, t in sorted(summed_edge_counts.items()):
+            f.write(f"{k}\t{t[0]}\t{t[1]}\n")
+
 
 def compute_summary_statistic_for_group(filename: str) -> dict[str, float]:
     """
@@ -137,23 +173,30 @@ def compute_summary_statistic_for_group(filename: str) -> dict[str, float]:
 
     Cache files (written by CacheManager) are a list of ints, one per line, that describe
     either all of the alignment lengths or percent identicals for a given alignment score. To
-    render a boxplot, only the min, max, median, and quartiles are needed (five number summary, 
-    https://en.wikipedia.org/wiki/Five-number_summary). This function returns those values in a 
+    render a boxplot, only the min, max, median, and quartiles are needed (five number summary,
+    https://en.wikipedia.org/wiki/Five-number_summary). This function returns those values in a
     dict than can be passed to matplotlib's [bxp function]
     (https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.bxp.html)
 
     Parameters:
     ---
         filename (str) - path to a file written by CacheManager, 1 value per line
-    
+
     Returns:
     ---
         A 5-key dictionary that contains a five-number summary of the input file
     """
     group_data = np.loadtxt(filename, dtype=np.float32)
-    fivenum = np.quantile(group_data, [0, .25, .5, .75, 1])
-    bxp_summary =  {"whislo": fivenum[0], "q1": fivenum[1], "med": fivenum[2], "q3": fivenum[3], "whishi": fivenum[4]}
+    fivenum = np.quantile(group_data, [0, 0.25, 0.5, 0.75, 1])
+    bxp_summary = {
+        "whislo": fivenum[0],
+        "q1": fivenum[1],
+        "med": fivenum[2],
+        "q3": fivenum[3],
+        "whishi": fivenum[4],
+    }
     return bxp_summary
+
 
 def compute_summary_statistics(metadata: dict[int, Group], field: str) -> tuple[list[dict[str, float]], list[int]]:
     """
@@ -162,7 +205,7 @@ def compute_summary_statistics(metadata: dict[int, Group], field: str) -> tuple[
     Parameters:
     ---
         metadata (dict[int, Group]) - cache metadata from `group_output_data`
-        
+
         field (str) - either "length_filename" or "pident_filename"
 
     Returns:
@@ -177,6 +220,7 @@ def compute_summary_statistics(metadata: dict[int, Group], field: str) -> tuple[
         summary.append(compute_summary_statistic_for_group(fname))
     return summary, xpos
 
+
 def delete_outlying_groups(metadata: dict[int, Group], groups_to_delete: set) -> dict[int, Group]:
     """
     Removes outlying groups from metadata
@@ -184,7 +228,7 @@ def delete_outlying_groups(metadata: dict[int, Group], groups_to_delete: set) ->
     Parameters:
     ---
         metadata (dict[int, Group]) - cache metadata from `group_output_data`
-        
+
         groups_to_delete (set) - set of groups to exclude from the returned dict
 
     Returns:
@@ -194,6 +238,7 @@ def delete_outlying_groups(metadata: dict[int, Group], groups_to_delete: set) ->
     for group in groups_to_delete:
         del metadata[group]
     return metadata
+
 
 def get_edge_hist_data(metadata: dict[int, Group]) -> tuple[list[int], list[int]]:
     """
@@ -211,7 +256,20 @@ def get_edge_hist_data(metadata: dict[int, Group]) -> tuple[list[int], list[int]
     heights = [metadata[k].edge_count for k in xpos]
     return xpos, heights
 
-def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_filename, edge_filename, evalue_tab_filename, output_format, proxies, delete_cache=True):
+
+def main(
+    blast_output,
+    job_id,
+    min_edges,
+    min_groups,
+    length_filename,
+    pident_filename,
+    edge_filename,
+    evalue_tab_filename,
+    output_format,
+    proxies,
+    delete_cache=True,
+):
     # compute groups and trim outliers
     print("Grouping output data")
     metadata, cachedir = group_output_data(blast_output)
@@ -229,27 +287,61 @@ def main(blast_output, job_id, min_edges, min_groups, length_filename, pident_fi
     # plot alignment_length
     print("Computing boxplot stats for alignment length")
     length_dd, length_xpos = compute_summary_statistics(metadata, "length_filename")
-    draw_boxplot(length_dd, length_xpos, f"Alignment Length vs Alignment Score for Job {job_id}",
-                "Alignment Score", "Alignment Length", length_filename, output_format, dpis=proxies)
+    draw_boxplot(
+        length_dd,
+        length_xpos,
+        f"Alignment Length vs Alignment Score for Job {job_id}",
+        "Alignment Score",
+        "Alignment Length",
+        length_filename,
+        output_format,
+        dpis=proxies,
+    )
 
     # percent identical box plot data
     print("Computing boxplot stats for percent identical")
     pident_dd, pident_xpos = compute_summary_statistics(metadata, "pident_filename")
-    draw_boxplot(pident_dd, pident_xpos, f"Percent Identical vs Alignment Score for Job {job_id}",
-                "Alignment Score", "Percent Identical", pident_filename, output_format, dpis=proxies)
-    
+    draw_boxplot(
+        pident_dd,
+        pident_xpos,
+        f"Percent Identical vs Alignment Score for Job {job_id}",
+        "Alignment Score",
+        "Percent Identical",
+        pident_filename,
+        output_format,
+        dpis=proxies,
+    )
+
     # draw edge length histogram
     print("Extracting histogram data")
     xpos, heights = get_edge_hist_data(metadata)
-    draw_histogram(xpos, heights, f"Number of Edges at Alignment Score for Job {job_id}",
-                "Alignment Score", "Number of Edges", edge_filename, output_format, dpis=proxies)
+    draw_histogram(
+        xpos,
+        heights,
+        f"Number of Edges at Alignment Score for Job {job_id}",
+        "Alignment Score",
+        "Number of Edges",
+        edge_filename,
+        output_format,
+        dpis=proxies,
+    )
 
     # cleanup cache dir
     if delete_cache:
         shutil.rmtree(cachedir)
 
+
 if __name__ == "__main__":
     args = parse_args()
-    main(args.blast_output, args.job_id, args.min_edges, args.min_groups,
-        args.length_plot_filename, args.pident_plot_filename, args.edge_hist_filename, args.evalue_tab_filename,
-        args.output_type, args.proxies)
+    main(
+        args.blast_output,
+        args.job_id,
+        args.min_edges,
+        args.min_groups,
+        args.length_plot_filename,
+        args.pident_plot_filename,
+        args.edge_hist_filename,
+        args.evalue_tab_filename,
+        args.output_type,
+        args.proxies,
+    )

@@ -1,0 +1,5 @@
+line-length = 120
+
+[format]
+line-ending = "lf"
+docstring-code-format = true
