@@ -1,8 +1,3 @@
-"""
-Filters, summarizes, and plots BLAST output using matplotlib and
-computes cumulative-sum table for alignment scores
-"""
-
 import argparse
 import shutil
 import os
@@ -83,12 +78,13 @@ def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
     """
     Compute alignment score and use it to bin rows from BLAST output
 
-    Parameters:
-    ---
-        blast_output (str) - Path to the BLAST output Parquet file
+    Parameters
+    ----------
+        blast_output
+            Path to the BLAST output Parquet file
 
-    Returns:
-    ---
+    Returns
+    -------
         dictionary of alignment scores as keys and CacheManager.Group values
         string name of directory used for cache (so it can be deleted later)
     """
@@ -109,22 +105,25 @@ def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int
     Determine groups to exclude from plots
 
     Considers groups in sorted order and locates the first and last group which has less than
-    `min_num_edges`. Cuts groups that are less than the first or greater than the last group. Some
+    ``min_num_edges``. Cuts groups that are less than the first or greater than the last group. Some
     groups between these endpoints may still have less than `min_num_edges`. If the the number of
     groups present after removing the outliers is less than `min_group_size`, the upper cutoff
     index is incremented until the group size meets the minimum or no more groups are left to
     include.
 
-    Parameters:
-    ---
-        group_metadata (dict[int, Group]) - cache metadata from `group_output_data`
+    Parameters
+    ----------
+        group_metadata
+            cache metadata from `group_output_data`
 
-        min_num_edges (int) - minimum number of edges needed to retain a group
+        min_num_edges
+            minimum number of edges needed to retain a group
 
-        min_num_groups (int) - keep at least this many groups (may override min_num_edges)
+        min_num_groups
+            keep at least this many groups (may override min_num_edges)
 
-    Returns:
-    ---
+    Returns
+    -------
         A set of groups to exclude
     """
     sizes = [(k, group_metadata[k].edge_count) for k in sorted(group_metadata.keys())]
@@ -156,10 +155,12 @@ def save_edge_counts(metadata: dict[int, Group], filename: str) -> None:
     """
     Saves edge counts and cumulative edge counts from metadata to a file
 
-    Parameters:
-    ---
-        metadata (dict[int, Group]) - cache metadata from `group_output_data`
-        filename (str) - Filename to which edge counts are saved
+    Parameters
+    ----------
+        metadata
+            cache metadata from `group_output_data`
+        filename
+            Filename to which edge counts are saved
     """
     summed_edge_counts = {k: (metadata[k].edge_count, metadata[k].cumulative_edge_count) for k in metadata.keys()}
     with open(filename, "w+") as f:
@@ -173,17 +174,18 @@ def compute_summary_statistic_for_group(filename: str) -> dict[str, float]:
 
     Cache files (written by CacheManager) are a list of ints, one per line, that describe
     either all of the alignment lengths or percent identicals for a given alignment score. To
-    render a boxplot, only the min, max, median, and quartiles are needed (five number summary,
-    https://en.wikipedia.org/wiki/Five-number_summary). This function returns those values in a
-    dict than can be passed to matplotlib's [bxp function]
-    (https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.bxp.html)
+    render a boxplot, only the min, max, median, and quartiles are needed 
+    (`five number summary <https://en.wikipedia.org/wiki/Five-number_summary>`_). This function returns those values in a
+    dict than can be passed to matplotlib's 
+    `bxp function <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.bxp.html>`_.
 
-    Parameters:
-    ---
-        filename (str) - path to a file written by CacheManager, 1 value per line
+    Parameters
+    ----------
+        filename
+            path to a file written by CacheManager, 1 value per line
 
-    Returns:
-    ---
+    Returns
+    -------
         A 5-key dictionary that contains a five-number summary of the input file
     """
     group_data = np.loadtxt(filename, dtype=np.float32)
@@ -202,14 +204,16 @@ def compute_summary_statistics(metadata: dict[int, Group], field: str) -> tuple[
     """
     Computes five-number summaries for the indicated field, either "length_filename" or "pident_filename"
 
-    Parameters:
-    ---
-        metadata (dict[int, Group]) - cache metadata from `group_output_data`
+    Parameters
+    ----------
+        metadata
+            cache metadata from `group_output_data`
 
-        field (str) - either "length_filename" or "pident_filename"
+        field
+            either "length_filename" or "pident_filename"
 
-    Returns:
-    ---
+    Returns
+    -------
         A list of dictionaries that can be passed to matplotlib's bxp function and a list
         of integers to be used as x-axis positions
     """
@@ -225,14 +229,16 @@ def delete_outlying_groups(metadata: dict[int, Group], groups_to_delete: set) ->
     """
     Removes outlying groups from metadata
 
-    Parameters:
-    ---
-        metadata (dict[int, Group]) - cache metadata from `group_output_data`
+    Parameters
+    ----------
+        metadata
+            cache metadata from `group_output_data`
 
-        groups_to_delete (set) - set of groups to exclude from the returned dict
+        groups_to_delete
+            set of groups to exclude from the returned dict
 
-    Returns:
-    ---
+    Returns
+    -------
         Metadata dict with groups removed
     """
     for group in groups_to_delete:
@@ -244,12 +250,13 @@ def get_edge_hist_data(metadata: dict[int, Group]) -> tuple[list[int], list[int]
     """
     Extracts alignment_score and edge_count from metadata
 
-    Parameters:
-    ---
-        metadata (dict[int, Group]) - cache metadata from `group_output_data`
+    Parameters
+    ----------
+        metadata
+            cache metadata from `group_output_data`
 
-    Returns:
-    ---
+    Returns
+    -------
         list of ints to use as x-axis positions and list of ints representing heights of bars
     """
     xpos = sorted(list(metadata.keys()))

@@ -7,15 +7,16 @@ def parse_proxies(proxies: list[str] | None) -> dict[str, int] | None:
     """
     Convert ["key1:value1", "key2:value2",...] into {"key1": value1, "key2": value2, ...}
 
-    Will exit on parse failure.
+    Will exit on parse failure. Used to get proxy image generation info from CLI arguments
 
-    Parameters:
-    ---
-        proxies (list[str]) - list of "key:value" proxy pairs from argparse option
+    Parameters
+    ----------
+        proxies
+            list of "key:value" proxy pairs from argparse option
 
-    Returns:
-    ---
-        None if proxies is None, dict of string keys and int values otherwise
+    Returns
+    -------
+        ``None`` if proxies is None, dict of string keys and int values otherwise
     """
     if proxies is None:
         return None

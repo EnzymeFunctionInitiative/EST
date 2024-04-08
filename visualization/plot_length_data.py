@@ -1,7 +1,3 @@
-"""
-Plot data from length_uniprot.tab
-"""
-
 import argparse
 import os
 
@@ -58,13 +54,15 @@ def count_lengths(count_file: str, frac: float) -> pd.DataFrame:
     is borrowed from the original perl code and it seems to include a
     certain percentage of the total count.
 
-    Parameters:
-    ---
-        count_file (str) - path to a 2 column tsv (length and count)
-        frac (float) - percentage of counts to include
+    Parameters
+    ----------
+        count_file
+            path to a 2 column tsv (length and count)
+        frac
+            percentage of counts to include
 
-    Returns:
-    ---
+    Returns
+    -------
         A pandas DataFrame object with "count" and "length" columns
     """
     df = pd.read_csv(count_file, sep="\t", names=["length", "count"])

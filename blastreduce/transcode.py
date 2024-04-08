@@ -58,7 +58,25 @@ def parse_args():
         return args
 
 
-def csv_to_parquet_file(filename: str, read_options, parse_options, convert_options) -> pq.ParquetFile:
+def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_options: csv.ParseOptions, convert_options: csv.ConvertOptions) -> pq.ParquetFile:
+    """
+    Convert a single CSV file to a Parquet file using the supplied options
+
+    Parameters
+    ----------
+        filename
+            The path to the CSV file
+        read_options
+            Read Options
+        parse_options
+            Parse Options
+        convert_options
+            Convert Options
+    
+    Returns
+    -------
+            A ParquetFile object representing the transcoded input file. Name will be `filename`.parquet
+    """
     data = csv.open_csv(
         filename,
         read_options=read_options,
@@ -73,9 +91,30 @@ def csv_to_parquet_file(filename: str, read_options, parse_options, convert_opti
 
     return new_name
 
+def csvs_to_parquets(blast_directory: str) -> str:
+    """
+    Convert csv files to Parquet Dataset
+    
+    This function defines the read_options, parse_options, and convert_options
+    needed to correctly interpret BLAST output. It the gathers a list of BLAST
+    output files from the speficied directory using a glob pattern and passes
+    the resulting file paths to the :func:`csv_to_parquet_file` function for
+    conversion.
 
-def csvs_to_parquets(blast_directory: str) -> pq.ParquetDataset:
-    """convert csv files to Parquet Dataset"""
+    Parameters
+    ----------
+        blast_directory
+            Location of BLAST output files. Should contain many `.fa.tab` files
+
+    Returns
+    -------
+        A string containing a glob for the new parquet files
+
+    Warning
+    -------
+        Will exit if no BLAST output files are found.
+    
+    """
     # https://edwards.flinders.edu.au/blast-output-8/
     read_options = csv.ReadOptions(
         column_names=[
@@ -125,7 +164,19 @@ def csvs_to_parquets(blast_directory: str) -> pq.ParquetDataset:
     return os.path.join(blast_directory, "*.parquet")
 
 
-def fasta_to_parquet(fasta_file):
+def fasta_to_parquet(fasta_file: str) -> str:
+    """
+    Converts the provided FASTA file into a 2-column parquet file with columns `seqid` and `sequence_length`
+
+    Parameters
+    ----------
+        fasta_file
+            path to the FASTA file
+    
+    Returns
+    -------
+        The filename of the new parquet files as `fasta_file`.parquet
+    """
     ids, lengths = [], []
     for record in SeqIO.parse(fasta_file, "fasta"):
         ids.append(record.id)
@@ -139,13 +190,37 @@ def fasta_to_parquet(fasta_file):
 
 
 def render_sql_from_template(
-    template_file,
-    mem_limit,
-    duckdb_temp_dir,
-    blast_output_glob,
-    fasta_lengths_parquet,
-    reduce_output_file,
+    template_file: str,
+    mem_limit: str,
+    duckdb_temp_dir: str,
+    blast_output_glob: str,
+    fasta_lengths_parquet: str,
+    reduce_output_file: str,
 ):
+    """
+    Creates a .sql file for deduplication and merging using newly created
+    parquet files
+
+    This function uses the python stdlib
+    :external+python:py:class:`string.Template` to fill in file paths and other
+    options in a SQL file. The SQL file is executed with `DuckDB
+    <https://duckdb.org/>`_.
+
+    Parameters
+    ----------
+        template_file
+            Path to the template sql file for reduce operations
+        mem_limit
+            Soft limit for DuckDB memory usage. In bytes by default but can use common suffixes siuch as `MB and `GB`
+        duckdb_temp_dir
+            Location where duckdb should place its on-disk cache. Folder will be created if it does not exist
+        blast_output_glob
+            Globbed path to Parquet-encoded BLAST output files to combine (from :func:`csvs_to_parquets`)
+        fasta_lengths_parquet
+            Path to the parquet file with columns `seqid` and `sequence_lengths` (from :func:`fasta_to_parquet`)
+        reduce_output_file
+            Location to which the combined output (in Parquet format) should be written
+    """
     mapping = {
         "mem_limit": mem_limit,
         "duckdb_temp_dir": duckdb_temp_dir,

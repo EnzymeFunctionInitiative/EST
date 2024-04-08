@@ -12,22 +12,12 @@ This code replaces several perl + R scripts previously used to generate plots. S
 ## Usage
 This code was develop with Python 3.10.12. Python 3.10.x should be used to run it.
 
-1. Create a python environment using python 3.10.x
-   ```
-   python3 -mvenv efi-viz
-   ```
-
-2. Activate the environment and install required packages
-   ```
-   source efi-viz/bin/activate; pip install -r requirements.txt
-   ```
-
-3. Generate BLAST visualizations
+1. Generate BLAST visualizations
    ```
    python3 process_blast_results.py --blast-output 1.out --job-id 131 --length-plot-filename length --pidentplot-filename pident --edgehist-filename edge --output-type png --evalue-tab-filename evalue.tab
    ```
 
-4. Generate the uniref/uniprot length histogram
+2. Generate the uniref/uniprot length histogram
    ```
    python3 plot_length_data.py --lengths ../est_graphs/graph_data_small/length_uniprot.tab --job-id 131 --plot-filename hist
    ```
