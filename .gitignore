@@ -6,3 +6,4 @@ tests/testEnvironment.sh
 *.bak
 .*.swp
 .*.swo
+build/
