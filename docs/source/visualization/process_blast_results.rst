@@ -2,7 +2,8 @@ Process BLAST Results
 =====================
 
 Filters, summarizes, and plots BLAST output using matplotlib and
-computes cumulative-sum table for alignment scores
+computes cumulative-sum table for alignment scores.
+
 
 Commandline Usage
 -----------------
@@ -28,11 +29,11 @@ Commandline Usage
     --min-groups MIN_GROUPS
                             Minimum number of alignment-score groups to retain in output
     --length-plot-filename LENGTH_PLOT_FILENAME
-                            Filename, without extention, to write the alignment length boxplots to
+                            Filename, without extension, to write the alignment length boxplots to
     --pident-plot-filename PIDENT_PLOT_FILENAME
-                            Filename, without extention, to write the percent identity boxplots to
+                            Filename, without extension, to write the percent identity boxplots to
     --edge-hist-filename EDGE_HIST_FILENAME
-                            Filename, without extention, to write the edge count histograms to
+                            Filename, without extension, to write the edge count histograms to
     --evalue-tab-filename EVALUE_TAB_FILENAME
                             Filename to save evalue cumulative sum table to
     --output-type {png,svg,pdf}

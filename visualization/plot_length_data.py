@@ -21,7 +21,7 @@ def parse_args():
         "--plot-filename",
         type=str,
         required=True,
-        help="Filename, without extention, to write the plots to",
+        help="Filename, without extension, to write the plots to",
     )
     parser.add_argument("--title-extra", type=str, default="", help="Extra text to include plot title")
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
@@ -51,7 +51,7 @@ def count_lengths(count_file: str, frac: float) -> pd.DataFrame:
     Load and trim length histogram data
 
     This function can also trim ends of the data. The method to do this
-    is borrowed from the original perl code and it seems to include a
+    is borrowed from the original Perl code and it seems to include a
     certain percentage of the total count.
 
     Parameters

@@ -1,8 +1,8 @@
 Transcode
 =========
 
-Tab-delimited ASCII files are conveninet to use but hurt performance. To more
-efficienly post-process BLAST results, the BLAST output files are transcoded to
+Tab-delimited ASCII files are convenient to use but hurt performance. To more
+efficiently post-process BLAST results, the BLAST output files are transcoded to
 Parquet files.
 
 The conversion only includes the columns needed in later stages.

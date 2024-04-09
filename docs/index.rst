@@ -1,7 +1,7 @@
 .. EST documentation master file
 
-Enzyme Function Initiaive's Enzyme Similarity Tool
-==================================================
+Enzyme Function Initiative's Enzyme Similarity Tool
+===================================================
 
 The EST pipeline consists of the following stages:
 

@@ -32,19 +32,19 @@ def parse_args():
         "--length-plot-filename",
         type=str,
         required=True,
-        help="Filename, without extention, to write the alignment length boxplots to",
+        help="Filename, without extension, to write the alignment length boxplots to",
     )
     parser.add_argument(
         "--pident-plot-filename",
         type=str,
         required=True,
-        help="Filename, without extention, to write the percent identity boxplots to",
+        help="Filename, without extension, to write the percent identity boxplots to",
     )
     parser.add_argument(
         "--edge-hist-filename",
         type=str,
         required=True,
-        help="Filename, without extention, to write the edge count histograms to",
+        help="Filename, without extension, to write the edge count histograms to",
     )
     parser.add_argument(
         "--evalue-tab-filename",

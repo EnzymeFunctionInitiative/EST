@@ -10,5 +10,8 @@ docs-html:
 docs-coverage:
 	sphinx-build -b coverage docs/ build/
 
+docs-spelling:
+	sphinx-build -b spelling docs/ build/
+
 docs-clean:
 	rm -rf build/

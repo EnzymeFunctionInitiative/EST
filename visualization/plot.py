@@ -24,9 +24,9 @@ def draw_boxplot(dd, pos, title, xlabel, ylabel, output_filename, output_filetyp
         ylabel
             y-axis label
         output_filename
-            file name to save plot image to, without extention
+            file name to save plot image to, without extension
         output_filetype
-            file type to create. Should be a valid extention
+            file type to create. Should be a valid extension
         dpis
             if provided, a dict image suffixes and DPI values at which to render
             images. These are in addition to the default 96dpi image
@@ -67,9 +67,9 @@ def draw_histogram(xpos, heights, title, xlabel, ylabel, output_filename, output
         ylabel
             y-axis label
         output_filename
-            file name to save plot image to, without extention
+            file name to save plot image to, without extension
         output_filetype
-            file type to create. Should be a valid extention
+            file type to create. Should be a valid extension
         dpis
             if provided, a dict image suffixes and DPI values at which to render
             images. These are in addition to the default 96dpi image
@@ -99,7 +99,7 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
         output_filename
             file name to save plot image to. do not include an extension
         output_filetype
-            image file type, must be a valid exetention such as "pdf", "png", or
+            image file type, must be a valid extension such as "pdf", "png", or
             "svg"
         dpis
             if provided, a dict image suffixes and DPI values at which to render

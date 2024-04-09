@@ -97,7 +97,7 @@ def csvs_to_parquets(blast_directory: str) -> str:
     
     This function defines the read_options, parse_options, and convert_options
     needed to correctly interpret BLAST output. It the gathers a list of BLAST
-    output files from the speficied directory using a glob pattern and passes
+    output files from the specified directory using a glob pattern and passes
     the resulting file paths to the :func:`csv_to_parquet_file` function for
     conversion.
 
@@ -211,7 +211,7 @@ def render_sql_from_template(
         template_file
             Path to the template sql file for reduce operations
         mem_limit
-            Soft limit for DuckDB memory usage. In bytes by default but can use common suffixes siuch as `MB and `GB`
+            Soft limit for DuckDB memory usage. In bytes by default but can use common suffixes such as `MB and `GB`
         duckdb_temp_dir
             Location where duckdb should place its on-disk cache. Folder will be created if it does not exist
         blast_output_glob

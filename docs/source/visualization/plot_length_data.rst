@@ -1,7 +1,7 @@
 Plot Length Data
 ================
 
-Plot data from length_uniprot.tab and similar files
+Plot data from length_uniprot.tab and similar files.
 
 Commandline Usage
 -----------------
@@ -21,7 +21,7 @@ Commandline Usage
     --job-id JOB_ID       Job ID number for BLAST output file
     --frac FRAC           Percent of length values to include in plot
     --plot-filename PLOT_FILENAME
-                            Filename, without extention, to write the plots to
+                            Filename, without extension, to write the plots to
     --title-extra TITLE_EXTRA
                             Extra text to include plot title
     --output-type {png,svg,pdf}
