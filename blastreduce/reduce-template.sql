@@ -11,7 +11,7 @@ SET threads TO 1;
 -- Perl version of BLASTreduce. If DISTINCT ON ever stops working by picking the
 -- first occurence, this will break.
 CREATE TABLE blast_results as (
-        SELECT * FROM read_parquet('$transcoded_blast_output_glob')
+        SELECT * FROM read_parquet($transcoded_blast_output_glob)
         WHERE NOT qseqid = sseqid
         ORDER BY bitscore DESC, pident ASC, alignment_length ASC
 );

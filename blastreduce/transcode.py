@@ -191,6 +191,7 @@ def fasta_to_parquet(fasta_file: str) -> str:
 
 def render_sql_from_template(
     template_file: str,
+    sql_output_file: str,
     mem_limit: str,
     duckdb_temp_dir: str,
     blast_output_glob: str,
@@ -224,33 +225,13 @@ def render_sql_from_template(
     mapping = {
         "mem_limit": mem_limit,
         "duckdb_temp_dir": duckdb_temp_dir,
-        "transcoded_blast_output_glob": blast_output_glob,
+        "transcoded_blast_output_glob": str(blast_output_glob),
         "fasta_lengths_parquet": fasta_lengths_parquet,
         "reduce_output_file": reduce_output_file,
         "compression": "zstd",
     }
     with open(template_file) as f:
         template = string.Template(f.read())
-        with open(args.sql_output_file, "w") as g:
-            print(f"Saving template to '{args.sql_output_file}'")
+        with open(sql_output_file, "w") as g:
+            print(f"Saving template to '{sql_output_file}'")
             g.write(template.substitute(mapping))
-
-
-if __name__ == "__main__":
-    args = parse_args()
-    if args.blast_output or args.fasta:
-        if args.blast_output is not None:
-            blast_output_glob = csvs_to_parquets(args.blast_output)
-        if args.fasta is not None:
-            fasta_lengths_parquet = fasta_to_parquet(args.fasta)
-        if args.blast_output and args.fasta:
-            render_sql_from_template(
-                args.sql_template,
-                args.duckdb_memory_limit,
-                args.duckdb_temp_dir,
-                blast_output_glob,
-                fasta_lengths_parquet,
-                args.output_file,
-            )
-    else:
-        print("No input specified, nothing to do")
