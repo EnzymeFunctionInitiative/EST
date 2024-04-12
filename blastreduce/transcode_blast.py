@@ -12,7 +12,6 @@ import pyarrow as pa
 def parse_args():
     parser = argparse.ArgumentParser(description="Transcode BLAST output files and FASTA sequence lengths to Parquet")
     parser.add_argument("--blast-output", type=str, nargs="+", help="Path to directory containing the BLAST output files")
-    parser.add_argument("--transcoded-output", nargs="+", type=str)
     parser.add_argument(
         "--sql-template",
         type=str,
@@ -44,7 +43,7 @@ def parse_args():
     # validate input filepaths
     fail = False
     if not all(map(os.path.exists, args.blast_output)):
-        print(f"BLAST output '{args.blast_output}' does not exist")
+        print(f"At least one of BLAST output '{args.blast_output}' does not exist")
         fail = True
     if fail:
         exit(1)
@@ -87,7 +86,7 @@ convert_options = csv.ConvertOptions(
     include_columns=["qseqid", "sseqid", "pident", "alignment_length", "bitscore"],
 )
 
-def csv_to_parquet_file(filename: str, output: str, read_options: csv.ReadOptions, parse_options: csv.ParseOptions, convert_options: csv.ConvertOptions) -> pq.ParquetFile:
+def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_options: csv.ParseOptions, convert_options: csv.ConvertOptions) -> pq.ParquetFile:
     """
     Convert a single CSV file to a Parquet file using the supplied options
 
@@ -104,7 +103,7 @@ def csv_to_parquet_file(filename: str, output: str, read_options: csv.ReadOption
     
     Returns
     -------
-            A ParquetFile object representing the transcoded input file. Name will be `filename`.parquet
+        A ParquetFile object representing the transcoded input file. Name will be `filename`.parquet
     """
     data = csv.open_csv(
         filename,
@@ -112,6 +111,7 @@ def csv_to_parquet_file(filename: str, output: str, read_options: csv.ReadOption
         parse_options=parse_options,
         convert_options=convert_options,
     )
+    output = f"{os.path.basename(filename)}.parquet"
     writer = pq.ParquetWriter(output, data.schema)
     for batch in data:
         writer.write_batch(batch)
@@ -119,8 +119,5 @@ def csv_to_parquet_file(filename: str, output: str, read_options: csv.ReadOption
 
 if __name__ == "__main__":
     args = parse_args()
-    if len(args.blast_output) != len(args.transcoded_output):
-        exit(1)
-    else:
-        for blast_output, transcoded_output in zip(args.blast_output, args.transcoded_output):
-            csv_to_parquet_file(blast_output, transcoded_output, read_options, parse_options, convert_options)
+    for blast_output in args.blast_output:
+        csv_to_parquet_file(blast_output, read_options, parse_options, convert_options)
