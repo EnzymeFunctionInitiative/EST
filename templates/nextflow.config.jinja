@@ -1,0 +1,31 @@
+timeline.overwrite = true
+dag.overwrite = true
+report.overwrite = true
+
+executor {
+    name = 'slurm'
+    queue = 'efi'
+    queueSize = 256
+}
+
+process {
+    executor = 'local'
+    cpus = 1
+    memory = 5.GB
+
+    withName: all_by_all_blast {
+        executor = 'slurm'
+        queue = 'efi'
+        memory = 2.GB
+    }
+
+    withName: blastreduce {
+        cpus = 2
+        memory = 16.GB
+    }
+
+    withName: visualize_blast {
+        cpus = 2
+        memory = 16.GB
+    }
+}

@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --partition=efi
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16gb
+#SBATCH --job-name="nextflow-efi-est-{{ job_id }}"
+#SBATCH -o {{ output_dir }}/nextflow.stdout
+#SBATCH -e {{ output_dir }}/nextflow.stderr
+
+module load nextflow
+nextflow -C /home/a-m/demeyer3/EST/nextflow.config run -ansi-log false -offline {{ workflow_definition }} -params-file {{ params_file }} -with-report {{ output_dir }}/{{ report_file }} -with-timeline {{ output_dir }}/{{ timeline_file }} -work-dir {{ output_dir }}/work
