@@ -220,7 +220,7 @@ def compute_summary_statistics(metadata: dict[int, Group], field: str) -> tuple[
     summary = []
     xpos = sorted(list(metadata.keys()))
     for group in xpos:
-        fname = metadata[group]._asdict()[field]
+        fname = getattr(metadata[group], field)
         summary.append(compute_summary_statistic_for_group(fname))
     return summary, xpos
 

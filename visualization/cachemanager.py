@@ -2,17 +2,20 @@ import os
 from collections import namedtuple, OrderedDict
 from typing import Any
 
-Group = namedtuple("Group", ["edge_count", "cumulative_edge_count", "length_filename", "pident_filename"])
-""" Represents a group of sequence lengths and percents identity with a common alignment score
 
-    ..py:attribute:: edge_count
-        int, number of edges in this group
-    ..py:attribute:: cumulative_edge_count
+class Group:
+    """
+    Represents a group of sequence lengths and percents
+    """
+    def __init__(self, edge_count=0, cumulative_edge_count=0, length_filename="", pident_filename=""):
+        self.edge_count = edge_count
+        self.cumulative_edge_count = cumulative_edge_count
+        self.length_filename = length_filename
+        self.pident_filename = pident_filename
 
-    ..py:attribute:: length_filename
-    ..py:attribute:: pident_filename
+    def __str__(self):
+        return f"Edge count: {self.edge_count}, Cumulative_edge_count: {self.cumulative_edge_count}, Length filename: '{self.length_filename}', Percent identical filename: '{self.pident_filename}'"
 
-"""
 
 class CacheManager:
     """
