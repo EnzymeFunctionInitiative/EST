@@ -30,6 +30,7 @@ extensions = ["sphinx.ext.autodoc",       # parses docstrings from python code
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "pyarrow": ("https://arrow.apache.org/docs", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None)
 }
 typehints_use_signature = True
 typehints_use_signature_return  = True
