@@ -27,7 +27,7 @@ process split_fasta {
     output:
         path "fracfile-*.fa"
     """
-    ${params.est_dir}/split_fasta.pl -parts 64 -source ${fasta_file}
+    ${params.est_dir}/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
     """
 }
 
@@ -104,12 +104,12 @@ workflow {
     // step 2: create blastdb and frac seq file 
     // chunk_size = (int) Math.ceil(num_fasta_records / 256)
     fasta_lengths_parquet = blastreduce_transcode_fasta(fasta_file)
-    fasta_fractions = fasta_file | splitFasta(size: params.blast_shard_file_size, file: true)
-    fasta_fractions.view {"FASTA split into $it pieces"}
+    // fasta_fractions = fasta_file | splitFasta(size: params.blast_shard_file_size, file: true)
+    fasta_fractions = split_fasta(fasta_file)
     blastdb = create_blast_db(fasta_file)
 
     // step 3: all-by-all blast and blast reduce
-    blast_fractions = all_by_all_blast(blastdb, fasta_fractions.toList()) | collect
+    blast_fractions = all_by_all_blast(blastdb, fasta_fractions) | collect
     reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
 
     // step 4: visualize and save

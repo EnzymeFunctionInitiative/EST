@@ -2,4 +2,4 @@ est_dir: "{{ est_dir }}"
 fasta_file: "{{ job_dir }}/output/sequences.fa"
 final_output_dir: "{{ output_dir }}"
 duckdb_memory_limit: "8GB"
-blast_shard_file_size: "500KB"
+num_fasta_shards: 64
