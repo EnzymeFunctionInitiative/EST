@@ -80,10 +80,10 @@ convert_options = csv.ConvertOptions(
         "qend": pa.int32(),
         "sstart": pa.int32(),
         "send": pa.int32(),
-        "evale": pa.float32(),
+        "evalue": pa.float32(),
         "bitscore": pa.float32(),
     },
-    include_columns=["qseqid", "sseqid", "pident", "alignment_length", "bitscore"],
+    include_columns=["qseqid", "sseqid", "pident", "alignment_length", "bitscore"]
 )
 
 def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_options: csv.ParseOptions, convert_options: csv.ConvertOptions) -> pq.ParquetFile:

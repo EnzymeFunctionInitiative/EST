@@ -39,12 +39,11 @@ process all_by_all_blast {
     output:
         path "${frac}.tab.parquet"
     """
-    export PATH="/private_stores/gerlt/test_lib:$PATH"
     module load efidb/ip98
     module load efiest/devlocal
     module load Python
     module load efiest/python_est_1.0
-    blastall -p blastp -i $frac -d $blast_db_name -m 8 -e 1e-5 -b 250 -o ${frac}.tab
+    blastall -p blastp -i $frac -d $blast_db_name -m 8 -e 1e-5 -b ${params.num_blast_matches} -o ${frac}.tab
     python ${params.est_dir}/blastreduce/transcode_blast.py --blast-output ${frac}.tab
     """
 }
@@ -74,6 +73,7 @@ process blastreduce {
     """
     module load Python
     module load efiest/python_est_1.0
+    module load efidb/ip98
     python ${params.est_dir}/blastreduce/render_sql_template.py --blast-output $blast_files  --sql-template ${params.est_dir}/blastreduce/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --sql-output-file reduce.sql
     module load DuckDB
     duckdb < reduce.sql
