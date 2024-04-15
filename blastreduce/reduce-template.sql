@@ -34,7 +34,7 @@ ALTER TABLE blast_results RENAME largeseqid TO sseqid;
 -- on (qseqid, sseqid) and assigning a rank to a specific sorted order. It does
 -- not exactly match the previous method but it is extremly close
 CREATE TABLE reduced AS
-    SELECT *
+    SELECT qseqid, sseqid, pident, alignment_length, bitscore
     FROM (
         SELECT qseqid, sseqid, pident, alignment_length, bitscore,
         ROW_NUMBER() OVER (PARTITION BY qseqid, sseqid
