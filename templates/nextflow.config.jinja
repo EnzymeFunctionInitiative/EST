@@ -5,13 +5,13 @@ report.overwrite = true
 executor {
     name = 'slurm'
     queue = 'efi'
-    queueSize = 256
+    queueSize = 64
 }
 
 process {
     executor = 'local'
     cpus = 1
-    memory = 5.GB
+    memory = 4.GB
 
     withName: all_by_all_blast {
         executor = 'slurm'
@@ -20,12 +20,14 @@ process {
     }
 
     withName: blastreduce {
-        cpus = 2
+        executor = 'slurm'
+        queue = 'efi'
+        cpus = 4
         memory = 16.GB
     }
 
     withName: visualize_blast {
         cpus = 2
-        memory = 16.GB
+        memory = 4.GB
     }
 }
