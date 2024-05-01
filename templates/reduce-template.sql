@@ -64,6 +64,10 @@ SET subject_length = (SELECT sequence_length FROM sequence_lengths WHERE reduced
 
 DROP TABLE sequence_lengths;
 
+-- add alignment score
+ALTER TABLE reduced ADD COLUMN alignment_score INT32;
+UPDATE reduced SET alignment_score = CAST(FLOOR(-1 * log10(query_length * subject_length) + log10(2) * bitscore) AS INT32)
+
 -- export table back to parquet file, sorted by alignment score descending --
 -- this allows for optimal grouping in the next stage
 COPY (
@@ -74,8 +78,32 @@ COPY (
            bitscore,
            query_length,
            subject_length,
-           CAST(FLOOR(-1 * log10(query_length * subject_length) + log10(2) * bitscore) AS INT32) as alignment_score
+           alignment_score,
     FROM reduced
     ORDER BY alignment_score DESC
 )
 TO '$reduce_output_file' (FORMAT 'parquet', COMPRESSION '$compression');
+
+-- export boxplot statistics for pident
+COPY (
+    SELECT alignment_score,
+        MEDIAN(pident) as 'med',
+        MIN(pident) as 'whislo',
+        MAX(pident) as 'whishi',
+        QUANTILE_CONT(pident, .25) as 'q1',
+        QUANTILE_CONT(pident, .75) as 'q3'
+    FROM reduced
+    GROUP BY alignment_Score
+) TO '$pident_statistics' (FORMAT 'parquet', COMPRESSION '$compression');
+
+-- export boxplot statistics for alignment_length
+COPY (
+    SELECT alignment_score,
+        MEDIAN(alignment_length) as 'med',
+        MIN(alignment_length) as 'whislo',
+        MAX(alignment_length) as 'whishi',
+        QUANTILE_CONT(alignment_length, .25) as 'q1',
+        QUANTILE_CONT(alignment_length, .75) as 'q3'
+    FROM reduced
+    GROUP BY alignment_Score
+) TO '$aligment_length_statistics' (FORMAT 'parquet', COMPRESSION '$compression');

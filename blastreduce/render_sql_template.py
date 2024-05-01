@@ -8,7 +8,7 @@ def parse_args():
     parser.add_argument(
         "--sql-template",
         type=str,
-        default="reduce-template.sql",
+        default="../templates/reduce-template.sql",
         help="Path to the template sql file for reduce operations",
     )
     parser.add_argument(
