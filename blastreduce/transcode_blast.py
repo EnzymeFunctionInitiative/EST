@@ -10,33 +10,8 @@ import pyarrow as pa
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Transcode BLAST output files and FASTA sequence lengths to Parquet")
-    parser.add_argument("--blast-output", type=str, nargs="+", help="Path to directory containing the BLAST output files")
-    parser.add_argument(
-        "--sql-template",
-        type=str,
-        default="reduce-template.sql",
-        help="Path to the template sql file for reduce operations",
-    )
-    parser.add_argument(
-        "--sql-output-file",
-        type=str,
-        default="reduce.sql",
-        help="Location to write the reduce SQL commands to",
-    )
-    parser.add_argument("--duckdb-memory-limit", type=str, default="4GB", help="Soft limit on DuckDB memory usage")
-    parser.add_argument(
-        "--duckdb-temp-dir",
-        type=str,
-        default="./duckdb",
-        help="Location DuckDB should use for temporary files",
-    )
-    parser.add_argument(
-        "--output-file",
-        type=str,
-        default="1.out.parquet",
-        help="The final output file the aggregated BLAST output should be written to. Will be Parquet.",
-    )
+    parser = argparse.ArgumentParser(description="Transcode BLAST output files to Parquet")
+    parser.add_argument("--blast-output", type=str, nargs="+", help="BLAST output files")
 
     args = parser.parse_args()
 
