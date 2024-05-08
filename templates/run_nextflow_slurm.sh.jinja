@@ -1,11 +1,10 @@
 #!/bin/bash
 #SBATCH --partition=efi
-#SBATCH --nodes=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=8GB
+#SBATCH -c 4
+#SBATCH --mem=32GB
 #SBATCH --job-name="est-{{ job_id }}"
 #SBATCH -o {{ output_dir }}/nextflow.stdout
 #SBATCH -e {{ output_dir }}/nextflow.stderr
 
 module load nextflow
-nextflow -C {{ config_path }} run {{ workflow_definition }} -ansi-log false -offline -params-file {{ params_file }} -with-report {{ output_dir }}/{{ report_file }} -with-timeline {{ output_dir }}/{{ timeline_file }} -work-dir /scratch
+nextflow -C {{ config_path }} run {{ workflow_definition }} -ansi-log false -offline -params-file {{ params_file }} -with-report {{ output_dir }}/{{ report_file }} -with-timeline {{ output_dir }}/{{ timeline_file }}

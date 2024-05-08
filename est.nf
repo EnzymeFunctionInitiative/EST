@@ -8,6 +8,13 @@ process import_sequences {
     """
 }
 
+process multiplex {
+    input:
+        path fasta_file
+    output:
+        "sequences.fa"
+}
+
 process create_blast_db {
     input:
         path fasta_file
@@ -15,6 +22,8 @@ process create_blast_db {
         path "database.*"
         val "database"
     """
+    module load efidb/ip98
+    module load efiest/devlocal
     formatdb -i ${fasta_file} -n database -p T -o T
     """
 }
@@ -25,6 +34,7 @@ process split_fasta {
     output:
         path "fracfile-*.fa"
     """
+    module load Perl
     ${params.est_dir}/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
     """
 }
@@ -62,8 +72,8 @@ process blastreduce_transcode_fasta {
         path "${fasta_file.getName()}.parquet"
 
     """
-    # module load Python
-    # module load efiest/python_est_1.0
+    module load Python
+    module load efiest/python_est_1.0
     python ${params.est_dir}/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
     """
 }
@@ -78,16 +88,16 @@ process blastreduce {
         path "1.out.parquet"
 
     """
-    # module load Python
-    # module load efiest/python_est_1.0
-    # module load efidb/ip98
-    python ${params.est_dir}/blastreduce/render_sql_template.py --blast-output $blast_files  --sql-template ${params.est_dir}/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --sql-output-file reduce.sql
-    # module load DuckDB
-    duckdb < reduce.sql
+    module load Python
+    module load efiest/python_est_1.0
+    module load efidb/ip98
+    python ${params.est_dir}/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template ${params.est_dir}/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
+    module load DuckDB
+    duckdb < allreduce.sql
     """
 }
 
-process visualize_blast {
+process visualize {
     input:
         path blast_parquet
     output:
@@ -124,11 +134,9 @@ process finalize_ouptut {
         path pident_boxplot
         path edge_histo
         path evalue_tab
-    output:
-        path 'output.tar'
+        path counts
     """
-    python finalize/transcode_blast_parquet.py --blast-parquet $blast_output
-    # tar -cf output.tar 1.out $length_boxplot $pident_boxplot $edge_histo $evalue_tab
+    echo 'Finalizing'
     """
 }
 
