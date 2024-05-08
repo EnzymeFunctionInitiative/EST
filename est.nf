@@ -97,32 +97,40 @@ process blastreduce {
     """
 }
 
-process visualize {
+process compute_stats {
     input:
         path blast_parquet
+        path fasta_file
+    output:
+        path "boxplot_stats.parquet", emit: boxplot_stats
+        path "evalue.tab", emit: evaluetab
+        path "acc_counts.json", emit: acc_counts
+    """
+    module load Python
+    module load efiest/python_est_1.0
+    module load DuckDB
+
+    # compute convergence ratio
+    python ${params.est_dir}/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
+
+    # compute boxplot stats and evalue.tab
+    python ${params.est_dir}/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template ${params.est_dir}/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
+    duckdb < boxplotstats.sql
+    """
+}
+
+process visualize {
+    input:
+        path boxplot_stats
     output:
         path 'length.png'
         path 'pident.png'
         path 'edge.png'
-        path 'evalue.tab'
 
     """
     module load Python
     module load efiest/python_est_1.0
-    python ${params.est_dir}/visualization/process_blast_results.py --blast-output $blast_parquet --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --evalue-tab-filename evalue.tab --cache-dir /scratch/${params.job_id}-viz --proxies sm:48
-    """
-}
-
-process convergence_ratio {
-    input:
-        path blast_output
-        path fasta_file
-    output:
-        path "acc_counts.json"
-    """
-    module load Python
-    module load efiest/python_est_1.0
-    python ${params.est_dir}/finalize/conv_ratio.py --blast-output $blast_output --fasta $fasta_file --output acc_counts.json
+    python ${params.est_dir}/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
     """
 }
 
@@ -134,7 +142,14 @@ process finalize_ouptut {
         path pident_boxplot
         path edge_histo
         path evalue_tab
-        path counts
+        path acc_counts
+    output:
+        path blast_output
+        path length_boxplot
+        path pident_boxplot
+        path edge_histo
+        path evalue_tab
+        path acc_counts
     """
     echo 'Finalizing'
     """
@@ -153,10 +168,12 @@ workflow {
     blast_fractions = all_by_all_blast(blastdb, fasta_fractions) | collect
     reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
 
-    // step 4: visualize and compute convergence ratio
-    plots = visualize(reduced_blast_parquet)
-    counts = convergence_ratio(reduced_blast_parquet, fasta_lengths_parquet)
+    // step 4: compute convergence ratio and boxplot stats
+    stats = compute_stats(reduced_blast_parquet, fasta_lengths_parquet)
+
+    // step 5: visualize
+    plots = visualize(stats.boxplot_stats)
 
     // step 5: copy files to output dir
-    finalize_ouptut(reduced_blast_parquet, plots, counts)
+    finalize_ouptut(reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
