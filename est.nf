@@ -35,14 +35,23 @@ process all_by_all_blast {
         val blast_db_name
         each path(frac)
     output:
-        path "${frac}.tab.parquet"
+        path "${frac}.tab.sorted.parquet"
     """
-    # module load efidb/ip98
-    # module load efiest/devlocal
-    # module load Python
-    # module load efiest/python_est_1.0
+    module load efidb/ip98
+    module load efiest/devlocal
+    module load Python
+    module load efiest/python_est_1.0
+    module load DuckDB
+
+    # run blast to get similarity metrics
     blastall -p blastp -i $frac -d $blast_db_name -m 8 -e 1e-5 -b ${params.num_blast_matches} -o ${frac}.tab
+
+    # transcode to parquet for speed, creates frac.tab.parquet
     python ${params.est_dir}/blastreduce/transcode_blast.py --blast-output ${frac}.tab
+
+    # in each row, ensure that qseqid < sseqid lexicographically
+    python ${params.est_dir}/blastreduce/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template ${params.est_dir}/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
+    duckdb < prereduce.sql
     """
 }
 
