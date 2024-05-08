@@ -59,6 +59,7 @@ def parse_args():
         nargs="+",
         help="A list of key:value pairs for rendering smaller proxy images. Keys wil be included in filenames, values should be less than 96",
     )
+    parser.add_argument("--cache-dir", type=str, help="Location for cache dir used when grouping pidents and alignment lengths")
 
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
@@ -74,7 +75,7 @@ def parse_args():
         return args
 
 
-def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
+def group_output_data(blast_output: str, cache_dir: str = None) -> tuple[dict[int, Group], str]:
     """
     Compute alignment score and use it to bin rows from BLAST output
 
@@ -86,18 +87,18 @@ def group_output_data(blast_output: str) -> tuple[dict[int, Group], str]:
     Returns
     -------
         dictionary of alignment scores as keys and CacheManager.Group values
-        string name of directory used for cache (so it can be deleted later)
     """
     pf = pq.ParquetFile(blast_output, read_dictionary=["pident", "alignment_length", "alignment_score"])
-    cachedir = f"./data_{str(uuid4()).split('-')[0]}"
-    with CacheManager(cachedir) as cm:
+    if cache_dir is None:
+        cache_dir = f"./data_{str(uuid4()).split('-')[0]}"
+    with CacheManager(cache_dir) as cm:
         for batch in pf.iter_batches():
             for line in batch.to_pylist():
                 cm.append(line["alignment_score"], line["alignment_length"], line["pident"])
 
         metadata = cm.get_edge_counts_and_filenames()
 
-    return metadata, cachedir
+    return metadata
 
 
 def compute_outlying_groups(group_metadata: dict[int, Group], min_num_edges: int, min_num_groups: int) -> set:
@@ -274,12 +275,13 @@ def main(
     edge_filename,
     evalue_tab_filename,
     output_format,
+    cache_dir,
     proxies,
-    delete_cache=True,
+    delete_cache=True
 ):
     # compute groups and trim outliers
     print("Grouping output data")
-    metadata, cachedir = group_output_data(blast_output)
+    metadata = group_output_data(blast_output, cache_dir)
 
     # save evalue table
     print("Saving edge count cumulative sum table")
@@ -335,7 +337,7 @@ def main(
 
     # cleanup cache dir
     if delete_cache:
-        shutil.rmtree(cachedir)
+        shutil.rmtree(cache_dir)
 
 
 if __name__ == "__main__":
@@ -350,5 +352,6 @@ if __name__ == "__main__":
         args.edge_hist_filename,
         args.evalue_tab_filename,
         args.output_type,
-        args.proxies,
+        args.cache_dir,
+        args.proxies
     )

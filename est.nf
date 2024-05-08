@@ -97,9 +97,22 @@ process visualize_blast {
         path 'evalue.tab'
 
     """
-    # module load Python
-    # module load efiest/python_est_1.0
-    python ${params.est_dir}/visualization/process_blast_results.py --blast-output $blast_parquet --job-id $job_id --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --evalue-tab-filename evalue.tab --proxies sm:48
+    module load Python
+    module load efiest/python_est_1.0
+    python ${params.est_dir}/visualization/process_blast_results.py --blast-output $blast_parquet --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --evalue-tab-filename evalue.tab --cache-dir /scratch/${params.job_id}-viz --proxies sm:48
+    """
+}
+
+process convergence_ratio {
+    input:
+        path blast_output
+        path fasta_file
+    output:
+        path "acc_counts.json"
+    """
+    module load Python
+    module load efiest/python_est_1.0
+    python ${params.est_dir}/finalize/conv_ratio.py --blast-output $blast_output --fasta $fasta_file --output acc_counts.json
     """
 }
 
@@ -132,9 +145,10 @@ workflow {
     blast_fractions = all_by_all_blast(blastdb, fasta_fractions) | collect
     reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
 
-    // step 4: visualize and save
-    plots = visualize_blast(reduced_blast_parquet)
+    // step 4: visualize and compute convergence ratio
+    plots = visualize(reduced_blast_parquet)
+    counts = convergence_ratio(reduced_blast_parquet, fasta_lengths_parquet)
 
     // step 5: copy files to output dir
-    finalize_ouptut(reduced_blast_parquet, plots)
+    finalize_ouptut(reduced_blast_parquet, plots, counts)
 }
