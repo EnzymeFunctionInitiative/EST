@@ -61,7 +61,8 @@ if __name__ == "__main__":
                                            timeline_file="timeline.html",
                                            output_dir=args.output_dir,
                                            job_id=args.job_id,
-                                           config_path=args.config_path)
+                                           config_path=args.config_path,
+                                           load_modules=True)
     submission_script_output = os.path.join(args.output_dir, "run_nextflow.sh")
     with open(submission_script_output, "w") as f:
         f.write(submission_script)
