@@ -2,7 +2,7 @@ import argparse
 import string
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Transcode BLAST output file to Parquet")
+    parser = argparse.ArgumentParser(description="Render the DuckDB SQL template for alphabetizing IDs")
     parser.add_argument("--blast-output", type=str, required=True, help="Path to directory containing the BLAST output file")
     parser.add_argument(
         "--sql-template",

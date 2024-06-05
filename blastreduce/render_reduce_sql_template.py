@@ -2,7 +2,7 @@ import argparse
 import string
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Transcode BLAST output files and FASTA sequence lengths to Parquet")
+    parser = argparse.ArgumentParser(description="Render the DuckDB SQL template for eliminating duplicate and self edges")
     parser.add_argument("--blast-output", type=str, nargs="+", help="Path to directory containing the BLAST output files")
     parser.add_argument("--fasta-length-parquet", type=str, help="Path to the FASTA file to transcode")
     parser.add_argument(
