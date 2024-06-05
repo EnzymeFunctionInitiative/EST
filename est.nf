@@ -32,7 +32,7 @@ process split_fasta {
     output:
         path "fracfile-*.fa"
     """
-    ${params.est_dir}/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
+    $projectDir/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
     """
 }
 
@@ -48,10 +48,10 @@ process all_by_all_blast {
     blastall -p blastp -i $frac -d $blast_db_name -m 8 -e 1e-5 -b ${params.num_blast_matches} -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet
-    python ${params.est_dir}/blastreduce/transcode_blast.py --blast-output ${frac}.tab
+    python $projectDir/blastreduce/transcode_blast.py --blast-output ${frac}.tab
 
     # in each row, ensure that qseqid < sseqid lexicographically
-    python ${params.est_dir}/blastreduce/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template ${params.est_dir}/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
+    python $projectDir/blastreduce/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
     duckdb < prereduce.sql
     """
 }
@@ -63,7 +63,7 @@ process blastreduce_transcode_fasta {
         path "${fasta_file.getName()}.parquet"
 
     """
-    python ${params.est_dir}/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
+    python $projectDir/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
     """
 }
 
@@ -77,7 +77,7 @@ process blastreduce {
         path "1.out.parquet"
 
     """
-    python ${params.est_dir}/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template ${params.est_dir}/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
+    python $projectDir/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
     
     duckdb < allreduce.sql
     """
@@ -93,10 +93,10 @@ process compute_stats {
         path "acc_counts.json", emit: acc_counts
     """
     # compute convergence ratio
-    python ${params.est_dir}/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
+    python $projectDir/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
 
     # compute boxplot stats and evalue.tab
-    python ${params.est_dir}/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template ${params.est_dir}/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
+    python $projectDir/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
     duckdb < boxplotstats.sql
     """
 }
@@ -110,11 +110,11 @@ process visualize {
         path 'edge.png'
 
     """
-    python ${params.est_dir}/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
+    python $projectDir/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
     """
 }
 
-process finalize_ouptut {
+process finalize_output {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_output
@@ -155,5 +155,5 @@ workflow {
     plots = visualize(stats.boxplot_stats)
 
     // step 5: copy files to output dir
-    finalize_ouptut(reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
+    finalize_output(reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
