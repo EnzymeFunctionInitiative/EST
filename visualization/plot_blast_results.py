@@ -111,9 +111,11 @@ def compute_outlying_groups(group_edge_counts: pd.DataFrame, min_num_edges: int,
     while upper_bound_idx < len(sizes) and upper_bound_idx - lower_bound_idx + 1 < min_num_groups:
         upper_bound_idx += 1
     # extract `alignment_score`s from sizes array, put in Set of O(1) lookups in subsequent filter
-    groups_to_keep = set(k.alignment_score for k in sizes[lower_bound_idx:-upper_bound_idx])
-
-    return set([k.alignment_score for k in sizes]) - groups_to_keep
+    if upper_bound_idx - lower_bound_idx + 1 < min_num_groups:
+        return set()
+    else:
+        groups_to_keep = set(k.alignment_score for k in sizes[lower_bound_idx:-upper_bound_idx])
+        return set([k.alignment_score for k in sizes]) - groups_to_keep
 
 
 def delete_outlying_groups(stats: pd.DataFrame, groups_to_delete: set) -> pd.DataFrame:
