@@ -43,7 +43,7 @@ if __name__ == "__main__":
     sh_template = env.get_template("run_nextflow_slurm.sh.jinja")
 
     params = params_template.render(est_dir=args.est_dir, 
-                                    job_dir=f"/private_stores/gerlt/jobs/dev/est/{args.job_id}", 
+                                    fasta_file=f"/private_stores/gerlt/jobs/dev/est/{args.job_id}/output/sequences.fa", 
                                     output_dir=args.output_dir,
                                     duckdb_threads=args.duckdb_threads,
                                     duckdb_mem=args.duckdb_mem,
