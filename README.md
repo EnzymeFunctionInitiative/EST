@@ -67,7 +67,8 @@ DuckDB, Python, and Perl installed on your cluster.
 ### EST
 1. Nextflow will be executed in a batch job which will launch other batch jobs
    as needed. To generate the script which starts the pipeline, use the provided
-   generation script:
+   generation script. This script relies on the Jinja python package and will
+   fail if it is not installed.
    ```
    python create_est_nextflow_job.py --config-path conf/slurm.config --fasta-file <path_to_fasta>  --output-dir <path_to_results_dir>
    ```

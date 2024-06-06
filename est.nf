@@ -149,6 +149,6 @@ workflow {
     // step 5: visualize
     plots = visualize(stats.boxplot_stats)
 
-    // step 5: copy files to output dir
+    // step 6: copy files to output dir
     finalize_output(reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
