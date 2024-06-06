@@ -1,4 +1,5 @@
 process import_sequences {
+    containerOptions "-v ${params.fasta_file}:${params.fasta_file}"
     input:
         val existing_fasta_file
     output:
