@@ -33,7 +33,7 @@ process split_fasta {
     output:
         path "fracfile-*.fa"
     """
-    $projectDir/src/split_fasta/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
+    $projectDir/src/est/split_fasta/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
     """
 }
 
@@ -49,10 +49,10 @@ process all_by_all_blast {
     blastall -p blastp -i $frac -d $blast_db_name -m 8 -e 1e-5 -b ${params.num_blast_matches} -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet
-    python $projectDir/src/blastreduce/transcode_blast.py --blast-output ${frac}.tab
+    python $projectDir/src/est/blastreduce/transcode_blast.py --blast-output ${frac}.tab
 
     # in each row, ensure that qseqid < sseqid lexicographically
-    python $projectDir/src/blastreduce/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
+    python $projectDir/src/est/blastreduce/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
     duckdb < prereduce.sql
     """
 }
@@ -64,7 +64,7 @@ process blastreduce_transcode_fasta {
         path "${fasta_file.getName()}.parquet"
 
     """
-    python $projectDir/src/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
+    python $projectDir/src/est/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
     """
 }
 
@@ -78,7 +78,7 @@ process blastreduce {
         path "1.out.parquet"
 
     """
-    python $projectDir/src/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
+    python $projectDir/src/est/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
     
     duckdb < allreduce.sql
     """
@@ -94,10 +94,10 @@ process compute_stats {
         path "acc_counts.json", emit: acc_counts
     """
     # compute convergence ratio
-    python $projectDir/src/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
+    python $projectDir/src/est/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
 
     # compute boxplot stats and evalue.tab
-    python $projectDir/src/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
+    python $projectDir/src/est/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
     duckdb < boxplotstats.sql
     """
 }
@@ -109,7 +109,7 @@ process visualize {
         path '*.png'
 
     """
-    python $projectDir/src/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
+    python $projectDir/src/est/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
     """
 }
 
