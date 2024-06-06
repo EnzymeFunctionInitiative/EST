@@ -1,12 +1,6 @@
 FROM python:3.10-bullseye
 
-COPY templates/* app/templates/
-COPY blastreduce/* app/blastreduce/
-COPY visualization/* app/visualization/
-COPY split_fasta.pl app/
-COPY endstages.nf app/
 COPY requirements.txt app/
-COPY create_nextflow_job.py app/
 
 # install blastall
 RUN curl -o /opt/blast-2.2.26.tar.gz https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/blast-2.2.26-x64-linux.tar.gz; \
