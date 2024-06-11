@@ -116,11 +116,13 @@ process visualize {
 process finalize_output {
     publishDir params.final_output_dir, mode: 'copy'
     input:
+        path fasta_file
         path blast_output
         path plots
         path evalue_tab
         path acc_counts
     output:
+        path fasta_file
         path blast_output
         path plots
         path evalue_tab
@@ -150,5 +152,5 @@ workflow {
     plots = visualize(stats.boxplot_stats)
 
     // step 6: copy files to output dir
-    finalize_output(reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
+    finalize_output(fasta_file, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
