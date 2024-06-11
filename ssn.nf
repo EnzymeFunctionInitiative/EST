@@ -72,7 +72,7 @@ process compute_stats {
 }
 
 process finalize_output {
-    publishDir params.results_dir, mode: 'copy'
+    publishDir params.output_dir, mode: 'copy'
     input:
         path filtered_blast
         path filtered_fasta
