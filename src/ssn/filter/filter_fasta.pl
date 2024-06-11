@@ -3,10 +3,6 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use FindBin;
-
-use lib "$FindBin::Bin/lib";
-use AlignmentScore;
 
 
 my ($minLen, $maxLen, $inputFasta, $outputFasta, $domainLenMeta, $idListFile);

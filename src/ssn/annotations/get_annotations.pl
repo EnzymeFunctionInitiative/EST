@@ -1,13 +1,5 @@
 #!/usr/bin/env perl
 
-BEGIN {
-    die "Please load efishared before runing this script" if not $ENV{EFISHARED};
-    use lib $ENV{EFISHARED};
-}
-
-#version 0.9.2 no changes to this file
-#version 0.9.4 modifications due to removing sequence and classi fields and addition of uniprot_description field
-
 use strict;
 use warnings;
 
@@ -16,6 +8,7 @@ use List::MoreUtils qw{apply};
 use FindBin;
 use Data::Dumper;
 
+use lib "../../../lib";
 use EFI::Database;
 use EFI::Config;
 use EFI::Annotations;

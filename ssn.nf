@@ -1,4 +1,5 @@
 process import_data {
+    containerOptions "-v ${params.blast_parquet}:${params.blast_parquet} -v ${params.fasta_file}:${params.fasta_file}"
     input:
         val existing_blast_output
         val existing_fasta_file
@@ -17,7 +18,7 @@ process filter_blast {
     output:
         path "2.out"
     """
-    python $projectDir/ssn/filter/render_filter_blast_sql_template.py --blast-output $blast_parquet --filter-parameter ${params.filter_parameter} --filter-min-val ${params.filter_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/filterblast-template.sql --output-file 2.out --sql-output-file filterblast.sql
+    python $projectDir/src/ssn/filter/render_filter_blast_sql_template.py --blast-output $blast_parquet --filter-parameter ${params.filter_parameter} --filter-min-val ${params.filter_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/filterblast-template.sql --output-file 2.out --sql-output-file filterblast.sql
     duckdb < filterblast.sql
     """
 }
@@ -29,7 +30,7 @@ process filter_fasta {
         path "filtered_sequences.fa", emit: filtered_fasta
         path "fasta.metadata", emit: fasta_metadata
     """
-    perl $projectDir/src/ssn/filter_fasta.pl --fastain $fasta --fastaout filtered_sequences.fa -minlen ${params.min_length} -maxlen ${params.max_length} -domain-meta fasta.metadata
+    perl $projectDir/src/ssn/filter/filter_fasta.pl --fastain $fasta --fastaout filtered_sequences.fa -minlen ${params.min_length} -maxlen ${params.max_length} -domain-meta fasta.metadata
     """
 }
 
@@ -38,8 +39,13 @@ process get_annotations {
         path fasta_metadata
     output:
         path "struct.filtered.out"
+    stub:
     """
-    perl $projectDir/src/ssn/annotations/get_annotations.pl -out struct.filtered.out -uniref-version ${} -min-len ${} -max-len ${} -meta-file $fasta_metadata -config ${}
+    cp $projectDir/cheat/struct.filtered.out .
+    """
+    script:
+    """
+    perl $projectDir/src/ssn/annotations/get_annotations.pl -out struct.filtered.out -uniref-version ${params.uniref_version} -min-len ${params.min_length} -max-len ${params.max_length} -meta-file $fasta_metadata -config=${params.efi_config}
     """
 }
 
@@ -49,10 +55,9 @@ process create_xgmml_100 {
         path filtered_fasta
         path struct_file
     output:
-        path "${params.ssn_name}_full_ssn.xgmml.zip"
+        path "full_ssn.xgmml"
     """
-    perl $projectDir/src/ssn/create/xgmml_100_create.pl -blast=$filtered_blast -fasta $filtered_fasta -struct $struct_file -output full_ssn.xgmml  -title ${params.title} -maxfull ${params.maxfull}
-    zip -j full_ssn.xgmml.zip ${params.ssn_name}_full_ssn.xgmml
+    perl $projectDir/src/ssn/create/xgmml_100_create.pl -blast=$filtered_blast -fasta $filtered_fasta -struct $struct_file -output full_ssn.xgmml  -title ${params.ssn_title} -dbver ${params.db_version}
     """
 }
 
@@ -63,6 +68,25 @@ process compute_stats {
         path "stats.tab"
     """
     perl $projectDir/src/ssn/stats/stats.pl -run-dir . -out stats.tab
+    """
+}
+
+process finalize_output {
+    publishDir params.results_dir, mode: 'copy'
+    input:
+        path filtered_blast
+        path filtered_fasta
+        path annotations
+        path full_ssn
+        path stats
+    output:
+        path filtered_blast
+        path filtered_fasta
+        path annotations
+        path full_ssn//"${params.ssn_name}_full_ssn.xgmml"
+        path stats
+    """
+    # zip -j ${params.ssn_name}_full_ssn.xgmml.zip full_ssn.xgmml
     """
 }
 
@@ -81,5 +105,7 @@ workflow {
     full_ssn = create_xgmml_100(filtered_blast, fasta_filter_outputs.filtered_fasta, struct_file)
 
     // compute stats
-    compute_stats(full_ssn)
+    stats = compute_stats(full_ssn)
+
+    finalize_output(filtered_blast, fasta_filter_outputs.filtered_fasta, struct_file, full_ssn, stats)
 }
