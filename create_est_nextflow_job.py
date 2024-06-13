@@ -67,7 +67,7 @@ if __name__ == "__main__":
     del args_dict["workflow_def"]
     del args_dict["templates_dir"]
     del args_dict["config_path"]
-    args_dict["template_file"] = os.path.join(args.templates_dir, "params-template.yml")
+    args_dict["template_file"] = os.path.join(args.templates_dir, "est-params-template.yml")
     params_output = render_params_template(**args_dict)
 
     env = Environment(loader=FileSystemLoader(args.templates_dir), autoescape=select_autoescape())
