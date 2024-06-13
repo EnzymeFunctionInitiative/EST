@@ -11,9 +11,9 @@ ENV PATH="${PATH}:/opt/blast-2.2.26/bin"
 
 # install DuckDB
 RUN mkdir opt/duckdb; \
-    curl -L -o /opt/duckdb/duckdb-0.10.1.zip https://github.com/duckdb/duckdb/releases/download/v0.10.1/duckdb_cli-linux-amd64.zip; \
-    unzip /opt/duckdb/duckdb-0.10.1.zip -d /opt/duckdb/; \
-    rm /opt/duckdb/duckdb-0.10.1.zip
+    curl -L -o /opt/duckdb/duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip; \
+    unzip /opt/duckdb/duckdb.zip -d /opt/duckdb/; \
+    rm /opt/duckdb/duckdb.zip
 ENV PATH="${PATH}:/opt/duckdb/"
 
 # set up python environment
