@@ -20,7 +20,7 @@ print OUT saveFile($fullFile, 1);
 foreach my $filePath (sort {$b cmp $a} glob("$runDir/*")){
     if ($filePath =~ /\.xgmml$/) {
         if (-s $filePath) {
-            if ($filePath !~ /_full_ssn\.xgmml/) {
+            if ($filePath !~ /full_ssn\.xgmml/) {
                 print OUT saveFile($filePath, 0);
             }
         } else {
