@@ -5,7 +5,8 @@
 use strict;
 use warnings;
 
-use lib "../../../lib";
+use FindBin;
+use lib "$FindBin::Bin/../../../lib";
 use List::MoreUtils qw{apply uniq any} ;
 use DBD::mysql;
 use IO::File;
@@ -13,7 +14,6 @@ use Fcntl qw(:flock);
 use XML::Writer;
 use XML::LibXML;
 use Getopt::Long;
-use FindBin;
 use EFI::Config;
 use EFI::Annotations;
 use Data::Dumper;

@@ -8,13 +8,13 @@ use List::MoreUtils qw{apply};
 use FindBin;
 use Data::Dumper;
 
-use lib "../../../lib";
+use FindBin;
+use lib "$FindBin::Bin/../../../lib";
 use EFI::Database;
 use EFI::Config;
 use EFI::Annotations;
 use EFI::IdMapping::Util;
 
-use lib "$FindBin::Bin/lib";
 use FileUtil;
 use EST::Filter;
 
