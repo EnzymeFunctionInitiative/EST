@@ -12,7 +12,7 @@ my $result = GetOptions(
 
 
 open(OUT, ">$out") or die "cannot write to $out\n";
-print OUT "File\t\t\tNodes\tEdges\tSize\n";
+print OUT "File\tNodes\tEdges\tSize (bytes)\n";
 
 my ($fullFile) = glob("$runDir/*full_ssn*");
 print OUT saveFile($fullFile, 1);
@@ -62,7 +62,6 @@ sub saveFile {
     }
 
     (my $filename = $filePath) =~ s%^.*/([^/]+)$%$1%;
-    $filename .= "\t" if $isFull;
 
     return "$filename\t$nodes\t$edges\t$size\n"
 }
