@@ -14,25 +14,31 @@ sub new {
     my $self = {};
     bless($self, $class);
     $self->{config} = $args{config} // die "Fatal error: unable to create filter: missing config param";
-    $self->{db} = $args{efi_db} // die "Fatal error: unble to create filter: missing efi_db param";
+    $self->{db} = $args{efi_db} // die "Fatal error: unable to create filter: missing efi_db param";
+    $self->{logger} = $args{logger};
 
     return $self;
 }
 
 
-sub filterData {
+sub filterIds {
     my $self = shift;
     my $seqData = shift;
 
+    my $numRemoved = 0;
     if (not $self->{config}->getFilterOption("fragments")) {
-        $self->removeFragments($seqData);
+        my $nr = $self->removeFragments($seqData);
+        $numRemoved += $nr;
+        $self->{logger}->message("Applied fragment filter and removed $numRemoved IDs");
     }
 
     if ($self->{config}->getFilterOption("fraction") > 1) {
-        $self->applyFraction($seqData);
+        my $nr = $self->applyFraction($seqData);
+        $numRemoved += $nr;
+        $self->{logger}->message("Applied fraction filter and removed $numRemoved IDs");
     }
 
-    return 1;
+    return $numRemoved;
 }
 
 
@@ -45,15 +51,19 @@ sub removeFragments {
     # Cache values for later use in filtering
     $self->initDb($dbh);
 
+    my $old = 0;
     my %removeIds;
     foreach my $id (keys %{ $seqData->{ids} }) {
         my $isFragment = $self->getDbValue($id, "is_fragment");
         $removeIds{$id} = 1 if $isFragment;
+        $old++;
     }
 
     foreach my $id (keys %removeIds) {
         deleteId($seqData, $id);
     }
+
+    return scalar(keys %removeIds);
 }
 
 
@@ -78,6 +88,8 @@ sub applyFraction {
         my $isSwissProt = $self->getDbValue($id, "swissprot");
         deleteId($seqData, $id) if not $keep{$id} and not $isSwissProt;
     }
+
+    return @ids - (keys %keep);
 }
 
 

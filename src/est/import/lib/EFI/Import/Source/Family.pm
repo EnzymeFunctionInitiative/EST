@@ -8,7 +8,7 @@ use Data::Dumper;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
-use lib dirname(abs_path(__FILE__)) . "/../../";
+use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Source);
 
 use EFI::Import::Metadata ':source';
@@ -22,6 +22,7 @@ sub new {
     my %args = @_;
 
     my $self = $class->SUPER::new(%args);
+    $self->{_type} = $TYPE_NAME;
     $self->{fams} = [];
 
     return $self;

@@ -1,5 +1,5 @@
 
-package EFI::Import::SourceManager;
+package EFI::Import::Sources;
 
 use strict;
 use warnings;
@@ -26,8 +26,8 @@ sub new {
     bless($self, $class);
     $self->{config} = $args{config} // die "Fatal error: unable to create source: missing config arg";
     $self->{efi_db} = $args{efi_db};
-    $self->{sunburst} = $args{sunburst};
-    $self->{stats} = $args{stats};
+    $self->{sunburst} = $args{sunburst}; # Optional
+    $self->{stats} = $args{stats}; # Optional
 
     return $self;
 }

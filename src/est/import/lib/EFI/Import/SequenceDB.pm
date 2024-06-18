@@ -27,36 +27,49 @@ sub new {
 # Retrieve sequences from the BLAST database and populate the $seqData structure (namely the {seq} key)
 sub getSequences {
     my $self = shift;
-    my $seqData = shift;
+    my $idFile = shift;
+    my $fastaFile = shift;
 
-    #TODO: handle domain_length_file
-    my $histo = new EFI::Data::LengthHistogram();
-
-    my @ids = grep { not $seqData->{seq}->{$_} } sort keys %{ $seqData->{ids} };
+    #TODO: handle domains/domain_length_file
 
     my @err;
-    while (@ids) {
-        # Divide up the list of IDs into batches because command shouldn't process all IDs at once.
-        my @batch = splice(@ids, 0, $self->{batch_size});
-        my $batchline = join ',', @batch;
-        my @parms = ("fastacmd", "-d", $self->{fasta_db}, "-s", $batchline);
-        my ($fastacmdOutput, $fastaErr) = capture {
-            system(@parms);
-        };
-        push(@err, $fastaErr);
 
-        my @sequences = parseSequences($fastacmdOutput);
+    my @parms = ("fastacmd", "-d", $self->{fasta_db}, "-i", $idFile, "-o", "$fastaFile.tmp");
+    my ($fastacmdOutput, $fastaErr) = capture {
+        system(@parms);
+    };
+    push(@err, $fastaErr);
 
-        foreach my $seqInfo (@sequences) { 
-            my $id = $seqInfo->[0];
-            my $seq = $seqInfo->[1];
-            if (not $self->{use_domain} and not $self->{use_user_domain}) {
-                $seqData->{seq}->{$id} = $seq;
-            }
+    my $numIds = $self->convertSequences("$fastaFile.tmp", $fastaFile);
+    unlink("$fastaFile.tmp");
+    return $numIds;
+}
+
+
+sub convertSequences {
+    my $self = shift;
+    my $input = shift;
+    my $output = shift;
+
+    open my $in, "<", $input or die "Unable to read $input fasta file: $!";
+    open my $out, ">", $output or die "Unable to write to $output fasta file: $!";
+
+    my $numIds = 0;
+
+    while (my $line = <$in>) {
+        if ($line =~ m/^>(\w\w\|)?([A-Za-z0-9_\.]+)(\|.*)?$/) {
+            chomp(my $id = $2);
+            $out->print(">$id\n");
+            $numIds++;
+        } else {
+            $out->print($line);
         }
     }
 
-    $histo->saveToFile($self->{domain_length_file}) if $self->{domain_length_file};
+    close $out;
+    close $in;
+
+    return $numIds;
 }
 
 

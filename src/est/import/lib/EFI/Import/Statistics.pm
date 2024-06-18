@@ -1,8 +1,10 @@
 
-package EFI::Import::Stats;
+package EFI::Import::Statistics;
 
 use strict;
 use warnings;
+
+use JSON;
 
 
 sub new {
@@ -27,25 +29,35 @@ sub addValue {
 }
 
 
+sub getValue {
+    my $self = shift;
+    my $key = shift;
+    return $self->{stats}->{$key} // 0;
+}
+
+
 sub saveToFile {
     my $self = shift;
     my $outputFile = shift;
 
-    open my $fh, ">", $outputFile or die "Unable to write to $outputFile: $!";
-
     $self->computeStats();
 
-    foreach my $key (sort keys %{ $self->{stats} }) {
-        my $name = $self->{mapping}->{$key} // $key;
-        $fh->print(join("\t", $name, $self->{stats}->{$key}), "\n");
-    }
+    my $json = encode_json($self->{stats});
 
+    open my $fh, ">", $outputFile or die "Unable to write to $outputFile: $!";
+    $fh->print($json);
     close $fh;
+
+    #foreach my $key (sort keys %{ $self->{stats} }) {
+    #    my $name = $self->{mapping}->{$key} // $key;
+    #    $fh->print(join("\t", $name, $self->{stats}->{$key}), "\n");
+    #}
 }
 
 
 sub computeStats {
     my $self = shift;
+    #TODO: implement this
 }
 
 

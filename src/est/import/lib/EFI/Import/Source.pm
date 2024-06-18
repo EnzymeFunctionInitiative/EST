@@ -19,6 +19,7 @@ sub new {
 
     my $self = {err => []};
     bless($self, $class);
+    $self->{_type} = $TYPE_NAME;
 
     return $self;
 }
@@ -39,6 +40,12 @@ sub init {
 }
 
 
+sub getType {
+    my $self = shift;
+    return $self->{_type};
+}
+
+
 sub getErrors {
     my $self = shift;
     return @{ $self->{err} };
@@ -49,9 +56,31 @@ sub addError {
 }
 
 
+# Returns a hash that looks like:
+# {
+#    type => uniprot|uniref50|uniref90,
+#    ids => {
+#        UNIPROT_ACC => [
+#                {
+#                    start => x, end => x
+#                    # optionally, other things
+#                }
+#                # optionally other "pieces", e.g. for multi-domain proteins
+#            ],
+#        UNIPROT_ACC2 => ...
+#    },
+#    meta => {
+#        UNIPROT_ACC => {
+#            source => x,
+#            ...
+#        },
+#        ...
+#    }
+# }
+
 sub getSequenceIds {
     my $self = shift;
-    return {ids => [], type => "uniprot"};
+    return {ids => {}, type => "uniprot", meta => {}};
 }
 
 

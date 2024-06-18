@@ -4,6 +4,15 @@ package EFI::Import::Config;
 use strict;
 use warnings;
 
+use Cwd;
+use Getopt::Long;
+
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../";
+
+use EFI::Import::Sources;
+
 
 sub new {
     my $class = shift;
@@ -12,11 +21,23 @@ sub new {
     my $self = {};
     bless($self, $class);
 
-    $self->{options} = $args{options} // die "Fatal error: options param not provided to Config";
+    $self->{options} = getOptions();
     hyphenToUnderscore($self->{options});
+
+    $self->{is_get_sequences} = $args{get_sequences} || 0;
 
     return $self;
 }
+
+
+sub getOptions {
+    my $opt = EFI::Import::Config::getOptionDefaults();
+    my @spec = EFI::Import::Config::getOptionSpec();
+    GetOptions($opt, @spec);
+    return $opt;
+}
+
+
 
 
 ###################################################################################################
@@ -33,7 +54,7 @@ sub getOutputDir {
 }
 sub getEfiDatabaseConfig {
     my $self = shift;
-    return $self->{efi_config};
+    return $self->{efi_config_file};
 }
 sub getEfiConfigFile {
     my $file = shift;
@@ -86,17 +107,19 @@ sub getConfigValue {
 sub getOptionDefaults {
     my %opts = (
         mode => "",
-        efi_config => "",
+        efi_config_file => "",
+
         fasta_db => "",
+        efi_db => "",
 
         output_dir => "",
-        meta_file => "",
-        seq_file => "",
-        sunburst_tax_output => "",
-        seq_count_file => "",
-        id_file => "",
+        output_metadata_file => "",
+        output_sequence_file => "",
+        output_sunburst_ids_file => "",
+        output_stats_file => "",
+        sequence_ids_file => "",
 
-        seq_ver => "uniprot",
+        sequence_version => "uniprot",
 
         include_family => "",
         restrict_family => "",
@@ -116,17 +139,19 @@ sub getOptionDefaults {
 sub getOptionSpec {
     return (
         "mode=s",
-        "efi-config=s",
+        "efi-config-file=s",
+
         "fasta-db=s",
+        "efi-db=s",
 
         "output-dir=s",
-        "meta-file=s",
-        "seq-file=s",
-        "sunburst-tax-output=s",
-        "seq-count-file=s",
-        "id-file=s",
+        "output-metadata-file=s",
+        "output-sequence-file=s",
+        "output-sunburst-ids-file-=s",
+        "output-stats-file=s",
+        "sequence-ids-file=s", # input to get_sequences.pl, output for get_sequence_ids.pl
 
-        "seq-ver=s",
+        "sequence-version=s",
 
         "include-family=s",
         "restrict-family=s",
@@ -146,26 +171,33 @@ sub validateAndProcessOptions {
     my $self = shift;
     my $h = $self->{options};
     my @err;
-    push @err, "Require --mode" if not $h->{mode};
-    push @err, "Invalid --mode" if $h->{mode} and not EFI::Import::SourceManager::validateSource($h->{mode});
-    push @err, "Require --output-dir" if not $h->{output_dir} or not -d $h->{output_dir};
 
-    my $file = getEfiConfigFile($h->{efi_config});
-    push @err, "Require --efi-config" if not $file;
-    $self->{efi_config} = $file;
+    $h->{output_dir} = getcwd() if not $h->{output_dir} or not -d $h->{output_dir};
+    $h->{id_file} = $h->{sequence_ids_file} || "$h->{output_dir}/accession_ids.txt";
 
-    my $fastaDb = getFastaDbFromEnv($h->{fasta_db});
-    push @err, "Require --fasta-db or EFI_DB_DIR+EFI_UNIPROT_DB env vars" if not $fastaDb;
-    $self->{fasta_db} = $fastaDb;
+    if ($self->{is_get_sequences}) {
+        push @err, "Require --fasta-db" if not $h->{fasta_db};
+        $self->{fasta_db} = $h->{fasta_db};
+        $h->{seq_file} = $h->{output_sequence_file} || "$h->{output_dir}/all_sequences.fasta";
+        push @err, "Require --sequence-ids-file" if not -f $h->{id_file};
+    } else {
+        push @err, "Require --mode" if not $h->{mode};
+        push @err, "Invalid --mode" if $h->{mode} and not EFI::Import::Sources::validateSource($h->{mode});
 
-    $self->{filtering}->{fragments} = not $h->{exclude_fragments};
-    $self->{filtering}->{fraction} = $h->{fraction} || 1;
+        my $file = getEfiConfigFile($h->{efi_config_file});
+        push @err, "Require --efi-config-file" if not $file or not -f $file;
+        $self->{efi_config_file} = $file;
 
-    $self->{options}->{seq_file} = $h->{seq_file} || "$h->{output_dir}/allsequences.fa";
-    $self->{options}->{meta_file} = $h->{meta_file} || "$h->{output_dir}/fasta.metadata";
-    $self->{options}->{sunburst_tax_output} = $h->{sunburst_tax_output} || "$h->{output_dir}/sunburst.raw";
-    $self->{options}->{seq_count_file} = $h->{seq_count_file} || "$h->{output_dir}/stats.tab";
-    $self->{options}->{id_file} = $h->{id_file} || "$h->{output_dir}/accession.txt";
+        push @err, "Require --efi-db" if not $h->{efi_db};
+        $self->{efi_db} = $h->{efi_db};
+
+        $self->{filtering}->{fragments} = not $h->{exclude_fragments};
+        $self->{filtering}->{fraction} = $h->{fraction} || 1;
+
+        $h->{meta_file} = $h->{output_metadata_file} || "$h->{output_dir}/sequence_metadata.tab";
+        $h->{sunburst_ids_file} = $h->{output_sunburst_ids_file} || "$h->{output_dir}/sunburst_ids.tab";
+        $h->{stats_file} = $h->{output_stats_file} || "$h->{output_dir}/import_stats.json";
+    }
 
     return @err;
 }
