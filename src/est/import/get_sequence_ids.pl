@@ -48,7 +48,7 @@ if (not $source) {
 $logger->message("Using " . $source->getType() . " as source");
 
 # Retrieve only the IDs from the input sequence family or file
-$logger->message("Retriving accession IDs from source");
+$logger->message("Retrieving accession IDs from source");
 my $_start = time();
 
 my $seqData = $source->getSequenceIds();
