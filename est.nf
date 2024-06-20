@@ -1,19 +1,40 @@
-process import_sequences {
-    containerOptions "-v ${params.fasta_file}:${params.fasta_file}"
-    input:
-        val existing_fasta_file
+process get_sequence_ids {
+    // containerOptions "-v ${params.fasta_file}:${params.fasta_file}"
     output:
-        path "sequences.fa"
+        path 'accession_ids.txt', emit: 'accession_ids'
+        path 'import_stats.json', emit: 'import_stats'
+        path 'sequence_metadata.tab', emit: 'sequence_metadata'
+        path 'sunburst_ids.tab', emit: 'sunburst_ids'
+    stub:
     """
-    cp $existing_fasta_file sequences.fa
+    cp $existing_fasta_file allsequences.fa
     """
+    script:
+    common_args = "--efi-config-file ${params.efi_config} --efi-db ${params.fasta_db} --mode ${params.import_mode}"
+    if (params.import_mode == "family")
+        """
+        perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --family ${params.families} --sequence-version ${params.family_id_format}
+        """
+    else
+        error "Mode '${params.import_mode}' not yet implemented"
 }
 
-process multiplex {
+process get_sequences {
     input:
-        path fasta_file
+        path accession_ids
     output:
-        "sequences.fa"
+        path 'all_sequences.fasta', emit: 'fasta_file'
+    stub:
+    """
+    cp $existing_fasta_file all_sequences.fasta
+    """
+    script:
+    if (params.import_mode == 'family')
+        """
+        perl $projectDir/src/est/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids
+        """
+    else
+        error "Mode '${params.import_mode}' not yet implemented"
 }
 
 process create_blast_db {
@@ -33,7 +54,7 @@ process split_fasta {
     output:
         path "fracfile-*.fa"
     """
-    $projectDir/src/est/split_fasta/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
+    perl $projectDir/src/est/split_fasta/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
     """
 }
 
@@ -133,13 +154,15 @@ process finalize_output {
 }
 
 workflow {
-    // step 1: import sequences (stub that just copies the file)
-    fasta_file = import_sequences(params.fasta_file)
+    // step 1: import sequence ids using params
+    sequence_id_files = get_sequence_ids()
+    sequence_files = get_sequences(sequence_id_files.accession_ids)
+
 
     // step 2: create blastdb and frac seq file 
-    fasta_lengths_parquet = blastreduce_transcode_fasta(fasta_file)
-    fasta_fractions = split_fasta(fasta_file)
-    blastdb = create_blast_db(fasta_file)
+    fasta_lengths_parquet = blastreduce_transcode_fasta(sequence_files.fasta_file)
+    fasta_fractions = split_fasta(sequence_files.fasta_file)
+    blastdb = create_blast_db(sequence_files.fasta_file)
 
     // step 3: all-by-all blast and blast reduce
     blast_fractions = all_by_all_blast(blastdb, fasta_fractions) | collect
@@ -152,5 +175,5 @@ workflow {
     plots = visualize(stats.boxplot_stats)
 
     // step 6: copy files to output dir
-    finalize_output(fasta_file, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
+    finalize_output(sequence_files.fasta_file, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }

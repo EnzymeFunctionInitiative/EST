@@ -2,8 +2,7 @@ import argparse
 import os
 import string
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Render params-template.yml for EST nextflow pipeline")
+def add_parameter_args(parser: argparse.ArgumentParser):
     parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
     parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
     parser.add_argument("--template-file", default="templates/params-template.yml", help="The location of the params template file")
@@ -12,6 +11,14 @@ def parse_args():
     parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA input into. File is split so that BLAST can be parallelized")
     parser.add_argument("--blast-matches", default=250, type=int, help="Number of matches BLAST should return")
     parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
+    parser.add_argument("--import-mode", choices=["BLAST", "family", "FASTA", "accession"], help="How to import sequences")
+    parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
+    parser.add_argument("--families", type=string, help="Comma-separated list of families to add")
+    parser.add_argument("--family-id-format", choices=["UniProt", "UniRef90", "UniRef50"])
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Render params-template.yml for EST nextflow pipeline")
+    add_parameter_args(parser)
 
     args = parser.parse_args()
 
@@ -39,7 +46,7 @@ def parse_args():
         args.output_dir = os.path.abspath(args.output_dir)
         return args
 
-def render_params_template(fasta_file, output_dir, template_file, duckdb_memory_limit, duckdb_threads, fasta_shards, blast_matches, job_id):
+def render_params_template(fasta_file, output_dir, template_file, duckdb_memory_limit, duckdb_threads, fasta_shards, blast_matches, job_id, import_mode, exclude_fragments, families, family_id_format):
     mapping = {
         "fasta_file": fasta_file,
         "output_dir": output_dir,
@@ -47,7 +54,14 @@ def render_params_template(fasta_file, output_dir, template_file, duckdb_memory_
         "duckdb_threads": duckdb_threads,
         "fasta_shards": fasta_shards,
         "blast_matches": blast_matches,
-        "job_id": job_id
+        "job_id": job_id,
+        "efi_config": "",
+        "fasta_db": "",
+        "import_mode": import_mode,
+        "exclude_fragments": exclude_fragments,
+        "families": families,
+        "family_id_format": family_id_format
+
     }
     with open(template_file) as f:
         template = string.Template(f.read())
