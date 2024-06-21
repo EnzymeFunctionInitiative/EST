@@ -19,11 +19,21 @@ process get_sequence_ids {
         error "Mode '${params.import_mode}' not yet implemented"
 }
 
+process split_sequence_ids {
+    input:
+        path accessions_file
+    output:
+        path "accession_ids.txt.part*"
+    """
+    split -d -e -n r/${params.num_accession_shards} $accessions_file accession_ids.txt.part
+    """
+}
+
 process get_sequences {
     input:
         path accession_ids
     output:
-        path 'all_sequences.fasta', emit: 'fasta_file'
+        path "${accession_ids}.fasta"
     stub:
     """
     cp $existing_fasta_file all_sequences.fasta
@@ -31,7 +41,7 @@ process get_sequences {
     script:
     if (params.import_mode == 'family')
         """
-        perl $projectDir/src/est/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids
+        perl $projectDir/src/est/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
         """
     else
         error "Mode '${params.import_mode}' not yet implemented"
@@ -39,12 +49,16 @@ process get_sequences {
 
 process create_blast_db {
     input:
-        path fasta_file
+        path fasta_files
     output:
-        path "database.*"
-        val "database"
+        path "all_sequences.fasta", emit: 'fasta_file'
+        path "database.*", emit: 'database_files'
+        val "database", emit: 'database_name'
+    script:
+    input = fasta_files.join(" ")
     """
-    formatdb -i ${fasta_file} -n database -p T -o T
+    cat $input > all_sequences.fasta
+    formatdb -i all_sequences.fasta -n database -p T -o T
     """
 }
 
@@ -62,7 +76,7 @@ process all_by_all_blast {
     input:
         path(blast_db_files, arity: 5)
         val blast_db_name
-        each path(frac)
+        path frac
     output:
         path "${frac}.tab.sorted.parquet"
     """
@@ -90,7 +104,6 @@ process blastreduce_transcode_fasta {
 }
 
 process blastreduce {
-    publishDir "$baseDir/nextflow_results/", mode: 'copy'
     input:
         path blast_files
         path fasta_length_parquet
@@ -137,12 +150,14 @@ process visualize {
 process finalize_output {
     publishDir params.final_output_dir, mode: 'copy'
     input:
+        path accession_ids
         path fasta_file
         path blast_output
         path plots
         path evalue_tab
         path acc_counts
     output:
+        path accession_ids
         path fasta_file
         path blast_output
         path plots
@@ -156,16 +171,16 @@ process finalize_output {
 workflow {
     // step 1: import sequence ids using params
     sequence_id_files = get_sequence_ids()
-    sequence_files = get_sequences(sequence_id_files.accession_ids)
-
+    accession_shards = split_sequence_ids(sequence_id_files.accession_ids)
+    fasta_files = get_sequences(accession_shards.flatten())
 
     // step 2: create blastdb and frac seq file 
-    fasta_lengths_parquet = blastreduce_transcode_fasta(sequence_files.fasta_file)
-    fasta_fractions = split_fasta(sequence_files.fasta_file)
-    blastdb = create_blast_db(sequence_files.fasta_file)
+    blastdb = create_blast_db(fasta_files.collect())
+    fasta_lengths_parquet = blastreduce_transcode_fasta(blastdb.fasta_file)
 
     // step 3: all-by-all blast and blast reduce
-    blast_fractions = all_by_all_blast(blastdb, fasta_fractions) | collect
+    fasta_shards = split_fasta(blastdb.fasta_file)
+    blast_fractions = all_by_all_blast(blastdb.database_files, blastdb.database_name, fasta_shards.flatten()) | collect
     reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
 
     // step 4: compute convergence ratio and boxplot stats
@@ -175,5 +190,5 @@ workflow {
     plots = visualize(stats.boxplot_stats)
 
     // step 6: copy files to output dir
-    finalize_output(sequence_files.fasta_file, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
+    finalize_output(sequence_id_files.accession_ids, blastdb.fasta_file, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
