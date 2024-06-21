@@ -7,7 +7,7 @@ def add_parameter_args(parser: argparse.ArgumentParser):
     parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
     parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
     parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
-    parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
+    parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
     parser.add_argument("--blast-matches", default=250, type=int, help="Number of matches BLAST should return")
     parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
     parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")

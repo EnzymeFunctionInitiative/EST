@@ -113,7 +113,6 @@ process blastreduce {
 
     """
     python $projectDir/src/est/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
-    
     duckdb < allreduce.sql
     """
 }
