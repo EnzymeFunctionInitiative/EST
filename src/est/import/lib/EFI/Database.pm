@@ -18,7 +18,7 @@ sub new {
     bless($self, $class);
 
     # Assume config is existing, because validation occurs upstream
-    $self->parseConfig($args{config});
+    $self->parseConfig($args{config}, $args{db_name});
 
     return $self;
 }
@@ -33,6 +33,7 @@ sub isMysql {
 sub parseConfig {
     my $self = shift;
     my $efiConfigFile = shift;
+    my $dbName = shift || "";
 
     my $cfg = new Config::IniFiles(-file => $efiConfigFile);
     die "Unable to parse config file: " . join("; ", @Config::IniFiles::errors), "\n" if not defined $cfg;
@@ -45,9 +46,10 @@ sub parseConfig {
     $db->{ip_range} = $cfg->val("database", "ip_range", "");
     $db->{dbi} = lc $cfg->val("database", "db", MYSQL);
 
-    $db->{name} = $cfg->val("database", "name");
-    if (not $db->{name} and exists $ENV{EFI_DB}) {
-        $db->{name} = $ENV{EFI_DB};
+    if ($dbName) {
+        $db->{name} = $dbName;
+    } else {
+        $db->{name} = $cfg->val("database", "name");
     }
     die "Missing database name\n" if not $db->{name};
 
