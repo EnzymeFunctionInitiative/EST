@@ -1,5 +1,4 @@
 process get_sequence_ids {
-    // containerOptions "-v ${params.fasta_file}:${params.fasta_file}"
     output:
         path 'accession_ids.txt', emit: 'accession_ids'
         path 'import_stats.json', emit: 'import_stats'
@@ -10,7 +9,7 @@ process get_sequence_ids {
     cp $existing_fasta_file allsequences.fa
     """
     script:
-    common_args = "--efi-config-file ${params.efi_config} --efi-db ${params.fasta_db} --mode ${params.import_mode}"
+    common_args = "--efi-config-file ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode}"
     if (params.import_mode == "family")
         """
         perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --family ${params.families} --sequence-version ${params.family_id_format}
