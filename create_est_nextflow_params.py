@@ -6,7 +6,8 @@ def add_parameter_args(parser: argparse.ArgumentParser):
     parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
     parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
     parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
-    parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA input into. File is split so that BLAST can be parallelized")
+    parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
+    parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
     parser.add_argument("--blast-matches", default=250, type=int, help="Number of matches BLAST should return")
     parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
     parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
@@ -52,12 +53,17 @@ def parse_args():
         args.fasta_db = os.path.abspath(args.fasta_db)
         return args
 
+<<<<<<< HEAD
 def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format):
+=======
+def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, import_mode, exclude_fragments, families, family_id_format):
+>>>>>>> nextflow-split-accessions
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
         "duckdb_threads": duckdb_threads,
         "num_fasta_shards": fasta_shards,
+        "num_accession_shards": accession_shards,
         "num_blast_matches": blast_matches,
         "multiplex": False,
         "job_id": job_id,

@@ -85,8 +85,9 @@ DuckDB, Python, and Perl installed on your cluster.
 3. After the pipeline completes, output files will be available in the results directory
    ```
    $ ls <path_to_results_dir>
-   1.out.parquet    edge.png     evalue.tab  length_sm.png  pident.png
-   acc_counts.json  edge_sm.png  length.png  params.yml     pident_sm.png
+   1.out.parquet      all_sequences.fasta  evalue.tab     nextflow.stderr  pident.png     run_nextflow_slurm.sh
+   acc_counts.json    edge.png             length.png     nextflow.stdout  pident_sm.png  timeline.html
+   accession_ids.txt  edge_sm.png          length_sm.png  params.json      report.html    work/
    ```
    `pident.png` and `length.png` can be used to determine the apropriate
    alignment score cutoff for the SSN creation.
@@ -111,22 +112,27 @@ edges processed.
 ![image](assets/dag.png)
 
 The EST pipeline consists of different stages which transform the input sequences into network edges. The stages are executed roughly in this chronological order
-1. **Import Sequences**. A FASTA file copied into the workflow. In the future,
-   sequence input will be more flexible and will allow for accession IDs,
-   sequences found by BLAST, family IDs, and more.
+1. **Import Sequences**. EST supports several methods of obtaining sequences.
+   The pipeline uses parameters from the various methods to create a list of
+   accession IDs. This list is then split into shards and the translation of
+   accession IDs to sequences is performed concurrently, resulting in a number
+   of FASTA files equal to the number of accession ID file shards.
 
-2. **Create BLAST Database and split FASTA**. From the FASTA file, a BLAST
-   database is created. The FASTA file is also split into several smaller files.
-   EFI-EST uses a non-parallelized version of BLAST; splitting the input file
-   allows for running multiple searches simultaneously.
+2. **Create BLAST Database and split FASTA**. The FASTA files from the previos
+   stage are combined into a single file and are then used to created a BLAST
+   database. The FASTA file is split again, this time to enable concurrent
+   execution of BLAST. The number of shards in this split should be much higher
+   than the number of shards used in the import step (because the BLAST
+   computations scale better). EFI-EST uses a non-parallelized version of BLAST;
+   splitting the input file allows for running multiple searches simultaneously.
 
 3. **All-by-all BLAST**. Every sequence in the FASTA file is used as a query
    against the BLAST database. Shards of the FASTA from the previous step can be
    run in parallel. The result of this process is a multiset of edges between
    sequences. In this stage, the BLAST tabular output is converted to
-   [Parquet]() files for more efficient processing. The conversion is referred
-   to as "transcoding" in the code. The is the most computationally intensive
-   stage of the pipeline.
+   [Parquet](https://parquet.apache.org/) files for more efficient processing.
+   The conversion is referred to as "transcoding" in the code. The is the most
+   computationally intensive stage of the pipeline.
 
 4. **BLASTreduce**. All-by-all BLAST creates a multiset of directed edges, but a
    set without duplicity is needed to generate the network. This stage selects

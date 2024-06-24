@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --partition=efi
+#SBATCH -c 2
+#SBATCH --mem=32GB
+#SBATCH --job-name="est-{{ job_id }}"
+#SBATCH -o {{ output_dir }}/nextflow.stdout
+#SBATCH -e {{ output_dir }}/nextflow.stderr
+
+{% if load_modules %}
+module load efidb/ip100
+module load efiest/devlocal
+module load Perl
+module load Python
+module load efiest/python_est_1.0
+module load DuckDB
+source /home/groups/efi/apps/perl_env.sh
+{% endif %}
+
+module load nextflow
+nextflow -C {{ config_path }} run {{ workflow_definition }} -ansi-log false -offline -params-file {{ params_file }} -with-report {{ output_dir }}/{{ report_file }} -with-timeline {{ output_dir }}/{{ timeline_file }}
