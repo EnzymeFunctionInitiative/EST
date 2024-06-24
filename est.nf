@@ -137,12 +137,18 @@ process finalize_output {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta_file
+        path import_stats
+        path sequence_metadata
+        path sunburst_ids
         path blast_output
         path plots
         path evalue_tab
         path acc_counts
     output:
         path fasta_file
+        path import_stats
+        path sequence_metadata
+        path sunburst_ids
         path blast_output
         path plots
         path evalue_tab
@@ -174,5 +180,5 @@ workflow {
     plots = visualize(stats.boxplot_stats)
 
     // step 6: copy files to output dir
-    finalize_output(sequence_files.fasta_file, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
+    finalize_output(sequence_files.fasta_file, sequence_id_files.import_stats, sequence_id_files.sequence_metadata, sequence_id_files.sunburst_ids, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
