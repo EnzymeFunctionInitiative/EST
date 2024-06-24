@@ -7,7 +7,7 @@ use strict;
 
 use FindBin;
 use Getopt::Long;
-use lib "$FindBin::Bin/lib";
+use lib "$FindBin::Bin/../../../lib";
 use CdHitParser;
 
 

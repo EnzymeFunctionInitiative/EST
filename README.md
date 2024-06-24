@@ -10,11 +10,13 @@ This respository contains the analysis code that these services use.
 ## Prerequisites
 The pipeline is developed with
 [Nextflow](https://www.nextflow.io/docs/latest/index.html) and uses python
-3.10.12. It also relies upon [DuckDB](https://duckdb.org/) and [BLAST
-2.2.26](https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/).
-All of these dependencies are available through the [efi/efi-est]() docker
+3.10.12. It also relies upon [DuckDB](https://duckdb.org/), [BLAST
+2.2.26](https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/),
+and if multiplexing is used, [CD-HIT](https://sites.google.com/view/cd-hit). All
+of these dependencies are available through the [efi/efi-est]() docker
 container. If running without docker, they will need to be installed manually
-along with the python packages in `requirements.txt`.
+along with the python packages in `requirements.txt` and perl modules in
+`cpanfile`.
 
 ## Running locally via docker
 ### EST
@@ -40,14 +42,9 @@ along with the python packages in `requirements.txt`.
    nextflow -C conf/docker.config run est.ng -params-file <path_to_results_dir>/params.yml
    ```
 
-4. After the pipeline completes, output files will be available in the results directory
-   ```
-   $ ls <path_to_results_dir>
-   1.out.parquet    edge.png     evalue.tab  length_sm.png  pident.png
-   acc_counts.json  edge_sm.png  length.png  params.yml     pident_sm.png
-   ```
-   `pident.png` and `length.png` can be used to determine the appropriate
-   alignment score cutoff for the SSN creation.
+4. After the pipeline completes, output files will be available in the results
+   directory. The plots in `pident.png` and `length.png` can be used to
+   determine the appropriate alignment score cutoff for the SSN creation.
 
 ### SSN
 The EST pipeline described above creates edges between sequences with high
@@ -106,7 +103,8 @@ disk if it is memory constrained but some operations require some minimum amount
 of memory. If these solutions did not solve the problem, try using the newest
 version of DuckDB (which may require manually building the docker image) or
 decreasing the number of `--blast-matches` which will reduce the total number of
-edges processed.
+edges processed. Multiplexing will also reduce the number of sequences analyzed
+and can help solve these errors.
 
 ## Execution Details
 ![image](assets/dag.png)
@@ -118,7 +116,14 @@ The EST pipeline consists of different stages which transform the input sequence
    accession IDs to sequences is performed concurrently, resulting in a number
    of FASTA files equal to the number of accession ID file shards.
 
-2. **Create BLAST Database and split FASTA**. The FASTA files from the previos
+   If multiplexing is enabled, CD-HIT will be used to reduce the set of imported
+   sequences to a representiative subset. A smaller number of sequences will be
+   used in the all-by-all BLAST, meaning it should execute more quickly and
+   return a smaller number of edges. The alignment score and other values from
+   each representative sequence is then assigned to each of the sequences for
+   which it acted as a proxy in the demultiplexing stage (see [`src/est/mux/demux.pl`](src/est/mux/demux.pl)).
+
+2. **Create BLAST Database and split FASTA**. The FASTA files from the previous
    stage are combined into a single file and are then used to created a BLAST
    database. The FASTA file is split again, this time to enable concurrent
    execution of BLAST. The number of shards in this split should be much higher
@@ -138,6 +143,8 @@ The EST pipeline consists of different stages which transform the input sequence
    set without duplicity is needed to generate the network. This stage selects
    the edges that best represent the similarity between two sequences. This
    stage may be computationally intensive if the number of edges is high.
+
+   If mulitplexing was used, demultiplexing occurs after BLASTreduce.
 
 5. **Compute Statistics**. One of the primary outputs of the EST pipeline is a
    set of plots which show the distribution of percent identity and sequence

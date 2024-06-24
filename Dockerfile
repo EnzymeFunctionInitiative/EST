@@ -16,6 +16,13 @@ RUN mkdir opt/duckdb; \
     rm /opt/duckdb/duckdb.zip
 ENV PATH="${PATH}:/opt/duckdb/"
 
+# install CD-HIT
+RUN curl -L -o /opt/cd-hit.tar.gz https://github.com/weizhongli/cdhit/releases/download/V4.8.1/cd-hit-v4.8.1-2019-0228.tar.gz; \
+    tar xzf /opt/cd-hit.tar.gz -C /opt; \
+    rm /opt/cd-hit.tar.gz; \
+    cd /opt/cd-hit-v4.8.1-2019-0228; make; mkdir bin; mv cd-hit bin;
+ENV PATH="${PATH}:/opt/cd-hit-v4.8.1-2019-0228/bin"
+
 # set up python environment
 RUN pip3 install -r app/requirements.txt
 

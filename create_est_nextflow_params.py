@@ -17,6 +17,7 @@ def add_parameter_args(parser: argparse.ArgumentParser):
     parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
     parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
     parser.add_argument("--family-id-format", choices=["UniProt", "UniRef90", "UniRef50"])
+    parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Render params.yml for EST nextflow pipeline")
@@ -53,7 +54,7 @@ def parse_args():
         args.fasta_db = os.path.abspath(args.fasta_db)
         return args
 
-def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, import_mode, exclude_fragments, families, family_id_format):
+def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format, multiplex):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
@@ -67,7 +68,8 @@ def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fast
         "fasta_db": fasta_db,
         "efi_db": efi_db,
         "import_mode": import_mode,
-        "exclude_fragments": exclude_fragments
+        "exclude_fragments": exclude_fragments,
+        "multiplex": multiplex
     }
     if import_mode == "family":
         fail = False
