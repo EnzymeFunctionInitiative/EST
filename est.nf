@@ -46,18 +46,37 @@ process get_sequences {
         error "Mode '${params.import_mode}' not yet implemented"
 }
 
-process create_blast_db {
+process cat_fasta_files {
     input:
         path fasta_files
     output:
-        path "all_sequences.fasta", emit: 'fasta_file'
-        path "database.*", emit: 'database_files'
-        val "database", emit: 'database_name'
+        path 'all_sequences.fasta'
     script:
-    input = fasta_files.join(" ")
+    input = fasta_files.toSorted().join(" ")
     """
     cat $input > all_sequences.fasta
-    formatdb -i all_sequences.fasta -n database -p T -o T
+    """
+}
+
+process multiplex {
+    input:
+        path fasta_file
+    output:
+        path 'sequences.fasta', emit: 'fasta_file'
+        path 'sequences.fasta.clstr', emit: 'clusters'
+    """
+    cd-hit -d 0  -c 1 -s 1 -i $fasta_file -o sequences.fasta -M 10000
+    """
+}
+
+process create_blast_db {
+    input:
+        path fasta_file
+    output:
+        path "database.*", emit: 'database_files'
+        val "database", emit: 'database_name'
+    """
+    formatdb -i $fasta_file -n database -p T -o T
     """
 }
 
@@ -113,6 +132,19 @@ process blastreduce {
     """
     python $projectDir/src/est/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
     duckdb < allreduce.sql
+    """
+}
+
+process demultiplex {
+    input:
+        path blast_parquet
+        path clusters
+    output:
+        path '1.out.parquet'
+    """
+    echo "COPY (SELECT * FROM read_parquet('$blast_parquet')) TO 'mux.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
+    perl $projectDir/src/est/mux/demux.pl -blastin mux.out -blastout 1.out -cluster $clusters
+    python $projectDir/src/est/mux/transcode_demuxed_blast.py --blast-output 1.out
     """
 }
 
@@ -176,16 +208,27 @@ workflow {
     // step 1: import sequence ids using params
     sequence_id_files = get_sequence_ids()
     accession_shards = split_sequence_ids(sequence_id_files.accession_ids)
-    fasta_files = get_sequences(accession_shards.flatten())
+    fasta_file = cat_fasta_files(get_sequences(accession_shards.flatten()).collect()) 
+
+    // step 2: multiplex
+    if (params.multiplex) {
+        multiplex_files = multiplex(fasta_file)
+        fasta_file = multiplex_files.fasta_file
+    }
 
     // step 2: create blastdb and frac seq file 
-    blastdb = create_blast_db(fasta_files.collect())
-    fasta_lengths_parquet = blastreduce_transcode_fasta(blastdb.fasta_file)
+    blastdb = create_blast_db(fasta_file)
+    fasta_lengths_parquet = blastreduce_transcode_fasta(fasta_file)
 
     // step 3: all-by-all blast and blast reduce
-    fasta_shards = split_fasta(blastdb.fasta_file)
+    fasta_shards = split_fasta(fasta_file)
     blast_fractions = all_by_all_blast(blastdb.database_files, blastdb.database_name, fasta_shards.flatten()) | collect
     reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
+
+    // demultiplex
+    if (params.multiplex) {
+        reduced_blast_parquet = demultiplex(reduced_blast_parquet, multiplex_files.clusters)
+    }
 
     // step 4: compute convergence ratio and boxplot stats
     stats = compute_stats(reduced_blast_parquet, fasta_lengths_parquet)
@@ -194,5 +237,5 @@ workflow {
     plots = visualize(stats.boxplot_stats)
 
     // step 6: copy files to output dir
-    finalize_output(sequence_id_files.accession_ids, blastdb.fasta_file, sequence_id_files.import_stats, sequence_id_files.sequence_metadata, sequence_id_files.sunburst_ids, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
+    finalize_output(sequence_id_files.accession_ids, fasta_file, sequence_id_files.import_stats, sequence_id_files.sequence_metadata, sequence_id_files.sunburst_ids, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
