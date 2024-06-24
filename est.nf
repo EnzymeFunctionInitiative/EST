@@ -194,9 +194,5 @@ workflow {
     plots = visualize(stats.boxplot_stats)
 
     // step 6: copy files to output dir
-<<<<<<< HEAD
-    finalize_output(sequence_files.fasta_file, sequence_id_files.import_stats, sequence_id_files.sequence_metadata, sequence_id_files.sunburst_ids, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
-=======
-    finalize_output(sequence_id_files.accession_ids, blastdb.fasta_file, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
->>>>>>> nextflow-split-accessions
+    finalize_output(sequence_id_files.accession_ids, blastdb.fasta_file, sequence_id_files.import_stats, sequence_id_files.sequence_metadata, sequence_id_files.sunburst_ids, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }

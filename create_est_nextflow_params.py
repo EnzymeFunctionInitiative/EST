@@ -53,11 +53,7 @@ def parse_args():
         args.fasta_db = os.path.abspath(args.fasta_db)
         return args
 
-<<<<<<< HEAD
-def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format):
-=======
 def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, import_mode, exclude_fragments, families, family_id_format):
->>>>>>> nextflow-split-accessions
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
