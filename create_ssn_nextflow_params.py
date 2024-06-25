@@ -1,9 +1,10 @@
 import argparse
+import json
 import os
 import string
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Render params-template.yml for SSN nextflow pipeline")
+def add_args(parser):
+    # TODO: pass --est-output-dir to this tool and set some params based on files in there
     parser.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
     parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
     parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
@@ -17,8 +18,11 @@ def parse_args():
     parser.add_argument("--uniref-version", default="", choices=["", "90", "50"], help="Which database to use for annotations")
     parser.add_argument("--efi-config", required=True, help="Location of the EFI config file")
     parser.add_argument("--db-version", default=99, help="The temporal version of UniProt to use")
-    parser.add_argument("--template-file", default="templates/ssn-params-template.yml", help="The location of the params template file")
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Render params.yml for SSN nextflow pipeline")
+    add_args(parser)
     args = parser.parse_args()
 
     fail = False
@@ -55,11 +59,11 @@ def parse_args():
         args.efi_config = os.path.abspath(args.efi_config)
         return args
 
-def render_params_template(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, template_file):
-    mapping = {
+def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version):
+    params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
-        "output_dir": output_dir,
+        "final_output_dir": output_dir,
         "filter_parameter": filter_parameter,
         "filter_min_val": filter_min_val,
         "min_length": min_length,
@@ -71,14 +75,11 @@ def render_params_template(blast_parquet, fasta_file, output_dir, filter_paramet
         "efi_config": efi_config,
         "db_version": db_version
     }
-    with open(template_file) as f:
-        template = string.Template(f.read())
-    output_file = os.path.join(output_dir, "params.yml")
-    with open(output_file, "w") as params_file:
-        params_file.write(template.substitute(mapping))
-    print(f"Wrote params to '{output_file}'")
-    return output_file
+    params_file = os.path.join(output_dir, "params.yml")
+    with open(params_file, "w") as f:
+        json.dump(params, f, indent=4)
+    print(f"Wrote params to '{params_file}'")
 
 if __name__ == "__main__":
     args = parse_args()
-    render_params_template(**vars(args))
+    render_params(**vars(args))

@@ -27,10 +27,10 @@ process filter_fasta {
     input:
         path fasta
     output:
-        path "filtered_sequences.fa", emit: filtered_fasta
+        path "filtered_sequences.fasta", emit: filtered_fasta
         path "fasta.metadata", emit: fasta_metadata
     """
-    perl $projectDir/src/ssn/filter/filter_fasta.pl --fastain $fasta --fastaout filtered_sequences.fa -minlen ${params.min_length} -maxlen ${params.max_length} -domain-meta fasta.metadata
+    perl $projectDir/src/ssn/filter/filter_fasta.pl --fastain $fasta --fastaout filtered_sequences.fasta -minlen ${params.min_length} -maxlen ${params.max_length} -domain-meta fasta.metadata
     """
 }
 
@@ -72,7 +72,7 @@ process compute_stats {
 }
 
 process finalize_output {
-    publishDir params.output_dir, mode: 'copy'
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path filtered_blast
         path filtered_fasta
