@@ -8,8 +8,7 @@ import pandas as pd
 from plot import draw_boxplot, draw_histogram
 from util import parse_proxies
 
-
-def parse_args():
+def create_parser():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
     parser.add_argument("--boxplot-stats", type=str, required=True, help="Boxplot statisitcs parquet file")
     parser.add_argument("--job-id", required=True, help="Job ID number for BLAST output file")
@@ -51,6 +50,9 @@ def parse_args():
         help="A list of key:value pairs for rendering smaller proxy images. Keys wil be included in filenames, values should be less than 96",
     )
 
+    return parser
+
+def parse_args(parser):
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
 
@@ -203,7 +205,7 @@ def main(
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = parse_args(create_parser())
     main(
         args.boxplot_stats,
         args.job_id,

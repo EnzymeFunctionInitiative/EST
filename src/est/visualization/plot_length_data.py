@@ -6,8 +6,7 @@ import pandas as pd
 
 import util
 
-
-def parse_args():
+def create_parser():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
     parser.add_argument(
         "--lengths",
@@ -32,6 +31,9 @@ def parse_args():
         help="A list of name:dpi pairs for rendering smaller proxy images. Names wil be included in filenames, DPIs should be less than 96",
     )
 
+    return parser
+
+def parse_args(parser):
     args = parser.parse_args()
     args.proxies = util.parse_proxies(args.proxies)
 
@@ -103,7 +105,7 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = parse_args(create_parser())
     main(
         args.lengths,
         args.job_id,

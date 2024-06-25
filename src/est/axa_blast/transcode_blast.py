@@ -9,10 +9,13 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 
 
-def parse_args():
+def create_parser():
     parser = argparse.ArgumentParser(description="Transcode BLAST output files to Parquet")
     parser.add_argument("--blast-output", type=str, nargs="+", help="BLAST output files")
 
+    return parser
+
+def parse_args(parser):
     args = parser.parse_args()
 
     # validate input filepaths
@@ -93,6 +96,6 @@ def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_opti
     writer.close()
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = parse_args(create_parser())
     for blast_output in args.blast_output:
         csv_to_parquet_file(blast_output, read_options, parse_options, convert_options)
