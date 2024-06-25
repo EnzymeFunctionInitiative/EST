@@ -28,6 +28,7 @@ ruff==0.3.5
 six==1.16.0
 snowballstemmer==2.2.0
 Sphinx==7.2.6
+sphinx-argparse
 sphinx-autodoc-typehints==2.0.0
 sphinx-rtd-theme==2.0.0
 sphinxcontrib-applehelp==1.0.8
