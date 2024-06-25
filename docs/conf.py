@@ -8,7 +8,8 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('../visualization'))
+sys.path.insert(0, os.path.abspath('../src/est/visualization'))
+sys.path.insert(0, os.path.abspath('../src/est/statistics'))
 
 
 project = 'EFI'
@@ -24,7 +25,8 @@ extensions = ["sphinx.ext.autodoc",       # parses docstrings from python code
               "sphinx.ext.napoleon",      # parses google and numpy style docstrings which look nicer than native sphinx/rst
               "sphinx_autodoc_typehints", # reads types from signature and includes in description
               "sphinx.ext.coverage",      # reports percentage of functions which have documentation
-              "sphinxcontrib.spelling"    # spell checking
+              "sphinxcontrib.spelling",    # spell checking
+              "sphinxarg.ext"
               ]
 
 intersphinx_mapping = {
@@ -40,7 +42,7 @@ add_module_names = False
 
 exclude_patterns = ["efi-env/*"]
 
-coverage_ignore_functions = ["main", "parse_args"]
+coverage_ignore_functions = ["main", "create_parser", "parse_args"]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

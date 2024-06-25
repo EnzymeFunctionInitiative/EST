@@ -1,14 +1,9 @@
-.. EST documentation master file
+Enzyme Function Initiative
+==========================
 
-Enzyme Function Initiative's Enzyme Similarity Tool
-===================================================
-
-The EST pipeline consists of the following stages:
+Welcome to the Enzyme Function Initiative Documentation! Information is available for the following pipelines.
 
 .. toctree::
-   :maxdepth: 1
-
-   source/blastreduce/index.rst
-   source/visualization/index.rst
-
-See the :ref:`genindex` for all functions and classes.
+    source/est/index.rst
+    source/ssn/index.rst
+    :maxdepth: 1

@@ -17,7 +17,7 @@ of these pairs is desired, so this stage removes all but the first occurrence
 
 1. **Add sequence length information**. Every `qseqid` and every `sseqid`
 represents a sequence from the input FASTA file. The lengths of these
-sequences is needed for a later alignment score calculation. This stage
+sequences are needed for a later alignment score calculation. This stage
 computes sequence lengths and combines this information with the concatenated
 BLAST output.
 
@@ -115,6 +115,6 @@ Components
 ----------
 
 .. toctree::
+    render_reduce_sql_template.rst
+    transcode_fasta_lengths.rst
     :maxdepth: 1
-    
-    transcode.rst
