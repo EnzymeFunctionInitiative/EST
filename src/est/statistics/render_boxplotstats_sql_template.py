@@ -1,7 +1,7 @@
 import argparse
 import string
 
-def parse_args():
+def create_parser():
     parser = argparse.ArgumentParser(description="Render sql to compute boxplot stats and produce evalue.tab")
     parser.add_argument("--blast-output", type=str, help="Path to directory containing the BLAST output files")
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_args():
         default="evalue.tab",
         help="Output filename for edge count file",
     )
-    return parser.parse_args()
+    return parser
 
 def render_sql_from_template(
     template_file: str,
@@ -80,7 +80,7 @@ def render_sql_from_template(
             g.write(template.substitute(mapping))
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = create_parser().parse_args()
     render_sql_from_template(
                 args.sql_template,
                 args.sql_output_file,
