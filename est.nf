@@ -102,10 +102,10 @@ process all_by_all_blast {
     blastall -p blastp -i $frac -d $blast_db_name -m 8 -e 1e-5 -b ${params.num_blast_matches} -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet
-    python $projectDir/src/est/blastreduce/transcode_blast.py --blast-output ${frac}.tab
+    python $projectDir/src/est/axa_blast/transcode_blast.py --blast-output ${frac}.tab
 
     # in each row, ensure that qseqid < sseqid lexicographically
-    python $projectDir/src/est/blastreduce/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
+    python $projectDir/src/est/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
     duckdb < prereduce.sql
     """
 }
