@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 
-def add_parameter_args(parser: argparse.ArgumentParser):
+def add_args(parser: argparse.ArgumentParser):
     parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
     parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
     parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
@@ -11,7 +11,7 @@ def add_parameter_args(parser: argparse.ArgumentParser):
     parser.add_argument("--blast-matches", default=250, type=int, help="Number of matches BLAST should return")
     parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
     parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
-    parser.add_argument("--fasta-db", type=str, help="FASTA file or BLAST database to retrieve sequences from")
+    parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
     parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406)")
     parser.add_argument("--import-mode", required=True, choices=["BLAST", "family", "FASTA", "accession"], help="How to import sequences")
     parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
@@ -19,12 +19,7 @@ def add_parameter_args(parser: argparse.ArgumentParser):
     parser.add_argument("--family-id-format", choices=["UniProt", "UniRef90", "UniRef50"])
     parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Render params.yml for EST nextflow pipeline")
-    add_parameter_args(parser)
-
-    args = parser.parse_args()
-
+def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
     if os.path.exists(args.output_dir):
         if len(os.listdir(args.output_dir)) > 0:
@@ -54,7 +49,13 @@ def parse_args():
         args.fasta_db = os.path.abspath(args.fasta_db)
         return args
 
-def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format, multiplex):
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Render params.yml for EST nextflow pipeline")
+    add_args(parser)
+    return parser
+
+
+def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format, multiplex):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
@@ -74,7 +75,7 @@ def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fast
     if import_mode == "family":
         fail = False
         if families is None:
-            print("Specified 'family' as import method but did not supply any families with --family option")
+            print("Specified 'family' as import method but did not supply any families with --families option")
             fail = True
         if family_id_format is None:
             print("Specified 'family' as import method but did not supply the family id format with --family-id-format")
@@ -90,7 +91,8 @@ def render_params_template(output_dir, duckdb_memory_limit, duckdb_threads, fast
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)
     print(f"Wrote params to '{params_file}'")
+    return params_file
 
 if __name__ == "__main__":
-    args = parse_args()
-    render_params_template(**vars(args))
+    args = check_args(create_parser().parse_args)
+    render_params(**vars(args))

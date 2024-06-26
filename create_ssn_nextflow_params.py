@@ -18,13 +18,9 @@ def add_args(parser):
     parser.add_argument("--uniref-version", default="", choices=["", "90", "50"], help="Which database to use for annotations")
     parser.add_argument("--efi-config", required=True, help="Location of the EFI config file")
     parser.add_argument("--db-version", default=99, help="The temporal version of UniProt to use")
+    parser.add_argument("--job-id", default=131, help="Job ID")
 
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Render params.yml for SSN nextflow pipeline")
-    add_args(parser)
-    args = parser.parse_args()
-
+def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
     if not os.path.exists(args.blast_parquet):
         print(f"BLAST Parquet '{args.blast_parquet}' does not exist")
@@ -59,7 +55,12 @@ def parse_args():
         args.efi_config = os.path.abspath(args.efi_config)
         return args
 
-def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version):
+def create_parser():
+    parser = argparse.ArgumentParser(description="Render params.yml for SSN nextflow pipeline")
+    add_args(parser)
+    return parser
+
+def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
@@ -73,13 +74,15 @@ def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filte
         "maxfull": maxfull,
         "uniref_version": uniref_version,
         "efi_config": efi_config,
-        "db_version": db_version
+        "db_version": db_version,
+        "job_id": job_id
     }
     params_file = os.path.join(output_dir, "params.yml")
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)
     print(f"Wrote params to '{params_file}'")
+    return params_file
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = check_args(create_parser().parse_args())
     render_params(**vars(args))
