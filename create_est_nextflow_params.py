@@ -3,21 +3,39 @@ import json
 import os
 
 def add_args(parser: argparse.ArgumentParser):
-    parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
-    parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
-    parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
-    parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
-    parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
-    parser.add_argument("--blast-matches", default=250, type=int, help="Number of matches BLAST should return")
-    parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
-    parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
-    parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406)")
-    parser.add_argument("--import-mode", required=True, choices=["BLAST", "family", "FASTA", "accession"], help="How to import sequences")
-    parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
-    parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
-    parser.add_argument("--family-id-format", choices=["UniProt", "UniRef90", "UniRef50"])
-    parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
+    # general parameters
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
+    common_parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
+    common_parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
+    common_parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
+    common_parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
+    common_parser.add_argument("--blast-matches", default=250, type=int, help="Number of matches BLAST should return")
+    common_parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
+    common_parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
+    common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
+    common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406)")
+    common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
+    # parser.add_argument("--import-mode", required=True, choices=["BLAST", "family", "FASTA", "accession"], help="How to import sequences")
+    
+
+    # add a subparser for each import mode
+    subparsers = parser.add_subparsers(dest="import_mode", required=True)
+    
+    # option A: Sequence BLAST
+    blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
+
+    # option B: Family
+    family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group('Family Options')
+    family_parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
+    family_parser.add_argument("--families", type=str, required=True, help="Comma-separated list of families to add")
+    family_parser.add_argument("--family-id-format", required=True, choices=["UniProt", "UniRef90", "UniRef50"])
+
+    # option C: FASTA
+    fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
+
+    # option D: Accession IDs
+    accession_parser = subparsers.add_parser("accession", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
@@ -50,7 +68,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         return args
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Render params.yml for EST nextflow pipeline")
+    parser = argparse.ArgumentParser(description="Render params.yml for EST nextflow pipeline", add_help=False)
     add_args(parser)
     return parser
 
@@ -73,15 +91,6 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "multiplex": multiplex
     }
     if import_mode == "family":
-        fail = False
-        if families is None:
-            print("Specified 'family' as import method but did not supply any families with --families option")
-            fail = True
-        if family_id_format is None:
-            print("Specified 'family' as import method but did not supply the family id format with --family-id-format")
-            fail = True
-        if fail:
-            exit(1)
         params |= {
             "families": families,
             "family_id_format": family_id_format
@@ -94,5 +103,5 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
     return params_file
 
 if __name__ == "__main__":
-    args = check_args(create_parser().parse_args)
+    args = check_args(create_parser().parse_args())
     render_params(**vars(args))
