@@ -6,9 +6,9 @@ EST analyzes protein sequences. Sequences can import sequences in one of four wa
    the chosen database (UniProt, UniRef90, or UniRef50) and the matches are used
    in the pipeline.
 
- * **Families**: A list of protein familiy identifiers is provided. Family
+ * **Families**: A list of protein family identifiers is provided. Family
    identifiers are used to lookup accession IDs, which are then used to lookup
-   sequeneces.
+   sequences.
 
  * **FASTA**: When custom sequences are desired, the user may pass a FASTA file
    directly into the pipeline.
@@ -19,8 +19,8 @@ Commandline Usage
 -----------------
 
 Import consists of collecting accession IDs and retrieving sequences. Both
-scripts need to be run for all input types because the accession retrival script
-also filters the accessions.
+scripts need to be run for all input types because the accession retrieval
+script also filters the accessions.
 
 To get accession IDs,::
     
@@ -43,7 +43,7 @@ BLAST database
 When import options such as Family and Accession ID are used, the import stage
 pull sequences from a BLAST database using ``fastacmd``. EFITools was designed
 to work with sequences from UniProt, UniRef90, and UniRef50 and accordingly the
-servers for the web version maintain copies of these datbases.
+servers for the web version maintain copies of these databases.
 
 SQL Database
 ~~~~~~~~~~~~

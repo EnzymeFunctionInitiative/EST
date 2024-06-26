@@ -9,7 +9,7 @@ already in the database (created in an earlier stage). EFI uses BLAST version
 :doc:`split <../split_fasta/index>` into shards and the shards are run in
 parallel.
 
-After BLAST completes, the output is trancoded to parquet and then accession IDs
+After BLAST completes, the output is transcoded to parquet and then accession IDs
 for the query and subject are sorted lexicographically. This ensures that
 symmetric pairs of accessions do not both get included in the output.
 

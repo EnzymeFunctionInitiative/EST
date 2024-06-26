@@ -28,7 +28,7 @@ def create_parser():
         "--proxies",
         metavar="KEY:VALUE",
         nargs="+",
-        help="A list of name:dpi pairs for rendering smaller proxy images. Names wil be included in filenames, DPIs should be less than 96",
+        help="A list of name:dpi pairs for rendering smaller proxy images. Names will be included in filenames, DPIs should be less than 96",
     )
 
     return parser

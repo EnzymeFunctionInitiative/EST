@@ -10,7 +10,7 @@ from util import parse_proxies
 
 def create_parser():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
-    parser.add_argument("--boxplot-stats", type=str, required=True, help="Boxplot statisitcs parquet file")
+    parser.add_argument("--boxplot-stats", type=str, required=True, help="Boxplot statistics parquet file")
     parser.add_argument("--job-id", required=True, help="Job ID number for BLAST output file")
     parser.add_argument(
         "--min-edges",
@@ -47,7 +47,7 @@ def create_parser():
         "--proxies",
         metavar="KEY:VALUE",
         nargs="+",
-        help="A list of key:value pairs for rendering smaller proxy images. Keys wil be included in filenames, values should be less than 96",
+        help="A list of key:value pairs for rendering smaller proxy images. Keys will be included in filenames, values should be less than 96",
     )
 
     return parser

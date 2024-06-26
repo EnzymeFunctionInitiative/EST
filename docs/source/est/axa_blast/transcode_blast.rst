@@ -4,7 +4,7 @@ Transcode BLAST output
 Tab-delimited ASCII files are convenient to use but hurt performance. To more
 efficiently post-process BLAST results, the BLAST output files are transcoded to
 Parquet files. This includes a type specification for each column so that excess
-bits are not used to store data. THis reduces overall memory usage in the
+bits are not used to store data. This reduces overall memory usage in the
 :doc:`BLASTreduce stage <../blastreduce/index>`.
 
 The conversion only includes the columns needed in later stages. Here is an
