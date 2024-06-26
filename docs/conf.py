@@ -48,3 +48,6 @@ coverage_ignore_functions = ["main", "create_parser", "parse_args"]
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'sphinx_rtd_theme'
+html_theme_options = {
+    'navigation_depth': 4
+}

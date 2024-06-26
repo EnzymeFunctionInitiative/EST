@@ -1,9 +1,10 @@
 Enzyme Function Initiative
 ==========================
 
-Welcome to the Enzyme Function Initiative Documentation! Information is available for the following pipelines.
+Welcome to the Enzyme Function Initiative Documentation! The following resources
+are available to help you use the tools.
 
 .. toctree::
-    source/est/index.rst
-    source/ssn/index.rst
-    :maxdepth: 1
+    source/guides/index
+    source/pipelines/index
+    :maxdepth: 2
