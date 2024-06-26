@@ -7,6 +7,10 @@ import create_est_nextflow_params
 import create_ssn_nextflow_params
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
+    """
+    Verify that paths exist and destinations directories exist/are empty. Make
+    paths absolute. Will call ``exit(1)`` if files do not exist.
+    """
     if not os.path.exists(args.workflow_def):
         print(f"Workflow definition '{args.workflow_def}' does not exist")
         print("Failed to generate run script")
@@ -21,13 +25,18 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
 
     return args
 
-def create_parser():
+def create_parser() -> argparse.ArgumentParser:
+    """
+    Define the parent parser for job script creation and adds subcommands for
+    different pipelines
+    """
     parser = argparse.ArgumentParser(description="Render templates for nextflow job run")
     # batch args
     parser.add_argument("--templates-dir", type=str, default="./templates", help="Directory where EST templates are stored")
     parser.add_argument("--config-path", type=str, default="conf/slurm.conf", help="Path to nextflow config file for run")
     subparsers = parser.add_subparsers(dest="command")
 
+    # add pipelines as subcommands
     est_parser = subparsers.add_parser("est", help="Create an EST pipeline job script")
     est_parser.add_argument("--workflow-def", type=str, default="est.nf", help="Location of the EST nextflow workflow file")
     create_est_nextflow_params.add_args(est_parser)
@@ -53,7 +62,7 @@ if __name__ == "__main__":
     elif args.command == "ssn":
         params_output = create_ssn_nextflow_params.render_params(**args_dict)
     else:
-        print(f"Job type '{jobtype}' not known")
+        print(f"Job type '{args.command}' not known")
         exit(1)
 
 

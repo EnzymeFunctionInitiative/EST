@@ -4,6 +4,9 @@ import os
 import string
 
 def add_args(parser):
+    """
+    add arguments for SSN pipeline parameters to ``parser``
+    """
     # TODO: pass --est-output-dir to this tool and set some params based on files in there
     parser.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
     parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
@@ -21,6 +24,10 @@ def add_args(parser):
     parser.add_argument("--job-id", default=131, help="Job ID")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
+    """
+    Test file path and rewrite them to be absolute. Ensures target directory
+    exists and is empty. Modifies ``args`` parameter
+    """
     fail = False
     if not os.path.exists(args.blast_parquet):
         print(f"BLAST Parquet '{args.blast_parquet}' does not exist")

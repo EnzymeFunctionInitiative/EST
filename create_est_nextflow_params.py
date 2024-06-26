@@ -3,6 +3,9 @@ import json
 import os
 
 def add_args(parser: argparse.ArgumentParser):
+    """
+    Add global arguments and subparsers to ``parser``
+    """
     # general parameters
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
@@ -38,6 +41,10 @@ def add_args(parser: argparse.ArgumentParser):
     accession_parser = subparsers.add_parser("accession", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
+    """
+    Test file path and rewrite them to be absolute. Ensures target directory
+    exists and is empty. Modifies ``args`` parameter
+    """
     fail = False
     if os.path.exists(args.output_dir):
         if len(os.listdir(args.output_dir)) > 0:
