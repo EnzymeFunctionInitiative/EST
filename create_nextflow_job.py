@@ -11,12 +11,21 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     Verify that paths exist and destinations directories exist/are empty. Make
     paths absolute. Will call ``exit(1)`` if files do not exist.
     """
+    fail = False
     if not os.path.exists(args.workflow_def):
         print(f"Workflow definition '{args.workflow_def}' does not exist")
+        fail = True
+
+    if not os.path.exists(args.config_path):
+        print(f"Nextflow configuration file '{args.config_path}' does not exist")
+        fail = True
+
+    if fail:
         print("Failed to generate run script")
         exit(1)
     else:
         args.workflow_def = os.path.abspath(args.workflow_def)
+        args.config_path = os.apth.abspath(args.config_path)
 
     if args.command == "est":
         args = create_est_nextflow_params.check_args(args)
