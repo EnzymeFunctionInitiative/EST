@@ -1,4 +1,5 @@
 import argparse
+import glob
 import json
 import os
 
@@ -61,8 +62,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"EFI config file '{args.efi_config}' does not exist")
         fail = True
     
-    if not os.path.exists(args.fasta_db):
-        print(f"FASTA database '{args.fasta_db}' does not exist")
+    if len(glob.glob(f"{args.fasta_db}.*")) == 0:
+        print(f"FASTA database '{args.fasta_db}' not found")
         fail = True
 
     if fail:
