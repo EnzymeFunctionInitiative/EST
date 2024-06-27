@@ -25,7 +25,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         exit(1)
     else:
         args.workflow_def = os.path.abspath(args.workflow_def)
-        args.config_path = os.apth.abspath(args.config_path)
+        args.config_path = os.path.abspath(args.config_path)
 
     if args.command == "est":
         args = create_est_nextflow_params.check_args(args)
