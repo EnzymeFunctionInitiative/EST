@@ -33,7 +33,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Render templates for nextflow job run")
     # batch args
     parser.add_argument("--templates-dir", type=str, default="./templates", help="Directory where EST templates are stored")
-    parser.add_argument("--config-path", type=str, default="conf/slurm.conf", help="Path to nextflow config file for run")
+    parser.add_argument("--config-path", type=str, default="conf/slurm.config", help="Path to nextflow config file for run")
     subparsers = parser.add_subparsers(dest="command")
 
     # add pipelines as subcommands
