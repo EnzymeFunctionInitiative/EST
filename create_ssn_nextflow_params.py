@@ -44,7 +44,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             print(f"EST output directory '{args.est_output_dir}' does not exist, failed to render params file")
             exit(1)
         args.blast_parquet = os.path.join(args.est_output_dir, "1.out.parquet")
-        args.fasta_file = os.path.join(args.est_output_dir, "allsequences.fasta")
+        args.fasta_file = os.path.join(args.est_output_dir, "all_sequences.fasta")
         args.output_dir = os.path.join(args.est_output_dir, f"ssn")
         parameter_file = os.path.join(args.est_output_dir, "params.yml")
         try:
@@ -100,7 +100,7 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id):
+def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id, mode, est_output_dir=None):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
@@ -124,7 +124,5 @@ def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filte
     return params_file
 
 if __name__ == "__main__":
-    args = vars(check_args(create_parser().parse_args()))
-    del args["est_output_dir"]
-    del args["mode"]
-    render_params(**args)
+    args = check_args(create_parser().parse_args())
+    render_params(**vars(args))
