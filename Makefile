@@ -4,7 +4,7 @@ clean: docs-clean
 
 docs: docs-html docs-coverage
 
-docs-html:
+docs-html: docs-perlpod
 	sphinx-build -M html docs/ build/ -n
 
 docs-coverage:
@@ -15,3 +15,6 @@ docs-spelling:
 
 docs-clean:
 	rm -rf build/
+
+docs-perlpod:
+	find src -name "*.pl" | xargs scripts/pod2rst.sh
