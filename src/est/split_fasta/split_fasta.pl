@@ -8,10 +8,22 @@ use Getopt::Long;
 
 use strict;
 
-my ($source, $parts, $outputDir);
+my ($source, $parts, $outputDir, $help);
 my $result = GetOptions (
     "source=s" => \$source,
-    "parts=i"  => \$parts);
+    "parts=i"  => \$parts,
+    "help" => \$help);
+
+if ($help) {
+    print 'Usage: perl split_fasta.pl --source SOURCE --parts PARTS
+    Splits a FASTA file into approximately even shards by round-robin distribution
+
+    Options:
+        --source        FASTA file to split
+        --parts         number of shards to create
+    ';
+    exit 0;
+}
 
 die "Input sequence file to split up not valid or not provided" if not -f $source;
 die "Number of parts to split paramter not provided" if not $parts;
