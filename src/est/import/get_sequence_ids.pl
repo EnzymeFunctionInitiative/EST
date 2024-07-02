@@ -11,7 +11,7 @@ use Time::HiRes;
 use lib "$FindBin::Bin/lib";
 
 use EFI::Database;
-use EFI::Import::Config;
+use EFI::Import::Config::IdList;
 use EFI::Import::Sources;
 use EFI::Import::Filter;
 use EFI::Import::Writer;
@@ -24,7 +24,7 @@ use EFI::Import::Logger;
 
 my $logger = new EFI::Import::Logger();
 
-my $config = new EFI::Import::Config();
+my $config = new EFI::Import::Config::IdList();
 my @err = $config->validateAndProcessOptions();
 if (@err) {
     $logger->error(@err);

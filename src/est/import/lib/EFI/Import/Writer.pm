@@ -27,8 +27,8 @@ sub saveSequenceIdData {
     my $seqData = shift;
 
     my $outputDir = $self->{config}->getOutputDir();
-    my $metaFile = $self->{config}->getConfigValue("meta_file");
-    my $idFile = $self->{config}->getConfigValue("id_file");
+    my $metaFile = $self->{config}->getConfigValue("output_metadata_file");
+    my $idFile = $self->{config}->getConfigValue("sequence_ids_file");
 
     open my $metaFh, ">", $metaFile or die "Unable to write to seq meta file $metaFile: $!";
     open my $idFh, ">", $idFile or die "Unable to write to id file $idFile: $!";
@@ -45,8 +45,8 @@ sub saveSequenceIdData {
     close $idFile;
     close $metaFh;
 
-    $self->{sunburst}->saveToFile($self->{config}->getConfigValue("sunburst_ids_file")) if $self->{sunburst};
-    $self->{stats}->saveToFile($self->{config}->getConfigValue("stats_file")) if $self->{stats};
+    $self->{sunburst}->saveToFile($self->{config}->getConfigValue("output_sunburst_ids_file")) if $self->{sunburst};
+    $self->{stats}->saveToFile($self->{config}->getConfigValue("output_stats_file")) if $self->{stats};
 }
 
 

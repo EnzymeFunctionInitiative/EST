@@ -9,7 +9,7 @@ use Time::HiRes;
 
 use lib "$FindBin::Bin/lib";
 
-use EFI::Import::Config;
+use EFI::Import::Config::Sequences;
 use EFI::Import::SequenceDB;
 use EFI::Import::Logger;
 
@@ -18,7 +18,7 @@ use EFI::Import::Logger;
 
 my $logger = new EFI::Import::Logger();
 
-my $config = new EFI::Import::Config(get_sequences => 1);
+my $config = new EFI::Import::Config::Sequences();
 my @err = $config->validateAndProcessOptions();
 if (@err) {
     $logger->error(@err);
@@ -29,8 +29,8 @@ if (@err) {
 my $seqDb = new EFI::Import::SequenceDB(config => $config);
 
 # Populates the sequence structure with sequences from the sequence database
-my $inputIdsFile = $config->getConfigValue("id_file");
-my $outputFile = $config->getConfigValue("seq_file");
+my $inputIdsFile = $config->getConfigValue("sequence_ids_file");
+my $outputFile = $config->getConfigValue("output_sequence_file");
 
 my $_start = time();
 
