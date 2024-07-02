@@ -19,7 +19,10 @@ if [ ! -d $docpath ]; then
     exit 1
 fi
 
+# capture usage and indent it all so it is properly rendered as formatted text in reST
 usage=$(perl $1 --help | sed -e 's/\(^.*\)/\t\1/g')
+
+# generate HTML from POD and convert to reST
 rstpod=$(pod2html --infile $1 --noindex | pandoc --read html --write rst | sed -E "s/^\.\.\ \_.*://g")
 
 underline=$(python -c "print('=' * len('$scriptname'))")
