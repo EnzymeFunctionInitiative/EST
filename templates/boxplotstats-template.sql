@@ -33,4 +33,4 @@ COPY (
     SELECT alignment_score, edge_count, SUM(edge_count) OVER (ORDER BY alignment_score DESC) as cumulative_edge_count
     FROM statistics
     ORDER BY alignment_score ASC
-) TO '$edge_counts_file' (HEADER false, DELIMITER '\t');
+) TO '$edge_counts_file' (DELIMITER '\t');
