@@ -12,6 +12,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Config);
 
 use EFI::Import::Sources;
+use EFI::Import::Config::Defaults;
 
 
 sub new {
@@ -29,6 +30,12 @@ sub new {
 sub getMode {
     my $self = shift;
     return $self->{options}->{mode} // "";
+}
+
+
+sub getEfiDatabaseConfig {
+    my $self = shift;
+    return $self->{efi_config_file};
 }
 
 
@@ -119,7 +126,7 @@ sub validateAndProcessOptions {
     my $h = $self->getAllOptions();
     my $outputDir = $self->getOutputDir();
 
-    $h->{sequence_ids_file} = $h->{sequence_ids_file} || "$outputDir/accession_ids.txt";
+    $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_path("accession_ids", $outputDir);
 
     push @err, "Require --mode" if not $h->{mode};
     push @err, "Invalid --mode" if $h->{mode} and not EFI::Import::Sources::validateSource($h->{mode});
@@ -134,9 +141,9 @@ sub validateAndProcessOptions {
     $self->{filtering}->{fragments} = not $h->{exclude_fragments};
     $self->{filtering}->{fraction} = $h->{fraction} || 1;
 
-    $h->{output_metadata_file} = $h->{output_metadata_file} || "$outputDir/sequence_metadata.tab";
-    $h->{output_sunburst_ids_file} = $h->{output_sunburst_ids_file} || "$outputDir/sunburst_ids.tab";
-    $h->{output_stats_file} = $h->{output_stats_file} || "$outputDir/import_stats.json";
+    $h->{output_metadata_file} = $h->{output_metadata_file} || get_path("sequence_metadata", $outputDir);
+    $h->{output_sunburst_ids_file} = $h->{output_sunburst_ids_file} || get_path("sunburst_ids", $outputDir);
+    $h->{output_stats_file} = $h->{output_stats_file} || get_path("import_stats", $outputDir);
 
     return @err;
 }

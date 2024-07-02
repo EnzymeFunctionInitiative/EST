@@ -11,6 +11,8 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Config);
 
+use EFI::Import::Config::Defaults;
+
 
 sub new {
     my $class = shift;
@@ -35,10 +37,12 @@ sub getOptions {
 
     my @spec = (
         "fasta-db=s" => "",
+        "sequence-ids-file=s",
         "output-sequence-file=s" => "",
     );
     my %defaults = (
         fasta_db => "",
+        sequence_ids_file => "",
         output_sequence_file => "",
     );
     
@@ -55,11 +59,13 @@ sub validateAndProcessOptions {
 
     my $outputDir = $self->getOutputDir();
     if (not $h->{output_sequence_file}) {
-        my $seqFile = "$outputDir/all_sequences.fasta";
+        my $seqFile = get_path("all_sequences", $outputDir);
         $self->setConfigValue("output_sequence_file", $seqFile);
     }
 
     push @err, "Require --fasta-db" if not $h->{fasta_db};
+
+    $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_path("accession_ids", $outputDir);
 
     return @err;
 }
