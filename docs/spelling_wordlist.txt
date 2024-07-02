@@ -46,3 +46,11 @@ plt
 xpos
 dataframe
 tsv
+docstring
+Docstring
+docstrings
+Docstrings
+reST
+reStructured
+repo
+natively
