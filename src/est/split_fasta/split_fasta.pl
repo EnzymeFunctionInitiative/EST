@@ -16,11 +16,14 @@ my $result = GetOptions (
 
 if ($help) {
     print 'Usage: perl split_fasta.pl --source SOURCE --parts PARTS
-    Splits a FASTA file into approximately even shards by round-robin distribution
 
-    Options:
-        --source        FASTA file to split
-        --parts         number of shards to create
+Description:
+    Splits a FASTA file into approximately evenly-sized shards by round-robin
+    distribution. Shards will be named "fracfile-<number>.fa". <number> starts at 1.
+
+Options:
+    --source        FASTA file to split
+    --parts         number of shards to create
     ';
     exit 0;
 }
