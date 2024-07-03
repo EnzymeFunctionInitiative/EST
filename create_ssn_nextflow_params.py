@@ -32,6 +32,8 @@ def add_args(parser):
     manual_parser.add_argument("--efi-config", required=True, help="Location of the EFI config file")
     manual_parser.add_argument("--db-version", default=100, help="The temporal version of UniProt to use")
     manual_parser.add_argument("--job-id", default=131, help="Job ID")
+    manual_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406)")
+
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -53,6 +55,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
                 # args.uniref_version = params[""]
                 args.efi_config = params["efi_config"]
                 args.db_version = 1
+                args.efi_db = params["efi_db"]
                 args.uniref_version = 1
                 args.job_id = params["job_id"]
         except (FileNotFoundError, PermissionError) as e:
@@ -93,6 +96,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.fasta_file = os.path.abspath(args.fasta_file)
         args.output_dir = os.path.abspath(args.output_dir)
         args.efi_config = os.path.abspath(args.efi_config)
+        if os.path.exists(args.efi_db):
+            args.efi_db = os.path.abspath(args.efi_db)
         return args
 
 def create_parser():
@@ -100,7 +105,7 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id, mode, est_output_dir=None):
+def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id, efi_db, mode, est_output_dir=None):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
@@ -115,7 +120,8 @@ def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filte
         "uniref_version": uniref_version,
         "efi_config": efi_config,
         "db_version": db_version,
-        "job_id": job_id
+        "job_id": job_id,
+        "efi_db": efi_db
     }
     params_file = os.path.join(output_dir, "params.yml")
     with open(params_file, "w") as f:
