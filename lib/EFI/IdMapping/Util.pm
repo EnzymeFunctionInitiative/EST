@@ -2,11 +2,11 @@
 package EFI::IdMapping::Util;
 
 use strict;
-use lib "../../";
-use Exporter;
+use warnings;
 
-our @ISA        = qw(Exporter);
-our @EXPORT     = qw(sanitize_id check_id_type GENBANK NCBI GI UNIPROT PDB UNKNOWN AUTO);
+use Exporter qw(import);
+
+our @EXPORT     = qw(check_id_type GENBANK NCBI GI UNIPROT PDB UNKNOWN AUTO);
 
 use constant GENBANK     => "embl-cds";
 use constant NCBI        => "refseq";
@@ -45,32 +45,6 @@ sub check_id_type {
     }
 }
 
-#sub get_fasta_header_ids {
-#    my ($line) = @_;
-#
-#    chomp $line;
-#    my @ids;
-#
-#    my @headers = split(m/>/, $line);
-#    foreach my $id (@headers) {
-#        continue if m/^\s*$/;
-#        $id =~ s/^\s*(tr|sp|pdb)\|//;
-#        $id =~ s/^([^\|]+)\|/$1/;
-#        push(@ids, $id); # if (check_id_type($id) ne UNKNOWN);
-#    }
-#
-#    return @ids;
-#}
-
-
-#sub get_map_keys_sorted {
-#    my ($config) = @_;
-#
-#    my $m = $config->{id_mapping}->{map};
-#    return sort { $m->{$a}->[0] cmp $m->{$b}->[0] } keys %$m;
-#}
-
 
 1;
-
 

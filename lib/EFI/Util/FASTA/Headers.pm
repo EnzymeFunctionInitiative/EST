@@ -1,37 +1,33 @@
 
-package EFI::Fasta::Headers;
+package EFI::Util::FASTA::Headers;
 
-use File::Basename;
-use Cwd qw(abs_path);
 use strict;
-use lib abs_path(dirname(__FILE__)) . "/../../";
-use Exporter;
+use warnings;
+
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../../";
+
 use EFI::IdMapping;
 use EFI::IdMapping::Util;
-use EFI::Database;
 
 
 use constant HEADER     => 1;
 use constant SEQUENCE   => 2;
 use constant FLUSH      => 3;
 
-our @ISA        = qw(Exporter);
-our @EXPORT     = qw();
-our @EXPORT_OK  = qw(get_fasta_header_ids);
-
 
 
 sub new {
     my ($class, %args) = @_;
 
-    my $self = bless {}, $class;
+    my $self = {};
+    bless $self, $class;
 
-    die "config_file_path argument must be passed to EFI::Fasta::Headers." if not exists $args{config_file_path};
+    $self->{db} = $args{efi_db} // die "Require db argument for EFI::Util::FASTA::Headers";
+    $self->{id_mapper} = new EFI::IdMapping(efi_db => $args{efi_db});
 
     $self->reset();
-    $self->{id_mapper} = new EFI::IdMapping(config_file_path => $args{config_file_path});
-    $self->{db_obj} = new EFI::Database(%args);
-    $self->{dbh} = $self->{db_obj}->getHandle();
 
     return $self;
 }
@@ -40,7 +36,7 @@ sub new {
 sub finish {
     my ($self) = @_;
 
-    $self->{dbh}->disconnect();
+    $self->{dbh}->disconnect() if $self->{dbh};
 }
 
 
@@ -81,8 +77,10 @@ sub reset {
 }
 
 
-sub parse_line_for_headers {
+sub parseLineForHeaders {
     my ($self, $line) = @_;
+
+    $self->{dbh} = $self->{db}->getHandle() if not $self->{dbh};
 
     my $result = { state => HEADER, ids => [], primary_id => undef };
 
@@ -166,5 +164,4 @@ sub parse_line_for_headers {
 
 
 1;
-
 

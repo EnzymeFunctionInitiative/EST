@@ -39,13 +39,9 @@ process get_annotations {
         path fasta_metadata
     output:
         path "struct.filtered.out"
-    stub:
-    """
-    cp $projectDir/cheat/struct.filtered.out .
-    """
     script:
     """
-    perl $projectDir/src/ssn/annotations/get_annotations.pl -out struct.filtered.out -uniref-version ${params.uniref_version} -min-len ${params.min_length} -max-len ${params.max_length} -meta-file $fasta_metadata -config=${params.efi_config}
+    perl $projectDir/src/ssn/annotations/get_annotations.pl -out struct.filtered.out -uniref-version ${params.uniref_version} -min-len ${params.min_length} -max-len ${params.max_length} -meta-file $fasta_metadata -config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
 
