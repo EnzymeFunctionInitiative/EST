@@ -7,6 +7,10 @@ use warnings;
 use Data::Dumper;
 use Capture::Tiny qw(capture);
 
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
+
 use EFI::Data::LengthHistogram;
 
 
