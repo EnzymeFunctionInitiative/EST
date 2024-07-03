@@ -2,15 +2,13 @@
 package EFI::IdMapping;
 
 use strict;
-use lib "../";
+use warnings;
 
-use DBI;
-use Log::Message::Simple qw[:STD :CARP];
-use EFI::Config qw(cluster_configure);
-use EFI::SchedulerApi;
-use EFI::Database;
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../";
+
 use EFI::IdMapping::Util;
-
 
 
 sub new {
@@ -19,25 +17,9 @@ sub new {
     my $self = {};
     bless($self, $class);
 
-    cluster_configure($self, %args);
-
-    # $self->{db} is defined by cluster_configure
-    $self->{db_obj} = new EFI::Database(%args);
-
-    $self->{dbh} = $self->{db_obj}->getHandle();
-
-    $self->{has_table} = $self->checkForTable();
-    # By default we check uniprot IDs for existence in idmapping table. This can be
-    # turned off by providing argument uniprot_check = 0
-    $self->{uniprot_check} = exists $args{uniprot_check} ? $args{uniprot_check} : 0;
+    $self->{db} = $args{efi_db} // die "Require db argument for EFI::IdMapping";
 
     return $self;
-}
-
-
-sub checkForTable {
-    my ($self) = @_;
-
 }
 
 
@@ -50,6 +32,8 @@ sub getMap {
 
 sub reverseLookup {
     my ($self, $typeHint, @ids) = @_;
+
+    $self->{dbh} = $self->{db_obj}->getHandle() if not $self->{dbh};
 
     my $m = $self->getMap();
 
@@ -101,7 +85,7 @@ sub reverseLookup {
 sub finish {
     my ($self) = @_;
 
-    $self->{dbh}->disconnect();
+    $self->{dbh}->disconnect() if $self->{dbh};
 }
 
 

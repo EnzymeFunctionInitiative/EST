@@ -9,6 +9,7 @@ use FindBin;
 use Time::HiRes;
 
 use lib "$FindBin::Bin/lib";
+use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
 use EFI::Import::Config::IdList;
@@ -34,7 +35,7 @@ if (@err) {
 
 my $sunburst = new EFI::Import::Sunburst();
 my $stats = new EFI::Import::Statistics(config => $config);
-my $efiDb = new EFI::Database(config => $config->getEfiDatabaseConfig(), db_name => $config->getConfigValue("efi_db"));
+my $efiDb = new EFI::Database(config => $config->getEfiDatabaseConfigFile(), db_name => $config->getConfigValue("efi_db"));
 
 my $sources = new EFI::Import::Sources(config => $config, efi_db => $efiDb, sunburst => $sunburst, stats => $stats);
 my $filter = new EFI::Import::Filter(config => $config, efi_db => $efiDb, logger => $logger);

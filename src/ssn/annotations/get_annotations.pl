@@ -10,23 +10,23 @@ use Data::Dumper;
 
 use FindBin;
 use lib "$FindBin::Bin/../../../lib";
+
 use EFI::Database;
-use EFI::Config;
 use EFI::Annotations;
 use EFI::IdMapping::Util;
 
 use FileUtil;
-use EST::Filter;
 
 
 
-my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $minLen, $maxLen, $annoSpecFile, $idListFile);
+my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
 my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "out=s"                 => \$annoOut,
     "meta-file=s"           => \$metaFileIn,
     "uniref-version=s"      => \$unirefVersion,    # if this is a uniref job then we need to filter out uniref cluster members by fragments
     "config=s"              => \$configFile,
+    "db-name=s"             => \$dbName,
     "min-len=i"             => \$minLen,
     "max-len=i"             => \$maxLen,
     "anno-spec-file=s"      => \$annoSpecFile,      # if this is specified we only write out the attributes listed in the file
@@ -35,21 +35,17 @@ my $result = GetOptions(
 );
 
 
-if (not $configFile) {
-    if (not exists $ENV{EFI_CONFIG}) {
-        die "Missing configuration variable EFI_CONFIG or -config argument.";
-    } else {
-        $configFile = $ENV{EFI_CONFIG};
-        if (not -f $configFile) {
-            die "Missing configuration variable EFI_CONFIG or -config argument.";
-        }
-    }
+if (not $configFile or not -f $configFile) {
+    die "Missing configuration file argument or doesn't exist.";
 }
 
-die "Missing -meta-file input length info file" if not $metaFileIn or not -f $metaFileIn;
-die "Missing -out output annotation (struct.out) file" if not $annoOut;
+die "Missing --meta-file input length info file" if not $metaFileIn or not -f $metaFileIn;
+die "Missing --out output annotation (struct.out) file" if not $annoOut;
+die "Missing --db-name argument" if not $dbName;
 
 
+my $anno = new EFI::Annotations;
+my $db = new EFI::Database(config => $configFile, db_name => $dbName);
 
 
 $unirefVersion = "" if not defined $unirefVersion or ($unirefVersion ne "90" and $unirefVersion ne "50");
@@ -95,9 +91,7 @@ if ($maxLen) {
 my $annoSpec = readAnnoSpec($annoSpecFile);
 
 
-my $anno = new EFI::Annotations;
 
-my $db = new EFI::Database(config_file_path => $configFile);
 my $dbh = $db->getHandle();
 $dbh->do('SET @@group_concat_max_len = 3000') if ($db->{db}->{dbi} and $db->{db}->{dbi} eq "mysql" and $db->{db}->{name} !~ m/\.sqlite/ and (not $ENV{EFI_DB} or $ENV{EFI_DB} =~ m/\.sqlite/)); # Increase the amount of elements that can be concat together (to avoid truncation)
 
