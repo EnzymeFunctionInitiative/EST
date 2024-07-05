@@ -81,6 +81,8 @@ sub saveSeqMapping {
 
     open my $fh, ">", $self->{map_file} or die "Unable to write to map file $self->{map_file}: $!";
 
+    $fh->print(join("\t", "Sequence_ID", "Line_Number"), "\n");
+
     my @ids = sort { $data->{$a} <=> $data->{$b} } keys %$data;
 
     foreach my $id (@ids) {

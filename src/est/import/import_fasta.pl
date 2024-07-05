@@ -61,6 +61,8 @@ sub loadMappingFile {
 
     open my $fh, "<", $file or die "Unable to read mapping file $file: $!";
 
+    my $headerLine = <$fh>;
+
     while (my $line = <$fh>) {
         chomp $line;
         next if $line =~ m/^\s*$/ or $line =~ m/^#/;
