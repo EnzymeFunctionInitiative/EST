@@ -9,7 +9,7 @@ process get_sequence_ids {
     cp $existing_fasta_file allsequences.fa
     """
     script:
-    common_args = "--efi-config-file ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode}"
+    common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode}"
     if (params.import_mode == "family")
         """
         perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --family ${params.families} --sequence-version ${params.family_id_format}
@@ -55,6 +55,22 @@ process cat_fasta_files {
     input = fasta_files.toSorted().join(" ")
     """
     cat $input > all_sequences.fasta
+    """
+}
+
+process import_fasta {
+    output:
+        path "all_sequences.fasta", emit: "fasta_file"
+        path 'accession_ids.txt', emit: 'accession_ids'
+        path 'import_stats.json', emit: 'import_stats'
+        path 'sequence_metadata.tab', emit: 'sequence_metadata'
+        path 'sunburst_ids.tab', emit: 'sunburst_ids'
+        path 'seq_mapping.tab', emit: 'mapping_file'
+
+    """
+    # produces a mapping.txt file
+    perl $projectDir/src/est/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file}
+    perl $projectDir/src/est/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
     """
 }
 
@@ -206,9 +222,16 @@ process finalize_output {
 
 workflow {
     // step 1: import sequence ids using params
-    sequence_id_files = get_sequence_ids()
-    accession_shards = split_sequence_ids(sequence_id_files.accession_ids)
-    fasta_file = cat_fasta_files(get_sequences(accession_shards.flatten()).collect()) 
+
+    if (params.import_mode == "fasta") {
+        fasta_import_files = import_fasta()
+        fasta_file = fasta_import_files.fasta_file
+        sequence_id_files = fasta_import_files
+    } else {
+        sequence_id_files = get_sequence_ids()
+        accession_shards = split_sequence_ids(sequence_id_files.accession_ids)
+        fasta_file = cat_fasta_files(get_sequences(accession_shards.flatten()).collect())
+    }
 
     // step 2: multiplex
     if (params.multiplex) {
