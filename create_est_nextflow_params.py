@@ -18,7 +18,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
     common_parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406)")
+    common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
     # parser.add_argument("--import-mode", required=True, choices=["BLAST", "family", "FASTA", "accession"], help="How to import sequences")
     
