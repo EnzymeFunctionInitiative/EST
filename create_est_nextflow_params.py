@@ -74,6 +74,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.output_dir = os.path.abspath(args.output_dir)
         args.efi_config = os.path.abspath(args.efi_config)
         args.fasta_db = os.path.abspath(args.fasta_db)
+        if os.path.exists(args.efi_db):
+            args.efi_db = os.path.abspath(args.efi_db)
         return args
 
 def create_parser() -> argparse.ArgumentParser:
