@@ -42,7 +42,7 @@ sub saveToFile {
 
     $self->computeStats();
 
-    my $json = encode_json($self->{stats});
+    my $json = JSON->new->allow_nonref->pretty->encode($self->{stats});
 
     open my $fh, ">", $outputFile or die "Unable to write to $outputFile: $!";
     $fh->print($json);
