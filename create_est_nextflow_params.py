@@ -18,8 +18,9 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
     common_parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406)")
+    common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
+    common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
     # parser.add_argument("--import-mode", required=True, choices=["BLAST", "family", "FASTA", "accession"], help="How to import sequences")
     
 
@@ -73,6 +74,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.output_dir = os.path.abspath(args.output_dir)
         args.efi_config = os.path.abspath(args.efi_config)
         args.fasta_db = os.path.abspath(args.fasta_db)
+        if os.path.exists(args.efi_db):
+            args.efi_db = os.path.abspath(args.efi_db)
         return args
 
 def create_parser() -> argparse.ArgumentParser:
@@ -81,7 +84,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format, multiplex):
+def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format, multiplex, blast_evalue):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
@@ -96,7 +99,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "efi_db": efi_db,
         "import_mode": import_mode,
         "exclude_fragments": exclude_fragments,
-        "multiplex": multiplex
+        "multiplex": multiplex,
+        "blast_evalue": blast_evalue
     }
     if import_mode == "family":
         params |= {

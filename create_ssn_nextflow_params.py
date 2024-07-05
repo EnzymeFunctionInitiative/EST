@@ -32,7 +32,7 @@ def add_args(parser):
     manual_parser.add_argument("--efi-config", required=True, help="Location of the EFI config file")
     manual_parser.add_argument("--db-version", default=100, help="The temporal version of UniProt to use")
     manual_parser.add_argument("--job-id", default=131, help="Job ID")
-    manual_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406)")
+    manual_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
 
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
