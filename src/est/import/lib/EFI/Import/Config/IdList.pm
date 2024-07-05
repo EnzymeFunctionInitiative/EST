@@ -128,9 +128,9 @@ sub validateAndProcessOptions {
     my $h = $self->getAllOptions();
     my $outputDir = $self->getOutputDir();
 
-    $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_path("accession_ids", $outputDir);
+    $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_default_path("accession_ids", $outputDir);
 
-    $h->{seq_mapping_file} = $h->{seq_mapping_file} || get_path("seq_mapping", $outputDir);
+    $h->{seq_mapping_file} = $h->{seq_mapping_file} || get_default_path("seq_mapping", $outputDir);
 
     push @err, "Require --mode" if not $h->{mode};
     push @err, "Invalid --mode" if $h->{mode} and not EFI::Import::Sources::validateSource($h->{mode});
@@ -145,9 +145,9 @@ sub validateAndProcessOptions {
     $self->{filtering}->{fragments} = not $h->{exclude_fragments};
     $self->{filtering}->{fraction} = $h->{fraction} || 1;
 
-    $h->{output_metadata_file} = $h->{output_metadata_file} || get_path("sequence_metadata", $outputDir);
-    $h->{output_sunburst_ids_file} = $h->{output_sunburst_ids_file} || get_path("sunburst_ids", $outputDir);
-    $h->{output_stats_file} = $h->{output_stats_file} || get_path("import_stats", $outputDir);
+    $h->{output_metadata_file} = $h->{output_metadata_file} || get_default_path("sequence_metadata", $outputDir);
+    $h->{output_sunburst_ids_file} = $h->{output_sunburst_ids_file} || get_default_path("sunburst_ids", $outputDir);
+    $h->{output_stats_file} = $h->{output_stats_file} || get_default_path("import_stats", $outputDir);
 
     return @err;
 }

@@ -60,8 +60,8 @@ sub validateAndProcessOptions {
 
     push @err, "Require --uploaded-fasta" if not $h->{uploaded_fasta};
 
-    $h->{seq_mapping_file} = $h->{seq_mapping_file} || get_path("seq_mapping", $outputDir);
-    $h->{output_sequence_file} = $h->{output_sequence_file} || get_path("all_sequences", $outputDir);
+    $h->{seq_mapping_file} = $h->{seq_mapping_file} || get_default_path("seq_mapping", $outputDir);
+    $h->{output_sequence_file} = $h->{output_sequence_file} || get_default_path("all_sequences", $outputDir);
 
     return @err;
 }

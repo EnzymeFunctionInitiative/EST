@@ -6,7 +6,7 @@ use warnings;
 
 use Exporter qw(import);
 
-our @EXPORT = qw(get_path);
+our @EXPORT = qw(get_default_path);
 
 my %files = (
     accession_ids => "accession_ids.txt",
@@ -18,7 +18,7 @@ my %files = (
 );
 
 
-sub get_path {
+sub get_default_path {
     my $file = shift;
     my $path = shift || "";
     if ($files{$file}) {

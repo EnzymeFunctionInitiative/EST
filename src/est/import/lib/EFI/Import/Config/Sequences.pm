@@ -59,13 +59,13 @@ sub validateAndProcessOptions {
 
     my $outputDir = $self->getOutputDir();
     if (not $h->{output_sequence_file}) {
-        my $seqFile = get_path("all_sequences", $outputDir);
+        my $seqFile = get_default_path("all_sequences", $outputDir);
         $self->setConfigValue("output_sequence_file", $seqFile);
     }
 
     push @err, "Require --fasta-db" if not $h->{fasta_db};
 
-    $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_path("accession_ids", $outputDir);
+    $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_default_path("accession_ids", $outputDir);
 
     return @err;
 }
