@@ -99,7 +99,7 @@ process all_by_all_blast {
         path "${frac}.tab.sorted.parquet"
     """
     # run blast to get similarity metrics
-    blastall -p blastp -i $frac -d $blast_db_name -m 8 -e 1e-5 -b ${params.num_blast_matches} -o ${frac}.tab
+    blastall -p blastp -i $frac -d $blast_db_name -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet
     python $projectDir/src/est/axa_blast/transcode_blast.py --blast-output ${frac}.tab
