@@ -76,7 +76,8 @@ sub getOptions {
 
         "family|ipro|pfam=s@",
 
-        "fasta-file=s",
+        "fasta=s",
+        "seq-mapping-file=s",
 
         "accession-file=s",
 
@@ -104,7 +105,8 @@ sub getOptions {
 
         family => [],
 
-        fasta_file => "",
+        fasta => "",
+        seq_mapping_file => "",
 
         accession_file => "",
 
@@ -127,6 +129,8 @@ sub validateAndProcessOptions {
     my $outputDir = $self->getOutputDir();
 
     $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_path("accession_ids", $outputDir);
+
+    $h->{seq_mapping_file} = $h->{seq_mapping_file} || get_path("seq_mapping", $outputDir);
 
     push @err, "Require --mode" if not $h->{mode};
     push @err, "Invalid --mode" if $h->{mode} and not EFI::Import::Sources::validateSource($h->{mode});

@@ -61,17 +61,13 @@ sub saveSingleSequenceMetadata {
     # SEQ_ID\tAttr\tVal
 
     my @attr = ("Sequence_Source", "Description", "Query_IDs", "Other_IDs", "UniRef50_IDs", "UniRef50_Cluster_Size",
-        "UniRef90_IDs", "UniRef90_Cluster_Size", "attr_len", "User_IDs_in_Cluster");
+        "UniRef90_IDs", "UniRef90_Cluster_Size", "seq_len", "User_IDs_in_Cluster");
     foreach my $attr (@attr) {
-        $metaFh->print(join("\t", $id, $attr, $meta->{$attr}), "\n") if $meta->{$attr};
+        my $metaVal = ref $meta->{$attr} eq "ARRAY" ? join(",", @{ $meta->{$attr} }) : $meta->{$attr};
+        $metaFh->print(join("\t", $id, $attr, $metaVal), "\n") if $meta->{$attr};
     }
 }
 
-
-sub saveUserFastaSequences {
-    my $self = shift;
-    #TODO: implement this
-}
 
 1;
 
