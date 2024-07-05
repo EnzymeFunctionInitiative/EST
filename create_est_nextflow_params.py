@@ -21,8 +21,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
-    # parser.add_argument("--import-mode", required=True, choices=["BLAST", "family", "FASTA", "accession"], help="How to import sequences")
-    
+
 
     # add a subparser for each import mode
     subparsers = parser.add_subparsers(dest="import_mode", required=True)
@@ -38,6 +37,7 @@ def add_args(parser: argparse.ArgumentParser):
 
     # option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
+    fasta_parser.add_argument("--fasta-file", required=True, type=str, help="The FASTA file to read sequences from")
 
     # option D: Accession IDs
     accession_parser = subparsers.add_parser("accession", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
@@ -67,6 +67,14 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"FASTA database '{args.fasta_db}' not found")
         fail = True
 
+    # import mode-specific tests
+    if args.import_mode == "fasta":
+        if not os.path.exists(args.fasta_file):
+            print(f"FASTA import mode: FASTA file '{args.fasta_file}' does not exist")
+            fail = True
+        else:
+            args.fasta_file = os.path.abspath(args.fasta_file)
+
     if fail:
         print("Failed to render params template")
         exit(1)
@@ -84,7 +92,12 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, import_mode, exclude_fragments, families, family_id_format, multiplex, blast_evalue):
+def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id,
+                  efi_config, fasta_db, efi_db, multiplex, blast_evalue,
+                  import_mode,
+                  families=None, family_id_format=None, exclude_fragments=None,
+                  fasta_file=None
+                  ):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
@@ -106,6 +119,10 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         params |= {
             "families": families,
             "family_id_format": family_id_format
+        }
+    elif import_mode == "fasta":
+        params |= {
+            "uploaded_fasta_file": fasta_file
         }
     
     params_file = os.path.join(output_dir, "params.yml")
