@@ -79,7 +79,7 @@ sub getOptions {
         "fasta=s",
         "seq-mapping-file=s",
 
-        "accession-file=s",
+        "accessions=s",
 
         "domain-region=s",
 
@@ -108,7 +108,7 @@ sub getOptions {
         fasta => "",
         seq_mapping_file => "",
 
-        accession_file => "",
+        accessions => "",
 
         domain_region => "",
 
