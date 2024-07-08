@@ -46,7 +46,7 @@ sub parseConfig {
     $db->{host} = $cfg->val("database", "host", "localhost");
     $db->{port} = $cfg->val("database", "port", "3306");
     $db->{ip_range} = $cfg->val("database", "ip_range", "");
-    $db->{dbi} = lc $cfg->val("database", "db", MYSQL);
+    $db->{dbi} = lc $cfg->val("database", "dbi", MYSQL);
 
     if ($dbName) {
         $db->{name} = $dbName;
