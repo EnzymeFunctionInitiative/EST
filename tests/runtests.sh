@@ -21,6 +21,8 @@ source efi-env/bin/activate
 rm -rf $TEST_RESULTS_DIR
 mkdir $TEST_RESULTS_DIR
 
+set +e
+
 for file in $(ls tests/modules); do
     echo "================================================================================"
     echo "Executing test in '$file'"
