@@ -35,7 +35,8 @@ if (@err) {
 
 my $sunburst = new EFI::Import::Sunburst();
 my $stats = new EFI::Import::Statistics(config => $config);
-my $efiDb = new EFI::Database(config => $config->getEfiDatabaseConfig(), db_name => $config->getConfigValue("efi_db"));
+my $efiDbName = $config->getConfigValue("efi_db");
+my $efiDb = new EFI::Database(config => $config->getEfiDatabaseConfig(), db_name => $efiDbName);
 
 my $sources = new EFI::Import::Sources(config => $config, efi_db => $efiDb, sunburst => $sunburst, stats => $stats);
 my $filter = new EFI::Import::Filter(config => $config, efi_db => $efiDb, logger => $logger);
@@ -49,7 +50,7 @@ if (not $source) {
 $logger->message("Using " . $source->getType() . " as source");
 
 # Retrieve only the IDs from the input sequence family or file
-$logger->message("Retrieving accession IDs from source");
+$logger->message("Retrieving accession IDs from source $efiDbName");
 my $_start = time();
 
 my $seqData = $source->getSequenceIds();
