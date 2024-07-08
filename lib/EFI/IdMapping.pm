@@ -17,7 +17,7 @@ sub new {
     my $self = {};
     bless($self, $class);
 
-    $self->{db} = $args{efi_db} // die "Require db argument for EFI::IdMapping";
+    $self->{efi_db} = $args{efi_db} // die "Require efi db argument for EFI::IdMapping";
 
     return $self;
 }
@@ -33,7 +33,7 @@ sub getMap {
 sub reverseLookup {
     my ($self, $typeHint, @ids) = @_;
 
-    $self->{dbh} = $self->{db_obj}->getHandle() if not $self->{dbh};
+    $self->{dbh} = $self->{efi_db}->getHandle() if not $self->{dbh};
 
     my $m = $self->getMap();
 
