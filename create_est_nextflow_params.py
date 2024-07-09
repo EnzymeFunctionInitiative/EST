@@ -40,7 +40,8 @@ def add_args(parser: argparse.ArgumentParser):
     fasta_parser.add_argument("--fasta-file", required=True, type=str, help="The FASTA file to read sequences from")
 
     # option D: Accession IDs
-    accession_parser = subparsers.add_parser("accession", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
+    accession_parser = subparsers.add_parser("accessions", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
+    accession_parser.add_argument("--accessions-file", required=True, type=str, help="The list of Accession IDs to pull sequences for, one per line")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -75,6 +76,13 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         else:
             args.fasta_file = os.path.abspath(args.fasta_file)
 
+    elif args.import_mode == "accessions":
+        if not os.path.exists(args.accessions_file):
+            print(f"Accession ID list '{args.accessions_file}' does not exist")
+            fail = True
+        else:
+            args.accessions_file = os.path.abspath(args.accessions_file)
+
     if fail:
         print("Failed to render params template")
         exit(1)
@@ -96,7 +104,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   efi_config, fasta_db, efi_db, multiplex, blast_evalue,
                   import_mode,
                   families=None, family_id_format=None, exclude_fragments=None,
-                  fasta_file=None
+                  fasta_file=None,
+                  accessions_file=None
                   ):
     params = {
         "final_output_dir": output_dir,
@@ -123,6 +132,10 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
     elif import_mode == "fasta":
         params |= {
             "uploaded_fasta_file": fasta_file
+        }
+    elif import_mode == "accessions":
+        params |= {
+            "accessions_file": accessions_file
         }
     
     params_file = os.path.join(output_dir, "params.yml")

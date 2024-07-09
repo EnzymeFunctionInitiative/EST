@@ -14,6 +14,11 @@ process get_sequence_ids {
         """
         perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --family ${params.families} --sequence-version ${params.family_id_format}
         """
+    else if (params.import_mode == "accessions") {
+        """
+        perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --accessions ${params.accessions_file}
+        """
+    }
     else
         error "Mode '${params.import_mode}' not yet implemented"
 }
@@ -38,12 +43,9 @@ process get_sequences {
     cp $existing_fasta_file all_sequences.fasta
     """
     script:
-    if (params.import_mode == 'family')
-        """
-        perl $projectDir/src/est/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
-        """
-    else
-        error "Mode '${params.import_mode}' not yet implemented"
+    """
+    perl $projectDir/src/est/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
+    """
 }
 
 process cat_fasta_files {
