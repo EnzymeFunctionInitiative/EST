@@ -4,7 +4,7 @@ process unzip_input {
     output:
         path "ssn.xgmml"
     """
-    perl $projectDir/src/colorssn/unzip_file/unzip_file.pl -in $ssn_zipped -out ssn.xgmml
+    perl $projectDir/src/colorssn/unzip_input/unzip_file.pl -in $ssn_zipped -out ssn.xgmml
     """
 }
 
@@ -54,8 +54,8 @@ process cluster_gnn {
 }
 
 workflow {
-    if (params.ssn_input ==~ /\.zip/) {
-        ssn_file = unzip_file(params.ssn_input)
+    if (params.ssn_input =~ /\.zip/) {
+        ssn_file = unzip_input(params.ssn_input)
     } else {
         ssn_file = params.ssn_input
     }
