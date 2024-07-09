@@ -13,10 +13,12 @@ use lib dirname(abs_path(__FILE__)) . "/../../";
 
 use EFI::Import::Source::Family;
 use EFI::Import::Source::FASTA;
+use EFI::Import::Source::Accession;
 
 our %types = (
     $EFI::Import::Source::Family::TYPE_NAME => new EFI::Import::Source::Family(),
     $EFI::Import::Source::FASTA::TYPE_NAME => new EFI::Import::Source::FASTA(),
+    $EFI::Import::Source::Accession::TYPE_NAME => new EFI::Import::Source::Accession(),
 );
 
 
