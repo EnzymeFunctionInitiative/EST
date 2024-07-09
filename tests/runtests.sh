@@ -14,6 +14,8 @@ if [[ ! -e smalldata || ! -d smalldata ]]; then
     mkdir smalldata
     curl -o smalldata/data.tar.gz https://efi.igb.illinois.edu/downloads/sample_data/kb_test_all.tar.gz
     tar xzf smalldata/data.tar.gz -C smalldata/
+    echo "[database]" > smalldata/efi.config
+    echo "dbi=sqlite" >> smalldata/efi.config
 fi
 
 source efi-env/bin/activate
