@@ -23,16 +23,26 @@ sub new {
 }
 
 
-# Given an initial guess for the input IDs, we return the list of identified UniProt IDs, IDs
-# that had no match, and, for those IDs that were not UniProt but had a matching UniProt ID,
-# a mapping of UniProt ID to query/input ID.
+sub getMap {
+    my ($self) = @_;
+
+    return $self->{id_mapping}->{map};
+}
+
+
 sub reverseLookup {
     my ($self, $typeHint, @ids) = @_;
 
     $self->{dbh} = $self->{efi_db}->getHandle() if not $self->{dbh};
 
+    my $m = $self->getMap();
+
     if ($typeHint eq EFI::IdMapping::Util::UNIPROT) {
         return (\@ids, \[]);
+    }
+
+    if ($typeHint ne EFI::IdMapping::Util::AUTO and not exists $m->{$typeHint}) { #grep {$m->{$_}->[1] eq $typeHint} get_map_keys_sorted($self)) {
+        return (undef, undef);
     }
 
     my @uniprotIds;
@@ -46,7 +56,7 @@ sub reverseLookup {
         next if $type eq EFI::IdMapping::Util::UNKNOWN;
 
         my $foreignIdCol = "foreign_id";
-        my $foreignIdCheck = " AND foreign_id_type = '$type'";
+        my $foreignIdCheck = " and foreign_id_type = '$type'";
         if ($type eq EFI::IdMapping::Util::UNIPROT) {
             if (not $self->{uniprot_check}) {
                 (my $upId = $id) =~ s/\.\d+$//;
@@ -54,11 +64,11 @@ sub reverseLookup {
                 push(@{ $uniprotRevMap{$upId} }, $id);
                 next;
             }
-            $foreignIdCol = "uniprot_id";
+            $foreignIdCol = $self->{id_mapping}->{uniprot_id};
             $foreignIdCheck = "";
         }
 
-        my $querySql = "SELECT uniprot_id FROM idmapping WHERE $foreignIdCol = '$id' $foreignIdCheck";
+        my $querySql = "select $self->{id_mapping}->{uniprot_id} from $self->{id_mapping}->{table} where $foreignIdCol = '$id' $foreignIdCheck";
         my $row = $self->{dbh}->selectrow_arrayref($querySql);
         if (defined $row) {
             push(@uniprotIds, $row->[0]);
