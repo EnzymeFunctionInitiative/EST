@@ -79,7 +79,7 @@ sub getSequenceIds {
 sub parseAccessions {
     my $self = shift;
 
-    $self->{logger}->message("Parsing accession file $self->{acc_file}");
+    print("Parsing accession file $self->{acc_file}\n");
 
     open my $afh, "<", $self->{acc_file} or die "Unable to open user accession file $self->{acc_file}: $!";
     
@@ -117,7 +117,7 @@ sub identifyAccessionIds {
     my $numUniprotIds = scalar @uniprotIds;
     my $numNoMatches = scalar @$noMatches;
 
-    $self->{logger}->message("There were $numUniprotIds IDs that had UniProt matches and $numNoMatches IDs that could not be identified.");
+    print("There were $numUniprotIds IDs that had UniProt matches and $numNoMatches IDs that could not be identified\n");
 
     my $numForeign = 0;
     my $meta = {};
