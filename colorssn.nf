@@ -9,6 +9,7 @@ process unzip_input {
 }
 
 process cluster_gnn {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path ssn_file
     output:
@@ -22,13 +23,13 @@ process cluster_gnn {
         path 'swissprot_singletons_desc.txt', emit: 'swissprot_singletons_desc'
         path 'ssn-sequences.fa', emit: 'ssn_sequences'
 
-        path 'cluster-data/uniprot-nodes', emit: 'uniprot_id_dir', optional: true
-        path 'cluster-data/uniprot-domain-nodes', emit: 'uniprot_domain_nodes', optional: true
-        path 'cluster-data/uniref50-nodes', emit: 'uniref50_id_dir', optional: true
-        path 'cluster-data/uniref50-domain-nodes', emit: 'uniref50_domain_nodes', optional: true
-        path 'cluster-data/uniref90-nodes', emit: 'uniref90_id_dir', optional: true
-        path 'cluster-data/uniref90-domain-nodes', emit: 'uniref90_domain_nodes', optional: true
-        path 'mapping_table_domain.txt', emit: 'mapping_table_domain', optional: true
+        // path 'cluster-data/uniprot-nodes', emit: 'uniprot_id_dir', optional: true
+        // path 'cluster-data/uniprot-domain-nodes', emit: 'uniprot_domain_nodes', optional: true
+        // path 'cluster-data/uniref50-nodes', emit: 'uniref50_id_dir', optional: true
+        // path 'cluster-data/uniref50-domain-nodes', emit: 'uniref50_domain_nodes', optional: true
+        // path 'cluster-data/uniref90-nodes', emit: 'uniref90_id_dir', optional: true
+        // path 'cluster-data/uniref90-domain-nodes', emit: 'uniref90_domain_nodes', optional: true
+        // path 'mapping_table_domain.txt', emit: 'mapping_table_domain', optional: true
 
     """
     perl $projectDir/src/colorssn/cluster_gnn/cluster_gnn.pl -output-dir . \
@@ -60,5 +61,5 @@ workflow {
         ssn_file = params.ssn_input
     }
 
-    cluster_output = cluster_gnn(ssn_file)
+    cluster_gnn(ssn_file)
 }
