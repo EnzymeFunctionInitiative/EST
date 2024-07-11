@@ -21,6 +21,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
+    common_parser.add_argument("--family-id-format", type=str, required=False, default="UniProt", choices=["UniProt", "UniRef90", "UniRef50"])
 
 
     # add a subparser for each import mode
@@ -28,12 +29,12 @@ def add_args(parser: argparse.ArgumentParser):
     
     # option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
+    blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
 
     # option B: Family
     family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group('Family Options')
     family_parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
     family_parser.add_argument("--families", type=str, required=True, help="Comma-separated list of families to add")
-    family_parser.add_argument("--family-id-format", required=True, choices=["UniProt", "UniRef90", "UniRef50"])
 
     # option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
@@ -82,6 +83,12 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             fail = True
         else:
             args.accessions_file = os.path.abspath(args.accessions_file)
+    elif args.import_mode == "blast":
+        if not os.path.exists(args.blast_query_file):
+            print(f"BLAST query file '{args.blast_query_file}' does not exist")
+            fail = True
+        else:
+            args.blast_query_file = os.path.abspath(args.blast_query_file)
 
     if fail:
         print("Failed to render params template")
@@ -105,7 +112,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   import_mode,
                   families=None, family_id_format=None, exclude_fragments=None,
                   fasta_file=None,
-                  accessions_file=None
+                  accessions_file=None,
+                  blast_query_file=None
                   ):
     params = {
         "final_output_dir": output_dir,
@@ -122,12 +130,12 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "import_mode": import_mode,
         "exclude_fragments": exclude_fragments,
         "multiplex": multiplex,
-        "blast_evalue": blast_evalue
+        "blast_evalue": blast_evalue,
+        "family_id_format": family_id_format
     }
     if import_mode == "family":
         params |= {
-            "families": families,
-            "family_id_format": family_id_format
+            "families": families
         }
     elif import_mode == "fasta":
         params |= {
@@ -136,6 +144,10 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
     elif import_mode == "accessions":
         params |= {
             "accessions_file": accessions_file
+        }
+    elif import_mode == "blast":
+        params |= {
+            "blast_query_file": blast_query_file
         }
     
     params_file = os.path.join(output_dir, "params.yml")
