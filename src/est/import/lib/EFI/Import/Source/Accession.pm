@@ -38,12 +38,12 @@ sub init {
     my $efiDb = shift;
     $self->SUPER::init($config, $efiDb, @_);
 
-    my $file = $config->getConfigValue("user_accession_file");
+    my $file = $config->getConfigValue("accessions");
     $self->{acc_file} = $file;
     $self->{efi_db} = $efiDb // die "Require efi db argument";
 
     if (not $self->{acc_file}) {
-        $self->addError("Require --user-accession-file arg");
+        $self->addError("Require --accessions arg");
         return undef;
     }
 
@@ -78,6 +78,8 @@ sub getSequenceIds {
 
 sub parseAccessions {
     my $self = shift;
+
+    print("Parsing accession file $self->{acc_file}\n");
 
     open my $afh, "<", $self->{acc_file} or die "Unable to open user accession file $self->{acc_file}: $!";
     
@@ -114,6 +116,8 @@ sub identifyAccessionIds {
 
     my $numUniprotIds = scalar @uniprotIds;
     my $numNoMatches = scalar @$noMatches;
+
+    print("There were $numUniprotIds IDs that had UniProt matches and $numNoMatches IDs that could not be identified\n");
 
     my $numForeign = 0;
     my $meta = {};

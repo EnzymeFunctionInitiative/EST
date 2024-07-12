@@ -4,7 +4,11 @@ package EFI::Import::Writer;
 use strict;
 use warnings;
 
-use Data::Dumper;
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../";
+
+use EFI::Import::Metadata 'INPUT_SEQ_ID';
 
 
 sub new {
@@ -38,7 +42,7 @@ sub saveSequenceIdData {
     #[{id => X, seq_len => X, seq => X, source => X}
     my @seqIds = sort keys %{ $seqData->{ids} };
     foreach my $id (@seqIds) {
-        $idFh->print("$id\n");
+        $idFh->print("$id\n") if $id ne INPUT_SEQ_ID and $id !~ m/^z/;
         $self->saveSingleSequenceMetadata($metaFh, $id, $seqData->{meta}->{$id}) if $seqData->{meta}->{$id};
     }
 

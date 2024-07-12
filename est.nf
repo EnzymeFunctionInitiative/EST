@@ -17,7 +17,7 @@ process get_sequence_ids {
         """
     } else if (params.import_mode == "accessions") {
         """
-        perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --user-accession-file ${params.accessions_file}
+        perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --accessions ${params.accessions_file}
         """
     } else if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
@@ -72,6 +72,11 @@ process cat_fasta_files {
     """
     cat $input > all_sequences.fasta
     """
+    if (params.import_mode == "blast") {
+        """
+        perl $projectDir/src/est/import/append_blast_query.pl --blast-query-file ${params.blast_query_file} --output-sequence-file all_sequences.fasta
+        """
+    }
 }
 
 process import_fasta {
@@ -85,7 +90,7 @@ process import_fasta {
 
     """
     # produces a mapping.txt file
-    perl $projectDir/src/est/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --user-fasta-file ${params.uploaded_fasta_file}
+    perl $projectDir/src/est/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file}
     perl $projectDir/src/est/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
     """
 }

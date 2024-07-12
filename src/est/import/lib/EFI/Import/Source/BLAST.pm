@@ -17,8 +17,6 @@ use EFI::Import::Metadata ':source';
 
 our $TYPE_NAME = "blast";
 
-our $INPUT_SEQ_ID = "zINPUTSEQ";
-
 
 sub new {
     my $class = shift;
@@ -68,8 +66,11 @@ sub getSequenceIds {
     foreach my $id (keys %$ids) {
         $meta->{$id} = {&FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_BLASTHIT};
     }
-    $meta->{$INPUT_SEQ_ID} = {
-        description => "Input Sequence",
+
+    $ids->{&INPUT_SEQ_ID} = [];
+    $meta->{&INPUT_SEQ_ID} = {
+        &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_BLAST_INPUT,
+        Description => "Input Sequence",
         seq_len => length($querySeq),
     };
 
@@ -121,7 +122,7 @@ sub loadQuerySequence {
     my $seq = "";
     while (my $line = <$fh>) {
         chomp($line);
-        next if m/^>/;
+        next if $line =~ m/^>/;
         $seq .= $line;
     }
     $seq =~ s/\s//gs;
