@@ -72,11 +72,6 @@ process cat_fasta_files {
     """
     cat $input > all_sequences.fasta
     """
-    if (params.import_mode == "blast") {
-        """
-        perl $projectDir/src/est/import/append_blast_query.pl --blast-query-file ${params.blast_query_file} --output-sequence-file all_sequences.fasta
-        """
-    }
 }
 
 process import_fasta {
