@@ -25,7 +25,7 @@ use constant FIELD_UNIREF50_CLUSTER_SIZE => "UniRef50_Cluster_Size";
 use constant FIELD_UNIREF90_CLUSTER_SIZE => "UniRef90_Cluster_Size";
 use constant FIELD_UNIREF100_CLUSTER_SIZE => "UniRef100_Cluster_Size";
 
-use constant INPUT_SEQ_ID => "zINPUTSEQ";
+use constant INPUT_SEQ_ID => "ZINPUTSEQ";
 
 
 our @EXPORT_OK = qw(INPUT_SEQ_ID);

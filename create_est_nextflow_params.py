@@ -21,7 +21,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
-    common_parser.add_argument("--family-id-format", type=str, required=False, default="UniProt", choices=["UniProt", "UniRef90", "UniRef50"])
+    common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
 
 
     # add a subparser for each import mode
@@ -70,25 +70,24 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         fail = True
 
     # import mode-specific tests
-    if args.import_mode == "fasta":
+    if args.import_mode == "blast":
+        if not os.path.exists(args.blast_query_file):
+            print(f"BLAST query file '{args.blast_query_file}' does not exist")
+            fail = True
+        else:
+            args.blast_query_file = os.path.abspath(args.blast_query_file)
+    elif args.import_mode == "fasta":
         if not os.path.exists(args.fasta_file):
             print(f"FASTA import mode: FASTA file '{args.fasta_file}' does not exist")
             fail = True
         else:
             args.fasta_file = os.path.abspath(args.fasta_file)
-
     elif args.import_mode == "accessions":
         if not os.path.exists(args.accessions_file):
             print(f"Accession ID list '{args.accessions_file}' does not exist")
             fail = True
         else:
             args.accessions_file = os.path.abspath(args.accessions_file)
-    elif args.import_mode == "blast":
-        if not os.path.exists(args.blast_query_file):
-            print(f"BLAST query file '{args.blast_query_file}' does not exist")
-            fail = True
-        else:
-            args.blast_query_file = os.path.abspath(args.blast_query_file)
 
     if fail:
         print("Failed to render params template")
@@ -110,7 +109,7 @@ def create_parser() -> argparse.ArgumentParser:
 def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id,
                   efi_config, fasta_db, efi_db, multiplex, blast_evalue,
                   import_mode,
-                  families=None, family_id_format=None, exclude_fragments=None,
+                  families=None, sequence_version=None, exclude_fragments=None,
                   fasta_file=None,
                   accessions_file=None,
                   blast_query_file=None
@@ -131,9 +130,13 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "exclude_fragments": exclude_fragments,
         "multiplex": multiplex,
         "blast_evalue": blast_evalue,
-        "family_id_format": family_id_format
+        "sequence_version": sequence_version
     }
-    if import_mode == "family":
+    if import_mode == "blast":
+        params |= {
+            "blast_query_file": blast_query_file
+        }
+    elif import_mode == "family":
         params |= {
             "families": families
         }
@@ -144,10 +147,6 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
     elif import_mode == "accessions":
         params |= {
             "accessions_file": accessions_file
-        }
-    elif import_mode == "blast":
-        params |= {
-            "blast_query_file": blast_query_file
         }
     
     params_file = os.path.join(output_dir, "params.yml")

@@ -4,33 +4,31 @@ process get_sequence_ids {
         path 'import_stats.json', emit: 'import_stats'
         path 'sequence_metadata.tab', emit: 'sequence_metadata'
         path 'sunburst_ids.tab', emit: 'sunburst_ids'
-        path 'blast_hits.tab', emit: 'blast_hits'
+        path 'blast_hits.tab', emit: 'blast_hits', optional: true
     stub:
     """
     cp $existing_fasta_file allsequences.fa
     """
     script:
     common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode} --sequence-version ${params.family_id_format}"
-    if (params.import_mode == "family") {
+    if (params.import_mode == "blast") {
+        // blast_hits.tab is provided as an output to the user
+        """
+        blastall -p blastp -i ${params.blast_query_file} -d ${params.fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init_blast.out
+        if [[ -s init_blast.out ]]; then
+            awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
+            perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
+        else
+            echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
+        fi
+        """
+    } else if (params.import_mode == "family") {
         """
         perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --family ${params.families}
         """
     } else if (params.import_mode == "accessions") {
         """
         perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --accessions ${params.accessions_file}
-        """
-    } else if (params.import_mode == "blast") {
-        // blast_hits.tab is provided as an output to the user
-        """
-        blastall -p blastp -i ${params.blast_query_file} -d ${params.fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init.blast
-        SZ=\$(wc -c "init.blast" | cut -d' ' -f1)
-        if [[ \$SZ != 0 ]]; then
-            cat init.blast | grep -v '#' | cut -f 1,2,3,4,12 | sort -k5,5nr > init_blast.tab
-            cat init.blast | grep -v '#' | cut -f 2,11 | sort -k2nr > blast_hits.tab
-            perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --blast-output init_blast.tab --blast-query ${params.blast_query_file}
-        else
-            echo "BLAST Failed. Check input sequence."
-        fi
         """
     } else {
         error "Mode '${params.import_mode}' not yet implemented"
@@ -69,13 +67,14 @@ process cat_fasta_files {
         path 'all_sequences.fasta'
     script:
     input = fasta_files.toSorted().join(" ")
-    """
-    cat $input > all_sequences.fasta
-    """
+    cat_cmd = "cat $input > all_sequences.fasta"
     if (params.import_mode == "blast") {
         """
+        $cat_cmd
         perl $projectDir/src/est/import/append_blast_query.pl --blast-query-file ${params.blast_query_file} --output-sequence-file all_sequences.fasta
         """
+    } else {
+        cat_cmd
     }
 }
 
@@ -251,8 +250,8 @@ workflow {
     } else {
         sequence_id_files = get_sequence_ids()
 
-        // split up the sequence ID list into separate files so we can parallelize the
-        // process of retrieving sequences from the BLAST sequence database
+        // split up the sequence ID list into separate files to enable parallel sequence
+        // retrieval from the BLAST sequence database
         accession_shards = split_sequence_ids(sequence_id_files.accession_ids)
         fasta_file = cat_fasta_files(get_sequences(accession_shards.flatten()).collect())
     }

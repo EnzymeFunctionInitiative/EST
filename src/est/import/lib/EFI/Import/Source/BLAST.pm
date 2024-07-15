@@ -89,13 +89,19 @@ sub parseBlastResults {
 
     open my $fh, "<", $self->{blast_output};
 
+    #cat init.blast | grep -v '#' | cut -f 1,2,3,4,12 | sort -k5,5nr > init_blast.tab
+
     my $count = 0;
     my $ids = {};
     my $firstHit = "";
 
     while (my $line = <$fh>) {
         chomp($line);
-        my ($junk, $id, @parts) = split(m/\s+/, $line);
+        next if $line =~ m/^#/ or $line =~ m/^\s*$/;
+
+        my @parts = split(m/\s+/, $line);
+
+        my $id = $parts[1] // next;
         $id =~ s/^.*\|(\w+)\|.*$/$1/;
         
         $firstHit = $id if $count == 0;
