@@ -81,6 +81,9 @@ sub getOptions {
 
         "accessions=s",
 
+        "blast-query=s",
+        "blast-output=s",
+
         "domain-region=s",
 
         "exclude-fragments",
@@ -109,6 +112,9 @@ sub getOptions {
         seq_mapping_file => "",
 
         accessions => "",
+
+        blast_query => "",
+        blast_output => "",
 
         domain_region => "",
 

@@ -15,6 +15,7 @@ my %files = (
     import_stats => "import_stats.json",
     all_sequences => "all_sequences.fasta",
     seq_mapping => "seq_mapping.tab",
+    blastout => "blastout.tab",
 );
 
 
