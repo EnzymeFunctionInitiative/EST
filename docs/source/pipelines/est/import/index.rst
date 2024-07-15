@@ -22,33 +22,38 @@ Import consists of collecting accession IDs and retrieving sequences. Both
 scripts need to be run for all input types because the accession retrieval
 script also filters the accessions.
 
-To get IDs and sequences from a BLAST,::
+To get IDs and sequences from a BLAST, ::
 
     perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode blast --blast-query <USER_BLAST_QUERY_FILE>
     perl src/est/import/append_blast_query.pl --blast-query <USER_BLAST_QUERY_FILE> --output-dir <OUTPUT_DIR>
     perl get_sequences.pl --fasta-db <FASTA_DB_PATH> --output-dir <OUTPUT_DIR>
 
-To get IDs and sequences from one or more families,::
+To get IDs and sequences from one or more families, ::
     
     perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode family --family <FAMILY>
     perl get_sequences.pl --fasta-db <FASTA_DB_PATH> --output-dir <OUTPUT_DIR>
 
-To get IDs and sequences from a FASTA file,::
+To get IDs and sequences from a FASTA file, ::
 
     perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode fasta --fasta <USER_FASTA_FILE>
     perl import_fasta.pl --uploaded-fasta <USER_FASTA_FILE> --output-dir <OUTPUT_DIR>
 
-To get IDs and sequences from an accession ID file,::
+To get IDs and sequences from an accession ID file, ::
 
     perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode accession --accessions <USER_ACCESSIONS_FILE>
     perl get_sequences.pl --fasta-db <FASTA_DB_PATH> --output-dir <OUTPUT_DIR>
 
-If ``--output-dir`` is not provided, the scripts assume that the files are to be
-output and read from the current working directory.
-``<EFI_CONFIG>`` is the path to the ``efi.config`` file as specified below.
-``<EFI_DB>`` is the path to the SQLite database file, or the name of the MySQL database.
-``<FASTA_DB_PATH>`` is the path to the BLAST database containing the FASTA
-sequences to be extracted.
+For all four modes:
+
+* If ``--output-dir`` is not provided, the scripts assume that the files are to be
+  output and read from the current working directory.
+
+* ``<EFI_CONFIG>`` is the path to the ``efi.config`` file as specified below.
+
+* ``<EFI_DB>`` is the path to the SQLite database file, or the name of the MySQL database.
+
+* ``<FASTA_DB_PATH>`` is the path to the BLAST database containing the FASTA
+  sequences to be extracted.
 
 Databases
 ---------
