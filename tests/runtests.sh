@@ -9,6 +9,14 @@ if [[ ! -e ssn.nf || ! -e est.nf ]]; then
     exit 1
 fi
 
+if [ $# -ne 1 ]; then
+    NXF_CONFIG_FILE='conf/docker.config'
+else
+    NXF_CONFIG_FILE=$1
+fi
+
+echo "NXF_CONFIG is $NXF_CONFIG_FILE"
+
 if [[ ! -e smalldata || ! -d smalldata ]]; then
     echo "Test data directory not found, attempting to download"
     mkdir smalldata
@@ -28,5 +36,5 @@ set +e
 for file in $(ls tests/modules); do
     echo "================================================================================"
     echo "Executing test in '$file'"
-    bash "tests/modules/$file" $TEST_RESULTS_DIR
+    bash "tests/modules/$file" $TEST_RESULTS_DIR $NXF_CONFIG_FILE
 done;

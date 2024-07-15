@@ -16,3 +16,16 @@ To execute and individual import mode test, execute ::
 
 where `mode` is one of `sequence_blast`, `family`, `fasta`, or `accession`.
 `results_dir` is usually `test_results`.
+
+
+Custom Configuration
+--------------------
+
+By default, the test scripts use ``conf/docker.config``. To use an alternative
+configuration file, pass it as a positional argument to the test runner script ::
+    
+    ./tests/runtests.sh conf/<config_file>
+
+or the individual test script ::
+
+    ./tests/modules/est_<mode>.sh <results_dir> conf/<config_file>
