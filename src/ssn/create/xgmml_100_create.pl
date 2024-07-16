@@ -8,7 +8,6 @@ use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../../../lib";
 use List::MoreUtils qw{apply uniq any} ;
-use DBD::mysql;
 use IO::File;
 use Fcntl qw(:flock);
 use XML::Writer;
