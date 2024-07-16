@@ -4,7 +4,7 @@ set -e
 TEST_RESULTS_DIR=$1
 NXF_CONFIG_FILE=$2
 
-OUTPUT_DIR="$TEST_RESULTS_DIR/test_results_sequence_blast"
+OUTPUT_DIR="$TEST_RESULTS_DIR/test_results_accession"
 
 rm -rf $OUTPUT_DIR
 
