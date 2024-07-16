@@ -10,7 +10,7 @@ process get_sequence_ids {
     cp $existing_fasta_file allsequences.fa
     """
     script:
-    common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode} --sequence-version ${params.family_id_format}"
+    common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode} --sequence-version ${params.sequence_version}"
     if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
         """
