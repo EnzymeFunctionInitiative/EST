@@ -2,6 +2,13 @@
 
 set -e
 
+function ctrl_c() {
+    echo "Stopping all tests"
+    exit 0
+}
+
+trap ctrl_c SIGINT
+
 TEST_RESULTS_DIR=test_results
 
 if [[ ! -e ssn.nf || ! -e est.nf ]]; then
