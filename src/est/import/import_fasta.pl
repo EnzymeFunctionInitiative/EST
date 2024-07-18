@@ -36,12 +36,11 @@ my $lineMapping = loadMappingFile($mappingFile);
 open my $in, "<", $fastaFile or die "Unable to read input fasta file $fastaFile: $!";
 open my $out, ">", $outputFile or die "Unable to write to output fasta file $outputFile: $!";
 
-my $lineNum = 0;
+my $lineNum = 1;
 while (my $line = <$in>) {
-    if ($lineMapping->{$lineNum}) {
+    if ($line =~ m/^>/) {
         $out->print(">$lineMapping->{$lineNum}\n");
-        $out->print($line);
-    } elsif ($line !~ m/^>/) {
+    } else {
         $out->print($line);
     }
     $lineNum++;
