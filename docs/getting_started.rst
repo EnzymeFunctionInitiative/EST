@@ -29,13 +29,13 @@ Manual Installation
 ~~~~~~~~~~~~~~~~~~~
 
 If running without docker, dependencies will need to be installed manually
-along with the python packages in ``requirements.txt`` and perl modules in
+along with the python packages in ``requirements.txt`` and Perl modules in
 ``cpanfile``. 
 
-For software dependcies, see the installation guides for each tool. Then for
+For software dependencies, see the installation guides for each tool. Then for
 library dependencies:
 
-1. We reccomend creating a python virtual environment before installing dependencies::
+1. We recommend creating a python virtual environment before installing dependencies::
 
         python -mvenv efi-env
 
@@ -43,7 +43,7 @@ library dependencies:
 
         source efi-env/bin/activate
 
-   and install the dependecies ::
+   and install the dependencies ::
 
         pip install -r requirements.txt
 

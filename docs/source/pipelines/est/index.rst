@@ -126,12 +126,12 @@ chronological order
    accession IDs to sequences is performed concurrently, resulting in a number
    of FASTA files equal to the number of accession ID file shards.
 
-   If the input mode is a FASTA file, accesison IDs will still try to be
+   If the input mode is a FASTA file, accessison IDs will still try to be
    identified so that taxonomy information can be associated with the sequences.
    The ID headers in the file may be rewritten internally.
 
    If multiplexing is enabled, CD-HIT will be used to reduce the set of imported
-   sequences to a representiative subset. A smaller number of sequences will be
+   sequences to a representative subset. A smaller number of sequences will be
    used in the all-by-all BLAST, meaning it should execute more quickly and
    return a smaller number of edges. The alignment score and other values from
    each representative sequence is then assigned to each of the sequences for
