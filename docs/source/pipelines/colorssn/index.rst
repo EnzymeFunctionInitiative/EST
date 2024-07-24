@@ -18,7 +18,7 @@ Running the Pipeline
 Generating a Parameter File
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Color SSN pipeline is cnofigured through a YAML (or JSON) file containing
+The Color SSN pipeline is configured through a YAML (or JSON) file containing
 parameters. The parameter file may be created manually or by running
 ``create_colorssn_nextflow_params.py``. An example usage of the command: ::
 
