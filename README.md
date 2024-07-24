@@ -39,7 +39,7 @@ along with the python packages in `requirements.txt` and perl modules in
    file to the specified output directory, this file must be referenced in this
    run command.
    ```
-   nextflow -C conf/docker.config run est.ng -params-file <path_to_results_dir>/params.yml
+   nextflow -C conf/est/docker.config run est.ng -params-file <path_to_results_dir>/params.yml
    ```
 
 4. After the pipeline completes, output files will be available in the results
