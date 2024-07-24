@@ -6,7 +6,6 @@ through a web tool at https://efi.igb.illinois.edu/efi-est/ and on [KBase]().
 This respository contains the analysis code that these services use.
 ![image](assets/sample_ssn.png)
 
-
 # Running the Pipelines
 Please see our [documentation](docs/index.rst) for comprehensive information on using the
 pipelines.

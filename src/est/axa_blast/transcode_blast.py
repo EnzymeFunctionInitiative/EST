@@ -1,9 +1,6 @@
 import argparse
-import glob
 import os
-import string
 
-from Bio import SeqIO
 from pyarrow import csv
 import pyarrow.parquet as pq
 import pyarrow as pa
@@ -62,9 +59,9 @@ convert_options = csv.ConvertOptions(
         "bitscore": pa.float32(),
     },
     include_columns=["qseqid", "sseqid", "pident", "alignment_length", "bitscore"]
-)
+)   
 
-def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_options: csv.ParseOptions, convert_options: csv.ConvertOptions) -> pq.ParquetFile:
+def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_options: csv.ParseOptions, convert_options: csv.ConvertOptions) -> str:
     """
     Convert a single CSV file to a Parquet file using the supplied options
 
@@ -81,19 +78,26 @@ def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_opti
     
     Returns
     -------
-        A ParquetFile object representing the transcoded input file. Name will be `filename`.parquet
+        The name of the parquet file created
     """
-    data = csv.open_csv(
-        filename,
-        read_options=read_options,
-        parse_options=parse_options,
-        convert_options=convert_options,
-    )
+    schema = pa.schema({k: convert_options.column_types[k] for k in convert_options.include_columns})
     output = f"{os.path.basename(filename)}.parquet"
-    writer = pq.ParquetWriter(output, data.schema)
-    for batch in data:
-        writer.write_batch(batch)
+    writer = pq.ParquetWriter(output, schema)
+    try:
+        data = csv.open_csv(
+            filename,
+            read_options=read_options,
+            parse_options=parse_options,
+            convert_options=convert_options,
+        )
+        for batch in data:
+            writer.write_batch(batch)
+    except pa.lib.ArrowInvalid as e:
+        print(f"Error when opening '{filename}': {e}")
+        print("Producing empty output file")
+    
     writer.close()
+    return output
 
 if __name__ == "__main__":
     args = parse_args(create_parser())
