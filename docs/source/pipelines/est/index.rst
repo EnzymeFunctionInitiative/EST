@@ -118,7 +118,7 @@ Execution Details
 
 The EST pipeline consists of different stages which transform the input
 sequences into network edges. The stages are executed roughly in this
-chronological order
+chronological order:
 
 1. **Import Sequences**. EST supports several methods of obtaining sequences.
    The pipeline uses parameters from the various methods to create a list of

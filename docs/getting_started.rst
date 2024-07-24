@@ -3,7 +3,7 @@ Getting started
 
 The Enzyme Function Initiative (EFI) offers several different tools to help you
 identify isofunctional protein families. This guide will walk you through the
-initial setup of the tools
+initial setup of the tools.
 
 Obtain the Code
 ---------------
