@@ -25,7 +25,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
 
 def fasta_to_parquet(fasta_file: str, output: str):
     """
-    Converts the provided FASTA file into a 2-column parquet file with columns `seqid` and `sequence_length`
+    Converts the provided FASTA file into a 2-column parquet file with columns
+    ``seqid`` and ``sequence_length``
 
     Parameters
     ----------
@@ -34,7 +35,7 @@ def fasta_to_parquet(fasta_file: str, output: str):
     
     Returns
     -------
-        The filename of the new parquet files as `fasta_file`.parquet
+        The filename of the new parquet files as ``fasta_file``.parquet
     """
     ids, lengths = [], []
     for record in SeqIO.parse(fasta_file, "fasta"):

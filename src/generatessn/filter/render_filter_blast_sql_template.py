@@ -100,11 +100,15 @@ def render_sql_from_template(
         template_file
             Path to the template sql file for reduce operations
         mem_limit
-            Soft limit for DuckDB memory usage. In bytes by default but can use common suffixes such as `MB and `GB`
+            Soft limit for DuckDB memory usage. In bytes by default but can use
+            common suffixes such as ``MB`` and ``GB``
         duckdb_temp_dir
-            Location where duckdb should place its on-disk cache. Folder will be created if it does not exist
+            Location where duckdb should place its on-disk cache. Folder will be
+            created if it does not exist
         blast_output
-            path to Parquet-encoded BLAST output file to combine (from :func:`csvs_to_parquets`)
+            path to Parquet-encoded BLAST output file to combine (from
+            :func:`csv_to_parquet()
+            <src.est.axa_blast.transcode_blast.csv_to_parquet_file>`)
     """
     mapping = {
         "mem_limit": mem_limit,

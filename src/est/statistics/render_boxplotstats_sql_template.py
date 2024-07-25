@@ -77,9 +77,11 @@ def render_sql_from_template(
         template_file
             Path to the template sql file for statistics operations
         mem_limit
-            Soft limit for DuckDB memory usage. In bytes by default but can use common suffixes such as `MB and `GB`
+            Soft limit for DuckDB memory usage. In bytes by default but can use
+            common suffixes such as ``MB`` and ``GB``
         duckdb_temp_dir
-            Location where duckdb should place its on-disk cache. Folder will be created if it does not exist
+            Location where duckdb should place its on-disk cache. Folder will be
+            created if it does not exist
         
     """
     mapping = {
