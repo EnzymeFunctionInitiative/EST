@@ -4,7 +4,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 
 import create_est_nextflow_params
-import create_ssn_nextflow_params
+import create_generatessn_nextflow_params
 import create_colorssn_nextflow_params
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -33,7 +33,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     elif args.command == "est":
         args = create_est_nextflow_params.check_args(args)
     elif args.command == "ssn":
-        args = create_ssn_nextflow_params.check_args(args)
+        args = create_generatessn_nextflow_params.check_args(args)
     else:
         print(f"Job type '{args.command}' not known")
         exit(1)
@@ -62,7 +62,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     ssn_parser = subparsers.add_parser("ssn", help="Create an SSN pipeline job script")
     ssn_parser.add_argument("--workflow-def", type=str, default="ssn.nf", help="Location of the SSN nextflow workflow file")
-    create_ssn_nextflow_params.add_args(ssn_parser)
+    create_generatessn_nextflow_params.add_args(ssn_parser)
 
     return parser
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     elif args.command == "est":
         params_output = create_est_nextflow_params.render_params(**args_dict)
     elif args.command == "ssn":
-        params_output = create_ssn_nextflow_params.render_params(**args_dict)
+        params_output = create_generatessn_nextflow_params.render_params(**args_dict)
     else:
         print(f"Job type '{args.command}' not known")
         exit(1)
