@@ -2,7 +2,7 @@ import argparse
 import string
 import os
 
-def parse_args():
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Filter reduced BLAST output on specified parameter")
     parser.add_argument("--blast-output", type=str, required=True, help="Path to directory containing the reduced BLAST output file")
     parser.add_argument(
@@ -56,15 +56,22 @@ def parse_args():
         help="Maximum sequence length allowed in retained rows"
     )
 
-    args = parser.parse_args()
+    return parser
 
+def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
     if not os.path.exists(args.blast_output):
         print(f"BLAST output '{args.blast_output}' does not exist")
         fail = True
+    if not os.path.exists(args.sql_template):
+        print(f"SQL template '{args.sql_template}' does not exist")
+        fail = True
+
     if fail:
         exit(1)
     else:
+        args.blast_output = os.path.abspath(args.blast_output)
+        args.sql_template = os.path.abspath(args.sql_template)
         return args
 
 def render_sql_from_template(
@@ -117,7 +124,7 @@ def render_sql_from_template(
             g.write(template.substitute(mapping))
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = check_args(create_parser().parse_args())
     render_sql_from_template(
                 args.sql_template,
                 args.sql_output_file,

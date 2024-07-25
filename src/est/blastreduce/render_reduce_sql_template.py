@@ -1,7 +1,8 @@
 import argparse
+import os
 import string
 
-def parse_args():
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Render the DuckDB SQL template for eliminating duplicate and self edges")
     parser.add_argument("--blast-output", type=str, nargs="+", help="Path to directory containing the BLAST output files")
     parser.add_argument("--fasta-length-parquet", type=str, help="Path to the FASTA file to transcode")
@@ -30,7 +31,24 @@ def parse_args():
         default="1.out.parquet",
         help="The final output file the aggregated BLAST output should be written to. Will be Parquet.",
     )
-    return parser.parse_args()
+    return parser
+
+def check_args(args: argparse.Namespace) -> argparse.Namespace:
+    fail = False
+    if not all(map(os.path.exists, args.blast_output)):
+        print(f"At least one of BLAST output '{args.blast_output}' does not exist")
+        fail = True
+    if not os.path.exists(args.sql_template):
+        print(f"SQL template '{args.sql_template}' does not exist")
+        fail = True
+
+    if fail:
+        exit(1)
+    else:
+        args.blast_output = list(map(os.path.abspath, args.blast_output))
+        args.sql_template = os.path.abspath(args.sql_template)
+        return args
+
 
 def render_sql_from_template(
     template_file: str,
@@ -80,7 +98,7 @@ def render_sql_from_template(
             g.write(template.substitute(mapping))
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = check_args(create_parser().parse_args())
     render_sql_from_template(
                 args.sql_template,
                 args.sql_output_file,

@@ -9,13 +9,13 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 
 
-def parse_args():
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Transcode demultiplexed BLAST output files to Parquet")
     parser.add_argument("--blast-output", type=str, nargs="+", help="BLAST output files")
 
-    args = parser.parse_args()
+    return parser
 
-    # validate input filepaths
+def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
     if not all(map(os.path.exists, args.blast_output)):
         print(f"At least one of BLAST output '{args.blast_output}' does not exist")
@@ -91,6 +91,6 @@ def csv_to_parquet_file(filename: str, read_options: csv.ReadOptions, parse_opti
     return output
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = check_args(create_parser().parse_args())
     for blast_output in args.blast_output:
         csv_to_parquet_file(blast_output, read_options, parse_options, convert_options)

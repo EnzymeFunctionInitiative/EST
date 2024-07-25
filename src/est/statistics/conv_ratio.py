@@ -5,7 +5,7 @@ import os
 
 import pyarrow.parquet as pq
 
-def create_parser():
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Compute convergence ratio for BLAST output")
     parser.add_argument("--blast-output", type=str, required=True, help="Path to transcoded BLAST parquet output parquet file from blastreduce")
     parser.add_argument("--fasta", type=str, required=True, help="Path to transcoded FASTA parquet file containing sequences")
@@ -13,9 +13,7 @@ def create_parser():
 
     return parser
 
-def parse_args(parser):
-    args = parser.parse_args()
-
+def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
     if not os.path.exists(args.blast_output):
         print(f"BLAST output '{args.blast_output}' does not exist")
@@ -27,6 +25,8 @@ def parse_args(parser):
     if fail:
         exit(1)
     else:
+        args.blast_output = os.path.abspath(args.blast_output)
+        args.fasta = os.path.abspath(args.fasta)
         return args
 
 def compute_conv_ratio(blast_output: str, fasta_file: str) -> tuple[float, int, int]:
@@ -58,7 +58,7 @@ def compute_conv_ratio(blast_output: str, fasta_file: str) -> tuple[float, int, 
 
 
 if __name__ == "__main__":
-    args = parse_args(create_parser())
+    args = check_args(create_parser().parse_args())
     conv_ratio, node_count, edge_count = compute_conv_ratio(args.blast_output, args.fasta)
     output = {
         "ConvergenceRatio": conv_ratio,
