@@ -4,7 +4,7 @@ Convergence Ratio
 .. argparse::
     :module: src.est.statistics.conv_ratio
     :func: create_parser
-    :prog: conv_ratio
+    :prog: conv_ratio.py
 
 Functions
 ---------
