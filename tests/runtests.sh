@@ -11,14 +11,14 @@ trap ctrl_c SIGINT
 
 TEST_RESULTS_DIR=test_results
 
-if [[ ! -e ssn.nf || ! -e est.nf ]]; then
+if [[ ! -e generatessn.nf || ! -e est.nf ]]; then
     echo "Run this script from the repository root"
     exit 1
 fi
 
 if [ $# -ne 2 ]; then
     NXF_EST_CONFIG_FILE='conf/est/docker.config'
-    NXF_SSN_CONFIG_FILE='conf/ssn/docker.config'
+    NXF_SSN_CONFIG_FILE='conf/generatessn/docker.config'
 else
     NXF_EST_CONFIG_FILE=$1
     NXF_SSN_CONFIG_FILE=$2
