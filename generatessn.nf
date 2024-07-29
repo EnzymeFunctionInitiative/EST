@@ -72,25 +72,6 @@ process compute_stats {
     """
 }
 
-process finalize_output {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path filtered_blast
-        path filtered_fasta
-        path annotations
-        path full_ssn
-        path stats
-    output:
-        path filtered_blast
-        path filtered_fasta
-        path annotations
-        path full_ssn//"${params.ssn_name}_full_ssn.xgmml"
-        path stats
-    """
-    # zip -j ${params.ssn_name}_full_ssn.xgmml.zip full_ssn.xgmml
-    """
-}
-
 workflow {
     // import data from EST run
     input_data = import_data(params.blast_parquet, params.fasta_file)
@@ -107,6 +88,4 @@ workflow {
 
     // compute stats
     stats = compute_stats(full_ssn)
-
-    finalize_output(filtered_blast, fasta_filter_outputs.filtered_fasta, struct_file, full_ssn, stats)
 }
