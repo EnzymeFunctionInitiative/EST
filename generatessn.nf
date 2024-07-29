@@ -13,6 +13,7 @@ process import_data {
 }
 
 process filter_blast {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_parquet
     output:
@@ -24,6 +25,7 @@ process filter_blast {
 }
 
 process filter_fasta {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta
     output:
@@ -35,6 +37,7 @@ process filter_fasta {
 }
 
 process get_annotations {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta_metadata
     output:
@@ -46,6 +49,7 @@ process get_annotations {
 }
 
 process create_xgmml_100 {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path filtered_blast
         path filtered_fasta
@@ -58,6 +62,7 @@ process create_xgmml_100 {
 }
 
 process compute_stats {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path full_ssn
     output:

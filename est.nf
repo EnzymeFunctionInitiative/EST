@@ -1,4 +1,5 @@
 process get_sequence_ids {
+    publishDir params.final_output_dir, mode: 'copy'
     output:
         path 'accession_ids.txt', emit: 'accession_ids'
         path 'import_stats.json', emit: 'import_stats'
@@ -61,6 +62,7 @@ process get_sequences {
 }
 
 process cat_fasta_files {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta_files
     output:
@@ -79,6 +81,7 @@ process cat_fasta_files {
 }
 
 process import_fasta {
+    publishDir params.final_output_dir, mode: 'copy'
     output:
         path "all_sequences.fasta", emit: "fasta_file"
         path 'accession_ids.txt', emit: 'accession_ids'
@@ -95,6 +98,7 @@ process import_fasta {
 }
 
 process multiplex {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta_file
     output:
@@ -158,6 +162,7 @@ process blastreduce_transcode_fasta {
 }
 
 process blastreduce {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_files
         path fasta_length_parquet
@@ -172,6 +177,7 @@ process blastreduce {
 }
 
 process demultiplex {
+    publishDir params.final_output_dir, mode: 'copy', overwrite: true
     input:
         path blast_parquet
         path clusters
@@ -185,6 +191,7 @@ process demultiplex {
 }
 
 process compute_stats {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_parquet
         path fasta_file
@@ -203,6 +210,7 @@ process compute_stats {
 }
 
 process visualize {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path boxplot_stats
     output:
