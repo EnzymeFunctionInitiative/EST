@@ -4,7 +4,7 @@ process unzip_input {
     output:
         path "ssn.xgmml"
     """
-    perl $projectDir/src/colorssn/unzip_input/unzip_file.pl -in $ssn_zipped -out ssn.xgmml
+    perl $projectDir/src/unzip_input/unzip_file.pl -in $ssn_zipped -out ssn.xgmml
     """
 }
 
