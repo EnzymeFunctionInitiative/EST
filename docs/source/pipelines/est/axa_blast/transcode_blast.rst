@@ -41,7 +41,7 @@ Commandline usage
 .. argparse::
     :module: src.est.axa_blast.transcode_blast
     :func: create_parser
-    :prog: transcode_blast
+    :prog: transcode_blast.py
 
 Functions
 ---------

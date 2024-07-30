@@ -1,7 +1,8 @@
 import argparse
+import os
 import string
 
-def create_parser():
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Render the DuckDB SQL template for alphabetizing IDs")
     parser.add_argument("--blast-output", type=str, required=True, help="Path to directory containing the BLAST output file")
     parser.add_argument(
@@ -30,6 +31,23 @@ def create_parser():
         help="The final output file the aggregated BLAST output should be written to. Will be Parquet.",
     )
     return parser
+
+def check_args(args: argparse.ArgumentParser) -> argparse.Namespace:
+    fail = False
+    if not os.path.exists(args.blast_output):
+        print(f"BLAST output '{args.blast_output}' does not exist")
+        fail = True
+    if not os.path.exists(args.sql_template):
+        print(f"SQL template '{args.sql_template}' does not exist")
+        fail = True
+
+    if fail:
+        exit(1)
+    else:
+        args.blast_output = os.path.abspath(args.blast_output)
+        args.sql_template = os.path.abspath(args.sql_template)
+        return args
+
 
 def render_sql_from_template(
     template_file: str,
@@ -60,7 +78,7 @@ def render_sql_from_template(
             created if it does not exist
         blast_output
             path to Parquet-encoded BLAST output file to combine (from
-            :func:`csv_to_parquet_file
+            :func:`csv_to_parquet_file()
             <src.est.axa_blast.transcode_blast.csv_to_parquet_file>`)
         reduce_output_file
             Location to which the combined output (in Parquet format) should be
@@ -80,7 +98,7 @@ def render_sql_from_template(
             g.write(template.substitute(mapping))
 
 if __name__ == "__main__":
-    args = create_parser().parse_args()
+    args = check_args(create_parser().parse_args())
     render_sql_from_template(
                 args.sql_template,
                 args.sql_output_file,

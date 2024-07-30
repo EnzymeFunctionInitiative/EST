@@ -126,7 +126,7 @@ chronological order:
    accession IDs to sequences is performed concurrently, resulting in a number
    of FASTA files equal to the number of accession ID file shards.
 
-   If the input mode is a FASTA file, accessison IDs will still try to be
+   If the input mode is a FASTA file, accession IDs will still try to be
    identified so that taxonomy information can be associated with the sequences.
    The ID headers in the file may be rewritten internally.
 
