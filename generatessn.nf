@@ -13,6 +13,7 @@ process import_data {
 }
 
 process filter_blast {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_parquet
     output:
@@ -24,6 +25,7 @@ process filter_blast {
 }
 
 process filter_fasta {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta
     output:
@@ -35,6 +37,7 @@ process filter_fasta {
 }
 
 process get_annotations {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta_metadata
     output:
@@ -46,6 +49,7 @@ process get_annotations {
 }
 
 process create_xgmml_100 {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path filtered_blast
         path filtered_fasta
@@ -58,31 +62,13 @@ process create_xgmml_100 {
 }
 
 process compute_stats {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path full_ssn
     output:
         path "stats.tab"
     """
     perl $projectDir/src/generatessn/stats/stats.pl -run-dir . -out stats.tab
-    """
-}
-
-process finalize_output {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path filtered_blast
-        path filtered_fasta
-        path annotations
-        path full_ssn
-        path stats
-    output:
-        path filtered_blast
-        path filtered_fasta
-        path annotations
-        path full_ssn//"${params.ssn_name}_full_ssn.xgmml"
-        path stats
-    """
-    # zip -j ${params.ssn_name}_full_ssn.xgmml.zip full_ssn.xgmml
     """
 }
 
@@ -102,6 +88,4 @@ workflow {
 
     // compute stats
     stats = compute_stats(full_ssn)
-
-    finalize_output(filtered_blast, fasta_filter_outputs.filtered_fasta, struct_file, full_ssn, stats)
 }

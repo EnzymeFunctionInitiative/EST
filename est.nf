@@ -1,4 +1,5 @@
 process get_sequence_ids {
+    publishDir params.final_output_dir, mode: 'copy'
     output:
         path 'accession_ids.txt', emit: 'accession_ids'
         path 'import_stats.json', emit: 'import_stats'
@@ -61,6 +62,7 @@ process get_sequences {
 }
 
 process cat_fasta_files {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta_files
     output:
@@ -79,6 +81,7 @@ process cat_fasta_files {
 }
 
 process import_fasta {
+    publishDir params.final_output_dir, mode: 'copy'
     output:
         path "all_sequences.fasta", emit: "fasta_file"
         path 'accession_ids.txt', emit: 'accession_ids'
@@ -95,6 +98,7 @@ process import_fasta {
 }
 
 process multiplex {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta_file
     output:
@@ -158,6 +162,7 @@ process blastreduce_transcode_fasta {
 }
 
 process blastreduce {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_files
         path fasta_length_parquet
@@ -172,6 +177,7 @@ process blastreduce {
 }
 
 process demultiplex {
+    publishDir params.final_output_dir, mode: 'copy', overwrite: true
     input:
         path blast_parquet
         path clusters
@@ -185,6 +191,7 @@ process demultiplex {
 }
 
 process compute_stats {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_parquet
         path fasta_file
@@ -203,6 +210,7 @@ process compute_stats {
 }
 
 process visualize {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path boxplot_stats
     output:
@@ -210,33 +218,6 @@ process visualize {
 
     """
     python $projectDir/src/est/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
-    """
-}
-
-process finalize_output {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path accession_ids
-        path fasta_file
-        path import_stats
-        path sequence_metadata
-        path sunburst_ids
-        path blast_output
-        path plots
-        path evalue_tab
-        path acc_counts
-    output:
-        path accession_ids
-        path fasta_file
-        path import_stats
-        path sequence_metadata
-        path sunburst_ids
-        path blast_output
-        path plots
-        path evalue_tab
-        path acc_counts
-    """
-    echo 'Finalizing'
     """
 }
 
@@ -281,7 +262,4 @@ workflow {
 
     // step 5: visualize
     plots = visualize(stats.boxplot_stats)
-
-    // step 6: copy files to output dir
-    finalize_output(sequence_id_files.accession_ids, fasta_file, sequence_id_files.import_stats, sequence_id_files.sequence_metadata, sequence_id_files.sunburst_ids, reduced_blast_parquet, plots, stats.evaluetab, stats.acc_counts)
 }
