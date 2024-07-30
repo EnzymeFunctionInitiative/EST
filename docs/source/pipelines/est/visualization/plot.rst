@@ -4,11 +4,11 @@ Utilities
 Plotting
 --------
 
-.. automodule:: src.est.visualization.plot
+.. automodule:: pipelines.est.src.visualization.plot
     :members:
 
 Other
 -----
 
-.. automodule:: src.est.visualization.util
+.. automodule:: pipelines.est.src.visualization.util
     :members:

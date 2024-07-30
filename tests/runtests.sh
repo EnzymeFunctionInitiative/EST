@@ -11,7 +11,8 @@ trap ctrl_c SIGINT
 
 TEST_RESULTS_DIR=test_results
 
-if [[ ! -e generatessn.nf || ! -e est.nf ]]; then
+# rough test to see if we are in repo root
+if [[ ! -e pipelines/generatessn/generatessn.nf || ! -e pipelines/est/est.nf ]]; then
     echo "Run this script from the repository root"
     exit 1
 fi

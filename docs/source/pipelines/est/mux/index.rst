@@ -7,4 +7,4 @@ representative sequences as proxies for groups of sequences. The representative
 sequences are used in the All-by-All BLAST.
 
 Multiplexing can be enabled by setting the ``multiplex`` parameter to ``true`` in the
-nextflow parameters file or by passing ``--multiplex`` to ``create_est_nextflow_params.py``.
+nextflow parameters file or by passing ``--multiplex`` to ``bin/create_est_nextflow_params.py``.

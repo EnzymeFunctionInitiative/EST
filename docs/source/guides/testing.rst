@@ -4,7 +4,7 @@ This repository include several basic validation tests to confirm that the
 pipelines execute without errors. There is one test per import method (4 total).
 These tests execute the EST pipeline and then the SSN generation pipeline using a
 parameter file which has been generated on "auto" mode (see
-`create_generatessn_nextflow_params.py`).
+``bin/create_generatessn_nextflow_params.py``).
 
 To execute all tests with docker configurations, run the following command: ::
 

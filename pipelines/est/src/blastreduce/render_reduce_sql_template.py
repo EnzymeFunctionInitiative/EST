@@ -81,11 +81,11 @@ def render_sql_from_template(
         blast_output_glob
             Globbed path to Parquet-encoded BLAST output files to combine (from
             :func:`csv_to_parquet_file()
-            <src.est.axa_blast.transcode_blast.csv_to_parquet_file>`)
+            <pipelines.est.src.axa_blast.transcode_blast.csv_to_parquet_file>`)
         fasta_lengths_parquet
             Path to the parquet file with columns ``seqid`` and
             ``sequence_lengths`` (from :func:`fasta_to_parquet()
-            <src.est.blastreduce.transcode_fasta_lengths.fasta_to_parquet>`)
+            <pipelines.est.src.blastreduce.transcode_fasta_lengths.fasta_to_parquet>`)
         reduce_output_file
             Location to which the combined output (in Parquet format) should be
             written
