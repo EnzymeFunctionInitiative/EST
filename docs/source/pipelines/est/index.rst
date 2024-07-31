@@ -30,7 +30,7 @@ that all of the required options are included. For example, to generate a
 parameter file which specifies the Family import mode, the command would look
 like ::
 
-   python create_est_nextflow_params.py family --output-dir results/ --efi-config efi.config --fasta-db uniprot.fasta --efi-db efi_202406 --sequence-version uniprot --families IPR04455
+   python bin/create_est_nextflow_params.py family --output-dir results/ --efi-config efi.config --fasta-db uniprot.fasta --efi-db efi_202406 --sequence-version uniprot --families IPR04455
 
 This produces a file ``params.yml`` which looks like ::
 
@@ -55,7 +55,7 @@ This produces a file ``params.yml`` which looks like ::
 All parameters may be set by commandline options. Once this file has been
 generated, it can be used to control how the pipeline runs: ::
 
-   nextflow run est.nf -params-file params.yml
+   nextflow run pipelines/est/est.nf -params-file params.yml
 
 Generating a Job Script
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,7 +64,7 @@ and computational intensity. The EST repo contains another script which can
 generate a job script for SLURM as well as the parameter file. To generate these
 files, ::
 
-   python create_nextflow_job.py est family --output-dir results/ --efi-config efi.config --efi-db efi_202406 --fasta-db combined.fasta --sequence-version uniprot --families IPR04455
+   python bin/create_nextflow_job.py est family --output-dir results/ --efi-config efi.config --efi-db efi_202406 --fasta-db combined.fasta --sequence-version uniprot --families IPR04455
 
 In addition to the ``params.json`` seen above, this will generate a SLURM job
 submission script called ``run_nextflow.sh``: ::

@@ -5,7 +5,7 @@ Commandline usage
 ------------------
 
 .. argparse::
-    :module: src.est.axa_blast.render_prereduce_sql_template
+    :module: pipelines.est.src.axa_blast.render_prereduce_sql_template
     :func: create_parser
     :prog: render_prereduce_sql_template.py
 
@@ -13,5 +13,5 @@ Commandline usage
 Functions
 ---------
 
-.. automodule:: src.est.axa_blast.render_prereduce_sql_template
+.. automodule:: pipelines.est.src.axa_blast.render_prereduce_sql_template
     :members:

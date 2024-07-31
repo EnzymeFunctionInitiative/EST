@@ -24,23 +24,23 @@ script also filters the accessions.
 
 To get IDs and sequences from a BLAST, ::
 
-    perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode blast --blast-query <USER_BLAST_QUERY_FILE>
-    perl src/est/import/append_blast_query.pl --blast-query <USER_BLAST_QUERY_FILE> --output-dir <OUTPUT_DIR>
+    perl get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode blast --blast-query <USER_BLAST_QUERY_FILE>
+    perl append_blast_query.pl --blast-query <USER_BLAST_QUERY_FILE> --output-dir <OUTPUT_DIR>
     perl get_sequences.pl --fasta-db <FASTA_DB_PATH> --output-dir <OUTPUT_DIR>
 
 To get IDs and sequences from one or more families, ::
     
-    perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode family --family <FAMILY>
+    perl get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode family --family <FAMILY>
     perl get_sequences.pl --fasta-db <FASTA_DB_PATH> --output-dir <OUTPUT_DIR>
 
 To get IDs and sequences from a FASTA file, ::
 
-    perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode fasta --fasta <USER_FASTA_FILE>
+    perl get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode fasta --fasta <USER_FASTA_FILE>
     perl import_fasta.pl --uploaded-fasta <USER_FASTA_FILE> --output-dir <OUTPUT_DIR>
 
 To get IDs and sequences from an accession ID file, ::
 
-    perl src/est/import/get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode accession --accessions <USER_ACCESSIONS_FILE>
+    perl get_sequence_ids.pl --efi-config <EFI_CONFIG> --efi-db <EFI_DB> --output-dir <OUTPUT_DIR> --mode accession --accessions <USER_ACCESSIONS_FILE>
     perl get_sequences.pl --fasta-db <FASTA_DB_PATH> --output-dir <OUTPUT_DIR>
 
 For all four modes:

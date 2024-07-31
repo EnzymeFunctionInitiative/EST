@@ -1,11 +1,10 @@
 import argparse
-import os
 import string
+import os
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Render the DuckDB SQL template for eliminating duplicate and self edges")
-    parser.add_argument("--blast-output", type=str, nargs="+", help="Path to directory containing the BLAST output files")
-    parser.add_argument("--fasta-length-parquet", type=str, help="Path to the FASTA file to transcode")
+    parser = argparse.ArgumentParser(description="Filter reduced BLAST output on specified parameter")
+    parser.add_argument("--blast-output", type=str, required=True, help="Path to directory containing the reduced BLAST output file")
     parser.add_argument(
         "--sql-template",
         type=str,
@@ -15,7 +14,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sql-output-file",
         type=str,
-        default="reduce.sql",
+        default="filterblast.sql",
         help="Location to write the reduce SQL commands to",
     )
     parser.add_argument("--duckdb-memory-limit", type=str, default="4GB", help="Soft limit on DuckDB memory usage")
@@ -28,15 +27,41 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-file",
         type=str,
-        default="1.out.parquet",
-        help="The final output file the aggregated BLAST output should be written to. Will be Parquet.",
+        required=True,
+        help="The final output file the filtered BLAST output should be written to. Will be tab-separated",
     )
+    parser.add_argument(
+        "--filter-parameter",
+        type=str,
+        required=True,
+        choices=["pident", "bitscore", "alignment_score"],
+        help="The parameter to filter on"
+    )
+    parser.add_argument(
+        "--filter-min-val",
+        type=float,
+        required=True,
+        help="The minimum value for the selected filter. Values below are not kept"
+    )
+    parser.add_argument(
+        "--min-length",
+        type=int,
+        default=0,
+        help="Minimum sequence length required to retain row"
+    )
+    parser.add_argument(
+        "--max-length",
+        type=int,
+        default=0,
+        help="Maximum sequence length allowed in retained rows"
+    )
+
     return parser
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
-    if not all(map(os.path.exists, args.blast_output)):
-        print(f"At least one of BLAST output '{args.blast_output}' does not exist")
+    if not os.path.exists(args.blast_output):
+        print(f"BLAST output '{args.blast_output}' does not exist")
         fail = True
     if not os.path.exists(args.sql_template):
         print(f"SQL template '{args.sql_template}' does not exist")
@@ -45,19 +70,21 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     if fail:
         exit(1)
     else:
-        args.blast_output = list(map(os.path.abspath, args.blast_output))
+        args.blast_output = os.path.abspath(args.blast_output)
         args.sql_template = os.path.abspath(args.sql_template)
         return args
-
 
 def render_sql_from_template(
     template_file: str,
     sql_output_file: str,
     mem_limit: str,
     duckdb_temp_dir: str,
-    blast_output_glob: str,
-    fasta_lengths_parquet: str,
-    reduce_output_file: str,
+    blast_output: str,
+    filtered_blast_output: str,
+    filter_parameter: str,
+    filter_min_val: float,
+    min_seq_length: int,
+    max_seq_length: int
 ):
     """
     Creates a .sql file for deduplication and merging using newly created
@@ -78,24 +105,20 @@ def render_sql_from_template(
         duckdb_temp_dir
             Location where duckdb should place its on-disk cache. Folder will be
             created if it does not exist
-        blast_output_glob
-            Globbed path to Parquet-encoded BLAST output files to combine (from
-            :func:`csv_to_parquet_file()
-            <src.est.axa_blast.transcode_blast.csv_to_parquet_file>`)
-        fasta_lengths_parquet
-            Path to the parquet file with columns ``seqid`` and
-            ``sequence_lengths`` (from :func:`fasta_to_parquet()
-            <src.est.blastreduce.transcode_fasta_lengths.fasta_to_parquet>`)
-        reduce_output_file
-            Location to which the combined output (in Parquet format) should be
-            written
+        blast_output
+            path to Parquet-encoded BLAST output file to combine (from
+            :func:`csv_to_parquet()
+            <pipelines.est.src.axa_blast.transcode_blast.csv_to_parquet_file>`)
     """
     mapping = {
         "mem_limit": mem_limit,
         "duckdb_temp_dir": duckdb_temp_dir,
-        "transcoded_blast_output_glob": str(blast_output_glob),
-        "fasta_lengths_parquet": fasta_lengths_parquet,
-        "reduce_output_file": reduce_output_file,
+        "blast_output": blast_output,
+        "filter_parameter": filter_parameter,
+        "min_val": filter_min_val,
+        "min_length": min_seq_length,
+        "max_length": max_seq_length,
+        "filtered_blast_output": filtered_blast_output,
         "compression": "zstd",
     }
     with open(template_file) as f:
@@ -112,6 +135,9 @@ if __name__ == "__main__":
                 args.duckdb_memory_limit,
                 args.duckdb_temp_dir,
                 args.blast_output,
-                args.fasta_length_parquet,
                 args.output_file,
+                args.filter_parameter,
+                args.filter_min_val,
+                args.min_length,
+                args.max_length
             )
