@@ -18,7 +18,7 @@ process get_sequence_ids {
         blastall -p blastp -i ${params.blast_query_file} -d ${params.fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init_blast.out
         if [[ -s init_blast.out ]]; then
             awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
-            perl $projectDir/src/est/import/get_sequence_ids.pl $common_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
+            perl $projectDir/src/import/get_sequence_ids.pl $common_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
         else
             echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
         fi
