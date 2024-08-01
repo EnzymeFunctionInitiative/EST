@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 use FindBin;
-use lib "$FindBin::Bin/../../../../lib";
+use lib "$FindBin::Bin/../../../lib";
 use List::MoreUtils qw{apply uniq any} ;
 use IO::File;
 use Fcntl qw(:flock);

@@ -4,7 +4,8 @@ import os
 import matplotlib.pyplot as plt
 import pandas as pd
 
-import util
+from pyEFI.cli import parse_proxies
+
 
 def create_parser():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
@@ -35,7 +36,7 @@ def create_parser():
 
 def parse_args(parser):
     args = parser.parse_args()
-    args.proxies = util.parse_proxies(args.proxies)
+    args.proxies = parse_proxies(args.proxies)
 
     # validate input filepaths
     fail = False

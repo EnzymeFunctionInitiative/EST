@@ -8,7 +8,7 @@ use Getopt::Long;
 use FindBin;
 
 use lib "$FindBin::Bin/lib";
-use lib "$FindBin::Bin/../../../../lib";
+use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Import::Config::FastaImport;
 use EFI::Import::Logger;

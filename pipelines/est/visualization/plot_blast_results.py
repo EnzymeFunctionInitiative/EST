@@ -1,12 +1,11 @@
 import argparse
-import shutil
 import os
 
 import numpy as np
 import pandas as pd
 
-from plot import draw_boxplot, draw_histogram
-from util import parse_proxies
+from pyEFI.plot import draw_boxplot, draw_histogram
+from pyEFI.cli import parse_proxies
 
 def create_parser():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")

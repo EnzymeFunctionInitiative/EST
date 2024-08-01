@@ -9,7 +9,7 @@ use FindBin;
 use Data::Dumper;
 
 use FindBin;
-use lib "$FindBin::Bin/../../../../lib";
+use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
 use EFI::Annotations;

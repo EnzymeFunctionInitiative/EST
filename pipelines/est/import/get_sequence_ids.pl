@@ -9,7 +9,7 @@ use FindBin;
 use Time::HiRes;
 
 use lib "$FindBin::Bin/lib";
-use lib "$FindBin::Bin/../../../../lib";
+use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
 use EFI::Import::Config::IdList;
