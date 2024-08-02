@@ -24,9 +24,9 @@ RUN curl -L -o /opt/cd-hit.tar.gz https://github.com/weizhongli/cdhit/releases/d
     cd /opt/cd-hit-v4.8.1-2019-0228; make; mkdir bin; mv cd-hit bin;
 ENV PATH="${PATH}:/opt/cd-hit-v4.8.1-2019-0228/bin"
 
+# set up Perl environment
+RUN apt update && apt install -y cpanminus libdbd-mysql-perl zip && cpanm --installdeps .
+
 # set up python environment
 RUN pip3 install -r app/requirements.txt
 RUN pip3 install opt/pyEFI
-
-# set up Perl environment
-RUN apt update && apt install -y cpanminus libdbd-mysql-perl zip && cpanm --installdeps .
