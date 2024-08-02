@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from pyEFI.cli import parse_proxies
+from pyEFI.plot import label_and_render_plot
 
 
 def create_parser():
@@ -92,7 +93,7 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
         linewidth=0.5,
         width=0.8,
     )
-    util.label_and_render_plot(
+    label_and_render_plot(
         fig,
         axs,
         df["length"],
