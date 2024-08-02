@@ -8,4 +8,5 @@ are available to help you use the tools.
     getting_started.rst
     source/guides/index
     source/pipelines/index
+    source/pyEFI/index
     :maxdepth: 2

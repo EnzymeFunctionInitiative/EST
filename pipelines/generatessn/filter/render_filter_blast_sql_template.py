@@ -107,8 +107,7 @@ def render_sql_from_template(
             created if it does not exist
         blast_output
             path to Parquet-encoded BLAST output file to combine (from
-            :func:`csv_to_parquet()
-            <pipelines.est.src.axa_blast.transcode_blast.csv_to_parquet_file>`)
+            :func:`csv_to_parquet() <pyEFI.csv_to_parquet>`)
     """
     mapping = {
         "mem_limit": mem_limit,

@@ -39,12 +39,12 @@ Commandline usage
 ------------------
 
 .. argparse::
-    :module: pipelines.est.src.axa_blast.transcode_blast
+    :module: pipelines.est.axa_blast.transcode_blast
     :func: create_parser
     :prog: transcode_blast.py
 
 Functions
 ---------
 
-.. automodule:: pipelines.est.src.axa_blast.transcode_blast
+.. automodule:: pipelines.est.axa_blast.transcode_blast
         :members:

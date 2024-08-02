@@ -21,10 +21,11 @@ class SQLTemplateRenderer:
         """
         Returns an `<argparse.ArgumentParser>_` that parses the following
         options:
-            * ``--sql-template``
-            * ``--sql-output-file``
-            * ``--duckdb-memory-limit``
-            * ``--duckdb-temp-dir``
+
+        * ``--sql-template``
+        * ``--sql-output-file``
+        * ``--duckdb-memory-limit``
+        * ``--duckdb-temp-dir``
         
         These options are common to all DuckDB SQL templates. The intention is
         for arguments to be added to the return value of this function.
@@ -33,11 +34,11 @@ class SQLTemplateRenderer:
         ----------
             desc
                 Description to be passed to the ``description`` parameter of
-                `<argparse.ArgumentParser()>_`
+                the ``ArgumentParser`` constructor
             
         Returns
         -------
-            An `ArgumentParser <argparse.ArgumentParser>` object
+            An :external+python:py:class:`argparse.ArgumentParser` object
         """
         parser = argparse.ArgumentParser(description=desc)
         parser.add_argument(

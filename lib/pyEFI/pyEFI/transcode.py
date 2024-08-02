@@ -57,6 +57,8 @@ def fasta_to_parquet(fasta_file: str, output: str):
     ----------
         fasta_file
             path to the FASTA file
+        output
+            name of the Parquet file to write results to
     
     Returns
     -------
