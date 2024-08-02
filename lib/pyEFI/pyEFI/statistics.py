@@ -1,4 +1,3 @@
-import math
 
 def compute_conv_ratio(node_count: int, edge_count: int) -> float:
     """
@@ -14,12 +13,15 @@ def compute_conv_ratio(node_count: int, edge_count: int) -> float:
 
     Returns
     -------
-        The convergence ratio cr, $0 \lt cr \le 1$
+        The convergence ratio, 0 < conv_ratio <= 1
     """
     num = edge_count * 2.0
     nom = float(node_count * (node_count - 1))
-    try:
-        conv_ratio =  num / nom
-    except ZeroDivisionError:
-        conv_ratio = 0
-    return conv_ratio
+    if num > nom and nom != 0.0:
+        raise ValueError(f"Number of edges {int(num)} is impossible for number of nodes (max is {int(nom)})")
+    else:
+        try:
+            conv_ratio =  num / nom
+        except ZeroDivisionError:
+            conv_ratio = 0
+        return conv_ratio
