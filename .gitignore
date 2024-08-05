@@ -6,4 +6,6 @@ tests/testEnvironment.sh
 *.bak
 .*.swp
 .*.swo
-build/
+**/build/
+**/dist/
+**/*.egg-info/

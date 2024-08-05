@@ -8,8 +8,9 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('../pipelines/est/src/visualization'))
-sys.path.insert(0, os.path.abspath('../pipelines/est/src/statistics'))
+sys.path.insert(0, os.path.abspath('../lib/pyEFI'))
+sys.path.insert(0, os.path.abspath('../pipelines/est/visualization'))
+sys.path.insert(0, os.path.abspath('../pipelines/est/statistics'))
 
 
 project = 'EFI'

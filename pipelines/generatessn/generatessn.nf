@@ -19,7 +19,7 @@ process filter_blast {
     output:
         path "2.out"
     """
-    python $projectDir/src/filter/render_filter_blast_sql_template.py --blast-output $blast_parquet --filter-parameter ${params.filter_parameter} --filter-min-val ${params.filter_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/filterblast-template.sql --output-file 2.out --sql-output-file filterblast.sql
+    python $projectDir/filter/render_filter_blast_sql_template.py --blast-output $blast_parquet --filter-parameter ${params.filter_parameter} --filter-min-val ${params.filter_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/filterblast-template.sql --output-file 2.out --sql-output-file filterblast.sql
     duckdb < filterblast.sql
     """
 }
@@ -32,7 +32,7 @@ process filter_fasta {
         path "filtered_sequences.fasta", emit: filtered_fasta
         path "fasta.metadata", emit: fasta_metadata
     """
-    perl $projectDir/src/filter/filter_fasta.pl --fastain $fasta --fastaout filtered_sequences.fasta -minlen ${params.min_length} -maxlen ${params.max_length} -domain-meta fasta.metadata
+    perl $projectDir/filter/filter_fasta.pl --fastain $fasta --fastaout filtered_sequences.fasta -minlen ${params.min_length} -maxlen ${params.max_length} -domain-meta fasta.metadata
     """
 }
 
@@ -44,7 +44,7 @@ process get_annotations {
         path "struct.filtered.out"
     script:
     """
-    perl $projectDir/src/annotations/get_annotations.pl -out struct.filtered.out -uniref-version ${params.uniref_version} -min-len ${params.min_length} -max-len ${params.max_length} -meta-file $fasta_metadata -config ${params.efi_config} --db-name ${params.efi_db}
+    perl $projectDir/annotations/get_annotations.pl -out struct.filtered.out -uniref-version ${params.uniref_version} -min-len ${params.min_length} -max-len ${params.max_length} -meta-file $fasta_metadata -config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
 
@@ -57,7 +57,7 @@ process create_xgmml_100 {
     output:
         path "full_ssn.xgmml"
     """
-    perl $projectDir/src/create/xgmml_100_create.pl -blast=$filtered_blast -fasta $filtered_fasta -struct $struct_file -output full_ssn.xgmml  -title ${params.ssn_title} -dbver ${params.db_version}
+    perl $projectDir/create/xgmml_100_create.pl -blast=$filtered_blast -fasta $filtered_fasta -struct $struct_file -output full_ssn.xgmml  -title ${params.ssn_title} -dbver ${params.db_version}
     """
 }
 
@@ -68,7 +68,7 @@ process compute_stats {
     output:
         path "stats.tab"
     """
-    perl $projectDir/src/stats/stats.pl -run-dir . -out stats.tab
+    perl $projectDir/stats/stats.pl -run-dir . -out stats.tab
     """
 }
 

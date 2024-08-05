@@ -4,7 +4,7 @@ process unzip_input {
     output:
         path "ssn.xgmml"
     """
-    perl $projectDir/src/unzip_input/unzip_file.pl -in $ssn_zipped -out ssn.xgmml
+    perl $projectDir/unzip_input/unzip_file.pl -in $ssn_zipped -out ssn.xgmml
     """
 }
 
@@ -32,7 +32,7 @@ process cluster_gnn {
         // path 'mapping_table_domain.txt', emit: 'mapping_table_domain', optional: true
 
     """
-    perl $projectDir/src/colorssn/cluster_gnn/cluster_gnn.pl -output-dir . \
+    perl $projectDir/cluster_gnn/cluster_gnn.pl -output-dir . \
                                                              -ssnin $ssn_file \
                                                              -ssnout ssn_out.xgmml \
                                                              -uniprot-id-dir cluster-data/uniprot-nodes \

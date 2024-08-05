@@ -18,18 +18,18 @@ process get_sequence_ids {
         blastall -p blastp -i ${params.blast_query_file} -d ${params.fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init_blast.out
         if [[ -s init_blast.out ]]; then
             awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
-            perl $projectDir/src/import/get_sequence_ids.pl $common_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
+            perl $projectDir/import/get_sequence_ids.pl $common_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
         else
             echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
         fi
         """
     } else if (params.import_mode == "family") {
         """
-        perl $projectDir/src/import/get_sequence_ids.pl $common_args --family ${params.families}
+        perl $projectDir/import/get_sequence_ids.pl $common_args --family ${params.families}
         """
     } else if (params.import_mode == "accessions") {
         """
-        perl $projectDir/src/import/get_sequence_ids.pl $common_args --accessions ${params.accessions_file}
+        perl $projectDir/import/get_sequence_ids.pl $common_args --accessions ${params.accessions_file}
         """
     } else {
         error "Mode '${params.import_mode}' not yet implemented"
@@ -57,7 +57,7 @@ process get_sequences {
     """
     script:
     """
-    perl $projectDir/src/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
+    perl $projectDir/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
     """
 }
 
@@ -73,7 +73,7 @@ process cat_fasta_files {
     if (params.import_mode == "blast") {
         """
         $cat_cmd
-        perl $projectDir/src/import/append_blast_query.pl --blast-query-file ${params.blast_query_file} --output-sequence-file all_sequences.fasta
+        perl $projectDir/import/append_blast_query.pl --blast-query-file ${params.blast_query_file} --output-sequence-file all_sequences.fasta
         """
     } else {
         cat_cmd
@@ -92,8 +92,8 @@ process import_fasta {
 
     """
     # produces a mapping.txt file
-    perl $projectDir/src/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file}
-    perl $projectDir/src/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
+    perl $projectDir/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file}
+    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
     """
 }
 
@@ -126,7 +126,7 @@ process split_fasta {
     output:
         path "fracfile-*.fa"
     """
-    perl $projectDir/src/split_fasta/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
+    perl $projectDir/split_fasta/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
     """
 }
 
@@ -142,10 +142,10 @@ process all_by_all_blast {
     blastall -p blastp -i $frac -d $blast_db_name -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet
-    python $projectDir/src/axa_blast/transcode_blast.py --blast-output ${frac}.tab
+    python $projectDir/axa_blast/transcode_blast.py --blast-output ${frac}.tab
 
     # in each row, ensure that qseqid < sseqid lexicographically
-    python $projectDir/src/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
+    python $projectDir/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file prereduce.sql
     duckdb < prereduce.sql
     """
 }
@@ -157,7 +157,7 @@ process blastreduce_transcode_fasta {
         path "${fasta_file.getName()}.parquet"
 
     """
-    python $projectDir/src/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
+    python $projectDir/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
     """
 }
 
@@ -171,7 +171,7 @@ process blastreduce {
         path "1.out.parquet"
 
     """
-    python $projectDir/src/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
+    python $projectDir/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir /scratch/duckdb-${params.job_id} --sql-output-file allreduce.sql
     duckdb < allreduce.sql
     """
 }
@@ -185,8 +185,8 @@ process demultiplex {
         path '1.out.parquet'
     """
     echo "COPY (SELECT * FROM read_parquet('$blast_parquet')) TO 'mux.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
-    perl $projectDir/src/mux/demux.pl -blastin mux.out -blastout 1.out -cluster $clusters
-    python $projectDir/src/mux/transcode_demuxed_blast.py --blast-output 1.out
+    perl $projectDir/mux/demux.pl -blastin mux.out -blastout 1.out -cluster $clusters
+    python $projectDir/mux/transcode_demuxed_blast.py --blast-output 1.out
     """
 }
 
@@ -201,10 +201,10 @@ process compute_stats {
         path "acc_counts.json", emit: acc_counts
     """
     # compute convergence ratio
-    python $projectDir/src/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
+    python $projectDir/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
 
     # compute boxplot stats and evalue.tab
-    python $projectDir/src/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
+    python $projectDir/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
     duckdb < boxplotstats.sql
     """
 }
@@ -217,7 +217,7 @@ process visualize {
         path '*.png'
 
     """
-    python $projectDir/src/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
+    python $projectDir/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename length --pident-plot-filename pident --edge-hist-filename edge --proxies sm:48
     """
 }
 

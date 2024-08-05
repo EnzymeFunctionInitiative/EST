@@ -47,6 +47,10 @@ library dependencies:
 
         pip install -r requirements.txt
 
+   if this fails to install ``pyEFI``, that package can be manually installed ::
+
+        pip install lib/pyEFI
+
 3. Then install the Perl dependencies::
 
         cpamn --installdeps .
