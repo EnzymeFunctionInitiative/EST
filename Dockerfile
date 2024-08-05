@@ -2,7 +2,7 @@ FROM python:3.10-bullseye
 
 COPY requirements.txt app/
 COPY cpanfile .
-COPY lib/pyEFI /opt/pyEFI
+COPY lib/pyEFI /lib/pyEFI
 
 # install blastall
 RUN curl -o /opt/blast-2.2.26.tar.gz https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/blast-2.2.26-x64-linux.tar.gz; \
@@ -29,4 +29,3 @@ RUN apt update && apt install -y cpanminus libdbd-mysql-perl zip && cpanm --inst
 
 # set up python environment
 RUN pip3 install -r app/requirements.txt
-RUN pip3 install opt/pyEFI
