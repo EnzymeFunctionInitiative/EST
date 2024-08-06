@@ -1,6 +1,8 @@
 
 package EFI::Import::Source::FASTA;
 
+# This Perl module is used internally by the import process, and the user should never use this code directly.
+
 use strict;
 use warnings;
 
@@ -32,6 +34,11 @@ sub new {
 }
 
 
+
+
+#
+# init - internal method, called by parent class to set parameters.  See parent for more details.
+#
 sub init {
     my $self = shift;
     my $config = shift;
@@ -53,10 +60,15 @@ sub init {
 }
 
 
-# Returns a list of sequence IDs that are in the specified families (provided via command-line argument)
+
+
+# 
+# getSequenceIds - called to obtain IDs from the FASTA file.  See parent class for usage.
+#
 sub getSequenceIds {
     my $self = shift;
 
+    # Load the sequences and metadata from the file
     my ($headerLineMap, $sequences, $sequenceMetadata, $uniprotMetadata) = $self->parseFasta();
 
     $self->addSunburstIds($uniprotMetadata);
@@ -75,6 +87,20 @@ sub getSequenceIds {
 }
 
 
+
+#
+# saveSeqMapping - internal method
+#
+# Saves the internal sequence mapping to a file.
+# The file format is a two column, tab separated file with a column header line.
+# The first column is the sequence ID and the second is the line number in the FASTA file at which the sequence header is located.
+#
+# Parameters:
+#    $data - hash reference with key being ID and value being line number
+#
+# Returns:
+#    nothing
+#
 sub saveSeqMapping {
     my $self = shift;
     my $data = shift;
@@ -83,6 +109,7 @@ sub saveSeqMapping {
 
     $fh->print(join("\t", "Sequence_ID", "Line_Number"), "\n");
 
+    # Sort the IDs numerically by line number
     my @ids = sort { $data->{$a} <=> $data->{$b} } keys %$data;
 
     foreach my $id (@ids) {
@@ -93,11 +120,22 @@ sub saveSeqMapping {
 }
 
 
-####################################################################################################
-# 
+
+
 #
-
-
+# parseFasta - internal method
+#
+# Look through a FASTA file and find sequence IDs in the header.
+# Create unidentified IDs if necessary if no UniProt ID was found.
+#
+# Parameters:
+#
+# Returns:
+#    header line map - hash ref mapping the sequence ID to the FASTA file line number.
+#    sequence data - hash ref of ID to sequences
+#    sequence metadata - hash ref of non-UniProt ID to sequence metadata
+#    uniprot metadata - hash ref of UniProt ID to sequence metadata
+#
 sub parseFasta {
     my $self = shift;
 
@@ -106,11 +144,32 @@ sub parseFasta {
     my $seq = {};           # sequence data
     my $seqMeta = {};       # Metadata for all sequences, UniProt and unidentified
     my $upMeta = {};        # Metadata for UniProt-match sequences
-    my $headerLineMap = {};    # Maps the sequence identifier to the first line number of the sequence
+    my $headerLineMap = {}; # Maps the sequence identifier to the line number of the sequence header
 
-    my $stats = {orig_count => 0, num_headers => 0, num_multi_id => 0, num_matched => 0, num_unmatched => 0, num_filter_removed => 0};
     my $headerCount = 0;
-    my $numMultUniprotIdSeq = 0;
+
+    my $addSequence = sub {
+        my $id = shift;
+        my $mapResult = shift;
+        my $isUniprot = shift || 0;
+
+        my $desc = $isUniprot ? substr($mapResult->{raw_header}, 0, 150) : $mapResult->{raw_header};
+
+        if ($id) {
+            $seqMeta->{$id} = {
+                description => $desc,
+                other_ids => $mapResult->{other_ids},
+            };
+        }
+
+        if ($isUniprot) {
+            $upMeta->{$id} = {
+                query_id => $mapResult->{query_id},
+                other_ids => $mapResult->{other_ids},
+                description => $desc,
+            };
+        }
+    };
 
     open my $fastaFh, "<", $self->{fasta} or die "Unable to read FASTA file $self->{fasta}: $!";
     
@@ -122,100 +181,78 @@ sub parseFasta {
     while (my $line = <$fastaFh>) {
         $line =~ s/[\r\n]+$//;
 
-        # Option C + read FASTA headers
-        if ($self->{use_headers}) {
-            my $result = $parser->parseLineForHeaders($line);
+        my $header = $parser->parseLineForHeaders($line);
+        if ($header) {
+            $headerCount++;
 
-            if ($result->{state} eq EFI::Util::FASTA::Headers::HEADER) {
-                $headerCount++;
-            }
-            # When we get here we are at the end of the headers and have started reading a sequence.
-            elsif ($result->{state} eq EFI::Util::FASTA::Headers::FLUSH) {
+            # If UniProt IDs were detected then save those
+            if ($header->{uniprot_id}) {
+                $id = $lastId = $header->{uniprot_id} ? $header->{uniprot_id} : "";
 
-                # If no UniProt IDs were detected, then make an ID
-                if (not scalar @{ $result->{uniprot_ids} }) {
-                    $id = makeSequenceId($seqCount);
-                    push(@{$seqMeta->{$seqCount}->{description}}, $result->{raw_headers}); # substr($result->{raw_headers}, 0, 200);
-                    $seqMeta->{$seqCount}->{other_ids} = $result->{other_ids};
-                    $lastId = $seqCount;
-                # If UniProt IDs were detected then save those
-                } else {
-                    my @uniprotIds = @{ $result->{uniprot_ids} };
-                    $numMultUniprotIdSeq += @uniprotIds - 1;
-                    my $desc = substr((split(m/>/, $result->{raw_headers}))[0], 0, 150);
+                $addSequence->($id, $header, 1);
 
-                    $id = $lastId = $uniprotIds[0] ? $uniprotIds[0]->{uniprot_id} : "";
-                    $seqMeta->{$id} = {
-                        other_ids => $result->{other_ids},
-                        description => $desc,
-                    } if $id;
-
-                    foreach my $res (@uniprotIds) {
-                        $upMeta->{$res->{uniprot_id}} = {
-                            query_id => $res->{other_id},
-                            other_ids => $result->{other_ids},
-                            description => $desc,
-                        };
-                    }
-                }
-
-                $seq->{$lastId}->{id} = $id;
-                $seq->{$lastId}->{seq} = $line . "\n";
-
-                $seqCount++;
-
-                $headerLineMap->{$lastId} = $lineNum;
-
-            # Here we have encountered a sequence line.
-            } elsif ($result->{state} eq EFI::Util::FASTA::Headers::SEQUENCE) {
-                $seq->{$lastId}->{seq} .= $line . "\n" if $lastId;
-            }
-        # Option C
-        } else {
-            # Custom header for Option C
-            if ($line =~ /^>/ and not $lastLineIsHeader) {
-                $line =~ s/^>//;
-
-                # $id is written to the file at the bottom of the while loop.
+            # If no UniProt IDs were detected, then make an ID
+            } else {
                 $id = makeSequenceId($seqCount);
-                $seq->{$seqCount}->{id} = $id;
-                $seqMeta->{$seqCount} = {description => [$line]};
 
-                $lastId = $seqCount;
+                $addSequence->($id, $header, 0);
 
-                $seqCount++;
-                $headerCount++;
-
-                $lastLineIsHeader = 1;
-            } elsif ($line =~ /^>/ and $lastLineIsHeader) {
-                $line =~ s/^>//;
-                push(@{$seqMeta->{$lastId}->{description}}, $line);
-                $headerCount++;
-            } elsif ($line =~ /\S/ and $line !~ /^>/) {
-                $headerLineMap->{$lastId} = $lineNum if $lastLineIsHeader;
-                $seq->{$lastId}->{seq} .= $line . "\n";
-                $lastLineIsHeader = 0;
+                $lastId = $id;
             }
+
+            $seq->{$lastId}->{id} = $id;
+            $seq->{$lastId}->{seq} = "";
+
+            $seqCount++;
+
+            $headerLineMap->{$lastId} = $lineNum;
+
+        # Here we have encountered a sequence line.
+        } elsif ($line !~ m/^\s*$/) {
+            $seq->{$lastId}->{seq} .= $line . "\n" if $lastId;
         }
 
         $lineNum++;
     }
 
-    $parser->finish();
+    # Remove empty sequences (e.g. when a header line occurs but doesn't have any sequences)
+    foreach my $id (keys %$seq) {
+        if (not $seq->{$id}->{seq}) {
+            delete $seq->{$id};
+            delete $headerLineMap->{$id};
+            $headerCount--;
+        }
+    }
 
     my $numMatched = scalar keys %$upMeta;
 
     $self->addStatsValue("num_ids", $seqCount);
     $self->addStatsValue("orig_count", $seqCount);
     $self->addStatsValue("num_headers", $headerCount);
-    $self->addStatsValue("num_multi_id", $numMultUniprotIdSeq);
     $self->addStatsValue("num_matched", $numMatched);
-    $self->addStatsValue("num_unmatched", $seqCount + $numMultUniprotIdSeq - $numMatched);
+    $self->addStatsValue("num_unmatched", $seqCount - $numMatched);
 
     return ($headerLineMap, $seq, $seqMeta, $upMeta);
 }
 
 
+
+
+#
+# makeMetadata - internal method
+#
+# Create a metadata structure that contains ID info as well as the sequence header (i.e. description).
+#
+# Parameters:
+#    $seq - a hash ref mapping sequence ID to original ID and sequence data
+#    $seqMeta - a hash ref containing metadata about unidentified (e.g. non-UniProt) sequences
+#    $upMeta - a hash ref containing metadata about UniProt sequences
+#
+# Returns:
+#    hash ref containing the IDs, UniProt and unidentified, that were in the $seq dataset
+#    hash ref containing a structure mapping sequence ID to metadata that is expected by the pipeline,
+#        namely Query_IDs, Other_IDs, and Description
+#
 sub makeMetadata {
     my $self = shift;
     my $seq = shift;
@@ -264,11 +301,19 @@ sub makeMetadata {
 }
 
 
-####################################################################################################
-# 
-# 
 
 
+#
+# addSunburstIds - internal method
+#
+# Add UniProt and UniRef IDs to the sunburst data structure that is saved by the import process.
+#
+# Parameters:
+#    $uniprotMetadata - a hash ref of UniProt IDs
+#
+# Returns:
+#    nothing
+#
 sub addSunburstIds {
     my $self = shift;
     my $uniprotMetadata = shift;
@@ -279,18 +324,26 @@ sub addSunburstIds {
 }
 
 
-####################################################################################################
-# 
+
+
 #
-
-
+# makeSequenceId - internal function
+#
+# Parameters:
+#    $seqCount - the nth sequence in the file
+#
+# Returns:
+#    An unidentified ID, a 7-character string beginning with Z and followed by additional Zs and numbers.
+#    For example, for input of 10000 the output would be Z10000. For input of 10, the output would be ZZZZ10.
+#
 sub makeSequenceId {
     my ($seqCount) = @_;
     my $id = sprintf("%7d", $seqCount);
-    $id =~ tr/ /z/;
+    $id =~ tr/ /Z/;
     return $id;
 }
 
 
 1;
+__END__
 
