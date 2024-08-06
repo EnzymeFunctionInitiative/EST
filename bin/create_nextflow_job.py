@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import argparse
 import copy
 from jinja2 import Environment, FileSystemLoader, select_autoescape
