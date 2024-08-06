@@ -9,7 +9,7 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../";
 
 use EFI::IdMapping;
-use EFI::IdMapping::Util;
+use EFI::IdMapping::Util qw(check_id_type UNKNOWN UNIPROT);
 
 
 use constant HEADER     => 1;
@@ -27,54 +27,52 @@ sub new {
     $self->{db} = $args{efi_db} // die "Require db argument for EFI::Util::FASTA::Headers";
     $self->{id_mapper} = new EFI::IdMapping(efi_db => $args{efi_db});
 
-    $self->reset();
-
     return $self;
 }
 
 
-sub finish {
-    my ($self) = @_;
-
-    $self->{dbh}->disconnect() if $self->{dbh};
-}
 
 
-sub get_primary_id {
-    my ($self) = @_;
-
-    return defined $self->{primary_id} ? $self->{primary_id} : "";
-}
-
-
+#
+# get_fasta_header_ids - internal function
+#
+# Header lines can come in various forms.  Typically they are in standard FASTA format,
+# but occasionally they can come in consecutive lines.
+# This function handles the following cases:
+#    >tr|UNIPROT ...
+#    >UNIPROT ...
+#    >OTHERID ...
+#    >UNIPROTID ... >OTHERID
+# 
+# An ID for the purposes of this function is defined as any sequence of non-whitespace
+# characters immediately following a > with an optional space (e.g. ">AAAAAA", "> AAAAAA").
+# Only strings of 5 characters or longer are assumed to be an ID type.
+#
+# Parameters:
+#    $line - the FASTA header line to parse
+#
+# Returns:
+#    list of sequence IDs (may or may not be known ID types)
+#
 sub get_fasta_header_ids {
     my ($line) = @_;
 
-    chomp $line;
     my @ids;
 
     my @headers = split(m/[>\|]/, $line);
     foreach my $id (@headers) {
         next if $id =~ m/^\s*$/;
-        #$id =~ s/^\s*([^\|]+\|)?([^\s\|]+).*$/$2/;
-        #$id =~ s/^\s*(tr|sp)\|([^\s\|]+).*$/$2/;
         $id =~ s/^\s*(\S+)\s*.*$/$1/;
         next if length $id < 5;
-        push(@ids, $id); # if (check_id_type($id) ne UNKNOWN);
+        push(@ids, $id);
     }
 
     return @ids;
 }
 
 
-sub reset {
-    my ($self) = @_;
 
-    $self->{other_ids} = [];
-    $self->{raw_headers} = "";
-    $self->{uniprot_ids} = [];
-    $self->{duplicates} = {};
-}
+
 
 
 sub parseLineForHeaders {
@@ -82,86 +80,207 @@ sub parseLineForHeaders {
 
     $self->{dbh} = $self->{db}->getHandle() if not $self->{dbh};
 
-    my $result = { state => HEADER, ids => [], primary_id => undef };
+    $line =~ s/[\r\n]+$//;
+    if ($line !~ m/^>/ or $line =~ m/^\s*$/) {
+        return undef;
+    }
 
-    # This flag treats the line as an option C style format where the ID format is unknown.
-    my $saveAsUnknownHeader = 0;
+    (my $rawHeader = $line =~ s/>/ /gr) =~ s/^\s*(.*?)\s*$/$1/;
 
-    # This checks the user-fasta Option C case.
-    if ($line =~ m/^>z/) {
-        $saveAsUnknownHeader = 1;
+    my @ids = get_fasta_header_ids($line);
 
-    # Handle multiple headers on a single line.
-    } elsif ($line =~ m/>/) {
-        $self->{raw_headers} .= $line;
-        $saveAsUnknownHeader = 1;
-        # Iterate over each ID in the header line to check if we know anything about it.
-        foreach my $id (get_fasta_header_ids($line)) {
-            # Check the ID type and if it's unknown, we add it to the ID list and move on.
-            my $idType = check_id_type($id);
-            if ($idType eq EFI::IdMapping::Util::UNKNOWN) {
-                next;
+    # The UniProt ID that was identified.
+    my $uniprotId = "";
+    # The list of IDs that were not identified, plus any other IDs.
+    my @otherIds;
+    # For the UniProt ID that was identified, this is the non-UniProt ID that was used to find the UniProt ID.
+    my $queryId = "";
+
+    foreach my $id (@ids) {
+        my $idType = check_id_type($id);
+        next if $idType eq UNKNOWN;
+
+        my $matchedId = $id;
+        # Remove homologues
+        $matchedId =~ s/\..+$// if $idType eq UNIPROT;
+
+        # Map to UniProt if possible
+        if ($idType ne UNIPROT) {
+            my ($uniprotIds, $noMatch) = $self->{id_mapper}->reverseLookup($idType, $id);
+            if (defined $uniprotIds and $#$uniprotIds >= 0) {
+                $matchedId = $uniprotIds->[0];
+                $idType = EFI::IdMapping::Util::UNIPROT;
             }
+        }
 
-            $saveAsUnknownHeader = 0; # We found a valid header so don't treat this line as an unknown format (Option C)
+        # Check if the UniProt ID exists in the EFI database. This is necessary in case the ID is a UniProt ID but
+        # has been moved to UniParc.
+        if ($idType eq EFI::IdMapping::Util::UNIPROT) {
+            my $sql = "SELECT accession FROM annotations WHERE accession = ?";
+            my $sth = $self->{dbh}->prepare($sql);
+            $sth->execute($matchedId);
 
-            # Check if the ID is in the idmapping database
-            my $upId = $id;
-            $upId =~ s/\..+$// if $idType eq EFI::IdMapping::Util::UNIPROT;
-            if ($idType ne EFI::IdMapping::Util::UNIPROT) {
-                my ($uniprotId, $noMatch) = $self->{id_mapper}->reverseLookup($idType, $id);
-                if (defined $uniprotId and $#$uniprotId >= 0) {
-                    $upId = $uniprotId->[0];
-                    $idType = EFI::IdMapping::Util::UNIPROT;
-                }
-            }
-
-            # Check if we known anything about the accession ID by querying the database.
-            if ($idType eq EFI::IdMapping::Util::UNIPROT) {
-                my $sql = "select accession from annotations where accession = '$upId'";
-                my $sth = $self->{dbh}->prepare($sql);
-                $sth->execute();
-
-                # We need to have a primary ID so we set that here if we haven't yet.
-                if ($sth->fetch) {
-                    if (not grep { $_->{uniprot_id} eq $upId } @{ $self->{uniprot_ids} }) {
-                        push(@{ $self->{uniprot_ids} }, { uniprot_id => $upId, other_id => $id });
-                        $self->{duplicates}->{$upId} = [];
-                    } elsif (not grep { $_->{other_id} eq $id } @{ $self->{uniprot_ids} }) {
-                        push(@{ $self->{duplicates}->{$upId} }, $id) if not grep { $_ eq $id } @{ $self->{duplicates}->{$upId} };
-                    }
-                } else {
-                    push(@{ $self->{other_ids} }, $id);
-                }
+            if ($sth->fetch() and not $uniprotId) {
+                $uniprotId = $matchedId;
+                $queryId = $id;
             } else {
-                push(@{ $self->{other_ids} }, $id);
+                push @otherIds, $id;
             }
-        }
-    } else {
-        # If the line doesn't contain a whitespace character, and we have some IDs, we assume we have just
-        # finished parsing the header, so we write the header info and reset the variables.
-        if ($line =~ m/\S/ and $self->{raw_headers}) { #$#{ $self->{other_ids} } >= 0) {
-            $result->{other_ids} = $self->{other_ids};
-            ($result->{raw_headers} = $self->{raw_headers}) =~ s/^\s*>(.*?)\s*$/$1/g;
-            $result->{raw_headers} =~ s/[\n\r\t]+/ /g;
-            $result->{state} = FLUSH;
-            $result->{uniprot_ids} = $self->{uniprot_ids};
-            $result->{duplicates} = $self->{duplicates};
-            # Reset for the next header
-            $self->reset();
         } else {
-            $result->{state} = SEQUENCE;
+            push @otherIds, $id;
         }
     }
 
-    if ($saveAsUnknownHeader) {
-        ($self->{primary_id} = $line) =~ s/^>//;
-        push(@{ $self->{cur_ids} }, $self->{primary_id});
-    }
-
-    return $result;
+    return { uniprot_id => $uniprotId, other_ids => \@otherIds, query_id => $queryId, raw_header => $rawHeader };
 }
 
 
 1;
+__END__
+
+=head1 EFI::Util::FASTA::Headers
+
+=head2 NAME
+
+EFI::Util::FASTA::Headers - Perl module for parsing ID information from FASTA headers.
+
+=head2 SYNOPSIS
+
+    use EFI::Util::FASTA::Headers;
+
+    my $parser = new EFI::Util::FASTA::Headers(efi_db => $efiDbRef); # $efiDbRef is required and is an EFI::Database object
+
+    open my $fh, "<", "fasta_file.fasta";
+
+    while (my $line = <$fh>) {
+        chomp($line);
+        my $header = $parser->parseLineForHeaders($line);
+        if ($header) {
+            # process header
+        } else {
+            # process sequence line
+        }
+    }
+
+
+=head2 DESCRIPTION
+
+EFI::Util::FASTA::Headers is a utility module that parses sequence IDs out of FASTA headers and maps them to UniProt IDs if they are not a UniProt ID.
+Information about the ID is included in the header return value that can be used for sequence metadata.
+
+=head2 METHODS
+
+=head3 new(efi_db => $efiDbObject)
+
+Create an instance of EFI::IdMapping object.
+
+=head4 Parameters
+
+=over
+
+=item C<efi_db>
+
+An instantiated C<EFI::Database> object.
+
+=back
+
+=head3 parseLineForHeaders($line)
+
+Determine if a line is a FASTA header, extract ID information, and return the result.
+
+=head4 Parameters
+
+=over
+
+=item C<$line>
+
+A line from a FASTA file, which can contain anything, sequence data, blank, or a FASTA sequence header.
+
+=back
+
+=head4 Returns
+
+If the line is not a FASTA header, return C<undef>.
+
+If the line is a FASTA header, return a hash ref containing the following values:
+
+=over
+
+=item C<uniprot_id>
+
+The UniProt ID that is contained in the sequence or that the sequence ID mapped back to.
+If the ID was not detected, this is an empty string.
+
+=item C<other_ids>
+
+An array ref containing a list of unidentified IDs or other UniProt IDs that are contained in the same header line.
+
+=item C<query_id>
+
+If the ID is UniProt or maps to a UniProt ID, this is the value of the original ID.
+For example, if the input was C<"B0SS77">, C<uniprot_id> is C<"B0SS77"> and C<query_id> is C<"B0SS77">.
+If the input was C<"XP_007754113.1">, C<query_id> is C<"XP_007754113.1"> and C<uniprot_id> is C<"W9WLN6">.
+
+=item C<raw_header>
+
+A string containing the entire contents of the header for unidentified IDs, and the first 150
+characters of the header string for UniProt IDs or IDs that map to UniProt IDs.
+
+=back
+
+=head4 Example input and output:
+
+    >sp|B0SS77| Description etc.
+
+        {
+            uniprot_id => "B0SS77",
+            other_ids => [],
+            query_id => "B0SS77",
+            raw_header => "Description etc."
+        }
+
+    >B0SS77
+
+        {
+            uniprot_id => "B0SS77",
+            other_ids => [],
+            query_id => "B0SS77",
+            raw_header => ""
+        }
+
+    >XP_007754113.1 metadata and other information
+
+        {
+            uniprot_id => "W9WLN6",
+            other_ids => ["XP_007754113.1"],
+            query_id => "XP_007754113.1",
+            raw_header => "metadata and other information"
+        }
+
+    >B0SS77|info >XP_007754113.1 metadata and other information
+
+        {
+            uniprot_id => "B0SS77",
+            other_ids => ["XP_007754113.1"],
+            query_id => "B0SS77",
+            raw_header => "info XP_007754113.1 metadata and other information"
+        }
+
+=head4 Example usage:
+
+    my $header = $parser->parseLineForHeaders($line);
+    if ($header->{uniprot_id}) {
+        if ($header->{query_id} ne $header->{uniprot_id}) {
+            print "Original header ID was $header->{query_id} which mapped to $header->{uniprot_id} UniProt ID.\n";
+        } else {
+            print "Original header ID was $header->{uniprot_id}\n";
+        }
+    } else {
+        print "No UniProt or mappable IDs detected in the header.\n";
+    }
+
+    print "Description: ", $header->{raw_header}, "\n";
+    print "Other IDs that were contained in the header include: ", join(", ", @{ $header->{other_ids} }), "\n";
+
+=cut
 
