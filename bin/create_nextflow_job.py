@@ -48,9 +48,10 @@ def create_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(description="Render templates for nextflow job run")
     # batch args
-    parser.add_argument("--templates-dir", type=str, default="./templates", help="Directory where EST templates are stored")
-    parser.add_argument("--config-path", type=str, default="conf/slurm.config", help="Path to nextflow config file for run")
-    subparsers = parser.add_subparsers(dest="command")
+    default_template_path = os.path.join(os.path.dirname(__file__), "templates")
+    parser.add_argument("--templates-dir", type=str, default=default_template_path, help="Directory where job script templates are stored")
+    parser.add_argument("--config-path", type=str, required=True, help="Path to nextflow config file for pipeline")
+    subparsers = parser.add_subparsers(dest="pipeline", required=True,)
 
     # add pipelines as subcommands
     colorssn_parser = subparsers.add_parser("colorssn", help="Create a Color SSN pipeline job script")
