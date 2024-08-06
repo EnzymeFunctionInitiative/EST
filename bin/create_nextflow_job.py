@@ -55,16 +55,19 @@ def create_parser() -> argparse.ArgumentParser:
 
     # add pipelines as subcommands
     colorssn_parser = subparsers.add_parser("colorssn", help="Create a Color SSN pipeline job script")
-    colorssn_parser.add_argument("--workflow-def", default="colorssn.nf", help="Location of the Color SSN nextflow workflow file")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/colorssn/colorssn.nf")
+    colorssn_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the Color SSN nextflow workflow file")
     create_colorssn_nextflow_params.add_args(colorssn_parser)
 
     est_parser = subparsers.add_parser("est", help="Create an EST pipeline job script")
-    est_parser.add_argument("--workflow-def", type=str, default="est.nf", help="Location of the EST nextflow workflow file")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/est/est.nf")
+    est_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the EST nextflow workflow file")
     create_est_nextflow_params.add_args(est_parser)
 
-    ssn_parser = subparsers.add_parser("ssn", help="Create an SSN pipeline job script")
-    ssn_parser.add_argument("--workflow-def", type=str, default="ssn.nf", help="Location of the SSN nextflow workflow file")
-    create_generatessn_nextflow_params.add_args(ssn_parser)
+    generatessn_parser = subparsers.add_parser("generatessn", help="Create a generate-SSN pipeline job script")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/generatessn/generatessn.nf")
+    generatessn_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the SSN nextflow workflow file")
+    create_generatessn_nextflow_params.add_args(generatessn_parser)
 
     return parser
 
