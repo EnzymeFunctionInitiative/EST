@@ -29,14 +29,14 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.workflow_def = os.path.abspath(args.workflow_def)
         args.config_path = os.path.abspath(args.config_path)
 
-    if args.command == "colorssn":
+    if args.pipeline == "colorssn":
         args = create_colorssn_nextflow_params.check_args(args)
-    elif args.command == "est":
+    elif args.pipeline == "est":
         args = create_est_nextflow_params.check_args(args)
-    elif args.command == "ssn":
+    elif args.pipeline == "generatessn":
         args = create_generatessn_nextflow_params.check_args(args)
     else:
-        print(f"Job type '{args.command}' not known")
+        print(f"Job type '{args.pipeline}' not known")
         exit(1)
 
     return args
@@ -77,18 +77,18 @@ if __name__ == "__main__":
 
     # remove args not relevant to params rendering
     args_dict = copy.deepcopy(vars(args))
-    del args_dict["command"]
+    del args_dict["pipeline"]
     del args_dict["workflow_def"]
     del args_dict["templates_dir"]
     del args_dict["config_path"]
-    if args.command == "colorssn":
+    if args.pipeline == "colorssn":
         params_output = create_colorssn_nextflow_params.render_params(**args_dict)
-    elif args.command == "est":
+    elif args.pipeline == "est":
         params_output = create_est_nextflow_params.render_params(**args_dict)
-    elif args.command == "ssn":
+    elif args.pipeline == "generatessn":
         params_output = create_generatessn_nextflow_params.render_params(**args_dict)
     else:
-        print(f"Job type '{args.command}' not known")
+        print(f"Job type '{args.pipeline}' not known")
         exit(1)
 
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
                                            report_file="report.html",
                                            timeline_file="timeline.html",
                                            output_dir=args.output_dir,
-                                           jobtype=args.command,
+                                           jobtype=args.pipeline,
                                            job_id=args.job_id,
                                            config_path=args.config_path,
                                            load_modules=True)
