@@ -15,5 +15,5 @@ The program takes two arguments:
 Example:
 
 ```
-$ perl src/est/split_fasta/split_fasta.pl -parts 64 -source all_sequences.fasta
+$ perl pipelines/est/src/split_fasta/split_fasta.pl -parts 64 -source all_sequences.fasta
 ```
