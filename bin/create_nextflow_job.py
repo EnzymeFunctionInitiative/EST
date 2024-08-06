@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import argparse
 import copy
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -28,14 +29,14 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.workflow_def = os.path.abspath(args.workflow_def)
         args.config_path = os.path.abspath(args.config_path)
 
-    if args.command == "colorssn":
+    if args.pipeline == "colorssn":
         args = create_colorssn_nextflow_params.check_args(args)
-    elif args.command == "est":
+    elif args.pipeline == "est":
         args = create_est_nextflow_params.check_args(args)
-    elif args.command == "ssn":
+    elif args.pipeline == "generatessn":
         args = create_generatessn_nextflow_params.check_args(args)
     else:
-        print(f"Job type '{args.command}' not known")
+        print(f"Job type '{args.pipeline}' not known")
         exit(1)
 
     return args
@@ -47,22 +48,26 @@ def create_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(description="Render templates for nextflow job run")
     # batch args
-    parser.add_argument("--templates-dir", type=str, default="./templates", help="Directory where EST templates are stored")
-    parser.add_argument("--config-path", type=str, default="conf/slurm.config", help="Path to nextflow config file for run")
-    subparsers = parser.add_subparsers(dest="command")
+    default_template_path = os.path.join(os.path.dirname(__file__), "templates")
+    parser.add_argument("--templates-dir", type=str, default=default_template_path, help="Directory where job script templates are stored")
+    parser.add_argument("--config-path", type=str, required=True, help="Path to nextflow config file for pipeline")
+    subparsers = parser.add_subparsers(dest="pipeline", required=True,)
 
     # add pipelines as subcommands
     colorssn_parser = subparsers.add_parser("colorssn", help="Create a Color SSN pipeline job script")
-    colorssn_parser.add_argument("--workflow-def", default="colorssn.nf", help="Location of the Color SSN nextflow workflow file")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/colorssn/colorssn.nf")
+    colorssn_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the Color SSN nextflow workflow file")
     create_colorssn_nextflow_params.add_args(colorssn_parser)
 
     est_parser = subparsers.add_parser("est", help="Create an EST pipeline job script")
-    est_parser.add_argument("--workflow-def", type=str, default="est.nf", help="Location of the EST nextflow workflow file")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/est/est.nf")
+    est_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the EST nextflow workflow file")
     create_est_nextflow_params.add_args(est_parser)
 
-    ssn_parser = subparsers.add_parser("ssn", help="Create an SSN pipeline job script")
-    ssn_parser.add_argument("--workflow-def", type=str, default="ssn.nf", help="Location of the SSN nextflow workflow file")
-    create_generatessn_nextflow_params.add_args(ssn_parser)
+    generatessn_parser = subparsers.add_parser("generatessn", help="Create a generate-SSN pipeline job script")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/generatessn/generatessn.nf")
+    generatessn_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the SSN nextflow workflow file")
+    create_generatessn_nextflow_params.add_args(generatessn_parser)
 
     return parser
 
@@ -72,18 +77,18 @@ if __name__ == "__main__":
 
     # remove args not relevant to params rendering
     args_dict = copy.deepcopy(vars(args))
-    del args_dict["command"]
+    del args_dict["pipeline"]
     del args_dict["workflow_def"]
     del args_dict["templates_dir"]
     del args_dict["config_path"]
-    if args.command == "colorssn":
+    if args.pipeline == "colorssn":
         params_output = create_colorssn_nextflow_params.render_params(**args_dict)
-    elif args.command == "est":
+    elif args.pipeline == "est":
         params_output = create_est_nextflow_params.render_params(**args_dict)
-    elif args.command == "ssn":
+    elif args.pipeline == "generatessn":
         params_output = create_generatessn_nextflow_params.render_params(**args_dict)
     else:
-        print(f"Job type '{args.command}' not known")
+        print(f"Job type '{args.pipeline}' not known")
         exit(1)
 
 
@@ -95,7 +100,7 @@ if __name__ == "__main__":
                                            report_file="report.html",
                                            timeline_file="timeline.html",
                                            output_dir=args.output_dir,
-                                           jobtype=args.command,
+                                           jobtype=args.pipeline,
                                            job_id=args.job_id,
                                            config_path=args.config_path,
                                            load_modules=True)
