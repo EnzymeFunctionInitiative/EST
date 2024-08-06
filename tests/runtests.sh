@@ -37,8 +37,6 @@ if [[ ! -e smalldata || ! -d smalldata ]]; then
     echo "dbi=sqlite" >> smalldata/efi.config
 fi
 
-source efi-env/bin/activate
-
 rm -rf $TEST_RESULTS_DIR
 mkdir $TEST_RESULTS_DIR
 
