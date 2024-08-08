@@ -8,7 +8,7 @@ def add_args(parser: argparse.ArgumentParser):
     """
     add argumdents for Color SSN pipeline to ``parser``
     """
-    parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
+    parser.add_argument("--final-output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
     parser.add_argument("--ssn-input", required=True, type=str, help="The SSN file to color, XGMML or zipped XGMML")
     parser.add_argument("--efi-config", required=True, type=str, help="Location of the EFI config file")
     parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
@@ -29,15 +29,15 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"EFI config file '{args.efi_config}' does not exist")
         fail = True
     
-    if os.path.exists(args.output_dir):
-        if len(os.listdir(args.output_dir)) > 0:
-            print(f"Output directory '{args.output_dir}' is not empty, refusing to create params.yml")
+    if os.path.exists(args.final_output_dir):
+        if len(os.listdir(args.final_output_dir)) > 0:
+            print(f"Output directory '{args.final_output_dir}' is not empty, refusing to create params.yml")
             fail = True
     else:
         try:
-            os.makedirs(args.output_dir)
+            os.makedirs(args.final_output_dir)
         except Exception as e:
-            print(f"Could not create output directory '{args.output_dir}': {e}")
+            print(f"Could not create output directory '{args.final_output_dir}': {e}")
             fail = True
 
 
@@ -45,7 +45,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print("Failed to render params template")
         exit(1)
     else:
-        args.output_dir = os.path.abspath(args.output_dir)
+        args.final_output_dir = os.path.abspath(args.final_output_dir)
         args.ssn_input = os.path.abspath(args.ssn_input)
         args.efi_config = os.path.abspath(args.efi_config)
         if os.path.exists(args.efi_db):
@@ -57,14 +57,14 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(ssn_input, efi_config, efi_db, output_dir, job_id):
+def render_params(ssn_input, efi_config, efi_db, final_output_dir, job_id):
     params = {
-        "output_dir": output_dir,
+        "final_output_dir": final_output_dir,
         "ssn_input": ssn_input,
         "efi_config": efi_config,
         "efi_db": efi_db
     }
-    params_file = os.path.join(output_dir, "params.yml")
+    params_file = os.path.join(final_output_dir, "params.yml")
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)
     print(f"Wrote params to '{params_file}'")

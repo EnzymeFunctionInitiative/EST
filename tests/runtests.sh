@@ -17,16 +17,13 @@ if [[ ! -e pipelines/generatessn/generatessn.nf || ! -e pipelines/est/est.nf ]];
     exit 1
 fi
 
-if [ $# -ne 2 ]; then
-    NXF_EST_CONFIG_FILE='conf/est/docker.config'
-    NXF_SSN_CONFIG_FILE='conf/generatessn/docker.config'
+if [ $# -ne 1 ]; then
+    CONFIG_FILE="docker.config"
 else
-    NXF_EST_CONFIG_FILE=$1
-    NXF_SSN_CONFIG_FILE=$2
+    CONFIG_FILE=$1
 fi
 
-echo "NXF_EST_CONFIG is $NXF_EST_CONFIG_FILE"
-echo "NXF_SSN_CONFIG is $NXF_SSN_CONFIG_FILE"
+echo "Using $CONFIG_FILE config files for processes"
 
 if [[ ! -e smalldata || ! -d smalldata ]]; then
     echo "Test data directory not found, attempting to download"
@@ -45,5 +42,5 @@ set +e
 for file in $(ls tests/modules); do
     echo "================================================================================"
     echo "Executing test in '$file'"
-    bash "tests/modules/$file" $TEST_RESULTS_DIR $NXF_EST_CONFIG_FILE $NXF_SSN_CONFIG_FILE
+    bash "tests/modules/$file" $TEST_RESULTS_DIR $CONFIG_FILE
 done;
