@@ -12,7 +12,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
 use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
-use EFI::Import::Metadata ':source';
+use EFI::Annotations::Fields ':source';
 
 
 our $TYPE_NAME = "blast";

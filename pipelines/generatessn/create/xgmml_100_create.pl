@@ -6,18 +6,19 @@ use strict;
 use warnings;
 
 use FindBin;
-use lib "$FindBin::Bin/../../../lib";
 use List::MoreUtils qw{apply uniq any} ;
 use IO::File;
 use Fcntl qw(:flock);
 use XML::Writer;
 use XML::LibXML;
 use Getopt::Long;
-use EFI::Config;
-use EFI::Annotations;
 use Data::Dumper;
 
-use lib "$FindBin::Bin/lib";
+use lib "$FindBin::Bin/../../../lib";
+
+use EFI::Config;
+use EFI::Annotations;
+use EFI::Annotations::Fields qw(:source);
 use AlignmentScore;
 
 
@@ -159,11 +160,11 @@ if (-e $annoFile) {
                     $uprot{$id}{$key} = $vals[0];
                 }
             }
-            if ($key eq EFI::Annotations::FIELD_SEQ_SRC_KEY and
-                ($includeAllSeqs or $value eq EFI::Annotations::FIELD_SEQ_SRC_VALUE_FASTA) and
+            if ($key eq FIELD_SEQ_SRC_KEY and
+                ($includeAllSeqs or $value eq FIELD_SEQ_SRC_VALUE_FASTA) and
                 exists $sequences{$id})
             {
-                $uprot{$id}{EFI::Annotations::FIELD_SEQ_KEY} = $sequences{$id};
+                $uprot{$id}{FIELD_SEQ_KEY} = $sequences{$id};
                 $hasSeqs = 1;
             }
         }
@@ -171,7 +172,7 @@ if (-e $annoFile) {
     close STRUCT;
 }
 if ($hasSeqs) {
-    push(@metas, EFI::Annotations::FIELD_SEQ_KEY);
+    push(@metas, FIELD_SEQ_KEY);
 }
 print time . " done reading in annotation data\n";
 

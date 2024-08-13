@@ -5,35 +5,17 @@ use strict;
 use constant UNIREF_ONLY => 1;
 use constant REPNODE_ONLY => 2;
 
-# Use these rather than the ones in EFI::Config
-# Many of these are used externally
-use constant FIELD_SEQ_SRC_KEY => "Sequence_Source";
-use constant FIELD_SEQ_SRC_VALUE_BOTH => "FAMILY+USER";
-use constant FIELD_SEQ_SRC_VALUE_FASTA => "USER";
-use constant FIELD_SEQ_SRC_VALUE_FAMILY => "FAMILY";
-use constant FIELD_SEQ_SRC_VALUE_INPUT => "INPUT";
-use constant FIELD_SEQ_SRC_VALUE_BLASTHIT => "BLASTHIT";
-use constant FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY => "FAMILY+BLASTHIT";
-use constant FIELD_SEQ_KEY => "Sequence";
-use constant FIELD_SEQ_LEN_KEY => "seq_len";
-use constant FIELD_SEQ_DOM_LEN_KEY => "Cluster_ID_Domain_Length";
-use constant FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY => "Cluster_ID_Sequence_Length";
-use constant FIELD_ID_ACC => "ACC";
-use constant FIELD_SWISSPROT_DESC => "Swissprot Description";
-use constant FIELD_TAXON_ID => "Taxonomy ID";
-use constant FIELD_SPECIES => "Species";
-use constant FIELD_UNIREF50_IDS => "UniRef50_IDs";
-use constant FIELD_UNIREF90_IDS => "UniRef90_IDs";
-use constant FIELD_UNIREF100_IDS => "UniRef100_IDs";
-use constant FIELD_UNIREF50_CLUSTER_SIZE => "UniRef50_Cluster_Size";
-use constant FIELD_UNIREF90_CLUSTER_SIZE => "UniRef90_Cluster_Size";
-use constant FIELD_UNIREF100_CLUSTER_SIZE => "UniRef100_Cluster_Size";
-
 our $Version = 2;
 
 use List::MoreUtils qw{uniq};
 use JSON;
 use Data::Dumper;
+
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../";
+
+use EFI::Annotations::Fields qw(:all);
 
 
 sub new {

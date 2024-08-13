@@ -12,8 +12,9 @@ use FindBin;
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
-use EFI::Annotations;
 use EFI::IdMapping::Util;
+use EFI::Annotations;
+use EFI::Annotations::Fields qw(:annotations);
 
 use FileUtil;
 
@@ -63,11 +64,11 @@ my $clusterField = "";
 my $clusterSizeField = "";
 if ($unirefVersion) {
     if ($unirefVersion == 50) {
-        $clusterField = EFI::Annotations::FIELD_UNIREF50_IDS;
-        $clusterSizeField = EFI::Annotations::FIELD_UNIREF50_CLUSTER_SIZE;
+        $clusterField = FIELD_UNIREF50_IDS;
+        $clusterSizeField = FIELD_UNIREF50_CLUSTER_SIZE;
     } else {
-        $clusterField = EFI::Annotations::FIELD_UNIREF90_IDS;
-        $clusterSizeField = EFI::Annotations::FIELD_UNIREF90_CLUSTER_SIZE;
+        $clusterField = FIELD_UNIREF90_IDS;
+        $clusterSizeField = FIELD_UNIREF90_CLUSTER_SIZE;
     }
 }
 
@@ -76,7 +77,7 @@ $idListFile = "" if not $idListFile;
 my ($idMeta) = FileUtil::read_struct_file($metaFileIn, $idListFile);
 
 my $unirefLenFiltWhere = "";
-my $sqlLenField = EFI::Annotations::FIELD_SEQ_LEN_KEY;
+my $sqlLenField = FIELD_SEQ_LEN_KEY;
 # Remove the legacy after summer 2022
 if ($legacyAnno) {
     $sqlLenField = "Sequence_Length";
@@ -175,7 +176,7 @@ while (my $line = <META>) {
             my $size = scalar(map { $_->[1] } @{$unirefIds{$seedId}}) + 1; # + for the seed sequence
             my $clusterIdRow = grep {$seedId eq $_->[0]} @{$unirefIds{$seedId}};
             print OUT "\t", join("\t", $field, $size), "\n";
-            print OUT "\t", join("\t", EFI::Annotations::FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY, $unirefClusterIdSeqLen{$seedId}), "\n" if $unirefClusterIdSeqLen{$seedId};
+            print OUT "\t", join("\t", FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY, $unirefClusterIdSeqLen{$seedId}), "\n" if $unirefClusterIdSeqLen{$seedId};
         } else {
             print OUT "\t", join("\t", $field, $value), "\n";
         }
