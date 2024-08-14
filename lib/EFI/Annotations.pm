@@ -53,6 +53,19 @@ sub build_query_string {
 }
 
 
+#
+# build_query_string_base - internal function
+#
+# Creates a SELECT statement for the given accession ID
+#
+# Parameters:
+#    $column - accession ID column name
+#    $id - accession ID
+#    $extraWhere - additional conditions, optional
+#
+# Returns:
+#    SQL SELECT statement
+#
 sub build_query_string_base {
     my $self = shift;
     my $column = shift;
@@ -103,7 +116,6 @@ sub build_id_mapping_query_string {
     my $sql = "SELECT foreign_id_type, foreign_id FROM idmapping WHERE uniprot_id = '$accession'";
     return $sql;
 }
-
 
 
 sub build_annotations {
@@ -195,6 +207,22 @@ sub build_annotations {
 #}
 
 
+#
+# parse_interpro - internal function
+#
+# Looks at the row (multiple rows in the case of UniRef) and breaks up the values from the database
+# into logical values for display in the SSN.
+#
+# Parameters:
+#     $rows - an array ref containing one or more hash refs of database retrieval rows (one hash
+#         ref for a UniProt retrieval, multiple for UniRef retrieval).
+#
+# Returns:
+#     an array ref of InterPro domains
+#     an array ref of InterPro families
+#     an array ref of InterPro superfamilies
+#     an array ref of other InterPro values if not one of the above
+#
 sub parse_interpro {
     my $rows = shift;
 
@@ -229,6 +257,21 @@ sub parse_interpro {
 }
 
 
+#
+# merge_anno_rows - internal function
+#
+# Merges values from multiple rows (e.g. UniRef) into one string.
+#
+# Parameters:
+#     $rows - an array ref containing one or more hash refs of database retrieval rows (one hash
+#         ref for a UniProt retrieval, multiple for UniRef retrieval).
+#     $field - the field in the row(s) to merge
+#     $typeSpec - display specific values differently; e.g. if the value is empty, replace with 'None'
+#         (optional)
+#
+# Returns:
+#     a scalar value with all of the values joined together using the row separator character
+#
 sub merge_anno_rows {
     my $rows = shift;
     my $field = shift;
@@ -274,6 +317,18 @@ sub get_annotation_data {
 }
 
 
+#
+# get_annotation_fields - internal function
+#
+# Returns a master list of field metadata.
+#
+# Parameters:
+#     $type - a subset of field names to retrieve. One of
+#         ANNO_FIELDS_SSN_DISPLAY, ANNO_FIELDS_BASE_SSN, ANNO_FIELDS_SSN_NUMERIC, ANNO_FIELDS_DB_USER
+#
+# Returns:
+#     an array of metadata, with each entry in the array being a hash ref representing a field and it's metadata
+#
 sub get_annotation_fields {
     my $self = shift;
     my $type = shift || 0;
@@ -436,6 +491,7 @@ sub is_list_attribute {
     return $self->{list_anno}->{$attr} // 0;
 }
 
+
 sub get_attribute_type {
     my $self = shift;
     my $attr = shift;
@@ -451,6 +507,7 @@ sub get_attribute_type {
         return "string";
     }
 }
+
 
 sub is_expandable_attr {
     my $self = shift;
@@ -479,6 +536,17 @@ sub is_expandable_attr {
 }
 
 
+#
+# parse_meta_string - internal function
+#
+# Converts an encoded metadata field string into a hash ref.
+#
+# Parameters:
+#     $string - JSON string
+#
+# Returns:
+#     hash ref (usually) of decoded JSON
+#
 sub parse_meta_string {
     my $string = shift;
     return {} if $string =~ m/^\s*$/;
@@ -486,5 +554,384 @@ sub parse_meta_string {
     return $struct;
 }
 
+
 1;
+__END__
+
+=head1 EFI::Annotations
+
+=head2 NAME
+
+EFI::Annotations - Perl module used for creating SQL statements and parsing
+SQL return data from the C<annotations> table in the EFI database.
+
+=head2 SYNOPSIS
+
+    use EFI::Annotations;
+
+    my $anno = new EFI::Annotations;
+
+    my $taxId = 1000;
+    my $taxIdSql = $anno->build_taxid_query_string($taxId);
+
+    my $accession = "B0SS77";
+    my $annoSql = $anno->build_query_string($accession);
+
+
+
+=head2 DESCRIPTION
+
+EFI::Annotations is a utility module that provides helper functions for creating SQL statements
+that can be used to query the EFI database C<annotations> table.  In addition, methods are provided
+for processing data rows returned from database query results.  Helper methods are provided
+for determining node attribute types.
+
+=head2 METHODS
+
+=head3 new()
+
+Create an instance of EFI::Annotations.
+
+=head3 build_taxid_query_string($taxId)
+
+Creates a SQL SELECT query statement based on a taxonomic identifier
+that can be provided to a SQL connection
+to retrieve values from the C<annotations> table.
+
+=head4 Parameters
+
+=over
+
+=item C<$taxId>
+
+A taxonomic identifier.
+
+=back
+
+=head4 Returns
+
+SQL SELECT query statement.
+
+=head4 Example Usage
+
+    my $taxId = 1000;
+    my $sqlSelect = $anno->build_taxid_query_string($taxId);
+
+=head3 build_query_string($accession, $extraWhere)
+
+Creates a SQL SELECT query statement based on a sequence identifier
+that can be provided to a SQL connection
+to retrieve values from the C<annotations> table.
+Extra conditions can be imposed on the query using the C<$extraWhere> optional argument.
+
+=head4 Parameters
+
+=over
+
+=item C<$accession>
+
+A sequence identifier (e.g. UniProt ID).
+
+=item C<$extraWhere> (Optional)
+
+An extra condition to impose on the query. Available table names are C<A> (C<annotations>),
+C<T> (C<taxonomy>), C<P> (C<PFAM>), and C<I> (C<INTERPRO>).
+
+=back
+
+=head4 Returns
+
+SQL SELECT query statement.
+
+=head4 Example Usage
+
+    use EFI::Annotations::Fields qw(FIELD_SEQ_LEN_KEY);
+    my $accession = "B0SS77";
+    my $sqlSelect = $anno->build_query_string($accession);
+
+    my $maxLen = 500;
+    my $extraWhere = "A." . FIELD_SEQ_LEN_KEY . " <= $maxLen";
+    my $sqlSelect = $anno->build_query_string($accession, $extraWhere);
+
+=head3 build_id_mapping_query_string($accession)
+
+Creates a SQL SELECT query statement to retrieve IDs from the EFI database C<idmapping> table.
+This can be used to convert from UniProt IDs to non-UniProt IDs (e.g. RefSeq).
+
+=head4 Parameters
+
+=over
+
+=item C<$accession>
+
+A UniProt sequence identifier.
+
+=back
+
+=head4 Returns
+
+SQL SELECT query statement.
+
+=head4 Example Usage
+
+    my $accession = "B0SS77";
+    my $sqlSelect = $anno->build_id_mapping_query_string($accession);
+
+=head3 build_annotations($dbRow, $ncbiIds, $annoSpec)
+
+Creates a hash ref data structure from a database result row.
+The structure contains all of the node attributes that are in the results, formatted appropriately,
+and also handles UniRef IDs by formatting the UniRef cluster node values.
+
+=head4 Parameters
+
+=over
+
+=item C<$dbRow>
+
+A row from the database retrieval query that was created using the C<build_query_string> method.
+If this is a hash ref, the row is assumed to be retrieved using a UniProt ID and the attributes
+in the hash are formatted properly and converted into a data structure that corresponds to
+the given accession ID.
+If this is an array ref of hash refs, the query is assumed to be a UniRef-based query.
+The attributes in each hash ref are formatted and joined together to create a single data
+structure that corresponds to the given UniRef accession ID.
+In the latter case, each hash ref corresponds to a member of the UniRef sequence cluster.
+The hash ref keys are database column names which are not the same as display names.
+
+=item C<$ncbiIds>
+
+An array ref containing the NCBI IDs that correspond to the UniProt ID.  In the case that the
+retrieval is for an UniRef sequence, the IDs are for all of the sequences in the UniRef
+sequence cluster.
+
+=item C<$annoSpec> (Optional)
+
+A hash ref to retrict the output structure to contain only the keys in the hash ref.
+If not provided all keys in the row are used.
+
+=back
+
+=head4 Returns
+
+An array ref of field names in the order in which they should appear in an output file,
+and a hash ref of values from the database row, mapping display field name to the value.
+
+=head4 Example Usage
+
+    # This hash ref should come from a database query, not manually constructed.
+    my $dbRow = {description => "SwissProt description", swissprot_status => 1, is_fragment => 0, ...};
+    my $ncbiIds = ["ID", "ID2"];
+    my $data = $anno->build_annotations($dbRow, $ncbiIds);
+    # $data contains:
+    # {
+    #     "swissprot_description" => "SwissProt description",
+    #     "swissprot_status" => "SwissProt",
+    #     "is_fragment" => "complete",
+    #     "NCBI_IDs" => "ID,ID2",
+    #     ...
+    # }
+
+    # This hash ref should come from a database query, not manually constructed.
+    my $dbRow = {description => "description", swissprot_status => 0, is_fragment => 1, ...};
+    my $ncbiIds = ["ID", "ID2"];
+    my $data = $anno->build_annotations($dbRow, $ncbiIds, {"swissprot_status" => 1, "is_fragment" => 1});
+
+    # $data contains:
+    # {
+    #     "swissprot_status" => "TrEMBL",
+    #     "is_fragment" => "fragment",
+    # }
+
+=head3 get_annotation_data()
+
+Return metadata for all of the fields that are displayed in the SSN.
+
+=head4 Returns
+
+A hash ref mapping field internal name (e.g. database column name) to metadata, namely
+the order in which they appear, the display name, and the node type.
+
+=head4 Example Usage
+
+    my $data = $anno->get_annotation_data();
+
+    # $data contains:
+    # {
+    #     "Sequence_Source" => {
+    #         order => 0,
+    #         display => "Sequence Source",
+    #     },
+    #     "organism" => {
+    #         order => 1,
+    #         display => "Organism",
+    #     },
+    #     "taxonomy_id" => {
+    #         order => 2,
+    #         display => "Taxonomy ID",
+    #     },
+    #     "description" => {
+    #         order => 3,
+    #         display => "Description",
+    #         ssn_list_type => 1,
+    #     },
+    #     "seq_len" => {
+    #         order => 4,
+    #         display => "Sequence Length",
+    #         ssn_num_type => 1,
+    #     },
+    #     ...
+    # }
+
+=head3 decode_meta_struct($jsonString)
+
+Decodes a JSON string from the C<annotations> table metadata column into a hash representing
+the values for that accession.  The metadata column uses short 1 or 2 character keys to
+represent the full key names to minimize storage space.  For example, C<organism> is
+represented by C<o> in the metadata column.
+
+=head4 Parameters
+
+=over
+
+=item C<$jsonString>
+
+A string in JSON format that contains field key-values corresponding to metadata, similar to
+that returned by C<get_annotation_data>.
+
+=back
+
+=head4 Returns
+
+A hash ref containing the values from the JSON string.
+
+=head4 Example Usage
+
+    my $json = '{"o":"An organism name","ec":"code"}';
+    my $data = $anno->decode_meta_struct($json);
+
+    # $data contains:
+    # {
+    #     "organism" => "An organism name",
+    #     "ec_code" => "code"
+    # }
+
+=head3 sort_annotations(@fields)
+
+Sorts the fields in the order in which they should appear in the SSN.
+
+=head4 Parameters
+
+=over
+
+=item C<@fields>
+
+An array of the keys in the metadata file that will be used to generate the SSN node attributes.
+
+=back
+
+=head4 Returns
+
+The input array, sorted by the internal C<order> field as specified in the module.
+
+=head4 Example Usage
+
+    # Get the keys from the C<ssn_metadata.tab> file and put into @fieldNames.
+    my @fieldNames = ("organism", "ec_code", "NCBI_IDs");
+    @fieldNames = $anno->sort_annotations(@fieldNames);
+    # @fieldNames will be ("organism", "NCBI_IDs", "ec_code").
+
+=head3 is_list_attribute($attrName)
+
+Checks if the input attribute name is a SSN list attribute.
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+A SSN display attribute name (e.g. C<Organism>).
+
+=back
+
+=head4 Returns
+
+1 if the value is a SSN list type, 0 otherwise.
+
+=head4 Example Usage
+
+    my $attrName = "Query IDs";
+    my $isList = $anno->is_list_attribute($attrName);
+    # $isList is 1
+
+    my $attrName = "Sequence Length";
+    my $isList = $anno->is_list_attribute($attrName);
+    # $isList is 0
+
+=head3 get_attribute_type($attrName)
+
+Returns the SSN node attribute data type for the attribute name.
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+A SSN display attribute name (e.g. C<Organism>).
+
+=back
+
+=head4 Returns
+
+The string "integer" if the type is numeric, "string" otherwise.
+
+=head4 Example Usage
+
+    my $attrName = "Organism";
+    my $theType = $anno->get_attribute_type($attrName);
+    # $theType is "string"
+
+    my $attrName = "Sequence Length";
+    my $theType = $anno->get_attribute_type($attrName);
+    # $theType is "integer"
+
+=head3 is_expandable_attr($attrName)
+
+Checks if the input attribute name can be expanded into a list of IDs.
+In other words, it checks if the input name is UniRef or repnode ID list attribute name.
+These are:
+
+    UniRef50_IDs
+    UniRef90_IDs
+    UniRef100_IDs
+    UniRef50 IDs
+    UniRef90 IDs
+    UniRef100 IDs
+    ACC
+    ACC_CDHIT
+    CD-HIT IDs
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+A SSN display attribute name (e.g. C<UniRef90 IDs>).
+
+=back
+
+=head4 Returns
+
+1 if the input node attribute can be expanded into multiple values, 0 otherwise.
+
+=head4 Example Usage
+
+    my $attrName = "UniRef90_IDs"; # or "UniRef90 IDs"
+    my $isExpandable = $anno->is_expandable_attr($attrName);
+    # $isExpandable is 1
+
+=cut
 
