@@ -76,10 +76,10 @@ my ($idMeta) = FileUtil::read_struct_file($metaFileIn, $idListFile);
 my $unirefLenFiltWhere = "";
 my $sqlLenField = FIELD_SEQ_LEN_KEY;
 if ($minLen) {
-    $unirefLenFiltWhere .= " AND A.$sqlLenField >= $minLen";
+    $unirefLenFiltWhere .= "A.$sqlLenField >= $minLen";
 }
 if ($maxLen) {
-    $unirefLenFiltWhere .= " AND A.$sqlLenField <= $maxLen";
+    $unirefLenFiltWhere .= "A.$sqlLenField <= $maxLen";
 }
 
 my $annoSpec = readAnnoSpec($annoSpecFile);
@@ -98,12 +98,12 @@ foreach my $accession (sort keys %$idMeta){
         # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
         # sequence cluster.  This code does that.
         my @sql_parts;
-        @sql_parts = (EFI::Annotations::build_query_string($accession, ""));
+        @sql_parts = $anno->build_query_string($accession);
         if ($unirefVersion and $clusterField and exists $idMeta->{$accession}->{$clusterField}) {
             my @allIds = split(m/,/, $idMeta->{$accession}->{$clusterField});
             my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
             while (my @chunk = splice(@idList, 0, 200)) {
-                my $sql = EFI::Annotations::build_query_string(\@chunk, $unirefLenFiltWhere);
+                my $sql = $anno->build_query_string(\@chunk, $unirefLenFiltWhere);
                 push @sql_parts, $sql;
             }
         }
@@ -134,7 +134,7 @@ foreach my $accession (sort keys %$idMeta){
         # Now get a list of NCBI IDs
         my @ncbiIds;
         if (not $annoSpec or exists $annoSpec->{"NCBI_IDS"}) {
-            my $sql = EFI::Annotations::build_id_mapping_query_string($accession);
+            my $sql = $anno->build_id_mapping_query_string($accession);
             my $sth = $dbh->prepare($sql);
             $sth->execute;
             while (my $idRow = $sth->fetchrow_hashref) {
@@ -145,9 +145,9 @@ foreach my $accession (sort keys %$idMeta){
             $sth->finish();
         }
         
-        my @params = ($accession, \@rows, \@ncbiIds);
+        my @params = (\@rows, \@ncbiIds);
         push @params, $annoSpec ? $annoSpec : undef;
-        my $data = EFI::Annotations::build_annotations(@params);
+        my $data = $anno->build_annotations(@params);
         print OUT $data;
     }
 }

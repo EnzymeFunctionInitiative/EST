@@ -193,8 +193,8 @@ if ($#metas < 0) {
 }
 
 
-my $annoData = EFI::Annotations::get_annotation_data();
-@metas = EFI::Annotations::sort_annotations($annoData, @metas);
+my $annoData = $anno->get_annotation_data();
+@metas = $anno->sort_annotations(@metas);
 
 my $metaline = join ',', @metas;
 
