@@ -2,10 +2,7 @@
 package EFI::Annotations;
 
 use strict;
-use constant UNIREF_ONLY => 1;
-use constant REPNODE_ONLY => 2;
-
-our $Version = 2;
+use warnings;
 
 use List::MoreUtils qw{uniq};
 use JSON;
@@ -16,6 +13,11 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../";
 
 use EFI::Annotations::Fields qw(:all);
+
+use constant UNIREF_ONLY => 1;
+use constant REPNODE_ONLY => 2;
+
+use constant ANNO_ROW_SEP => "^";
 
 
 sub new {
@@ -45,7 +47,6 @@ sub build_query_string_base {
     my $column = shift;
     my $id = shift;
     my $extraWhere = shift || "";
-    my $isLegacy = shift || 0;
 
     my $useTigr = 0;
 
@@ -61,30 +62,25 @@ sub build_query_string_base {
         $idQuoted = "= '" . $ids[0] . "'";
     }
 
-    my $sql = "";
-    if ($Version == 1) {
-        $sql = "select * from annotations where $column $idQuoted";
-    } else {
-        my $tigrJoin = $useTigr ? "left join TIGRFAMs AS TG on A.accession = TG.accession" : "";
-        my $tigrConcat = $useTigr ? "    group_concat(distinct TG.id) as TIGR," : "";
-        my $taxColVer = $isLegacy ? "Taxonomy_ID" : "taxonomy_id";
-        $sql = <<SQL;
-select
+    my $tigrJoin = $useTigr ? "LEFT JOIN TIGRFAMs AS TG ON A.accession = TG.accession" : "";
+    my $tigrConcat = $useTigr ? "    GROUP_CONCAT(DISTINCT TG.id) AS TIGR," : "";
+    my $taxColVer = "taxonomy_id";
+    my $sql = <<SQL;
+SELECT
     A.*,
     T.*,
-    group_concat(distinct P.id) as PFAM2,
+    GROUP_CONCAT(DISTINCT P.id) AS PFAM2,
     $tigrConcat
-    group_concat(I.family_type) as ipro_type,
-    group_concat(I.id) as ipro_fam
-from annotations as A
-left join taxonomy as T on A.$taxColVer = T.$taxColVer
-left join PFAM as P on A.accession = P.accession
-left join INTERPRO as I on A.accession = I.accession
+    group_concat(I.family_type) AS ipro_type,
+    group_concat(I.id) AS ipro_fam
+FROM annotations AS A
+LEFT JOIN taxonomy AS T ON A.$taxColVer = T.$taxColVer
+LEFT JOIN PFAM AS P ON A.accession = P.accession
+LEFT JOIN INTERPRO AS I ON A.accession = I.accession
 $tigrJoin
-where A.$column $idQuoted $extraWhere
-group by A.accession
+WHERE A.$column $idQuoted $extraWhere
+GROUP BY A.accession
 SQL
-    }
 
     return $sql;
 }
@@ -94,7 +90,7 @@ sub build_uniref_id_query_string {
     my $seed = shift;
     my $unirefVersion = shift;
 
-    my $sql = "select accession as ID from uniref where uniref${unirefVersion}_seed = '$seed'";
+    my $sql = "SELECT accession AS ID FROM uniref WHERE uniref${unirefVersion}_seed = '$seed'";
 
     return $sql;
 }
@@ -106,7 +102,6 @@ sub build_id_mapping_query_string {
     return $sql;
 }
 
-my $AnnoRowSep = "^";
 
 # $row is a row (as hashref) from the annotation table in the database.
 sub build_annotations {
@@ -114,13 +109,6 @@ sub build_annotations {
     my $row = shift;
     my $ncbiIds = shift;
     my $annoSpec = shift // undef;
-    my $isLegacy = shift // 0; # Remove the legacy after summer 2022
-
-    if (ref $accession eq "HASH" and not defined $ncbiIds) {
-        $ncbiIds = $row;
-        $row = $accession;
-        $accession = $row->{accession};
-    }
 
     my @rows = ($row);
     if (ref $row eq "ARRAY") {
@@ -140,7 +128,7 @@ sub build_annotations {
                 push @spDesc, "NA";
             }
         }
-        return join($AnnoRowSep, @spDesc);
+        return join(ANNO_ROW_SEP, @spDesc);
     };
 
     my $attrFunc = sub {
@@ -149,11 +137,11 @@ sub build_annotations {
     };
     my $booleanFunc = sub { my $key = shift; return merge_anno_rows(\@rows, $key, {1 => "True", "" => "False"}); };
     my $specialValueFunc = {
-        "IPRO_DOM" => sub { return join($AnnoRowSep, @$iproDom); },
-        "IPRO_FAM" => sub { return join($AnnoRowSep, @$iproFam); },
-        "IPRO_SUP" => sub { return join($AnnoRowSep, @$iproSup); },
-        "IPRO" => sub { return join($AnnoRowSep, @$iproOther); },
-        "swissprot_status" => sub { return join($AnnoRowSep, map { $_->{swissprot_status} ? "SwissProt" : "TrEMBL" } @rows); },
+        "IPRO_DOM" => sub { return join(ANNO_ROW_SEP, @$iproDom); },
+        "IPRO_FAM" => sub { return join(ANNO_ROW_SEP, @$iproFam); },
+        "IPRO_SUP" => sub { return join(ANNO_ROW_SEP, @$iproSup); },
+        "IPRO" => sub { return join(ANNO_ROW_SEP, @$iproOther); },
+        "swissprot_status" => sub { return join(ANNO_ROW_SEP, map { $_->{swissprot_status} ? "SwissProt" : "TrEMBL" } @rows); },
         "swissprot_description" => $swissprotDescFunc,
         "is_fragment" => sub { my $key = shift; return merge_anno_rows(\@rows, $key, {0 => "complete", 1 => "fragment"}); },
         #"description" => sub { my $key = shift; return merge_anno_rows(\@rows, $key, {"" => "None"}); },
@@ -180,93 +168,10 @@ sub build_annotations {
         return $val;
     };
 
-    # Remove the legacy after summer 2022
-    if ($isLegacy) {
-
-        #BUG due to misnaming
-        my $defaultFunc = sub {
-            my $key = shift;
-            my $val = merge_anno_rows(\@rows, $key, {"" => "None"});
-            $val = "None" if not $val;
-            $val =~ s/;?\s*$//;
-            return $val;
-        };
-        $specialValueFunc->{superkingdom} = sub { return &$defaultFunc("domain"); };
-        $specialValueFunc->{order} = sub { return &$defaultFunc("tax_order"); };
-
-        $specialValueFunc->{swissprot_status} = sub { return join($AnnoRowSep, map { $_->{STATUS} eq "Reviewed" ? "SwissProt" : "TrEMBL" } @rows); };
-        $specialValueFunc->{is_fragment} = sub { return merge_anno_rows(\@rows, "Fragment", {0 => "complete", 1 => "fragment"}); };
-        $specialValueFunc->{domain} = sub { return merge_anno_rows(\@rows, "Superkingdom", {"" => "None"}); };
-        $specialValueFunc->{kingdom} = sub { return merge_anno_rows(\@rows, "Kingdom"); };
-        $specialValueFunc->{phylum} = sub { return merge_anno_rows(\@rows, "Phylum"); };
-        $specialValueFunc->{class} = sub { return merge_anno_rows(\@rows, "Class"); };
-        $specialValueFunc->{tax_order} = sub { return merge_anno_rows(\@rows, "Order"); };
-        $specialValueFunc->{family} = sub { return merge_anno_rows(\@rows, "Family"); };
-        $specialValueFunc->{genus} = sub { return merge_anno_rows(\@rows, "Genus"); };
-        $specialValueFunc->{species} = sub { return merge_anno_rows(\@rows, "Species"); };
-        $specialValueFunc->{gn_gene} = sub { return merge_anno_rows(\@rows, "GN", {"" => "None"}); };
-        $specialValueFunc->{pdb} = sub { return merge_anno_rows(\@rows, "PDB", {"" => "None"}); };
-        $specialValueFunc->{ec_code} = sub { return merge_anno_rows(\@rows, "EC", {"" => "None"}); };
-        $specialValueFunc->{brenda} = sub { return merge_anno_rows(\@rows, "BRENDA", {"" => "None"}); };
-        $specialValueFunc->{cazy} = sub { return merge_anno_rows(\@rows, "CAZY", {"" => "None"}); };
-        $specialValueFunc->{go} = sub { return merge_anno_rows(\@rows, "GO", {"" => "None"}); };
-        $specialValueFunc->{kegg} = sub { return merge_anno_rows(\@rows, "KEGG", {"" => "None"}); };
-        $specialValueFunc->{patric} = sub { return merge_anno_rows(\@rows, "PATRIC", {"" => "None"}); };
-        $specialValueFunc->{string} = sub { return merge_anno_rows(\@rows, "STRING", {"" => "None"}); };
-        $specialValueFunc->{hmp_site} = sub { return merge_anno_rows(\@rows, "HMP_Body_Site", {"" => "None"}); };
-        $specialValueFunc->{hmp_oxygen} = sub { return merge_anno_rows(\@rows, "HMP_Oxygen", {"" => "None"}); };
-        $specialValueFunc->{gdna} = sub { return merge_anno_rows(\@rows, "P01_gDNA", {"" => "False"}); };
-        $specialValueFunc->{organism} = sub { return merge_anno_rows(\@rows, "Organism"); };
-        $specialValueFunc->{taxonomy_id} = sub { return merge_anno_rows(\@rows, "Taxonomy_ID"); };
-        $specialValueFunc->{description} = sub { return merge_anno_rows(\@rows, "Description"); };
-        $specialValueFunc->{reviewed_description} = sub { return merge_anno_rows(\@rows, "Swissprot_Description", {"" => "NA"}); };
-        $specialValueFunc->{seq_len} = sub { return merge_anno_rows(\@rows, "Sequence_Length"); };
-        # PFAM and NCBI_IDs are already process by the default handlers
-    }
-
     my @fields = grep { $_->{base_ssn} ? 1 : 0 } get_annotation_fields();
     my $tab = $accession . "\n\t";
     $tab .= join("\n\t", grep { length $_ } map { &$getValueFunc($_->{name}) } @fields);
     $tab .= "\n";
-
-    #my $tab = $accession .
-    #    "\n\tswissprot_status\t" . $status . 
-    #    "\n\tSequence_Length\t" . merge_anno_rows(\@rows, "Sequence_Length");
-    #$tab .= "\n\tTaxonomy_ID\t" . merge_anno_rows(\@rows, "Taxonomy_ID") if &$attrFunc("Taxonomy_ID"); 
-    #$tab .= "\n\tP01_gDNA\t" . merge_anno_rows(\@rows, "GDNA") if &$attrFunc("P01_gDNA"); 
-    #$tab .= "\n\tDescription\t" . merge_anno_rows(\@rows, "Description") if &$attrFunc("Description"); 
-    #$tab .= "\n\tSwissprot_Description\t" . merge_anno_rows(\@rows, "SwissProt_Description") if &$attrFunc("Swissprot_Description"); 
-    #$tab .= "\n\tOrganism\t" . merge_anno_rows(\@rows, "Organism") if &$attrFunc("Organism"); 
-    #$tab .= "\n\tGN\t" . merge_anno_rows(\@rows, "GN") if &$attrFunc("GN"); 
-    #$tab .= "\n\tPFAM\t" . merge_anno_rows_uniq(\@rows, "PFAM2") if &$attrFunc("PFAM"); 
-    #$tab .= "\n\tPDB\t" . merge_anno_rows(\@rows, "pdb") if &$attrFunc("PDB"); 
-    #$tab .= "\n\tIPRO_DOM\t" . join($AnnoRowSep, @$iproDom) if &$attrFunc("IPRO_DOM");
-    #$tab .= "\n\tIPRO_FAM\t" . join($AnnoRowSep, @$iproFam) if &$attrFunc("IPRO_FAM");
-    #$tab .= "\n\tIPRO_SUP\t" . join($AnnoRowSep, @$iproSup) if &$attrFunc("IPRO_SUP");
-    #$tab .= "\n\tIPRO\t" . join($AnnoRowSep, @$iproOther) if &$attrFunc("IPRO");
-    #$tab .= "\n\tGO\t" . merge_anno_rows(\@rows, "GO") if &$attrFunc("GO");
-    #$tab .= "\n\tKEGG\t" . merge_anno_rows(\@rows, "KEGG") if &$attrFunc("KEGG");
-    #$tab .= "\n\tSTRING\t" . merge_anno_rows(\@rows, "STRING") if &$attrFunc("STRING");
-    #$tab .= "\n\tBRENDA\t" . merge_anno_rows(\@rows, "BRENDA") if &$attrFunc("BRENDA");
-    #$tab .= "\n\tPATRIC\t" . merge_anno_rows(\@rows, "PATRIC") if &$attrFunc("PATRIC");
-    #$tab .= "\n\tHMP_Body_Site\t" . merge_anno_rows(\@rows, "HMP_Body_Site") if &$attrFunc("HMP_Body_Site");
-    #$tab .= "\n\tHMP_Oxygen\t" . merge_anno_rows(\@rows, "HMP_Oxygen") if &$attrFunc("HMP_Oxygen");
-    #$tab .= "\n\tEC\t" . merge_anno_rows(\@rows, "EC") if &$attrFunc("EC");
-    #$tab .= "\n\tSuperkingdom\t" . merge_anno_rows(\@rows, "Domain") if &$attrFunc("Superkingdom");
-    #$tab .= "\n\tKingdom\t" . merge_anno_rows(\@rows, "Kingdom") if $Version > 1 and &$attrFunc("Kingdom");
-    #$tab .= "\n\tPhylum\t" . merge_anno_rows(\@rows, "Phylum") if &$attrFunc("Phylum");
-    #$tab .= "\n\tClass\t" . merge_anno_rows(\@rows, "Class") if &$attrFunc("Class");
-    #$tab .= "\n\tOrder\t" . merge_anno_rows(\@rows, "TaxOrder") if &$attrFunc("Order");
-    #$tab .= "\n\tFamily\t" . merge_anno_rows(\@rows, "Family") if &$attrFunc("Family");
-    #$tab .= "\n\tGenus\t" . merge_anno_rows(\@rows, "Genus") if &$attrFunc("Genus");
-    #$tab .= "\n\tSpecies\t" . merge_anno_rows(\@rows, "Species") if &$attrFunc("Species");
-    #$tab .= "\n\tCAZY\t" . merge_anno_rows(\@rows, "Cazy") if &$attrFunc("CAZY");
-    #$tab .= "\n\tNCBI_IDs\t" . join(",", @$ncbiIds) if $ncbiIds and &$attrFunc("NCBI_IDs");
-    #$tab .= "\n\tFragment\t" . merge_anno_rows(\@rows, "Fragment", {0 => "complete", 1 => "fragment"}) if &$attrFunc("Fragment");
-    ## UniRef is added elsewhere
-    ##$tab .= "\n\tUniRef50\t" . $row->{"UniRef50_Cluster"} if $row->{"UniRef50_Cluster"};
-    ##$tab .= "\n\tUniRef90\t" . $row->{"UniRef90_Cluster"} if $row->{"UniRef90_Cluster"};
-    #$tab .= "\n";
 
     return $tab;
 }
@@ -317,26 +222,18 @@ sub merge_anno_rows {
     my $field = shift;
     my $typeSpec = shift || {};
 
-    my $value = join($AnnoRowSep,
-        map {
-            my $val = exists $typeSpec->{$_->{$field}} ? $typeSpec->{$_->{$field}} : $_->{$field};
-            #TODO: remove cleanup when the database after 202203 is released
+    my @vals;
+    foreach my $row (@$rows) {
+        my $val = "";
+        if ($_->{$field}) {
+            $val = exists $typeSpec->{$_->{$field}} ? $typeSpec->{$_->{$field}} : $_->{$field};
             $val =~ s/;\s*$//;
-            $val
-        } @$rows);
-    return $value;
-}
+        }
+        push @vals, $val;
+    }
 
+    my $value = join(ANNO_ROW_SEP, @vals);
 
-sub merge_anno_rows_uniq {
-    my $rows = shift;
-    my $field = shift;
-
-    my $value = join($AnnoRowSep,
-        map {
-            my @parts = split m/,/, $_->{$field};
-            return join(",", uniq sort @parts);
-        } @$rows);
     return $value;
 }
 
@@ -345,57 +242,6 @@ sub get_annotation_data {
     my %annoData;
 
     my $idx = 0;
-
-    #$annoData{"ACC"}                        = {order => $idx++, display => "List of IDs in Rep Node"};
-    #$annoData{"Cluster Size"}               = {order => $idx++, display => "Number of IDs in Rep Node"};
-    #$annoData{"Sequence_Source"}            = {order => $idx++, display => "Sequence Source"};
-    #$annoData{"Query_IDs"}                  = {order => $idx++, display => "Query IDs"};
-    #$annoData{"Other_IDs"}                  = {order => $idx++, display => "Other IDs"};
-    #$annoData{"Organism"}                   = {order => $idx++, display => "Organism"};
-    #$annoData{"Taxonomy_ID"}                = {order => $idx++, display => FIELD_TAXON_ID};
-    #$annoData{"swissprot_status"}           = {order => $idx++, display => "UniProt Annotation Status"};
-    #$annoData{"Description"}                = {order => $idx++, display => "Description"};
-    #$annoData{"Swissprot_Description"}      = {order => $idx++, display => FIELD_SWISSPROT_DESC};
-    #$annoData{"Sequence_Length"}            = {order => $idx++, display => "Sequence Length"};
-    #$annoData{"Cluster_ID_Domain_Length"}   = {order => $idx++, display => "Cluster ID Domain Length"};
-    #$annoData{"Cluster_ID_Sequence_Length"} = {order => $idx++, display => "Cluster ID Sequence Length"};
-    #$annoData{"GN"}                         = {order => $idx++, display => "Gene Name"};
-    #$annoData{"NCBI_IDs"}                   = {order => $idx++, display => "NCBI IDs"};
-    #$annoData{"Superkingdom"}               = {order => $idx++, display => "Superkingdom"};
-    #$annoData{"Kingdom"}                    = {order => $idx++, display => "Kingdom"};
-    #$annoData{"Phylum"}                     = {order => $idx++, display => "Phylum"};
-    #$annoData{"Class"}                      = {order => $idx++, display => "Class"};
-    #$annoData{"Order"}                      = {order => $idx++, display => "Order"};
-    #$annoData{"Family"}                     = {order => $idx++, display => "Family"};
-    #$annoData{"Genus"}                      = {order => $idx++, display => "Genus"};
-    #$annoData{"Species"}                    = {order => $idx++, display => FIELD_SPECIES};
-    #$annoData{"EC"}                         = {order => $idx++, display => "EC"};
-    #$annoData{"PFAM"}                       = {order => $idx++, display => "PFAM"};
-    #$annoData{"PDB"}                        = {order => $idx++, display => "PDB"};
-    #$annoData{"IPRO_DOM"}                   = {order => $idx++, display => "InterPro (Domain)"};
-    #$annoData{"IPRO_FAM"}                   = {order => $idx++, display => "InterPro (Family)"};
-    #$annoData{"IPRO_SUP"}                   = {order => $idx++, display => "InterPro (Homologous Superfamily)"};
-    #$annoData{"IPRO"}                       = {order => $idx++, display => "InterPro (Other)"};
-    #$annoData{"BRENDA"}                     = {order => $idx++, display => "BRENDA ID"};
-    #$annoData{"CAZY"}                       = {order => $idx++, display => "CAZY Name"};
-    #$annoData{"GO"}                         = {order => $idx++, display => "GO Term"};
-    #$annoData{"KEGG"}                       = {order => $idx++, display => "KEGG ID"};
-    #$annoData{"PATRIC"}                     = {order => $idx++, display => "PATRIC ID"};
-    #$annoData{"STRING"}                     = {order => $idx++, display => "STRING ID"};
-    #$annoData{"HMP_Body_Site"}              = {order => $idx++, display => "HMP Body Site"};
-    #$annoData{"HMP_Oxygen"}                 = {order => $idx++, display => "HMP Oxygen"};
-    #$annoData{"P01_gDNA"}                   = {order => $idx++, display => "P01 gDNA"};
-    #$annoData{"UniRef50_IDs"}               = {order => $idx++, display => "UniRef50 Cluster IDs"};
-    #$annoData{"UniRef50_Cluster_Size"}      = {order => $idx++, display => "UniRef50 Cluster Size"};
-    #$annoData{"UniRef90_IDs"}               = {order => $idx++, display => "UniRef90 Cluster IDs"};
-    #$annoData{"UniRef90_Cluster_Size"}      = {order => $idx++, display => "UniRef90 Cluster Size"};
-    #$annoData{"UniRef100_IDs"}              = {order => $idx++, display => "UniRef100 Cluster IDs"};
-    #$annoData{"UniRef100_Cluster_Size"}     = {order => $idx++, display => "UniRef100 Cluster Size"};
-    #$annoData{"ACC_CDHIT"}                  = {order => $idx++, display => "CD-HIT IDs"};
-    #$annoData{"ACC_CDHIT_COUNT"}            = {order => $idx++, display => "CD-HIT Cluster Size"};
-    #$annoData{"Sequence"}                   = {order => $idx++, display => "Sequence"};
-    #$annoData{"User_IDs_in_Cluster"}        = {order => $idx++, display => "User IDs in Cluster"};
-    #$annoData{"Fragment"}                   = {order => $idx++, display => "Sequence Status"};
 
     my @fields = get_annotation_fields();
     map {
@@ -563,23 +409,6 @@ sub is_list_attribute {
     }
 
     return $self->{list_anno}->{$attr} // 0;
-    #return (
-    #    $attr eq "IPRO"             or $attr eq $self->{anno}->{"IPRO"}->{display}              or 
-    #    $attr eq "GI"               or $attr eq $self->{anno}->{"GI"}->{display}                or 
-    #    $attr eq "PDB"              or $attr eq $self->{anno}->{"PDB"}->{display}               or
-    #    $attr eq "PFAM"             or $attr eq $self->{anno}->{"PFAM"}->{display}              or 
-    #    $attr eq "GO"               or $attr eq $self->{anno}->{"GO"}->{display}                or 
-    #    $attr eq "HMP_Body_Site"    or $attr eq $self->{anno}->{"HMP_Body_Site"}->{display}     or
-    #    $attr eq "CAZY"             or $attr eq $self->{anno}->{"CAZY"}->{display}              or 
-    #    $attr eq "Query_IDs"        or $attr eq $self->{anno}->{"Query_IDs"}->{display}         or 
-    #    $attr eq "Other_IDs"        or $attr eq $self->{anno}->{"Other_IDs"}->{display}         or
-    #    $attr eq "Description"      or $attr eq $self->{anno}->{"Description"}->{display}       or 
-    #    $attr eq "NCBI_IDs"         or $attr eq $self->{anno}->{"NCBI_IDs"}->{display}          or 
-    #    $attr eq FIELD_UNIREF50_IDS or $attr eq $self->{anno}->{"UniRef50_IDs"}->{display}  or
-    #    $attr eq FIELD_UNIREF90_IDS or $attr eq $self->{anno}->{"UniRef90_IDs"}->{display}  or 
-    #    $attr eq "ACC_CDHIT"        or $attr eq $self->{anno}->{"ACC_CDHIT"}->{display} or
-    #    $attr eq "User_IDs_in_Cluster" or $attr eq $self->{anno}->{"User_IDs_in_Cluster"}->{display}
-    #);
 }
 
 sub get_attribute_type {
@@ -601,21 +430,20 @@ sub get_attribute_type {
 sub is_expandable_attr {
     my $self = shift;
     my $attr = shift;
-    my $flag = shift;
 
-    $flag = 0 if not defined $flag;
-    $flag = $flag == flag_uniref_only();
+    my $flag = 0;
+    $flag = $flag == UNIREF_ONLY;
 
     $self->{anno} = get_annotation_data() if not exists $self->{anno};
 
     my $result = 0;
-    if (not $flag or $flag == flag_repnode_only()) {
+    if (not $flag or $flag == REPNODE_ONLY) {
         $result = (
             $attr eq FIELD_ID_ACC       or $attr eq $self->{anno}->{&FIELD_ID_ACC}->{display}               or 
             $attr eq "ACC_CDHIT"        or $attr eq $self->{anno}->{"ACC_CDHIT"}->{display}
         );
     }
-    if (not $flag or $flag == flag_uniref_only()) {
+    if (not $flag or $flag == UNIREF_ONLY) {
         $result = ($result or (
             $attr eq FIELD_UNIREF50_IDS     or $attr eq $self->{anno}->{&FIELD_UNIREF50_IDS}->{display}  or 
             $attr eq FIELD_UNIREF90_IDS     or $attr eq $self->{anno}->{&FIELD_UNIREF90_IDS}->{display}  or 
@@ -625,39 +453,6 @@ sub is_expandable_attr {
     return $result;
 }
 
-sub flag_uniref_only {
-    return UNIREF_ONLY;
-}
-
-sub flag_repnode_only {
-    return REPNODE_ONLY;
-}
-
-# Returns the SwissProt description, if any, from an XML node in an SSN.
-sub get_swissprot_description {
-    my $xmlNode = shift;
-
-    my $spStatus = "";
-
-    my @annotations = $xmlNode->findnodes("./*");
-    foreach my $annotation (@annotations) {
-        my $attrName = $annotation->getAttribute("name");
-        if ($attrName eq FIELD_SWISSPROT_DESC) {
-            my $attrType = $annotation->getAttribute("type");
-
-            if ($attrType and $attrType eq "list") {
-                $spStatus = get_swissprot_description($annotation);
-            } else {
-                my $val = $annotation->getAttribute("value");
-                $spStatus = $val if $val and length $val > 3; # Skip NA and N/A
-            }
-
-            last if $spStatus;
-        }
-    }
-
-    return $spStatus;
-}
 
 sub save_meta_struct {
     my $struct = shift;

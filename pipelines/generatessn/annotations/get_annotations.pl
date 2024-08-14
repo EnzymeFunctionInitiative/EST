@@ -15,13 +15,11 @@ use EFI::Database;
 use EFI::IdMapping::Util;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
-
+use EFI::IdMapping::Util qw(:ids);
 use FileUtil;
 
 
-
 my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
-my $legacyAnno; # Remove the legacy after summer 2022
 my $result = GetOptions(
     "out=s"                 => \$annoOut,
     "meta-file=s"           => \$metaFileIn,
@@ -31,7 +29,6 @@ my $result = GetOptions(
     "min-len=i"             => \$minLen,
     "max-len=i"             => \$maxLen,
     "anno-spec-file=s"      => \$annoSpecFile,      # if this is specified we only write out the attributes listed in the file
-    "legacy-anno"           => \$legacyAnno, # Remove this after summer 2022
     "filter-id-list=s"      => \$idListFile,
 );
 
@@ -55,9 +52,9 @@ $maxLen = 0 if not $maxLen or $maxLen =~ m/\D/;
 
 
 my %idTypes;
-$idTypes{EFI::IdMapping::Util::GENBANK} = uc EFI::IdMapping::Util::GENBANK;
-$idTypes{EFI::IdMapping::Util::GI} = uc EFI::IdMapping::Util::GI;
-$idTypes{EFI::IdMapping::Util::NCBI} = uc EFI::IdMapping::Util::NCBI;
+$idTypes{&GENBANK} = uc GENBANK;
+$idTypes{&GI} = uc GI;
+$idTypes{&NCBI} = uc NCBI;
 
 
 my $clusterField = "";
@@ -78,10 +75,6 @@ my ($idMeta) = FileUtil::read_struct_file($metaFileIn, $idListFile);
 
 my $unirefLenFiltWhere = "";
 my $sqlLenField = FIELD_SEQ_LEN_KEY;
-# Remove the legacy after summer 2022
-if ($legacyAnno) {
-    $sqlLenField = "Sequence_Length";
-}
 if ($minLen) {
     $unirefLenFiltWhere .= " AND A.$sqlLenField >= $minLen";
 }
@@ -105,13 +98,12 @@ foreach my $accession (sort keys %$idMeta){
         # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
         # sequence cluster.  This code does that.
         my @sql_parts;
-        # Remove the legacy after summer 2022
-        @sql_parts = (EFI::Annotations::build_query_string($accession, "", $legacyAnno));
+        @sql_parts = (EFI::Annotations::build_query_string($accession, ""));
         if ($unirefVersion and $clusterField and exists $idMeta->{$accession}->{$clusterField}) {
             my @allIds = split(m/,/, $idMeta->{$accession}->{$clusterField});
             my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
             while (my @chunk = splice(@idList, 0, 200)) {
-                my $sql = EFI::Annotations::build_query_string(\@chunk, $unirefLenFiltWhere, $legacyAnno);
+                my $sql = EFI::Annotations::build_query_string(\@chunk, $unirefLenFiltWhere);
                 push @sql_parts, $sql;
             }
         }
@@ -155,7 +147,6 @@ foreach my $accession (sort keys %$idMeta){
         
         my @params = ($accession, \@rows, \@ncbiIds);
         push @params, $annoSpec ? $annoSpec : undef;
-        push @params, $legacyAnno ? 1 : 0;
         my $data = EFI::Annotations::build_annotations(@params);
         print OUT $data;
     }

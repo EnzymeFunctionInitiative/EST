@@ -26,7 +26,7 @@ my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbve
 my $result = GetOptions(
     "blast=s"               => \$inputBlast,
     "fasta=s"               => \$inputFasta,
-    "struct=s"              => \$annoFile,
+    "metadata=s"            => \$annoFile,
     "output=s"              => \$outputSsn,
     "title=s"               => \$title,
     "maxfull|max-edges=i"   => \$maxNumEdges,
@@ -38,13 +38,13 @@ my $result = GetOptions(
     "is-domain"             => \$isDomainJob,
 );
 
-die "Missing -blast command line argument" if not $inputBlast;
-die "Missing -fasta command line argument" if not $inputFasta;
-die "Missing -struct command line argument" if not $annoFile;
-die "Missing -output command line argument" if not $outputSsn;
-die "Missing -title command line argument" if not $title;
-die "Missing -dbver command line argument" if not $dbver;
-die "-max-edges must be an integer" if defined $maxNumEdges and $maxNumEdges =~ /\D/;
+die "Missing --blast command line argument" if not $inputBlast;
+die "Missing --fasta command line argument" if not $inputFasta;
+die "Missing --metadata command line argument" if not $annoFile;
+die "Missing --output command line argument" if not $outputSsn;
+die "Missing --title command line argument" if not $title;
+die "Missing --dbver command line argument" if not $dbver;
+die "--max-edges must be an integer" if defined $maxNumEdges and $maxNumEdges =~ /\D/;
 
 
 $includeSeqs = 0            if not defined $includeSeqs;
@@ -211,7 +211,7 @@ foreach my $element (@uprotnumbers) {
         $element = $1;
     }
     foreach my $key (@metas) {
-        my $displayName = $annoData->{$key}->{display};
+        my $displayName = $annoData->{$key}->{display} // $key;
         if ($isList{$key}) {
             $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
             my @pieces;
