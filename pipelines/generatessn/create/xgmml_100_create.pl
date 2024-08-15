@@ -19,6 +19,7 @@ use lib "$FindBin::Bin/../../../lib";
 use EFI::Config;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:source);
+use EFI::EST::Metadata;
 use AlignmentScore;
 
 
@@ -47,222 +48,112 @@ die "Missing --dbver command line argument" if not $dbver;
 die "--max-edges must be an integer" if defined $maxNumEdges and $maxNumEdges =~ /\D/;
 
 
-$includeSeqs = 0            if not defined $includeSeqs;
-$includeAllSeqs = 0         if not defined $includeAllSeqs;
-$maxNumEdges = 10000000     if not defined $maxNumEdges;
-$useMinEdgeAttr = defined($useMinEdgeAttr) ? 1 : 0;
+my $IncludeSeqs         = defined $includeSeqs;
+my $IncludeAllSeqs      = defined $includeAllSeqs;
+my $MaxNumEdges         = $maxNumEdges // 10000000;     
+my $UseMinEdgeAttr      = defined $useMinEdgeAttr;
 
 my @domAttr = ($isDomainJob ? ("domain", "DOM_yes") : ());
 
-
-my ($edge, $node) = (0, 0);
-
-my %sequence;
-my %uprot;
-my @uprotnumbers;
-
-my $blastlength=`wc -l $inputBlast`;
-my @blastlength = split(/\s+/, $blastlength);
-my $numEdges = $blastlength[0];
-chomp($numEdges);
-if (int($numEdges) > $maxNumEdges) {
-    open(OUTPUT, ">$outputSsn") or die "cannot write to $outputSsn: $!";
-    print OUTPUT "Too many edges ($numEdges) not creating file\n";
-    print OUTPUT "Maximum edges is $maxNumEdges\n";
-    exit;
-}
+my $SeqLenField = "seq_len";
 
 
-my $parser = XML::LibXML->new();
+exit if not validateInputBlast($inputBlast);
+
+
+
 my $outputFh = new IO::File(">$outputSsn");
 flock($outputFh, LOCK_EX);
-my $writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
 
-my $anno = new EFI::Annotations;
+my $Writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
 
-print time . " check length of 2.out file\n";
+my $Anno = new EFI::Annotations;
+my $parser = new EFI::EST::Metadata;
 
+my $Connectivity = getConnectivity($ncMapFile);
 
-my $connectivity = {};
-if ($ncMapFile and -f $ncMapFile) {
-    open my $fh, "<", $ncMapFile;
-    while (<$fh>) {
-        chomp;
-        my ($id, $nc, $color) = split(m/\t/);
-        $connectivity->{$id} = {nc => $nc, color => $color};
-    }
-    close $fh;
-}
+my $Sequences = loadFastaFile($inputFasta);
 
 
+my %IsFieldList;
+my $NodeData = {};
+my @UniprotIds;
 
-print time . " Reading in uniprot numbers from fasta file\n";
+my $includeSequences = 0;
 
-my %sequences;
-my $curSeqId = "";
-open(FASTA, $inputFasta) or die "could not open $inputFasta: $!";
-while (my $line = <FASTA>) {
-    chomp $line;
-    if ($line =~ />([A-Za-z0-9:]+)/) {
-        push @uprotnumbers, $1;
-        if ($includeSeqs) {
-            $curSeqId = $1;
-            $sequences{$curSeqId} = "";
+
+my ($ssnAnno, $fieldNames) = $parser->parseFile($annoFile);
+my @fieldNames = @$fieldNames;
+
+# Convert values from the metadata structure into a form we can use for creating the SSN XML
+foreach my $id (keys %$ssnAnno) {
+    foreach my $field (keys %{ $ssnAnno->{$id} }) {
+        my $isList = 0;
+        if ($Anno->is_list_attribute($field)) {
+            $IsFieldList{$field} = 1;
+            $isList = 1;
         }
-    } elsif ($includeSeqs and ($includeAllSeqs or $curSeqId =~ m/^z/)) {
-        $sequences{$curSeqId} .= $line;
-    }
-}
-close FASTA;
-print time . " Finished reading in uniprot numbers\n";
 
-my $seqLenField = "seq_len";
+        my $value = $ssnAnno->{$id}->{$field};
+        $value = "None" if not $value;
 
-# Column headers and order in output file.
-my @metas;
-my %hasMetas;
-my %isList;
-my $hasSeqs = 0;
-print time . " Read in annotation data $annoFile\n";
-#if struct file (annotation information) exists, use that to generate annotation information
-if (-e $annoFile) {
-    print "populating annotation structure from file\n";
-    open STRUCT, $annoFile or die "could not open $annoFile: $!";
-    my $id;
-    while (my $line = <STRUCT>) {
-        chomp $line;
-        if ($line =~ /^([A-Za-z0-9\:]+)/) {
-            $id = $1;
-        } else {
-            my ($junk, $key, $value) = split "\t", $line;
-            unless($value) {
-                $value = 'None';
-            }
-            next if not $key;
-            if (not exists $hasMetas{$key}) {
-                push(@metas, $key);
-                $hasMetas{$key} = 1;
-            }
-            if ($anno->is_list_attribute($key)) {
-                $isList{$key} = 1;
-                my @vals = uniq sort split(m/\^/, $value);
-                @vals = grep !m/^None$/, @vals if scalar @vals > 1;
-                my @tmpline = grep /\S/, map { split(m/,/, $_) } @vals;
-                $uprot{$id}{$key} = \@tmpline;
-            } else {
-                my @vals = uniq sort split(m/\^/, $value);
-                @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if scalar @vals > 1;
-                if (scalar @vals > 1) {
-                    $isList{$key} = 1;
-                    $uprot{$id}{$key} = \@vals;
-                } elsif (scalar @vals == 1) {
-                    $isList{$key} = 0 if not exists $isList{$key};
-                    $uprot{$id}{$key} = $vals[0];
-                }
-            }
-            if ($key eq FIELD_SEQ_SRC_KEY and
-                ($includeAllSeqs or $value eq FIELD_SEQ_SRC_VALUE_FASTA) and
-                exists $sequences{$id})
-            {
-                $uprot{$id}{FIELD_SEQ_KEY} = $sequences{$id};
-                $hasSeqs = 1;
-            }
+        my ($forceList, $data) = loadDataForNode($isList, $id, $value);
+
+        if ($forceList) {
+            $IsFieldList{$field} = 1;
+            $isList = 1;
         }
-    }
-    close STRUCT;
-}
-if ($hasSeqs) {
-    push(@metas, FIELD_SEQ_KEY);
-}
-print time . " done reading in annotation data\n";
 
+        $NodeData->{$id}->{$field} = $data;
 
-if ($#metas < 0) {
-    print time . " Open struct file and get a annotation keys\n";
-    open STRUCT, $annoFile or die "could not open $annoFile: $!";
-    my $line = <STRUCT>;
-    @metas = ();
-    while ($line = <STRUCT>) {
-        last if $line =~ /^\w/;
-        chomp $line;
-        if ($line =~ /^\s/) {
-            my @parts = split /\t/, $line;
-            push @metas, $parts[1];
-        }
+        my $includeSeqs = addSequenceData($id, $field, $value, $NodeData->{$id});
+        $includeSequences = 1 if $includeSeqs;
     }
 }
 
-
-my $annoData = $anno->get_annotation_data();
-@metas = $anno->sort_annotations(@metas);
-
-my $metaline = join ',', @metas;
+if ($includeSequences) {
+    push(@fieldNames, FIELD_SEQ_KEY);
+}
 
 
-print time ." Metadata keys are $metaline\n";
-print time ." Start nodes\n";
-$writer->comment("Database: $dbver");
-$writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML', @domAttr);
-foreach my $element (@uprotnumbers) {
-    my $origelement = $element;
-    $node++;
-    $writer->startTag('node', 'id' => $element, 'label' => $element);
-    if ($element =~ /(\w{6,10}):/) {
-        $element = $1;
+
+my $AnnoMeta = $Anno->get_annotation_data();
+
+@fieldNames = $Anno->sort_annotations(@fieldNames);
+
+
+# Write SSN header info
+$Writer->comment("Database: $dbver");
+$Writer->startTag('graph', 'label' => "$title Full Network", 'xmlns' => 'http://www.cs.rpi.edu/XGMML', @domAttr);
+
+# Write nodes to the SSN
+foreach my $id (@UniprotIds) {
+    my $origId = $id;
+
+    $Writer->startTag('node', 'id' => $id, 'label' => $id);
+
+    # This allows us to get information from the metadata in the case that the ID includes domain information.
+    if ($id =~ /(\w{6,10}):/) {
+        $id = $1;
     }
-    foreach my $key (@metas) {
-        my $displayName = $annoData->{$key}->{display} // $key;
-        if ($isList{$key}) {
-            $writer->startTag('att', 'type' => 'list', 'name' => $displayName);
-            my @pieces;
-            if (ref $uprot{$element}{$key} eq "ARRAY") {
-                @pieces = @{$uprot{$element}{$key}};
-            } elsif ($uprot{$element}{$key}) {
-                @pieces = ($uprot{$element}{$key});
-            }
-            foreach my $piece (@pieces) {
-                $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
-                my $type = $anno->get_attribute_type($key);
-                #if ($piece or $type ne "integer") {
-                if ($type ne "integer" or ($piece and $piece ne "None")) {
-                    $writer->emptyTag('att', 'type' => $type, 'name' => $displayName, 'value' => $piece);
-                }
-            }
-            $writer->endTag();
-        } else {
-            my $piece = $uprot{$element}{$key};
-            $piece =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $piece;
-            if ($key eq $seqLenField and $origelement =~ /\w{6,10}:(\d+):(\d+)/) {
-                $piece = $2 - $1 + 1;
-                print "start:$1\tend$2\ttotal:$piece\n";
-            }
-            my $type = $anno->get_attribute_type($key);
-            #if ($piece or $type ne "integer") {
-            if ($type ne "integer" or ($piece and $piece ne "None")) {
-                $writer->emptyTag('att', 'name' => $displayName, 'type' => $type, 'value' => $piece);
-            }
-        }
+
+    foreach my $fieldName (@fieldNames) {
+        my $displayName = $AnnoMeta->{$fieldName}->{display} // $fieldName;
+        writeNodeField($fieldName, $displayName, $id, $origId);
     }
+
     if ($ncMapFile) {
-        my $ncVal = 0;
-        my $ncColor = "";
-        if ($connectivity->{$origelement}) {
-            $ncVal = $connectivity->{$origelement}->{nc};
-            $ncColor = $connectivity->{$origelement}->{color};
-        }
-        my $cname = $annoData->{connectivity} ? $annoData->{connectivity}->{display} : "Neighborhood Connectivity";
-        $writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
-        $writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
-        $writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
+        writeNcField($origId);
     }
-    $writer->endTag();
+
+    $Writer->endTag();
 }
 
-print time . " Writing Edges\n";
-open BLASTFILE, $inputBlast or die "could not open blast file $inputBlast: $!";
-while (<BLASTFILE>) {
-    my $line=$_;
-    $edge++;
+
+# Write edges to the SSN
+open my $bfh, "<", $inputBlast or die "could not open blast file $inputBlast: $!";
+
+while (my $line = <$bfh>) {
     chomp $line;
     
     my @parts = split /\t/, $line;
@@ -270,24 +161,247 @@ while (<BLASTFILE>) {
     my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen) = @parts;
 
     my $alignmentScore = compute_ascore(@parts);
+
     my %edgeProp = ('id' => "$qid,$sid", 'label' => "$qid,$sid", 'source' => $qid, 'target' => $sid);
-    if (not $useMinEdgeAttr) {
-        $writer->startTag('edge', %edgeProp);
-        $writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $pid);
-        $writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $alignmentScore);
-        $writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $alen);
-        $writer->endTag();
-    } else {
-        $writer->emptyTag('edge', %edgeProp);
-    }
+
+    writeEdge($pid, $alignmentScore, $alen, \%edgeProp);
 }
-close BLASTFILE;
-print time . " Finished writing edges\n";
-#print the footer
-$writer->endTag;
-print "finished writing xgmml file\n";
-print "\t$node\t$edge\n";
+
+close $bfh;
+
+$Writer->endTag;
 
 $outputFh->close();
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+sub addSequenceData {
+    my $id = shift;
+    my $field = shift;
+    my $value = shift;
+    my $nodeData = shift;
+
+    my $includeSeqs = 0;
+
+    # Include the sequence as a node attribute if this is a FASTA-type job
+    if ($field eq FIELD_SEQ_SRC_KEY and
+        ($IncludeAllSeqs or $field eq FIELD_SEQ_SRC_VALUE_FASTA) and
+        exists $Sequences->{$id})
+    {
+        $nodeData->{FIELD_SEQ_KEY} = $Sequences->{$id};
+        $includeSeqs = 1;
+    }
+
+    return $includeSeqs;
+}
+
+
+sub loadDataForNode {
+    my $isList = shift;
+    my $id = shift;
+    my $value = shift;
+
+    my $data = "";
+
+    my $forceList = 0;
+
+    my @vals = uniq sort split(m/\^/, $value);
+
+    if ($isList) {
+        @vals = grep !m/^None$/, @vals if @vals > 1;
+        @vals = grep /\S/, map { split(m/,/, $_) } @vals;
+        $data = \@vals;
+    } else {
+        @vals = grep !m/^\s*$/, grep !m/^None$/, @vals if @vals > 1;
+        if (@vals > 1) {
+            $data = \@vals;
+            $forceList = 1;
+        } else {
+            $data = $vals[0];
+        }
+    }
+
+    return ($forceList, $data);
+}
+
+
+sub writeEdge {
+    my $pid = shift;
+    my $ascore = shift;
+    my $alen = shift;
+    my $edgeProp = shift;
+
+    if (not $UseMinEdgeAttr) {
+        $Writer->startTag('edge', %$edgeProp);
+        $Writer->emptyTag('att', 'name' => '%id', 'type' => 'real', 'value' => $pid);
+        $Writer->emptyTag('att', 'name' => 'alignment_score', 'type'=> 'real', 'value' => $ascore);
+        $Writer->emptyTag('att', 'name' => 'alignment_len', 'type' => 'integer', 'value' => $alen);
+        $Writer->endTag();
+    } else {
+        $Writer->emptyTag('edge', %$edgeProp);
+    }
+}
+
+
+sub writeNcField {
+    my $origId = shift;
+
+    my $ncVal = 0;
+    my $ncColor = "";
+    if ($Connectivity->{$origId}) {
+        $ncVal = $Connectivity->{$origId}->{nc};
+        $ncColor = $Connectivity->{$origId}->{color};
+    }
+
+    my $cname = $AnnoMeta->{connectivity} ? $AnnoMeta->{connectivity}->{display} : "Neighborhood Connectivity";
+    $Writer->emptyTag('att', 'type' => 'real', 'name' => $cname, 'value' => $ncVal);
+    $Writer->emptyTag('att', 'type' => 'string', 'name' => "$cname Color", 'value' => $ncColor) if $ncColor;
+    $Writer->emptyTag('att', 'type' => 'string', 'name' => "node.fillColor", 'value' => $ncColor) if $ncColor;
+}
+
+
+# Uses $Writer and $Anno, which are script-level scope
+sub writeNodeField {
+    my $fieldName = shift;
+    my $displayName = shift;
+    my $id = shift;
+    my $origId = shift;
+
+    my $data = $NodeData->{$id}->{$fieldName};
+    my $isFieldList = $IsFieldList{$fieldName};
+
+    if ($isFieldList) {
+        writeNodeListField($fieldName, $displayName, $data);
+    } else {
+        writeNodeScalarField($fieldName, $displayName, $data, $origId);
+    }
+}
+
+
+sub writeNodeScalarField {
+    my $fieldName = shift;
+    my $displayName = shift;
+    my $value = shift;
+    my $origId = shift;
+
+    my $fieldType = $Anno->get_attribute_type($fieldName);
+
+    # Get rid of wierd ascii characters
+    $value =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $value;
+
+    # Compute sequence length if the ID contains domain info
+    if ($fieldName eq $SeqLenField and $origId =~ /\w{6,10}:(\d+):(\d+)/) {
+        $value = $2 - $1 + 1;
+    }
+
+    if ($fieldType ne "integer" or ($value and $value ne "None")) {
+        $Writer->emptyTag('att', 'name' => $displayName, 'type' => $fieldType, 'value' => $value);
+    }
+}
+
+
+sub writeNodeListField {
+    my $fieldName = shift;
+    my $displayName = shift;
+    my $value = shift;
+
+    my $fieldType = $Anno->get_attribute_type($fieldName);
+
+    $Writer->startTag('att', 'type' => 'list', 'name' => $displayName);
+
+    my @values;
+    if (ref $value eq "ARRAY") {
+        @values = @$value;
+    } elsif ($value) {
+        @values = ($value);
+    }
+
+    foreach my $value (@values) {
+        # Get rid of wierd ascii characters
+        $value =~ s/[\x00-\x08\x0B-\x0C\x0E-\x1F]//g if $value;
+        if ($fieldType ne "integer" or ($value and $value ne "None")) {
+            $Writer->emptyTag('att', 'type' => $fieldType, 'name' => $displayName, 'value' => $value);
+        }
+    }
+
+    $Writer->endTag();
+}
+
+
+sub loadFastaFile {
+    my $inputFasta = shift;
+
+    my %sequences;
+    my $curSeqId = "";
+
+    open my $fh, "<", $inputFasta or die "could not open $inputFasta: $!";
+    while (my $line = <$fh>) {
+        chomp $line;
+        if ($line =~ />([A-Za-z0-9:]+)/) {
+            push @UniprotIds, $1;
+            if ($IncludeSeqs) {
+                $curSeqId = $1;
+                $sequences{$curSeqId} = "";
+            }
+        } elsif ($IncludeSeqs and ($IncludeAllSeqs or $curSeqId =~ m/^z/)) {
+            $sequences{$curSeqId} .= $line;
+        }
+    }
+    close $fh;
+
+    return \%sequences;
+}
+
+
+sub getConnectivity {
+    my $ncMapFile = shift;
+
+    my $connectivity = {};
+
+    if ($ncMapFile and -f $ncMapFile) {
+        open my $fh, "<", $ncMapFile;
+        while (<$fh>) {
+            chomp;
+            my ($id, $nc, $color) = split(m/\t/);
+            $connectivity->{$id} = {nc => $nc, color => $color};
+        }
+        close $fh;
+    }
+
+    return $connectivity;
+}
+
+
+sub validateInputBlast {
+    my $inputBlast = shift;
+
+    my $blastlength = `wc -l $inputBlast`;
+    my @blastlength = split(/\s+/, $blastlength);
+    my $numEdges = $blastlength[0];
+    chomp($numEdges);
+
+    if (int($numEdges) > $MaxNumEdges) {
+        open my $output, ">", $outputSsn or die "cannot write to $outputSsn: $!";
+        $output->print("Too many edges ($numEdges) not creating file\n");
+        $output->print("Maximum edges is $MaxNumEdges\n");
+        close $output;
+        return 0;
+    } else {
+        return 1;
+    }
+}
