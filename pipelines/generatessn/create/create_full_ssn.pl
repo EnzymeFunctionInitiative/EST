@@ -20,7 +20,7 @@ use EFI::Config;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:source);
 use EFI::EST::Metadata;
-use AlignmentScore;
+use EFI::EST::AlignmentScore;
 
 
 my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile, $isDomainJob);
