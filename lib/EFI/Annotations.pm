@@ -33,6 +33,7 @@ sub new {
     bless($self, $class);
 
     $self->{use_tigr} = 0;
+    $self->{ssn_fields} = [ $self->get_ssn_annotation_fields() ];
 
     return $self;
 }
@@ -61,7 +62,7 @@ sub build_query_string {
 # Parameters:
 #    $column - accession ID column name
 #    $id - accession ID
-#    $extraWhere - additional conditions, optional
+#    $extraWhere (optional) - additional conditions
 #
 # Returns:
 #    SQL SELECT statement
@@ -176,35 +177,41 @@ sub build_annotations {
             $val = "None" if not $val;
             $val =~ s/;\s*$//;
         }
-        $val = join("\t", $key, $val);
         return $val;
     };
 
-    my @fields = $self->get_annotation_fields(ANNO_FIELDS_BASE_SSN);
-    my $tab = "\n\t";
-    $tab .= join("\n\t", grep { length $_ } map { &$getValueFunc($_->{name}) } @fields);
-    $tab .= "\n";
+    my @fields = @{ $self->{ssn_fields} };
+    my $data = {};
+    my @fieldNames;
+    foreach my $field (@fields) {
+        my $fname = $field->{name};
+        my $value = &$getValueFunc($fname);
+        #next if not length $value;
+        push @fieldNames, $fname;
+        $data->{$fname} = $value;
+    }
 
-    return $tab;
+    return $data;
 }
 
 
-#sub build_annotations_str {
-#    my $self = shift;
-#    my $accession = shift;
-#    my $row = shift;
-#    my $ncbiIds = shift;
-#    my $annoSpec = shift // undef;
-#
-#    my ($fieldNames, $data) = $self->build_annotations($accession, $row, $ncbiIds, $annoSpec);
-#
-#    my $tab = $accession . "\n";
-#    foreach my $field (@$fieldNames) {
-#        $tab .= join("\t", $field, $data->{$field}) . "\n";
-#    }
-#
-#    return $tab;
-#}
+# Legacy, only for testing
+sub build_annotations_str {
+    my $self = shift;
+    my $accession = shift;
+    my $row = shift;
+    my $ncbiIds = shift;
+    my $annoSpec = shift // undef;
+
+    my ($fieldNames, $data) = $self->build_annotations($accession, $row, $ncbiIds, $annoSpec);
+
+    my $tab = $accession . "\n";
+    foreach my $field (@$fieldNames) {
+        $tab .= join("\t", $field, $data->{$field}) . "\n";
+    }
+
+    return $tab;
+}
 
 
 #
@@ -266,8 +273,8 @@ sub parse_interpro {
 #     $rows - an array ref containing one or more hash refs of database retrieval rows (one hash
 #         ref for a UniProt retrieval, multiple for UniRef retrieval).
 #     $field - the field in the row(s) to merge
-#     $typeSpec - display specific values differently; e.g. if the value is empty, replace with 'None'
-#         (optional)
+#     $typeSpec (optional) - display specific values differently;
+#         e.g. if the value is empty, replace with 'None', or if the value is '0', replace with 'complete'
 #
 # Returns:
 #     a scalar value with all of the values joined together using the row separator character
@@ -280,8 +287,8 @@ sub merge_anno_rows {
     my @vals;
     foreach my $row (@$rows) {
         my $val = "";
-        if ($_->{$field}) {
-            $val = exists $typeSpec->{$_->{$field}} ? $typeSpec->{$_->{$field}} : $_->{$field};
+        if (exists $row->{$field}) {
+            $val = exists $typeSpec->{$row->{$field}} ? $typeSpec->{$row->{$field}} : $row->{$field};
             $val =~ s/;\s*$//;
         }
         push @vals, $val;
@@ -426,6 +433,13 @@ sub get_annotation_fields {
     } else {
         return @{ $self->{fields} };
     }
+}
+
+
+sub get_ssn_annotation_fields {
+    my $self = shift;
+    my @fields = $self->get_annotation_fields(ANNO_FIELDS_BASE_SSN);
+    return @fields;
 }
 
 
@@ -782,6 +796,24 @@ the order in which they appear, the display name, and the node type.
     #     },
     #     ...
     # }
+
+=head3 get_ssn_annotation_fields()
+
+Returns a list of field names that are included by default in the SSN output.
+
+=head4 Returns
+
+A list of field names.
+
+=head4 Example Usage
+
+    my @fields = $anno->get_ssn_annotation_fields();
+    # @fields contains:
+    # (
+    #    "organism",
+    #    "taxonomy_id",
+    #    ...
+    # )
 
 =head3 decode_meta_struct($jsonString)
 
