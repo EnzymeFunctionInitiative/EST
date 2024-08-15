@@ -309,7 +309,7 @@ sub writeNodeScalarField {
         $value = $2 - $1 + 1;
     }
 
-    if ($fieldType ne "integer" or ($value and $value ne "None")) {
+    if ($fieldType ne "integer" or (length $value and $value ne "None")) {
         $Writer->emptyTag('att', 'name' => $displayName, 'type' => $fieldType, 'value' => $value);
     }
 }

@@ -287,7 +287,7 @@ sub merge_anno_rows {
     my @vals;
     foreach my $row (@$rows) {
         my $val = "";
-        if (exists $row->{$field}) {
+        if (defined $row->{$field}) {
             $val = exists $typeSpec->{$row->{$field}} ? $typeSpec->{$row->{$field}} : $row->{$field};
             $val =~ s/;\s*$//;
         }

@@ -38,7 +38,7 @@ sub parseFile {
         next if $line =~ m/^#/;
         next if $line =~ m/^\s*$/;
 
-        my @parts = split(m/\t/, $line);
+        my @parts = split(m/\t/, $line, -1);
         my $id = $parts[0];
 
         next if ($id and $idList and not $idList->{$id});
