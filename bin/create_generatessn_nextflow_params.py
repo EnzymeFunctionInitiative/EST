@@ -51,7 +51,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.blast_parquet = os.path.join(args.est_output_dir, "1.out.parquet")
         args.fasta_file = os.path.join(args.est_output_dir, "all_sequences.fasta")
         args.output_dir = os.path.join(args.est_output_dir, f"ssn")
-        args.seq_meta_file = os.path.join(args.est_output_dir, f"sequence_metadata.tab")
+        args.seq_meta_file = os.path.join(args.est_output_dir, "sequence_metadata.tab")
         parameter_file = os.path.join(args.est_output_dir, "params.yml")
         try:
             with open(parameter_file) as f:
