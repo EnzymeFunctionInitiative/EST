@@ -1,5 +1,5 @@
 
-package AlignmentScore;
+package EFI::EST::AlignmentScore;
 
 use strict;
 use warnings;

@@ -11,9 +11,12 @@ use lib abs_path(dirname(__FILE__) . "/../../");
 use List::MoreUtils qw{apply uniq any};
 use List::Util qw(sum);
 use Array::Utils qw(:all);
-use EFI::Annotations;
 use XML::LibXML::Reader;
 use Data::Dumper;
+
+use EFI::Annotations;
+use EFI::Annotations::Fields qw(:annotations);
+
 
 use constant ALL_IDS => 1;          # Flag to indicate to return all IDs, not just the metanodes
 use constant METANODE_IDS => 2;     # Flag to indicate to return the list of IDs that match the visible nodes in the network
@@ -45,8 +48,8 @@ sub new {
 #    $self->{uniref90_id_dir} = ($args{uniref90_id_dir} and -d $args{uniref90_id_dir}) ? $args{uniref90_id_dir} : "";
 #    $self->{cluster_fh} = {};
     $self->{color_only} = exists $args{color_only} ? $args{color_only} : 0;
-    $self->{anno} = EFI::Annotations::get_annotation_data();
     $self->{efi_anno} = new EFI::Annotations;
+    $self->{anno} = $self->{efi_anno}->get_annotation_data();
 
     $self->{network} = {
         super_nodes => {},      # supernodes; clusters => metanode ID (ID as in id_label_map IDs), with domain info (if present)
@@ -210,9 +213,9 @@ sub getNodes {
                     }
                 };
 
-                if ($attrName eq EFI::Annotations::FIELD_SWISSPROT_DESC) {
+                if ($attrName eq FIELD_SWISSPROT_DESC) {
                     &$getNodeValFn(\%swissprotDesc);
-                } elsif ($attrName eq EFI::Annotations::FIELD_SEQ_KEY and $nodeLabel =~ m/^z/) {
+                } elsif ($attrName eq FIELD_SEQ_KEY and $nodeLabel =~ m/^z/) {
                     my %seq;
                     &$getNodeValFn(\%seq);
                     &$writeSeqFn($nodeLabel, ${$seq{$nodeLabel}}[0]) if scalar @{$seq{$nodeLabel}};

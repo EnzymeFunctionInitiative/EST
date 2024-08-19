@@ -8,8 +8,9 @@ use FindBin;
 use Cwd;
 
 use lib "$FindBin::Bin/lib";
+use lib "$FindBin::Bin/../../../lib";
 
-use EFI::Import::Metadata ':source';
+use EFI::Annotations::Fields qw(INPUT_SEQ_ID);
 use EFI::Import::Config::Defaults;
 
 

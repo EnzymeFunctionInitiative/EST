@@ -29,6 +29,7 @@ def add_args(parser):
     manual_parser = subparsers.add_parser("manual", help="Manually specify parameters related to EST output", parents=[ssn_args_parser]).add_argument_group("EST-related parameters")
     manual_parser.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
     manual_parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
+    manual_parser.add_argument("--seq-meta-file", required=True, type=str, help="EST sequence metadata file to get basic metadata from")
     manual_parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
     manual_parser.add_argument("--uniref-version", default="", choices=["", "90", "50"], help="Which database to use for annotations")
     manual_parser.add_argument("--efi-config", required=True, help="Location of the EFI config file")
@@ -50,6 +51,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.blast_parquet = os.path.join(args.est_output_dir, "1.out.parquet")
         args.fasta_file = os.path.join(args.est_output_dir, "all_sequences.fasta")
         args.output_dir = os.path.join(args.est_output_dir, f"ssn")
+        args.seq_meta_file = os.path.join(args.est_output_dir, "sequence_metadata.tab")
         parameter_file = os.path.join(args.est_output_dir, "params.yml")
         try:
             with open(parameter_file) as f:
@@ -75,6 +77,10 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"FASTA file '{args.fasta_file}' does not exist")
         fail = True
 
+    if not os.path.exists(args.seq_meta_file):
+        print(f"Sequence metadata file '{args.seq_meta_file}' does not exist")
+        fail = True
+
     if os.path.exists(args.output_dir):
         if len(os.listdir(args.output_dir)) > 0:
             print(f"Output directory '{args.output_dir}' is not empty, refusing to create params.yml")
@@ -96,6 +102,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     else:
         args.blast_parquet = os.path.abspath(args.blast_parquet)
         args.fasta_file = os.path.abspath(args.fasta_file)
+        args.seq_meta_file = os.path.abspath(args.seq_meta_file)
         args.output_dir = os.path.abspath(args.output_dir)
         args.efi_config = os.path.abspath(args.efi_config)
         if os.path.exists(args.efi_db):
@@ -107,10 +114,11 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(blast_parquet, fasta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id, efi_db, mode, est_output_dir=None):
+def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id, efi_db, mode, est_output_dir=None):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
+        "seq_meta_file": seq_meta_file,
         "final_output_dir": output_dir,
         "filter_parameter": filter_parameter,
         "filter_min_val": filter_min_val,

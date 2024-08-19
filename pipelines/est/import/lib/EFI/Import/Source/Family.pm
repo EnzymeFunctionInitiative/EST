@@ -11,7 +11,7 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Source);
 
-use EFI::Import::Metadata ':source';
+use EFI::Annotations::Fields ':source';
 
 
 our $TYPE_NAME = "family";
