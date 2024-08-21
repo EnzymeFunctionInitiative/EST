@@ -56,9 +56,14 @@ sub getSequenceIds {
     my $self = shift;
 
     my $rawIds = $self->parseAccessions();
-    my ($ids, $metadata) = $self->identifyAccessionIds($rawIds);
+    my ($ids, $sourceInfo) = $self->identifyAccessionIds($rawIds);
 
-    $self->addSunburstIds($ids);
+    # Maps UniRef50/UniRef90 to UniProt
+    my $unirefMapping = $self->retrieveUnirefIds($ids);
+
+    my $metadata = $self->createMetadata($ids, $unirefMapping, $sourceInfo);
+
+    $self->addSunburstIds($ids, $unirefMapping);
 
     #TODO: add sequences from family
     #TODO: apply tax/family filters here??? ???
@@ -127,7 +132,6 @@ sub identifyAccessionIds {
             $meta->{$id}->{query_ids} = $reverseMap->{$id};
             $numForeign++ if ($reverseMap->{$id}->[0] and $id ne $reverseMap->{$id}->[0]);
         }
-        $meta->{$id}->{&FIELD_SEQ_SRC_KEY} = FIELD_SEQ_SRC_VALUE_FASTA;
     }
 
     $self->addStatsValue("num_ids", scalar @ids);
@@ -139,18 +143,35 @@ sub identifyAccessionIds {
 }
 
 
-####################################################################################################
-# 
-# 
 
 
-sub addSunburstIds {
+sub createMetadata {
     my $self = shift;
-    my $uniprotMetadata = shift;
+    my $ids = shift;
+    my $unirefMapping = shift;
+    my $sourceInfo = shift;
 
-    foreach my $id (keys %$uniprotMetadata) {
-        $self->addIdToSunburst($id, {uniref50_seed => "", uniref90_seed => ""});
+    if ($self->{uniref_version}) {
+        $unirefMapping = $self->{uniref_version} eq "uniref50" ? $unirefMapping->{50} : $unirefMapping->{90};
     }
+
+    my $metaKeyMap = {
+        query_id => "Query_IDs",
+        other_ids => "Other_IDs",
+        description => "Description",
+    };
+
+    my $addMetadataFn = sub {
+        my ($id, $meta) = @_;
+        foreach my $k (keys %$sourceInfo) {
+            my $metaKey = $metaKeyMap->{$k} // $k;
+            $meta->{$metaKey} = $sourceInfo->{$k};
+        }
+    };
+
+    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FASTA, $ids, $unirefMapping, $addMetadataFn);
+
+    return $meta;
 }
 
 
