@@ -30,6 +30,11 @@ sub new {
 }
 
 
+
+
+#
+# init - internal method, called by parent class to set parameters.  See parent for more details.
+#
 sub init {
     my $self = shift;
     my $config = shift;
@@ -48,7 +53,11 @@ sub init {
 }
 
 
-# Returns a list of sequence IDs that are in the specified families (provided via command-line argument)
+
+
+#
+# getSequenceIds - called to obtain IDs from the FASTA file.  See parent class for usage.
+#
 sub getSequenceIds {
     my $self = shift;
 
@@ -86,11 +95,16 @@ sub createMetadata {
 
 
 
-####################################################################################################
 #
+# prepareQueries - internal method
 #
-
-# Prepare the list of SQL queries, one per family
+# Create a list of parameters to be executed later inside an SQL query.  There is one query per family.
+#
+# Parameters:
+#
+# Returns:
+#     hash ref of an array of parameters
+#
 sub prepareQueries {
     my $self = shift;
 
@@ -118,7 +132,18 @@ sub prepareQueries {
 }
 
 
+
+
+#
+# getFamilyNames - internal method
+#
 # Parse the input family lists into one entry per family (converting Pfam clans to Pfam list if specified)
+#
+# Parameters:
+#
+# Returns:
+#     hash ref mapping family type (e.g. PFAM) to list of families
+#
 sub getFamilyNames {
     my $self = shift;
 
@@ -146,7 +171,7 @@ sub getFamilyNames {
 
 
 
-# 
+#
 # executeQueries - internal method
 #
 # Using query data (parameters) from prepareQueries, create and execute SQL SELECT statements
@@ -199,7 +224,17 @@ sub executeQueries {
 
 
 
-# Convert a specification to a SQL statement
+#
+# makeSqlStatement - internal method
+#
+# Convert a query specification to a SQL statement.
+#
+# Parameters:
+#     $query - query data (parameters)
+#
+# Returns:
+#     SQL SELECT statement
+#
 sub makeSqlStatement {
     my $self = shift;
     my $query = shift;
@@ -221,7 +256,7 @@ sub makeSqlStatement {
 
 
 
-# 
+#
 # processQuery - internal method
 #
 # Process the results for one query/family.
@@ -235,7 +270,7 @@ sub makeSqlStatement {
 # Returns:
 #     number of UniProt IDs in the query
 #     number of UniRef IDs in the query (zero if UniRef is not used)
-# 
+#
 sub processQuery {
     my $self = shift;
     my $sth = shift;
@@ -277,10 +312,17 @@ sub processQuery {
 }
 
 
-####################################################################################################
-# 
-# 
 
+
+#
+# saveStats - internal method
+#
+# Computes and saves import statistics to the parent class stats object.
+#
+# Parameters:
+#
+# Returns:
+#
 sub saveStats {
     my $self = shift;
 
@@ -293,10 +335,19 @@ sub saveStats {
 }
 
 
-####################################################################################################
-# 
-#
 
+
+#
+# retrieveFamiliesForClans - internal method
+#
+# Retrieves all of the PFAMs for the input PFAM clans.
+#
+# Parameters:
+#     @clans - list of PFAM clans
+#
+# Returns:
+#     list of PFAM families in the clans
+#
 sub retrieveFamiliesForClans {
     my $self = shift;
     my (@clans) = @_;

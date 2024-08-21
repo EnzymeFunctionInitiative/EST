@@ -30,6 +30,11 @@ sub new {
 }
 
 
+
+
+#
+# Inherited from EFI::Import::Source; see parent class for documentation
+#
 sub init {
     my $self = shift;
     my $config = shift;
@@ -54,9 +59,9 @@ sub init {
 
 
 
-# 
+#
 # Inherited from EFI::Import::Source; see parent class for documentation
-# 
+#
 sub getSequenceIds {
     my $self = shift;
 
@@ -107,11 +112,18 @@ sub createMetadata {
 }
 
 
-####################################################################################################
-# 
+
+
 #
-
-
+# parseBlastResults- internal method
+#
+# Read in a raw BLAST output file from the initial BLAST and extract the IDs from it.
+#
+# Parameters:
+#
+# Returns:
+#     hash ref of IDs, mapping to empty array (empty for later use)
+#
 sub parseBlastResults {
     my $self = shift;
 
@@ -148,6 +160,18 @@ sub parseBlastResults {
 }
 
 
+
+
+#
+# loadQuerySequence - internal method
+#
+# Reads the sequence used to run the initial BLAST.
+#
+# Parameters:
+#
+# Returns:
+#     a string containing the protein sequence
+#
 sub loadQuerySequence {
     my $self = shift;
 

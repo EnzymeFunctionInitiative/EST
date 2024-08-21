@@ -91,6 +91,7 @@ sub getSequenceIds {
 
 
 
+
 #
 # saveSeqMapping - internal method
 #
@@ -136,8 +137,15 @@ sub saveSeqMapping {
 # Returns:
 #    header line map - hash ref mapping the sequence ID to the FASTA file line number.
 #    sequence data - hash ref of ID to sequences
+#        {
+#          index_or_uniprot_id =>
+#          {
+#            id => anon_or_uniprot_id,
+#            seq => fasta_seq
+#          }
+#        }
 #    sequence metadata - hash ref of non-UniProt ID to sequence metadata
-#    uniprot metadata - hash ref of UniProt ID to sequence metadata
+#    metadata - hash ref of UniProt ID to sequence metadata (e.g. query_id, other_ids, description)
 #
 sub parseFasta {
     my $self = shift;
@@ -249,7 +257,8 @@ sub parseFasta {
 # Parameters:
 #    $seq - a hash ref mapping sequence ID to original ID and sequence data
 #    $seqMeta - a hash ref containing metadata about unidentified (e.g. non-UniProt) sequences
-#    $upMeta - a hash ref containing metadata about UniProt sequences
+#    $idMetdata - a hash ref containing metadata about UniProt sequences
+#    $unirefMapping - a hash ref mapping UniRef IDs to UniProt IDs
 #
 # Returns:
 #    hash ref containing the IDs, UniProt and unidentified, that were in the $seq dataset
