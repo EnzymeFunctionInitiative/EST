@@ -145,6 +145,8 @@ sub validateAndProcessOptions {
     push @err, "Require --efi-config-file" if not $file or not -f $file;
     $self->{efi_config_file} = $file;
 
+    $h->{sequence_version} = $h->{sequence_version} =~ m/^uni(ref50|ref90|prot)$/i ? lc $h->{sequence_version} : "uniprot";
+
     push @err, "Require --efi-db" if not $h->{efi_db};
     $self->{efi_db} = $h->{efi_db};
 

@@ -57,22 +57,36 @@ sub getSequenceIds {
         return undef;
     }
 
-    my $meta = {};
-    foreach my $id (keys %{ $self->{data}->{uniprot_ids} }) {
-        $meta->{$id} = {&FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FAMILY};
-    }
+    my $meta = $self->createMetadata();
 
     $self->saveStats();
 
     my $seqType = $self->{uniref_version} ? $self->{uniref_version} : "uniprot";
-    return {ids => $self->{data}->{uniprot_ids}, type => $seqType, meta => $meta};
+
+    return {ids => $self->{data}->{ids}, type => $seqType, meta => $meta};
+}
+
+
+
+
+#
+# createMetadata - calls parent implementation with extra parameter.  See parent class for usage.
+#
+sub createMetadata {
+    my $self = shift;
+    my $ids = shift;
+    my $unirefMapping = shift;
+
+    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FAMILY, $ids, $self->{data}->{uniref_mapping});
+
+    return $meta;
 }
 
 
 
 
 ####################################################################################################
-# 
+#
 #
 
 # Prepare the list of SQL queries, one per family
@@ -129,16 +143,31 @@ sub getFamilyNames {
 }
 
 
-# Perform SQL queries
+
+
+# 
+# executeQueries - internal method
+#
+# Using query data (parameters) from prepareQueries, create and execute SQL SELECT statements
+# to obtain IDs from the input families.  
+#
+# Parameters:
+#     $queryData - hash ref pointing to list of query parameters
+#
+# Returns:
+#
 sub executeQueries {
     my $self = shift;
     my $queryData = shift;
 
     my $dbh = $self->{efi_db}->getHandle();
 
-    $self->{data}->{uniprot_ids} = {};
-    $self->{data}->{uniref_ids} = {};
+    my $ids = {};
+    my $unirefMapping = {};
+    my $numUniprotIds = 0;
+    my $numUnirefIds = 0;
 
+    # Look at every family in the input set; one query corresponds to one family
     foreach my $query (@{ $queryData->{queries} }) {
         my $sql = $self->makeSqlStatement($query);
         my $sth = $dbh->prepare($sql);
@@ -153,11 +182,20 @@ sub executeQueries {
             return undef;
         }
 
-        $self->processQuery($query, $sth);
+        my ($numUp, $numUr) = $self->processQuery($sth, $ids, $unirefMapping);
+        $numUniprotIds += $numUp;
+        $numUnirefIds += $numUr;
     }
+
+    $self->{data}->{ids} = $ids;
+    $self->{data}->{num_uniprot_ids} = $numUniprotIds;
+    $self->{data}->{uniref_mapping} = $unirefMapping if $self->{uniref_version};
+    $self->{data}->{num_uniref_ids} = $numUnirefIds if $self->{uniref_version};
 
     return 1;
 }
+
+
 
 
 # Convert a specification to a SQL statement
@@ -180,30 +218,61 @@ sub makeSqlStatement {
 }
 
 
-# Process the results for one family
+
+
+# 
+# processQuery - internal method
+#
+# Process the results for one query/family.
+#
+# Parameters:
+#     $sth - DBI statement handle, used for retrieving results
+#     $ids - hash ref, output data structure; hash ref so we can easily merge results
+#     $unirefMapping - hash ref, output UniRef mapping data structure (ignored
+#         if UniRef is not used
+#
+# Returns:
+#     number of UniProt IDs in the query
+#     number of UniRef IDs in the query (zero if UniRef is not used)
+# 
 sub processQuery {
     my $self = shift;
-    my $qdata = shift;
     my $sth = shift;
+    my $ids = shift;
+    my $unirefMapping = shift;
 
-    my $unirefMapping = {};
-    my $ids = $self->{data}->{uniprot_ids};
+    my $numUniprotIds = 0;
+    my $numUnirefIds = 0;
 
     my $unirefField = $self->{uniref_version} ? "$self->{uniref_version}_seed" : "";
+
+    # The retrieval process gets all IDs even if we're using UniRef
 
     while (my $row = $sth->fetchrow_hashref()) {
         (my $uniprotId = $row->{accession}) =~ s/\-\d+$//; #remove homologues
         my $unirefId = $unirefField ? $row->{$unirefField} : "";
 
-        my $piece = {'start' => $row->{start}, 'end' => $row->{end}};
-        push @{$ids->{$uniprotId}}, $piece;
-
+        # If we're using UniRef and this is a member of a UniRef cluster, add it to a mapping of UniRef cluster ID -> members
         if ($unirefId and $unirefId ne $uniprotId) {
-            $unirefMapping->{$uniprotId} = $unirefId;
+            push @{ $unirefMapping->{$unirefId} }, $uniprotId;
+        } else {
+            # If this is a UniRef ID or we're not using UniRef, then this gets added to the list of IDs to retrieve
+            my $piece = {'start' => $row->{start}, 'end' => $row->{end}};
+            push @{$ids->{$uniprotId}}, $piece;
+
+            # If we're using UniRef and this is the main UniRef cluster ID, this will create the mapping
+            if ($unirefId) {
+                push @{ $unirefMapping->{$unirefId} }, $uniprotId;
+                $numUnirefIds++;
+            }
         }
 
+        # Add all IDs to the sunburst
         $self->addIdToSunburst($uniprotId, $row);
+        $numUniprotIds++;
     }
+
+    return ($numUniprotIds, $numUnirefIds);
 }
 
 
