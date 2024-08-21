@@ -304,7 +304,7 @@ sub processQuery {
         }
 
         # Add all IDs to the sunburst
-        $self->addIdToSunburst($uniprotId, $row);
+        $self->addIdToSunburst($uniprotId, {uniref90 => $row->{uniref90_seed}, uniref50 => $row->{uniref50_seed}});
         $numUniprotIds++;
     }
 

@@ -11,7 +11,7 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
 
-use EFI::Annotations::Fields ':annotations';
+use EFI::Annotations::Fields ':all';
 
 
 our $TYPE_NAME = "";
@@ -102,6 +102,8 @@ sub getSequenceIds {
 # 
 # Parameters:
 #     $idMetadata - hash ref where the keys are UniProt IDs; the values are not used
+#     $assumeUniprot - assume IDs are UniProt not UniRef; this is used for the BLAST
+#         import option when UniRef is selected as an input option
 #
 # Returns:
 #     mapping of UniRef IDs to UniProt IDs
@@ -122,8 +124,9 @@ sub getSequenceIds {
 sub retrieveUnirefIds {
     my $self = shift;
     my $idMetadata = shift;
+    my $assumeUniprot = shift || 0;
 
-    my $unirefField = $self->{uniref_version} ? "$self->{uniref_version}_seed" : "accession";
+    my $unirefField = (not $assumeUniprot and $self->{uniref_version}) ? "$self->{uniref_version}_seed" : "accession";
 
     my @ids = keys %$idMetadata;
     my $unirefIds = {};
@@ -190,12 +193,60 @@ sub createMetadata {
 }
 
 
+
+
+#
+# addSunburstIds - protected method
+#
+# Add UniProt and UniRef IDs to the sunburst data structure that is saved by the import process.
+#
+# Parameters:
+#    $idMetadata - a hash ref of input IDs to metadata
+#    $unirefMapping - hash ref of ID -> UniRef cluster list mapping
+#
+# Returns:
+#    nothing
+#
+sub addSunburstIds {
+    my $self = shift;
+    my $idMetadata = shift;
+    my $unirefMapping = shift;
+
+    my %uniprotMap;
+
+    # Expand the UniRef IDs into the UniProt IDs and then reverse map them.  This is done so that the
+    # sunburst contains all UniProt IDs that are related to the input UniRef IDs.
+    my $uniprotMapFn = sub {
+        my $version = shift;
+        my $mapKey = "uniref$version";
+        foreach my $unirefId (keys %{ $unirefMapping->{$version} }) {
+            foreach my $uniprotId (@{ $unirefMapping->{$version}->{$unirefId} }) {
+                $uniprotMap{$uniprotId}->{$mapKey} = $unirefId;
+            }
+        }
+    };
+
+    &$uniprotMapFn("50");
+    &$uniprotMapFn("90");
+
+    foreach my $id (keys %uniprotMap) {
+        $self->addIdToSunburst($id, {uniref50 => $uniprotMap{$id}->{uniref50} // "", uniref90 => $uniprotMap{$id}->{uniref90} // ""});
+    }
+}
+
+
+
+
 sub addIdToSunburst {
     my $self = shift;
     my $uniprotId = shift;
-    my $row = shift;
-    $self->{sunburst}->addId($uniprotId, $row->{uniref50_seed} // "", $row->{uniref90_seed} // "") if $self->{sunburst};
+    my $unirefIds = shift;
+    $self->{sunburst}->addId($uniprotId, $unirefIds->{uniref50} // "", $unirefIds->{uniref90} // "") if $self->{sunburst};
 }
+
+
+
+
 sub addStatsValue {
     my $self = shift;
     my $name = shift;
