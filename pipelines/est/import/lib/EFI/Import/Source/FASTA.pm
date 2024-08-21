@@ -288,7 +288,7 @@ sub makeMetadata {
         my ($id, $meta) = @_;
         my $info = $idMetadata->{$id} // $seqMeta->{$id};
         foreach my $k (keys %$info) {
-            my $metaKey = $metaKeyMap->{$k} // "";
+            my $metaKey = $metaKeyMap->{$k} // $k;
             $meta->{$metaKey} = $info->{$k};
         }
     };
