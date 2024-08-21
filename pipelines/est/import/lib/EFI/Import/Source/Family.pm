@@ -62,8 +62,8 @@ sub getSequenceIds {
     my $self = shift;
 
     my $queryData = $self->prepareQueries();
-    my $sth = $self->executeQueries($queryData);
-    if (not $sth) {
+    my $status = $self->executeQueries($queryData);
+    if (not $status) {
         return undef;
     }
 
@@ -325,9 +325,9 @@ sub processQuery {
 #
 sub saveStats {
     my $self = shift;
-
-    my $numUniprot = scalar keys %{ $self->{data}->{uniprot_ids} };
-    my $numUniref = scalar keys %{ $self->{data}->{uniref_ids} };
+ 
+    my $numUniprot = $self->{data}->{num_uniprot_ids};
+    my $numUniref = $self->{data}->{num_uniref_ids};
     my $numIds = $self->{uniref_version} ? $numUniref : $numUniprot;
 
     $self->addStatsValue("num_ids", $numIds);
