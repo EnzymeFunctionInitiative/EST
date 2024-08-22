@@ -155,11 +155,11 @@ sub identifyAccessionIds {
     print("There were $numUniprotIds IDs that had UniProt matches and $numNoMatches IDs that could not be identified\n");
 
     my $numForeign = 0;
-    my $meta = {};
+    my $sourceInfo = {};
     foreach my $id (@uniprotIds) {
-        $meta->{$id} = {query_ids => []};
+        $sourceInfo->{$id} = {query_ids => []};
         if (exists $reverseMap->{$id}) {
-            $meta->{$id}->{query_ids} = $reverseMap->{$id};
+            $sourceInfo->{$id}->{query_ids} = $reverseMap->{$id};
             $numForeign++ if ($reverseMap->{$id}->[0] and $id ne $reverseMap->{$id}->[0]);
         }
     }
@@ -169,7 +169,7 @@ sub identifyAccessionIds {
     $self->addStatsValue("num_unmatched", $numNoMatches);
     $self->addStatsValue("num_foreign", $numForeign);
 
-    return (\%ids, $meta);
+    return (\%ids, $sourceInfo);
 }
 
 
@@ -197,16 +197,16 @@ sub createMetadata {
     }
 
     my $metaKeyMap = {
-        query_id => "Query_IDs",
+        query_ids => "Query_IDs",
         other_ids => "Other_IDs",
         description => "Description",
     };
 
     my $addMetadataFn = sub {
         my ($id, $meta) = @_;
-        foreach my $k (keys %$sourceInfo) {
+        foreach my $k (keys %{ $sourceInfo->{$id} }) {
             my $metaKey = $metaKeyMap->{$k} // $k;
-            $meta->{$metaKey} = $sourceInfo->{$k};
+            $meta->{$metaKey} = $sourceInfo->{$id}->{$k};
         }
     };
 
