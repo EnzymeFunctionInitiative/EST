@@ -182,8 +182,8 @@ sub createMetadata {
     my $meta = {};
     foreach my $id (keys %$ids) {
         $meta->{$id} = {&FIELD_SEQ_SRC_KEY => $source};
-        if ($self->{uniref_version}) {
-            $meta->{$id}->{$unirefIdsKey} = $unirefMapping->{$id} // [];
+        if ($self->{uniref_version} and $unirefMapping->{$id}) {
+            $meta->{$id}->{$unirefIdsKey} = $unirefMapping->{$id};
             $meta->{$id}->{$unirefSizeKey} = scalar @{ $meta->{$id}->{$unirefIdsKey} };
         }
         &$extraMetaFn($id, $meta->{$id});
