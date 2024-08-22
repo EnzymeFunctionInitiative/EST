@@ -15,7 +15,7 @@ process get_sequence_ids {
     if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
         """
-        blastall -p blastp -i ${params.blast_query_file} -d ${params.fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init_blast.out
+        blastall -p blastp -i ${params.blast_query_file} -d ${params.import_blast_fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init_blast.out
         if [[ -s init_blast.out ]]; then
             awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
             perl $projectDir/import/get_sequence_ids.pl $common_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
