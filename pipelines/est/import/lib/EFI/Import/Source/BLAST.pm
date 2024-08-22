@@ -73,7 +73,7 @@ sub getSequenceIds {
 
     $self->addSunburstIds($ids, $unirefMapping);
 
-    my $meta = $self->createMetadata($ids, $querySeq, $unirefMapping);
+    my $meta = $self->createMetadata($ids, $unirefMapping, $querySeq);
 
     my $seqType = $self->{uniref_version} ? $self->{uniref_version} : "uniprot";
     return {ids => $ids, type => $seqType, meta => $meta};

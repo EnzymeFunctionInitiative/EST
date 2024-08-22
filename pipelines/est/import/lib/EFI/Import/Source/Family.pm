@@ -84,10 +84,8 @@ sub getSequenceIds {
 #
 sub createMetadata {
     my $self = shift;
-    my $ids = shift;
-    my $unirefMapping = shift;
 
-    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FAMILY, $ids, $self->{data}->{uniref_mapping});
+    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FAMILY, $self->{data}->{ids}, $self->{data}->{uniref_mapping});
 
     return $meta;
 }
