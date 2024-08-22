@@ -92,7 +92,7 @@ process import_fasta {
 
     """
     # produces a mapping.txt file
-    perl $projectDir/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file}
+    perl $projectDir/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file} --sequence-version ${params.sequence_version}
     perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
     """
 }
