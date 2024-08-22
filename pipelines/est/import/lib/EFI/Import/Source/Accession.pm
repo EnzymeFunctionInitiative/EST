@@ -32,6 +32,11 @@ sub new {
 }
 
 
+
+
+#
+# init - internal method, called by parent class to set parameters.  See parent for more details.
+#
 sub init {
     my $self = shift;
     my $config = shift;
@@ -51,7 +56,11 @@ sub init {
 }
 
 
-# Returns a list of sequence IDs that are in the specified families (provided via command-line argument)
+
+
+# 
+# getSequenceIds - called to obtain IDs from the accession ID file.  See parent class for usage.
+#
 sub getSequenceIds {
     my $self = shift;
 
@@ -76,11 +85,18 @@ sub getSequenceIds {
 }
 
 
-####################################################################################################
-# 
+
+
 #
-
-
+# parseAccessions - internal method
+#
+# Load the accession IDs from the user-provided file.
+#
+# Parameters:
+#
+# Returns:
+#     hash ref containing the raw IDs (may or may not be valid) mapped to empty array (empty for later use)
+#
 sub parseAccessions {
     my $self = shift;
 
@@ -107,6 +123,20 @@ sub parseAccessions {
 }
 
 
+
+
+#
+# identifyAccessionIds - internal method
+#
+# Examines the input IDs to find UniProt IDs (or IDs that can be mapped back to UniProt IDs).
+#
+# Parameters:
+#     $rawIds - hash ref of IDs to data; only keys are used
+#
+# Returns:
+#     hash ref mapping UniProt IDs to empty array (empty for future use)
+#     hash ref of metadata (the foreign ID if not UniProt)
+#
 sub identifyAccessionIds {
     my $self = shift;
     my $rawIds = shift;
@@ -145,6 +175,17 @@ sub identifyAccessionIds {
 
 
 
+#
+# createMetadata - calls parent implementation with extra parameter.  See parent class for usage.
+#
+# Parameters:
+#     $ids - hash ref with the keys being the IDs identified from the initial BLAST
+#     $unirefMapping - a hash ref mapping UniRef IDs to UniProt IDs
+#     $sourceInfo - a hash ref mapping metadata fields to metadata field names
+#
+# Returns:
+#     hash ref of metadata with the key being an ID and the value being metadata
+#
 sub createMetadata {
     my $self = shift;
     my $ids = shift;

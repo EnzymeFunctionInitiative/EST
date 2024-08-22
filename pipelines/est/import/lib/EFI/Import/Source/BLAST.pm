@@ -83,11 +83,16 @@ sub getSequenceIds {
 
 
 #
-# createMetadata - calls parent implementation with extra parameter.  Se parent class for usage.
+# createMetadata - calls parent implementation with extra parameter.  See parent class for usage.
 # Also adds the query sequence to the metadata structure.
 #
 # Parameters:
+#     $ids - hash ref with the keys being the IDs identified from the initial BLAST
+#     $unirefMapping - a hash ref mapping UniRef IDs to UniProt IDs
 #     $querySeq - a string containing the query sequence used for the initial BLAST
+#
+# Returns:
+#     hash ref of metadata with the key being an ID and the value being metadata
 #
 sub createMetadata {
     my $self = shift;
