@@ -27,7 +27,7 @@ if (@err) {
 
 
 my $mappingFile = $config->getConfigValue("seq_mapping_file");
-my $fastaFile = $config->getConfigValue("uploaded_fasta");
+my $fastaFile = $config->getConfigValue("uploaded_fasta_file");
 my $outputFile = $config->getConfigValue("output_sequence_file");
 
 

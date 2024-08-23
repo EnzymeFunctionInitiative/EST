@@ -43,12 +43,12 @@ sub init {
     my $efiDb = shift;
     $self->SUPER::init($config, $efiDb, @_);
 
-    my $file = $config->getConfigValue("accessions");
+    my $file = $config->getConfigValue("user_accession_file");
     $self->{acc_file} = $file;
     $self->{efi_db} = $efiDb // die "Require efi db argument";
 
     if (not $self->{acc_file}) {
-        $self->addError("Require --accessions arg");
+        $self->addError("Require --user-accession-file arg");
         return undef;
     }
 

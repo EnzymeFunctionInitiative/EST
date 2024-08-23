@@ -45,12 +45,12 @@ sub init {
     my $efiDb = shift;
     $self->SUPER::init($config, $efiDb, @_);
 
-    my $file = $config->getConfigValue("fasta");
-    $self->{fasta} = $file;
+    my $file = $config->getConfigValue("user_fasta_file");
+    $self->{user_fasta_file} = $file;
     $self->{efi_db} = $efiDb // die "Require efi db argument";
 
-    if (not $self->{fasta}) {
-        $self->addError("Require --fasta arg");
+    if (not $self->{user_fasta_file}) {
+        $self->addError("Require --user-fasta-file arg");
         return undef;
     }
 
@@ -182,7 +182,7 @@ sub parseFasta {
         }
     };
 
-    open my $fastaFh, "<", $self->{fasta} or die "Unable to read FASTA file $self->{fasta}: $!";
+    open my $fastaFh, "<", $self->{user_fasta_file} or die "Unable to read FASTA file $self->{user_fasta_file}: $!";
     
     my $lastLineIsHeader = 0;
     my $id;

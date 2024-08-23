@@ -76,10 +76,10 @@ sub getOptions {
 
         "family|ipro|pfam=s@",
 
-        "fasta=s",
+        "user-fasta-file=s",
         "seq-mapping-file=s",
 
-        "accessions=s",
+        "user-accession-file=s",
 
         "blast-query=s",
         "blast-output=s",
@@ -108,10 +108,10 @@ sub getOptions {
 
         family => [],
 
-        fasta => "",
+        user_fasta_file => "",
         seq_mapping_file => "",
 
-        accessions => "",
+        user_accession_file => "",
 
         blast_query => "",
         blast_output => "",

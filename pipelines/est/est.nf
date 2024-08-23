@@ -29,7 +29,7 @@ process get_sequence_ids {
         """
     } else if (params.import_mode == "accessions") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args --accessions ${params.accessions_file}
+        perl $projectDir/import/get_sequence_ids.pl $common_args --user-accession-file ${params.accessions_file}
         """
     } else {
         error "Mode '${params.import_mode}' not yet implemented"
@@ -92,8 +92,8 @@ process import_fasta {
 
     """
     # produces a mapping.txt file
-    perl $projectDir/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file} --sequence-version ${params.sequence_version}
-    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
+    perl $projectDir/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --user-fasta-file ${params.uploaded_fasta_file} --sequence-version ${params.sequence_version}
+    perl $projectDir/import/import_fasta.pl --uploaded-fasta-file ${params.uploaded_fasta_file}
     """
 }
 
