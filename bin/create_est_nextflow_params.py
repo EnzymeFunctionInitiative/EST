@@ -79,11 +79,16 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             fail = True
         else:
             args.blast_query_file = os.path.abspath(args.blast_query_file)
-        if args.sequence_version != "uniprot" and len(args.import_blast_fasta_db) == 0:
-            print(f"BLAST FASTA db file '{args.import_blast_fasta_db}' for importing not found")
-            fail = True
+        if args.sequence_version != "uniprot":
+            if args.import_blast_fasta_db is None:
+                print("--import-blast-fasta-db is required when sequence version is not uniprot")
+                fail = True
+            else:
+                # Use the UniRef database for the BLAST
+                args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
         else:
-            args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
+            # Use the main database for the BLAST
+            args.import_blast_fasta_db = os.path.abspath(args.fasta_db)
     elif args.import_mode == "fasta":
         if not os.path.exists(args.fasta_file):
             print(f"FASTA import mode: FASTA file '{args.fasta_file}' does not exist")
