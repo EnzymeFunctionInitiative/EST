@@ -30,6 +30,11 @@ sub new {
 }
 
 
+
+
+#
+# Inherited from EFI::Import::Source; see parent class for documentation
+#
 sub init {
     my $self = shift;
     my $config = shift;
@@ -52,20 +57,54 @@ sub init {
 }
 
 
-# Returns a list of sequence IDs that are in the specified families (provided via command-line argument)
+
+
+#
+# Inherited from EFI::Import::Source; see parent class for documentation
+#
 sub getSequenceIds {
     my $self = shift;
 
     my $ids = $self->parseBlastResults();
 
+    my $unirefMapping = $self->retrieveUnirefIds($ids);
+
     my $querySeq = $self->loadQuerySequence();
 
-    $self->addSunburstIds($ids);
+    $self->addSunburstIds($ids, $unirefMapping);
 
-    my $meta = {};
-    foreach my $id (keys %$ids) {
-        $meta->{$id} = {&FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_BLASTHIT};
+    my $meta = $self->createMetadata($ids, $unirefMapping, $querySeq);
+
+    my $seqType = $self->{uniref_version} ? $self->{uniref_version} : "uniprot";
+    return {ids => $ids, type => $seqType, meta => $meta};
+}
+
+
+
+
+#
+# createMetadata - calls parent implementation with extra parameter.  See parent class for usage.
+# Also adds the query sequence to the metadata structure.
+#
+# Parameters:
+#     $ids - hash ref with the keys being the IDs identified from the initial BLAST
+#     $unirefMapping - a hash ref mapping UniRef IDs to UniProt IDs
+#     $querySeq - a string containing the query sequence used for the initial BLAST
+#
+# Returns:
+#     hash ref of metadata with the key being an ID and the value being metadata
+#
+sub createMetadata {
+    my $self = shift;
+    my $ids = shift;
+    my $unirefMapping = shift;
+    my $querySeq = shift;
+
+    if ($self->{uniref_version}) {
+        $unirefMapping = $self->{uniref_version} eq "uniref50" ? $unirefMapping->{50} : $unirefMapping->{90};
     }
+
+    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_BLASTHIT, $ids, $unirefMapping);
 
     $ids->{&INPUT_SEQ_ID} = [];
     $meta->{&INPUT_SEQ_ID} = {
@@ -74,16 +113,22 @@ sub getSequenceIds {
         seq_len => length($querySeq),
     };
 
-    my $seqType = $self->{uniref_version} ? $self->{uniref_version} : "uniprot";
-    return {ids => $ids, type => $seqType, meta => $meta};
+    return $meta;
 }
 
 
-####################################################################################################
-# 
+
+
 #
-
-
+# parseBlastResults- internal method
+#
+# Read in a raw BLAST output file from the initial BLAST and extract the IDs from it.
+#
+# Parameters:
+#
+# Returns:
+#     hash ref of IDs, mapping to empty array (empty for later use)
+#
 sub parseBlastResults {
     my $self = shift;
 
@@ -120,6 +165,18 @@ sub parseBlastResults {
 }
 
 
+
+
+#
+# loadQuerySequence - internal method
+#
+# Reads the sequence used to run the initial BLAST.
+#
+# Parameters:
+#
+# Returns:
+#     a string containing the protein sequence
+#
 sub loadQuerySequence {
     my $self = shift;
 
@@ -137,26 +194,6 @@ sub loadQuerySequence {
 
     return $seq;
 }
-
-
-####################################################################################################
-# 
-# 
-
-
-sub addSunburstIds {
-    my $self = shift;
-    my $ids = shift;
-
-    foreach my $id (keys %$ids) {
-        $self->addIdToSunburst($id, {uniref50_seed => "", uniref90_seed => ""});
-    }
-}
-
-
-####################################################################################################
-# 
-#
 
 
 1;

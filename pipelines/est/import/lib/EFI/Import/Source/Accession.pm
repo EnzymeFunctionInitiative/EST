@@ -32,6 +32,11 @@ sub new {
 }
 
 
+
+
+#
+# init - internal method, called by parent class to set parameters.  See parent for more details.
+#
 sub init {
     my $self = shift;
     my $config = shift;
@@ -51,14 +56,23 @@ sub init {
 }
 
 
-# Returns a list of sequence IDs that are in the specified families (provided via command-line argument)
+
+
+# 
+# getSequenceIds - called to obtain IDs from the accession ID file.  See parent class for usage.
+#
 sub getSequenceIds {
     my $self = shift;
 
     my $rawIds = $self->parseAccessions();
-    my ($ids, $metadata) = $self->identifyAccessionIds($rawIds);
+    my ($ids, $sourceInfo) = $self->identifyAccessionIds($rawIds);
 
-    $self->addSunburstIds($ids);
+    # Maps UniRef50/UniRef90 to UniProt
+    my $unirefMapping = $self->retrieveUnirefIds($ids);
+
+    my $metadata = $self->createMetadata($ids, $unirefMapping, $sourceInfo);
+
+    $self->addSunburstIds($ids, $unirefMapping);
 
     #TODO: add sequences from family
     #TODO: apply tax/family filters here??? ???
@@ -71,11 +85,18 @@ sub getSequenceIds {
 }
 
 
-####################################################################################################
-# 
+
+
 #
-
-
+# parseAccessions - internal method
+#
+# Load the accession IDs from the user-provided file.
+#
+# Parameters:
+#
+# Returns:
+#     hash ref containing the raw IDs (may or may not be valid) mapped to empty array (empty for later use)
+#
 sub parseAccessions {
     my $self = shift;
 
@@ -102,6 +123,20 @@ sub parseAccessions {
 }
 
 
+
+
+#
+# identifyAccessionIds - internal method
+#
+# Examines the input IDs to find UniProt IDs (or IDs that can be mapped back to UniProt IDs).
+#
+# Parameters:
+#     $rawIds - hash ref of IDs to data; only keys are used
+#
+# Returns:
+#     hash ref mapping UniProt IDs to empty array (empty for future use)
+#     hash ref of metadata (the foreign ID if not UniProt)
+#
 sub identifyAccessionIds {
     my $self = shift;
     my $rawIds = shift;
@@ -120,14 +155,13 @@ sub identifyAccessionIds {
     print("There were $numUniprotIds IDs that had UniProt matches and $numNoMatches IDs that could not be identified\n");
 
     my $numForeign = 0;
-    my $meta = {};
+    my $sourceInfo = {};
     foreach my $id (@uniprotIds) {
-        $meta->{$id} = {query_ids => []};
+        $sourceInfo->{$id} = {query_ids => []};
         if (exists $reverseMap->{$id}) {
-            $meta->{$id}->{query_ids} = $reverseMap->{$id};
+            $sourceInfo->{$id}->{query_ids} = $reverseMap->{$id};
             $numForeign++ if ($reverseMap->{$id}->[0] and $id ne $reverseMap->{$id}->[0]);
         }
-        $meta->{$id}->{&FIELD_SEQ_SRC_KEY} = FIELD_SEQ_SRC_VALUE_FASTA;
     }
 
     $self->addStatsValue("num_ids", scalar @ids);
@@ -135,22 +169,50 @@ sub identifyAccessionIds {
     $self->addStatsValue("num_unmatched", $numNoMatches);
     $self->addStatsValue("num_foreign", $numForeign);
 
-    return (\%ids, $meta);
+    return (\%ids, $sourceInfo);
 }
 
 
-####################################################################################################
-# 
-# 
 
 
-sub addSunburstIds {
+#
+# createMetadata - calls parent implementation with extra parameter.  See parent class for usage.
+#
+# Parameters:
+#     $ids - hash ref with the keys being the IDs identified from the initial BLAST
+#     $unirefMapping - a hash ref mapping UniRef IDs to UniProt IDs
+#     $sourceInfo - a hash ref mapping metadata fields to metadata field names
+#
+# Returns:
+#     hash ref of metadata with the key being an ID and the value being metadata
+#
+sub createMetadata {
     my $self = shift;
-    my $uniprotMetadata = shift;
+    my $ids = shift;
+    my $unirefMapping = shift;
+    my $sourceInfo = shift;
 
-    foreach my $id (keys %$uniprotMetadata) {
-        $self->addIdToSunburst($id, {uniref50_seed => "", uniref90_seed => ""});
+    if ($self->{uniref_version}) {
+        $unirefMapping = $self->{uniref_version} eq "uniref50" ? $unirefMapping->{50} : $unirefMapping->{90};
     }
+
+    my $metaKeyMap = {
+        query_ids => "Query_IDs",
+        other_ids => "Other_IDs",
+        description => "Description",
+    };
+
+    my $addMetadataFn = sub {
+        my ($id, $meta) = @_;
+        foreach my $k (keys %{ $sourceInfo->{$id} }) {
+            my $metaKey = $metaKeyMap->{$k} // $k;
+            $meta->{$metaKey} = $sourceInfo->{$id}->{$k};
+        }
+    };
+
+    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FASTA, $ids, $unirefMapping, $addMetadataFn);
+
+    return $meta;
 }
 
 

@@ -32,6 +32,7 @@ def add_args(parser: argparse.ArgumentParser):
     # option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
     blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
+    blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90")
 
     # option B: Family
     family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group('Family Options')
@@ -78,6 +79,16 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             fail = True
         else:
             args.blast_query_file = os.path.abspath(args.blast_query_file)
+        if args.sequence_version != "uniprot":
+            if args.import_blast_fasta_db is None:
+                print("--import-blast-fasta-db is required when sequence version is not uniprot")
+                fail = True
+            else:
+                # Use the UniRef database for the BLAST
+                args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
+        else:
+            # Use the main database for the BLAST
+            args.import_blast_fasta_db = os.path.abspath(args.fasta_db)
     elif args.import_mode == "fasta":
         if not os.path.exists(args.fasta_file):
             print(f"FASTA import mode: FASTA file '{args.fasta_file}' does not exist")
@@ -114,7 +125,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   families=None, exclude_fragments=None,
                   fasta_file=None,
                   accessions_file=None,
-                  blast_query_file=None
+                  blast_query_file=None,
+                  import_blast_fasta_db=None
                   ):
     params = {
         "final_output_dir": output_dir,
@@ -135,8 +147,11 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
     }
     if import_mode == "blast":
         params |= {
-            "blast_query_file": blast_query_file
+            "blast_query_file": blast_query_file,
+            "import_blast_fasta_db": fasta_db
         }
+        if sequence_version != "uniprot":
+            params["import_blast_fasta_db"] = args.import_blast_fasta_db
     elif import_mode == "family":
         params |= {
             "families": families

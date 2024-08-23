@@ -11,7 +11,7 @@ use Data::Dumper;
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
-use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
+use lib dirname(abs_path(__FILE__)) . "/../../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
 use EFI::Annotations::Fields ':source';
@@ -69,12 +69,15 @@ sub getSequenceIds {
     my $self = shift;
 
     # Load the sequences and metadata from the file
-    my ($headerLineMap, $sequences, $sequenceMetadata, $uniprotMetadata) = $self->parseFasta();
+    my ($headerLineMap, $sequences, $sequenceMetadata, $idMetadata) = $self->parseFasta();
 
-    $self->addSunburstIds($uniprotMetadata);
+    # Maps UniRef50/UniRef90 to UniProt
+    my $unirefMapping = $self->retrieveUnirefIds($idMetadata);
+
+    $self->addSunburstIds($idMetadata, $unirefMapping);
     $self->saveSeqMapping($headerLineMap);
 
-    my ($ids, $metadata) = $self->makeMetadata($sequences, $sequenceMetadata, $uniprotMetadata);
+    my ($ids, $metadata) = $self->makeMetadata($sequences, $sequenceMetadata, $idMetadata, $unirefMapping);
 
     #TODO: add sequences from family
     #TODO: apply tax/family filters here??? ???
@@ -85,6 +88,7 @@ sub getSequenceIds {
     my $seqType = $self->{uniref_version} ? $self->{uniref_version} : "uniprot";
     return {ids => $ids, type => $seqType, meta => $metadata};
 }
+
 
 
 
@@ -133,8 +137,15 @@ sub saveSeqMapping {
 # Returns:
 #    header line map - hash ref mapping the sequence ID to the FASTA file line number.
 #    sequence data - hash ref of ID to sequences
+#        {
+#          index_or_uniprot_id =>
+#          {
+#            id => anon_or_uniprot_id,
+#            seq => fasta_seq
+#          }
+#        }
 #    sequence metadata - hash ref of non-UniProt ID to sequence metadata
-#    uniprot metadata - hash ref of UniProt ID to sequence metadata
+#    metadata - hash ref of UniProt ID to sequence metadata (e.g. query_id, other_ids, description)
 #
 sub parseFasta {
     my $self = shift;
@@ -143,7 +154,7 @@ sub parseFasta {
 
     my $seq = {};           # sequence data
     my $seqMeta = {};       # Metadata for all sequences, UniProt and unidentified
-    my $upMeta = {};        # Metadata for UniProt-match sequences
+    my $idMetadata = {};        # Metadata for UniProt-match sequences
     my $headerLineMap = {}; # Maps the sequence identifier to the line number of the sequence header
 
     my $headerCount = 0;
@@ -163,7 +174,7 @@ sub parseFasta {
         }
 
         if ($isUniprot) {
-            $upMeta->{$id} = {
+            $idMetadata->{$id} = {
                 query_id => $mapResult->{query_id},
                 other_ids => $mapResult->{other_ids},
                 description => $desc,
@@ -224,7 +235,7 @@ sub parseFasta {
         }
     }
 
-    my $numMatched = scalar keys %$upMeta;
+    my $numMatched = scalar keys %$idMetadata;
 
     $self->addStatsValue("num_ids", $seqCount);
     $self->addStatsValue("orig_count", $seqCount);
@@ -232,7 +243,7 @@ sub parseFasta {
     $self->addStatsValue("num_matched", $numMatched);
     $self->addStatsValue("num_unmatched", $seqCount - $numMatched);
 
-    return ($headerLineMap, $seq, $seqMeta, $upMeta);
+    return ($headerLineMap, $seq, $seqMeta, $idMetadata);
 }
 
 
@@ -246,7 +257,8 @@ sub parseFasta {
 # Parameters:
 #    $seq - a hash ref mapping sequence ID to original ID and sequence data
 #    $seqMeta - a hash ref containing metadata about unidentified (e.g. non-UniProt) sequences
-#    $upMeta - a hash ref containing metadata about UniProt sequences
+#    $idMetdata - a hash ref containing metadata about UniProt sequences
+#    $unirefMapping - a hash ref mapping UniRef IDs to UniProt IDs
 #
 # Returns:
 #    hash ref containing the IDs, UniProt and unidentified, that were in the $seq dataset
@@ -257,9 +269,12 @@ sub makeMetadata {
     my $self = shift;
     my $seq = shift;
     my $seqMeta = shift;
-    my $upMeta = shift;
+    my $idMetadata = shift;
+    my $unirefMapping = shift;
 
-    my $meta = {};
+    if ($self->{uniref_version}) {
+        $unirefMapping = $self->{uniref_version} eq "uniref50" ? $unirefMapping->{50} : $unirefMapping->{90};
+    }
 
     my $metaKeyMap = {
         query_id => "Query_IDs",
@@ -267,60 +282,22 @@ sub makeMetadata {
         description => "Description",
     };
 
-    my $mapMeta = sub {
-        my ($id, $kv) = @_;
-        foreach my $k (keys %$kv) {
-            my $metaKey = $metaKeyMap->{$k} // "";
-            $meta->{$id}->{$metaKey} = $kv->{$k};
+    # Sets the metadata for an individual sequence. $info is a hash ref containing the values
+    # for query_id, other_ids, and description.
+    my $addFastaMetadata = sub {
+        my ($id, $meta) = @_;
+        my $info = $idMetadata->{$id} // $seqMeta->{$id};
+        foreach my $k (keys %$info) {
+            my $metaKey = $metaKeyMap->{$k} // $k;
+            $meta->{$metaKey} = $info->{$k};
         }
     };
 
-    # $seq contains the following:
-    #
-    # {
-    #   index_or_uniprot_id =>
-    #   {
-    #     id => anon_or_uniprot_id,
-    #     seq => fasta_seq
-    #   }
-    # }
-    foreach my $idx (keys %$seq) {
-        my $id = $seq->{$idx}->{id};
-        #$meta->{$id}->{seq_len} = length $seq->{$id}->{seq};
-        $meta->{$id}->{&FIELD_SEQ_SRC_KEY} = FIELD_SEQ_SRC_VALUE_FASTA;
-        if ($upMeta->{$id}) {
-            $mapMeta->($id, $upMeta->{$id});
-        } else {
-            $mapMeta->($id, $seqMeta->{$id});
-        }
-    }
+    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FASTA, $seq, $unirefMapping, $addFastaMetadata);
 
     my %ids = map { $_ => {} } keys %$meta;
 
     return (\%ids, $meta);
-}
-
-
-
-
-#
-# addSunburstIds - internal method
-#
-# Add UniProt and UniRef IDs to the sunburst data structure that is saved by the import process.
-#
-# Parameters:
-#    $uniprotMetadata - a hash ref of UniProt IDs
-#
-# Returns:
-#    nothing
-#
-sub addSunburstIds {
-    my $self = shift;
-    my $uniprotMetadata = shift;
-
-    foreach my $id (keys %$uniprotMetadata) {
-        $self->addIdToSunburst($id, {uniref50_seed => "", uniref90_seed => ""});
-    }
 }
 
 
