@@ -74,3 +74,31 @@ HELP
 
 
 
+
+
+__END__
+
+=head1 append_blast_query.pl
+
+=head2 NAME
+
+append_blast_query.pl - appends the input BLAST query to the sequence import file.
+
+=head2 SYNOPSIS
+
+    # Read <FILE.fa> and append to <PATH/TO/all_sequences.fasta>
+    append_blast_query.pl --blast-query-file <FILE.fa> --output-sequence-file <PATH/TO/all_sequences.fasta>
+    
+    # Read <FILE.fa> and append to <OUTPUT_DIR/all_sequences.fasta>
+    append_blast_query.pl --blast-query-file <FILE.fa> --output-dir <OUTPUT_DIR>
+
+    # Read <FILE.fa> and append to all_sequences.fasta in the current working directory
+    append_blast_query.pl --blast-query-file <FILE.fa>
+
+=head2 DESCRIPTION
+
+BLAST import option for EST generates import sequences that are used for the all-by-all BLAST later in the
+pipeline.  By default the query sequence (the sequence the user provided for the BLAST option)
+is not included in the import sequences.  This script takes that query sequence and appends it to
+the import sequence file.
+

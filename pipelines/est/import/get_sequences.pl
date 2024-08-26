@@ -48,7 +48,54 @@ my $_elapsed = int((time() - $_start) * 1000);
 
 $logger->message("Found $numIds IDs in FASTA file in $_elapsed ms"); 
 
-#TODO: handle user-specified FASTA sequences (e.g. Option C)
 
 
+
+
+
+
+
+__END__
+
+=head1 get_sequences.pl
+
+=head2 NAME
+
+get_sequences.pl - given a file with UniProt accession IDs, retrieve the FASTA sequences corresponding to each ID.
+
+=head2 SYNOPSIS
+
+    get_sequences.pl --fasta-db <BLAST_DATABASE> --sequence-ids-file accession_ids.txt --output-sequence-file all_sequences.fasta
+
+=head2 DESCRIPTION
+
+C<get_sequences.pl> retrieves sequences from a BLAST-formatted database.  The sequences that are retrieved
+are specified in an input file provided on the command line.
+
+=head3 Arguments
+
+=over
+
+=item C<--fasta-db>
+
+The path to a BLAST-formatted database that was built using a set of FASTA sequences.
+
+=item C<--output-dir> (optional, defaults)
+
+The directory to read and write the input and output files from and to. Defaults to the
+current working directory if not specified.
+
+=item C<--sequence-ids-file> (optional, defaults)
+
+The path to the input file containing a list of sequence IDs.
+If this is not specified, the file with the name corresponding to the C<accession_ids> value
+in the B<C<EFI::Import::Config::Defaults>> module is used from the output directory.
+
+=item C<--output-sequence-file> (optional, defaults)
+
+The path to the output file containing all of the FASTA sequences that were retrieved from the database.
+If this is not specified, the file with the name corresponding to the C<all_sequences> value
+in the B<C<EFI::Import::Config::Defaults>> module is used in the output directory.
+
+=back
 
