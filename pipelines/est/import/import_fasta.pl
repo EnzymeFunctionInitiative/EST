@@ -19,9 +19,16 @@ use EFI::Import::Logger;
 my $logger = new EFI::Import::Logger();
 
 my $config = new EFI::Import::Config::FastaImport();
-my @err = $config->validateAndProcessOptions();
-if (@err) {
-    $logger->error(@err);
+my ($err) = $config->validateAndProcessOptions();
+
+if ($config->wantHelp()) {
+    $config->printHelp($0);
+    exit(0);
+}
+
+if (@$err) {
+    $logger->error(@$err);
+    $config->printHelp($0);
     die "\n";
 }
 

@@ -81,6 +81,7 @@ sub setConfigValue {
 sub getOptionDefaults {
     my %opts = (
         output_dir => "",
+        help => "",
     );
     return \%opts;
 }
@@ -89,6 +90,7 @@ sub getOptionDefaults {
 sub getOptionSpec {
     return (
         "output-dir=s",
+        "help",
     );
 }
 
@@ -100,11 +102,64 @@ sub validateAndProcessOptions {
 
     $h->{output_dir} = getcwd() if not $h->{output_dir} or not -d $h->{output_dir};
 
-    return @err;
+    $self->addHelp("--output-dir", "<OUTPUT_DIR>", "If not specified, defaults to current working directory");
+    $self->addHelp("--help", "", "");
+
+    return (\@err);
 }
 
 
-sub getHelp {
+sub wantHelp {
+    my $self = shift;
+    return $self->{options}->{help};
+}
+
+
+sub addHelp {
+    my $self = shift;
+    my $arg = shift;
+    my $val = shift;
+    my $desc = shift;
+    my $isRequired = shift || 0;
+
+    push @{ $self->{help} }, {arg => $arg, val => $val, desc => $desc, is_required => $isRequired};
+}
+
+
+sub printHelp {
+    my $self = shift;
+    my $app = shift || "script.pl";
+
+    my @cmd;
+    my @desc;
+
+    my $arglen = 0;
+    foreach my $help (@{ $self->{help} }) {
+        next if $help->{arg} eq "--help";
+        $arglen = length $help->{arg} if length $help->{arg} > $arglen;
+        push @desc, [$help->{arg}, $help->{desc}];
+        my $arg = "$help->{arg} $help->{val}";
+        $arg = "[$arg]" if not $help->{is_required};
+        push @cmd, [" $arg", length $arg];
+    }
+
+    my $maxLen = 100;
+    my $len = length $app;
+    print "$app ";
+    foreach my $cmd (@cmd) {
+        print $cmd->[0];
+        $len += $cmd->[1];
+        if ($len > $maxLen) {
+            print "\n    ";
+            $len = 4;
+        }
+    }
+
+    print "\n\n";
+    foreach my $desc (@desc) {
+        printf("    %-${arglen}s    %s\n", @$desc);
+    }
+
     return "";
 }
 
