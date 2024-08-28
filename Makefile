@@ -23,7 +23,7 @@ docs-clean:
 	rm -rf build/
 
 docs-perlpod:
-	find src -name "*.pl" | xargs scripts/pod2rst.sh
+	find pipelines -name "*.pl" | xargs -d\\n -n1 scripts/pod2rst.sh
 
 test: test-pyefi test-pipelines
 
