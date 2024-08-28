@@ -12,7 +12,7 @@ fi
 
 scriptpath=$(dirname $1)
 scriptname=$(basename $1 | sed -e 's/.pl$//g')
-docpath="docs/source/pipelines$(echo $scriptpath | sed -e 's/src//g' )/"
+docpath="docs/source/$(echo $scriptpath | sed -e 's/src//g' )/"
 
 if [ ! -d $docpath ]; then
     echo "Documentation directory '$docpath' for script $scriptname does not exist"
