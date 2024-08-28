@@ -2,71 +2,65 @@
 package EFI::Database;
 
 use strict;
+use warnings;
+
 use DBI;
-use Log::Message::Simple qw[:STD :CARP];
-require 'Config.pm';
-use EFI::Config qw(cluster_configure);
+use Config::IniFiles;
+
+use constant MYSQL => "mysql";
 
 
 sub new {
-    my ($class, %args) = @_;
+    my $class = shift;
+    my %args = @_;
 
     my $self = {};
     bless($self, $class);
 
-    cluster_configure($self, %args);
+    die "Require config argument" if not $args{config};
 
-    if (exists $args{load_infile}) {
-        $self->{load_infile} = $args{load_infile};
-    } else {
-        $self->{load_infile} = 0;
-    }
+    # Assume config is existing, because validation occurs upstream
+    $self->parseConfig($args{config}, $args{db_name});
 
     return $self;
 }
 
 
-#sub createTable {
-#    my ($self, $tableName) = @_;
-#
-#    my $dbh = $self->getHandle();
-#    my $result = 1;
-#    eval {
-#        $dbh->do("CREATE TABLE $tableName");
-#        1;
-#    } or do {
-#        error("Creating table $tableName failed: $@");
-#        $result = 0;
-#    };
-#
-#    $dbh->finish();
-#
-#    return $result;
-#}
-
-
-sub loadTabular {
-    my ($self, $tableName, $tabularFile) = @_;
-
-    my $dbh = $self->getHandle();
-    my $result = 1;
-    eval {
-        $dbh->do("load data local infile '$tabularFile' into table $tableName");
-        1;
-    } or do {
-        error("Loading data from file '$tabularFile' failed: $@", 1);
-        $result = 0;
-    };
-
-    $dbh->disconnect();
-
-    return $result;
+sub isMysql {
+    my $self = shift;
+    return ($self->{db} and $self->{db}->{dbi} eq MYSQL);
 }
 
 
-sub stuff {
+sub parseConfig {
+    my $self = shift;
+    my $efiConfigFile = shift;
+    my $dbName = shift || "";
 
-#grant select,execute,show view on `efi_20170412`.* to 'efignn'@'10.1.0.0/255.255.0.0';
+    my $cfg = new Config::IniFiles(-file => $efiConfigFile);
+    die "Unable to parse config file: " . join("; ", @Config::IniFiles::errors), "\n" if not defined $cfg;
+
+    my $db = {};
+    $db->{user} = $cfg->val("database", "user");
+    $db->{password} = $cfg->val("database", "password");
+    $db->{host} = $cfg->val("database", "host", "localhost");
+    $db->{port} = $cfg->val("database", "port", "3306");
+    $db->{ip_range} = $cfg->val("database", "ip_range", "");
+    $db->{dbi} = lc $cfg->val("database", "dbi", MYSQL);
+
+    if ($dbName) {
+        $db->{name} = $dbName;
+    } else {
+        $db->{name} = $cfg->val("database", "name");
+    }
+    die "Missing database name\n" if not $db->{name};
+
+    if ($db->{dbi} eq MYSQL) {
+        die "Missing database username\n" if not defined $db->{user};
+        die "Missing database password\n" if not defined $db->{password};
+    }
+
+    $self->{db} = $db;
 }
 
 
@@ -86,36 +80,6 @@ sub tableExists {
     $dbh->disconnect() if not $dbhCache;
 
     return 0;
-}
-
-
-sub dropTable {
-    my ($self, $tableName) = @_;
-
-    my $dbh = $self->getHandle();
-
-    my $ok = $dbh->do("drop table $tableName");
-
-    $dbh->disconnect();
-
-    return $ok;
-}
-
-
-sub createTable {
-    my ($self, $schema) = @_;
-
-    my $dbh = $self->getHandle();
-
-    my @sql = $schema->getCreateSql();
-    my $ok;
-    foreach my $sql (@sql) {
-        $ok = $dbh->do($sql);
-    }
-
-    $dbh->disconnect();
-
-    return $ok;
 }
 
 
@@ -144,17 +108,6 @@ sub getVersion {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
 #######################################################################################################################
 # UTILITY METHODS
 #
@@ -164,7 +117,7 @@ sub getCommandLineConnString {
     my ($self) = @_;
 
     my $connStr ="";
-    if ($self->{db}->{dbi} eq EFI::Config::DATABASE_MYSQL) {
+    if ($self->{db}->{dbi} eq MYSQL) {
         $connStr =
             "mysql"
             . " -u " . $self->{db}->{user}
@@ -182,8 +135,12 @@ sub getCommandLineConnString {
 sub getHandle {
     my ($self) = @_;
 
+    if ($self->{dbh}) {
+        return $self->{dbh};
+    }
+
     my $dbh;
-    if ($self->{db}->{dbi} eq EFI::Config::DATABASE_MYSQL) {
+    if ($self->{db}->{dbi} eq MYSQL) {
         my $connStr =
             "DBI:mysql" .
             ":database=" . $self->{db}->{name} .
@@ -196,6 +153,8 @@ sub getHandle {
     } else {
         $dbh = DBI->connect("DBI:SQLite:dbname=$self->{db}->{name}","","");
     }
+
+    $self->{dbh} = $dbh;
 
     return $dbh;
 }

@@ -1,0 +1,21 @@
+;
+; This file provides configuration parameters for the EFI tools.
+; The file format is INI config-style.
+;
+
+
+;
+; Configure the database. The tools support MySQL/MariaDB and SQLite as database interfaces.
+;
+[database]
+; To use MySQL/MariaDB, the user, password, host, port, and dbi fields must be present. The dbi value must be
+; 'mysql' to select this interface.
+;user=<MYSQL_DB_USERNAME>
+;password=<MYSQL_DB_PASSWORD>
+;host=<MYSQL_DB_HOST>
+;port=<MYSQL_DB_PORT>
+;dbi=mysql
+
+; To use SQLite, the only field required is the dbi field. The value must be sqlite to select this interface.
+;dbi=sqlite
+

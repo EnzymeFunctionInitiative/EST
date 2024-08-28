@@ -2,11 +2,11 @@ Convergence Ratio
 =================
 
 .. argparse::
-    :module: src.est.statistics.conv_ratio
+    :module: pipelines.est.statistics.conv_ratio
     :func: create_parser
-    :prog: conv_ratio
+    :prog: conv_ratio.py
 
 Functions
 ---------
-.. automodule:: src.est.statistics.conv_ratio
+.. automodule:: pipelines.est.statistics.conv_ratio
     :members:

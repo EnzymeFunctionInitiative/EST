@@ -1,0 +1,20 @@
+[project]
+name = "pyEFI"
+version = "0.0.1"
+authors = [
+  { name="Hunter DeMeyer", email="demeyer3@illinois.edu" },
+]
+description = "Utilities used by the Enzyme Function Initiative"
+requires-python = ">=3.8"
+dependencies = ["biopython", "pyarrow"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 110
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
