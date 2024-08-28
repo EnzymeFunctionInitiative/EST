@@ -12,7 +12,7 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = {};
+    my $self = {help => [], help_desc => ""};
     bless($self, $class);
 
     $self->{options} = $self->getOptions();
@@ -126,9 +126,18 @@ sub addHelp {
 }
 
 
+sub addHelpDescription {
+    my $self = shift;
+    my $desc = shift || "";
+
+    $self->{help_desc} = $desc;
+}
+
+
 sub printHelp {
     my $self = shift;
-    my $app = shift || "script.pl";
+    my $app = shift;
+    my $err = shift || [];
 
     my @cmd;
     my @desc;
@@ -136,28 +145,53 @@ sub printHelp {
     my $arglen = 0;
     foreach my $help (@{ $self->{help} }) {
         next if $help->{arg} eq "--help";
-        $arglen = length $help->{arg} if length $help->{arg} > $arglen;
+        $arglen = length($help->{arg}) if length($help->{arg}) > $arglen;
         push @desc, [$help->{arg}, $help->{desc}];
         my $arg = "$help->{arg} $help->{val}";
         $arg = "[$arg]" if not $help->{is_required};
-        push @cmd, [" $arg", length $arg];
+        push @cmd, [$arg, length($arg)];
     }
 
-    my $maxLen = 100;
-    my $len = length $app;
-    print "$app ";
+    my $maxLen = 80;
+    my $scriptStr = "Usage: perl $app";
+    my $len = length($scriptStr);
+
+    print $scriptStr;
+
     foreach my $cmd (@cmd) {
-        print $cmd->[0];
-        $len += $cmd->[1];
-        if ($len > $maxLen) {
-            print "\n    ";
+        my $cmdLen = $cmd->[1] + 1;
+        if ($cmdLen + $len > $maxLen) {
+            print "\n   ";
             $len = 4;
         }
+        print " " . $cmd->[0];
+        $len += $cmdLen;
     }
 
     print "\n\n";
+    print "Description:\n   ";
+
+    my @words = split(m/ +/, $self->{help_desc});
+    $len = 4;
+    foreach my $word (@words) {
+        if (length($word) + $len + 1 > $maxLen) {
+            print "\n   ";
+            $len = 4;
+        }
+        $len += length($word) + 1;
+        print " $word";
+    }
+
+    print "\n\n";
+    print "Options:\n";
+
     foreach my $desc (@desc) {
         printf("    %-${arglen}s    %s\n", @$desc);
+    }
+
+    if (@$err) {
+        print "\nErrors:\n";
+        map { print "    $_\n"; } @$err;
     }
 
     return "";

@@ -23,8 +23,6 @@ my $result = GetOptions(
     "help" => \$wantHelp,
 );
 
-printHelp() if $wantHelp;
-
 $outputDir = getcwd() if not $outputDir;
 
 checkArgs();
@@ -46,6 +44,8 @@ close $queryFh;
 
 
 sub checkArgs {
+    printHelp() and exit(0) if $wantHelp;
+
     my $fail = 0;
     if (not $blastQueryFile or not -f $blastQueryFile) {
         print "Require --blast-query-file containing the FASTA sequence to use for the BLAST\n";
@@ -56,15 +56,26 @@ sub checkArgs {
     }
 
     if ($fail) {
-        die "\n";
+        printHelp();
+        exit(1);
     }
 }
 
 
 sub printHelp {
     print <<HELP;
-$0 --blast-query-file path_to_file [--output-sequence-file <path/to/output/sequences/file.fasta>]
+Usage: perl $0 --blast-query-file path_to_file
+    [--output-sequence-file <path/to/output/sequences/file.fasta>]
     [--output-dir <path/to/output/dir>]
+
+Description:
+    Append the input BLAST query to the sequence import file
+
+Options:
+    --blast-query-file      file that contains the BLAST query sequence
+    --output-sequence-file  file that contains the sequences already retrieved by the pipeline
+    --output-dir            directory that contains the files for the job
+
 HELP
     exit(0);
 }
@@ -82,7 +93,7 @@ __END__
 
 =head2 NAME
 
-append_blast_query.pl - appends the input BLAST query to the sequence import file.
+append_blast_query.pl - append the input BLAST query to the sequence import file
 
 =head2 SYNOPSIS
 

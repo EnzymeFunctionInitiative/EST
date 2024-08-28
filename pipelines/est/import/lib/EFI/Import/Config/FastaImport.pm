@@ -67,6 +67,8 @@ sub validateAndProcessOptions {
     $self->addHelp("--seq-mapping-file", "<FILE>", "File for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir");
     $self->addHelp("--output-sequence-file", "<FASTA_FILE>", "Path to output file to put sequences in; defaults into --output-dir");
 
+    $self->addHelpDescription("Import user-specified FASTA sequences into a form usable by the SSN creation pipeline");
+
     return ($err, $help);
 }
 

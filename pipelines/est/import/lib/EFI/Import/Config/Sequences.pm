@@ -71,6 +71,8 @@ sub validateAndProcessOptions {
     $self->addHelp("--sequence-ids-file", "<ACCESSION_IDS_FILE>", "Path to text file containing list of accession IDs", 0);
     $self->addHelp("--output-sequence-file", "<FASTA_FILE>", "Path to output file to put sequences in", 0);
 
+    $self->addHelpDescription("Retrieve the FASTA sequences for each ID in a file with UniProt accession IDs");
+
     return ($err);
 }
 

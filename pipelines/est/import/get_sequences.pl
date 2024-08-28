@@ -27,8 +27,8 @@ if ($config->wantHelp()) {
 }
 
 if (@$err) {
-    $logger->error(@$err);
-    $config->printHelp($0);
+    #$logger->error(@$err);
+    $config->printHelp($0, $err);
     die "\n";
 }
 
@@ -61,7 +61,7 @@ __END__
 
 =head2 NAME
 
-get_sequences.pl - given a file with UniProt accession IDs, retrieve the FASTA sequences corresponding to each ID.
+get_sequences.pl - retrieve the FASTA sequences for each ID in a file with UniProt accession IDs
 
 =head2 SYNOPSIS
 

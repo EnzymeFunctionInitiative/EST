@@ -27,8 +27,8 @@ if ($config->wantHelp()) {
 }
 
 if (@$err) {
-    $logger->error(@$err);
-    $config->printHelp($0);
+    #$logger->error(@$err);
+    $config->printHelp($0, $err);
     die "\n";
 }
 
@@ -94,7 +94,7 @@ __END__
 
 =head2 NAME
 
-import_fasta.pl - imports user-specified FASTA sequences instead of using C<get_sequences.pl>.
+import_fasta.pl - import user-specified FASTA sequences into a form usable by the SSN creation pipeline instead of using C<get_sequences.pl>.
 
 =head2 SYNOPSIS
 

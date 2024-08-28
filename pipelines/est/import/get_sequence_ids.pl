@@ -34,8 +34,8 @@ if ($config->wantHelp()) {
 }
 
 if (@$err) {
-    $logger->error(@$err);
-    $config->printHelp($0);
+    #$logger->error(@$err);
+    $config->printHelp($0, $err);
     die "\n";
 }
 
@@ -118,8 +118,8 @@ __END__
 
 =head2 NAME
 
-get_sequence_ids.pl - retrieves sequence IDs from a database or file and saves them for
-use by a script later in the EST import pipeline.
+get_sequence_ids.pl - retrieve sequence IDs from a database or file and save them for
+use by a script later in the EST import pipeline
 
 =head2 SYNOPSIS
 

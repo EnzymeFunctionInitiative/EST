@@ -178,6 +178,8 @@ sub validateAndProcessOptions {
     #$self->addHelp("--exclude-fragments", "", "");
     #$self->addHelp("--fraction", "", "");
 
+    $self->addHelpDescription("Retrieve sequence IDs from a database or file and saves them for use by a script later in the EST import pipeline");
+
     return ($err);
 }
 
