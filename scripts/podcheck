@@ -1,0 +1,163 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Cwd;
+use FindBin;
+use Getopt::Long;
+use Capture::Tiny qw(capture);
+use File::Find;
+use File::Temp qw(:POSIX);
+use Pod::Spell;
+use Pod::Checker;
+use Pod::Usage;
+
+
+if ($] ge '5.008001') {
+    # Try to get the encoding from the locale
+    my $encoding = eval {
+        require POSIX;
+        POSIX::setlocale(POSIX::LC_CTYPE(), '');
+        require I18N::Langinfo;
+        I18N::Langinfo::langinfo(I18N::Langinfo::CODESET())
+    };
+    if ($encoding) {
+        binmode(STDOUT, ":encoding($encoding)");
+    }
+}
+
+my %options;
+GetOptions(
+    \%options,
+    "wordlist=s",
+    "search=s",
+    "help",
+);
+
+
+if ($options{help}) {
+    printUsage();
+    exit(0);
+}
+
+
+my $searchPath = $options{search} // getcwd();
+my $Wordlist = getWordlist($options{wordlist});
+
+
+find({wanted => \&checkAndSpell, no_chdir => 1}, $searchPath);
+
+
+
+
+
+sub checkAndSpell {
+    return if not m/\.p[lm]$/i;
+
+    my $syntaxOk = checkPodSyntax($File::Find::name);
+    if (not $syntaxOk) {
+        return;
+    }
+
+    my $spellingOk = checkPodSpelling($File::Find::name);
+    if (not $spellingOk) {
+        return;
+    }
+}
+
+
+sub checkPodSyntax {
+    my $file = shift;
+    my $errors = podchecker($file, \*STDERR, '-warnings' => 0);
+    if ($errors > 0) {
+        printf STDERR ("%s has %d pod syntax %s.\n", $file, $errors, ($errors == 1) ? 'error' : 'errors');
+        return 0;
+    }
+    return 1;
+}
+
+
+sub checkPodSpelling {
+    my $file = shift;
+    my $tempFile = tmpnam();
+    Pod::Spell->new(stopwords => $Wordlist)->parse_from_file($file, $tempFile);
+    my ($out, $err) = capture {
+            system("cat $tempFile | spell | sort | uniq");
+    };
+    if ($err) {
+        print "ERROR: There was an error checking the spelling in $file: $err\n";
+        return;
+    }
+    if ($out) {
+        print "$file has spelling errors:\n$out\n";
+    }
+}
+
+
+sub getWordlist {
+    my $wordlistFile = shift;
+    return if not $wordlistFile or not -f $wordlistFile;
+
+    open my $fh, "<", $wordlistFile or die "Unable to read worldlist $wordlistFile: $!";
+    my @words;
+    while (<$fh>) {
+        chomp;
+        push @words, $_;
+    }
+    close $fh;
+
+    my $words = join(" ", @words);
+
+    require Pod::Wordlist;
+    my $stopwords = Pod::Wordlist->new();
+    $stopwords->learn_stopwords($words);
+
+    return $stopwords;
+}
+
+
+1;
+__END__
+
+=pod
+
+=head1 podcheck
+
+=head2 NAME
+
+podcheck - script for checking POD syntax and spelling in EFI tools
+
+=head2 SYNOPSIS
+
+    perl podcheck
+
+    perl podcheck --search dirtree/to/search
+
+    perl podcheck --wordlist docs/spelling_wordlist.txt
+
+=head2 DESCRIPTION
+
+B<podcheck> will search a directory tree for perl script (C<.pl>) and module (C<.pm>) files
+and check for POD syntax and spelling.  Output is sent to STDOUT.
+
+=head2 OPTIONS AND ARGUMENTS
+
+=over
+
+=item B<--search>
+
+The path to a directory to search.  If not specified, defaults to the current working directory.
+
+=item B<--wordlist>
+
+The path to a file containing a list of words that are acceptable word spellings.
+
+=back
+
+=head2 AUTHORS
+
+Nils Oberg E<lt>noberg@illinois.eduE<gt>
+
+Loosely based on code for B<Pod::Spell> and B<Pod::Checker>.
+

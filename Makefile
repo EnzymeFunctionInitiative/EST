@@ -16,7 +16,7 @@ docs-html: docs-perlpod
 docs-coverage:
 	sphinx-build -b coverage docs/ build/
 
-docs-spelling:
+docs-spelling: docs-spelling-perlpod
 	sphinx-build -b spelling docs/ build/
 
 docs-clean:
@@ -24,6 +24,9 @@ docs-clean:
 
 docs-perlpod:
 	find pipelines -name "*.pl" | xargs -d\\n -n1 scripts/pod2rst.sh
+
+docs-spelling-perlpod:
+	perl scripts/podcheck --search pipelines --wordlist docs/spelling_wordlist.txt
 
 test: test-pyefi test-pipelines
 
