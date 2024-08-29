@@ -85,6 +85,7 @@ sub checkPodSpelling {
     my ($out, $err) = capture {
             system("cat $tempFile | spell | sort | uniq");
     };
+    unlink $tempFile;
     if ($err) {
         print "ERROR: There was an error checking the spelling in $file: $err\n";
         return;
