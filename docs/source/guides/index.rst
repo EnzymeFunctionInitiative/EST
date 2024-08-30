@@ -1,5 +1,9 @@
 Usage Guides
 ============
 
-.. toctree ::
+.. toctree::
+    :maxdepth: 1
+
+    documentation.rst
     testing.rst
+
