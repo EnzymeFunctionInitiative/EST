@@ -84,6 +84,14 @@ should be a file like the following: ::
     port=<port that database is bound to, usuablly 3306 for MySQL>
     dbi=<sqlite|mysql>
 
+Reference
+---------
+
+.. toctree::
+    :glob:
+    :maxdepth: 1
+
+    *
 
 
 
