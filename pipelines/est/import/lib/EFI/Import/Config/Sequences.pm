@@ -53,7 +53,7 @@ sub getOptions {
 sub validateAndProcessOptions {
     my $self = shift;
 
-    my @err = $self->SUPER::validateAndProcessOptions();
+    my ($err) = $self->SUPER::validateAndProcessOptions();
 
     my $h = $self->getAllOptions();
 
@@ -63,11 +63,17 @@ sub validateAndProcessOptions {
         $self->setConfigValue("output_sequence_file", $seqFile);
     }
 
-    push @err, "Require --fasta-db" if not $h->{fasta_db};
+    push @$err, "Require --fasta-db" if not $h->{fasta_db};
 
     $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_default_path("accession_ids", $outputDir);
 
-    return @err;
+    $self->addHelp("--fasta-db", "<BLAST_DB>", "Path to BLAST-formatted sequence database", 1);
+    $self->addHelp("--sequence-ids-file", "<ACCESSION_IDS_FILE>", "Path to text file containing list of accession IDs", 0);
+    $self->addHelp("--output-sequence-file", "<FASTA_FILE>", "Path to output file to put sequences in", 0);
+
+    $self->addHelpDescription("Retrieve the FASTA sequences for each ID in a file with UniProt accession IDs");
+
+    return ($err);
 }
 
 
