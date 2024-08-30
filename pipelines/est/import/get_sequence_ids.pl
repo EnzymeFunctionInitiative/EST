@@ -258,7 +258,7 @@ The import options share a number of arguments.
 
 =item C<--sequence-ids-file> (optional, defaults)
 
-The output file that the IDs from the sequence ID retreival are stored in.
+The output file that the IDs from the sequence ID retrieval are stored in.
 If this is not specified, the file is named according to the C<accession_ids> value
 in the B<C<EFI::Import::Config::Defaults>> module and put in the output directory.
 
