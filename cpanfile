@@ -13,6 +13,6 @@ requires 'DBD::mysql', '4.050';
 requires 'Array::Utils', '0.5';
 
 # General
-requires 'Pod::Spell', '1.26'
-requires 'Pod::Checker', '1.77'
+requires 'Pod::Spell', '1.26';
+requires 'Pod::Checker', '1.77';
 
