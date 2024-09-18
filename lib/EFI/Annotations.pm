@@ -345,7 +345,7 @@ sub get_annotation_fields {
 
         # db_primary_col is present if it is required to be in the same table (e.g. not stored in a JSON structure, or in an external table)
         push @fields, {name => "accession",                 field_type => "db",     type_spec => "VARCHAR(10)",     display => "",                                                                                      db_primary_col => 1,index_name => "uniprot_accession_idx",                              primary_key => 1};
-        push @fields, {name => "Sequence_Source",           field_type => "ssn",                                    display => "Sequence Source"};
+        push @fields, {name => FIELD_SEQ_SRC_KEY,           field_type => "ssn",                                    display => "Sequence Source"};
         push @fields, {name => "organism",                  field_type => "db",     type_spec => "VARCHAR(150)",    display => "Organism",                      base_ssn => 1,                                                                          json_type_spec => "str",    json_name => "o"};
         push @fields, {name => "taxonomy_id",               field_type => "db",     type_spec => "INT",             display => "Taxonomy ID",                   base_ssn => 1,                                          db_primary_col => 1,index_name => "taxonomy_id_idx"};
         push @fields, {name => "swissprot_status",          field_type => "db",     type_spec => "BOOL",            display => "UniProt Annotation Status",     base_ssn => 1,                                          db_primary_col => 1,index_name => "swissprot_status_idx"};
@@ -411,8 +411,8 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_UNIREF90_CLUSTER_SIZE, field_type => "ssn",                                    display => "UniRef90 Cluster Size",                         ssn_num_type => 1};
         push @fields, {name => FIELD_UNIREF100_IDS,         field_type => "ssn",                                    display => "UniRef100 Cluster IDs",                                             ssn_list_type => 1};
         push @fields, {name => FIELD_UNIREF100_CLUSTER_SIZE,field_type => "ssn",                                    display => "UniRef100 Cluster Size",                        ssn_num_type => 1};
-        push @fields, {name => "ACC_CDHIT",                 field_type => "ssn",                                    display => "CD-HIT IDs",                                                        ssn_list_type => 1};
-        push @fields, {name => "ACC_CDHIT_COUNT",           field_type => "ssn",                                    display => "CD-HIT Cluster Size",                           ssn_num_type => 1};
+        push @fields, {name => FIELD_REPNODE_IDS,           field_type => "ssn",                                    display => "CD-HIT IDs",                                                        ssn_list_type => 1};
+        push @fields, {name => FIELD_REPNODE_SIZE,          field_type => "ssn",                                    display => "CD-HIT Cluster Size",                           ssn_num_type => 1};
         push @fields, {name => "Sequence",                  field_type => "ssn",                                    display => "Sequence"};
         push @fields, {name => "User_IDs_in_Cluster",       field_type => "ssn",                                    display => "User IDs in Cluster",                                               ssn_list_type => 1};
 
@@ -535,18 +535,33 @@ sub is_expandable_attr {
     my $result = 0;
     if (not $flag or $flag == REPNODE_ONLY) {
         $result = (
-            $attr eq FIELD_ID_ACC       or $attr eq $self->{anno}->{&FIELD_ID_ACC}->{display}               or 
-            $attr eq "ACC_CDHIT"        or $attr eq $self->{anno}->{"ACC_CDHIT"}->{display}
+            $attr eq FIELD_REPNODE_IDS  or $attr eq $anno->{&FIELD_REPNODE_IDS}->{display}               or 
+            $attr eq FIELD_ID_ACC       or $attr eq $anno->{&FIELD_ID_ACC}->{display}
         );
     }
     if (not $flag or $flag == UNIREF_ONLY) {
         $result = ($result or (
-            $attr eq FIELD_UNIREF50_IDS     or $attr eq $self->{anno}->{&FIELD_UNIREF50_IDS}->{display}  or 
-            $attr eq FIELD_UNIREF90_IDS     or $attr eq $self->{anno}->{&FIELD_UNIREF90_IDS}->{display}  or 
-            $attr eq FIELD_UNIREF100_IDS    or $attr eq $self->{anno}->{&FIELD_UNIREF100_IDS}->{display}     
+            $attr eq FIELD_UNIREF50_IDS     or $attr eq $anno->{&FIELD_UNIREF50_IDS}->{display}  or 
+            $attr eq FIELD_UNIREF90_IDS     or $attr eq $anno->{&FIELD_UNIREF90_IDS}->{display}  or 
+            $attr eq FIELD_UNIREF100_IDS    or $attr eq $anno->{&FIELD_UNIREF100_IDS}->{display}     
         ));
     }
     return $result;
+}
+
+
+sub get_expandable_attr {
+    my $self = shift;
+    my $anno = $self->get_annotation_data();
+    my @fields = (FIELD_ID_ACC, FIELD_REPNODE_IDS, FIELD_UNIREF50_IDS, FIELD_UNIREF90_IDS, FIELD_UNIREF100_IDS);
+    push @fields, map { $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
+    return @fields;
+}
+
+
+sub get_cluster_info_insert_location {
+    my $self = shift;
+    return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
 }
 
 
@@ -931,7 +946,7 @@ The string "integer" if the type is numeric, "string" otherwise.
 
 =head3 is_expandable_attr($attrName)
 
-Checks if the input attribute name can be expanded into a list of IDs.
+Checks if the input attribute name (or its display/SSN column name) can be expanded into a list of IDs.
 In other words, it checks if the input name is UniRef or repnode ID list attribute name.
 These are:
 
@@ -964,6 +979,37 @@ A SSN display attribute name (e.g. C<UniRef90 IDs>).
     my $attrName = "UniRef90_IDs"; # or "UniRef90 IDs"
     my $isExpandable = $anno->is_expandable_attr($attrName);
     # $isExpandable is 1
+
+=head3 get_expandable_attr()
+
+Gets a list of ID attribute names (such as UniRef clusters or repnodes) that can be expanded into
+multiple IDs. See C<is_expandable_attr()> for a list of the currently available ones. 
+
+=head4 Returns
+
+An array of fields that match ones in C<EFI::Annotations::Fields> plus the display (e.g. SSN
+column name) versions of those field names.
+
+=head4 Example Usage
+
+    my @attr = $anno->get_expandable_attr();
+
+=head3 get_cluster_info_insert_location()
+
+Returns the name of the SSN column where the cluster number and color columns should be inserted.
+This is designed so that the new columns will be inserted immediately following the returned column.
+
+=head4 Returns
+
+A string representing a SSN column heading (e.g. display name).
+
+=head4 Example Usage
+
+    my $name = $anno->get_cluster_info_insert_location();
+    if ($currentSsnColName eq $name) {
+        # Insert a copy of the current SSN column
+        # Append the color and cluster number column values
+    }
 
 =cut
 
