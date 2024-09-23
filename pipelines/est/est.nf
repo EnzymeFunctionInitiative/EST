@@ -57,7 +57,7 @@ process get_sequences {
     """
     script:
     """
-    perl $projectDir/import/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
+    perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
     """
 }
 

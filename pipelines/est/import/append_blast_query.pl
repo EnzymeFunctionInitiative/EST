@@ -7,7 +7,6 @@ use Getopt::Long;
 use FindBin;
 use Cwd;
 
-use lib "$FindBin::Bin/lib";
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Annotations::Fields qw(INPUT_SEQ_ID);

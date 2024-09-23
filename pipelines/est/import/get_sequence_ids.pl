@@ -8,7 +8,6 @@ use Getopt::Long;
 use FindBin;
 use Time::HiRes;
 
-use lib "$FindBin::Bin/lib";
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;

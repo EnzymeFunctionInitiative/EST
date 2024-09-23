@@ -77,35 +77,5 @@ sub convertSequences {
 }
 
 
-# Parse output from fastacmd (FASTA format) and return list of IDs and sequences.
-sub parseSequences {
-    my $output = shift;
-
-    my @lines = split(m/[\n\r]+/, $output);
-
-    my @seq;
-
-    my $id = "";
-    my $seq = "";
-    foreach my $line (@lines) {
-        # Header line can look like:
-        #   >tr|SEQ_ID|...
-        #   >SEQ_ID
-        #   >tr|SEQ_ID
-        if ($line =~ m/^>(\w\w\|)?([A-Za-z0-9_\.]+)(\|.*)?$/) {
-            push @seq, [$id, $seq] if $id;
-            $id = $2;
-            $seq = "";
-        } else {
-            $seq .= "$line\n";
-        }
-    }
-
-    push @seq, [$id, $seq] if $id;
-
-    return @seq;
-}
-
-
 1;
 

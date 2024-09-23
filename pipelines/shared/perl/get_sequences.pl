@@ -7,7 +7,7 @@ use Data::Dumper;
 use FindBin;
 use Time::HiRes;
 
-use lib "$FindBin::Bin/lib";
+use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Import::Config::Sequences;
 use EFI::Import::SequenceDB;

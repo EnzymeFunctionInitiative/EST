@@ -20,10 +20,28 @@ process get_fasta {
     input:
         path id_list_dir
     output:
-        path 'fasta/', emit: 'fasta'
+        path 'fasta/'
     """
     mkdir fasta
-    #TODO: get sequences from fasta database for the input IDs
+    mkdir fasta/uniprot_ids fasta/uniref90_ids fasta/uniref50_ids
+    for id_file in $id_list_dir/uniprot_ids/*.txt; do
+        [ -e "\${id_file}" ] || continue
+        fasta_file=\${id_file/%.txt/.fasta}
+        fasta_file=\${fasta_file/#$id_list_dir/fasta}
+        perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file \${id_file} --output-sequence-file \${fasta_file}
+    done
+    for id_file in $id_list_dir/uniref90_ids/*.txt; do
+        [ -e "\${id_file}" ] || continue
+        fasta_file=\${id_file/%.txt/.fasta}
+        fasta_file=\${fasta_file/#$id_list_dir/fasta}
+        perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file \${id_file} --output-sequence-file \${fasta_file}
+    done
+    for id_file in $id_list_dir/uniref50_ids/*.txt; do
+        [ -e "\${id_file}" ] || continue
+        fasta_file=\${id_file/%.txt/.fasta}
+        fasta_file=\${fasta_file/#$id_list_dir/fasta}
+        perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file \${id_file} --output-sequence-file \${fasta_file}
+    done
     """
 }
 
