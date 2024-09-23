@@ -554,8 +554,8 @@ sub get_expandable_attr {
     my $self = shift;
     my $anno = $self->get_annotation_data();
     my @fields = (FIELD_ID_ACC, FIELD_REPNODE_IDS, FIELD_UNIREF50_IDS, FIELD_UNIREF90_IDS, FIELD_UNIREF100_IDS);
-    push @fields, map { $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
-    return @fields;
+    my %display = map { $_ => $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
+    return (\@fields, \%display);
 }
 
 
@@ -982,17 +982,22 @@ A SSN display attribute name (e.g. C<UniRef90 IDs>).
 
 =head3 get_expandable_attr()
 
-Gets a list of ID attribute names (such as UniRef clusters or repnodes) that can be expanded into
-multiple IDs. See C<is_expandable_attr()> for a list of the currently available ones. 
+Gets a mapping of ID attribute display names (such as UniRef clusters or repnodes) that can be
+expanded into multiple IDs. See C<is_expandable_attr()> for a list of the currently available ones. 
 
 =head4 Returns
 
-An array of fields that match ones in C<EFI::Annotations::Fields> plus the display (e.g. SSN
-column name) versions of those field names.
+An array ref of SSN field names (from C<EFI::Annotations::Fields>) and a hash ref mapping SSN field
+names to display name for each expandable field in C<EFI::Annotations::Fields>.
 
 =head4 Example Usage
 
-    my @attr = $anno->get_expandable_attr();
+    my $ssnField = "UniRef50 Cluster IDs";
+    my ($attrFields, $attrDisplay) = $anno->get_expandable_attr();
+    my %attr = map { $attrDisplay->{$_} => $_ } @$attrFields;
+    if (exists $attr->{$ssnField}) {
+        print "The SSN field $ssnField is expandable\n";
+    }
 
 =head3 get_cluster_info_insert_location()
 
