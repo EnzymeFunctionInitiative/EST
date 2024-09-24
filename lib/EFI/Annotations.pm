@@ -835,7 +835,8 @@ A list of field names.
 Decodes a JSON string from the C<annotations> table metadata column into a hash representing
 the values for that accession.  The metadata column uses short 1 or 2 character keys to
 represent the full key names to minimize storage space.  For example, C<organism> is
-represented by C<o> in the metadata column.
+represented by C<o> in the metadata column.  The result returned is the full form (e.g.
+C<organism> instead of C<o>).
 
 =head4 Parameters
 

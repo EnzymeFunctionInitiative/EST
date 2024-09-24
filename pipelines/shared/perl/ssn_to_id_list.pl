@@ -73,7 +73,7 @@ sub saveMetanodeMapping {
     if ($metanodeType ne "uniprot") {
         $mmfh->print(join("\t", "${metanodeType}_id", "uniprot_id"), "\n");
         foreach my $metanode (keys %$metanodeMap) {
-            map { $mmfh->print(join("\t", $metanode, $metanodeMap->{$metanode}), "\n") } @{ $metanodeMap->{$metanode} };
+            map { $mmfh->print(join("\t", $metanode, $_), "\n"); } @{ $metanodeMap->{$metanode} };
         }
     }
 

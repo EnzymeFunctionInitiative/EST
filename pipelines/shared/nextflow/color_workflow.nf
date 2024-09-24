@@ -53,9 +53,10 @@ process color_ssn {
         path cluster_sizes
     output:
         path 'ssn_colored.xgmml', emit: 'ssn_output'
+        path 'cluster_colors.txt', emit: 'cluster_colors'
     """
     perl $projectDir/../shared/perl/color_xgmml.pl --ssn $ssn_file --color-ssn ssn_colored.xgmml --cluster-map $cluster_id_map \
-        --cluster-size $cluster_sizes
+        --cluster-size $cluster_sizes --cluster-color-map cluster_colors.txt
     """
 }
 
@@ -83,29 +84,19 @@ process unzip_input {
     """
 }
 
-process get_annotated_mapping_table {
+process get_annotated_mapping_tables {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path cluster_id_map
+        path seqid_source_map
+        path cluster_color_map
     output:
         path 'mapping_table.txt', emit: 'mapping_table'
+        path 'swissprot_clusters_desc.txt', emit: 'swissprot_table'
     """
-    #TODO
-    touch mapping_table.txt
-    """
-}
-
-process get_swissprot_tables {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path cluster_id_map
-    output:
-        path 'swissprot_clusters_desc.txt', emit: 'clusters'
-        path 'swissprot_singletons_desc.txt', emit: 'singletons'
-    """
-    #TODO
-    touch swissprot_clusters_desc.txt
-    touch swissprot_singletons_desc.txt
+    perl $projectDir/../shared/perl/annotate_mapping_table.pl --seqid-source-map $seqid_source_map --cluster-map $cluster_id_map \
+        --cluster-color-map $cluster_color_map --mapping-table mapping_table.txt --swissprot-table swissprot_clusters_desc.txt \
+        --config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
 
@@ -171,9 +162,7 @@ workflow color_and_retrieve {
 
         fasta_dir = get_fasta(id_list_dir)
 
-        mapping_table = get_annotated_mapping_table(compute_info.cluster_id_map)
-
-        sp_data = get_swissprot_tables(compute_info.cluster_id_map)
+        anno_tables = get_annotated_mapping_tables(compute_info.cluster_id_map, ssn_data.seqid_source_map, colored_ssn.cluster_colors)
 
         cr_table = get_conv_ratio_table(compute_info.cluster_id_map)
 
@@ -181,12 +170,11 @@ workflow color_and_retrieve {
 
     emit:
         ssn_file
-        ssn_output = colored_ssn
+        ssn_output = colored_ssn.ssn_output
         id_list_dir
         fasta_dir
-        mapping_table
-        sp_clusters = sp_data.clusters
-        sp_singletons = sp_data.singletons
+        mapping_table = anno_tables.mapping_table
+        sp_clusters = anno_tables.swissprot_table
         cr_table
         cluster_stats = cluster_data.stats
         cluster_sizes = cluster_data.cluster_sizes

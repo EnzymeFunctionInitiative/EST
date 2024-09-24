@@ -28,6 +28,9 @@ my $xwriter = ColorXgmmlWriter->new(ssn => $opts->{ssn}, color_ssn => $opts->{co
 
 $xwriter->write();
 
+if ($opts->{cluster_color_map}) {
+    saveClusterColorMap($opts->{cluster_color_map}, $xwriter->getClusterColors());
+}
 
 
 
@@ -35,6 +38,32 @@ $xwriter->write();
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+sub saveClusterColorMap {
+    my $mapFile = shift;
+    my $clusterColors = shift;
+
+    open my $fh, ">", $mapFile or die "Unable to write to cluster color map file '$mapFile': $!";
+
+    $fh->print(join("\t", "cluster_num_seq", "color"), "\n");
+
+    my @clusters = sort { $a <=> $b } keys %$clusterColors;
+    foreach my $cnum (@clusters) {
+        $fh->print(join("\t", $cnum, $clusterColors->{$cnum}), "\n");
+    }
+
+    $fh->close();
+}
 
 
 sub parseClusterSizeFile {
@@ -75,6 +104,7 @@ sub validateAndProcessOptions {
         "color-ssn=s",
         "cluster-map=s",
         "cluster-size=s",
+        "cluster-color-map=s",
         "color-file=s",
         "help",
     );
@@ -111,12 +141,13 @@ Description:
     the nodes based on cluster.
 
 Options:
-    --ssn           path to input SSN (XGMML) file
-    --color-ssn     path to output SSN (XGMML) file
-    --cluster-map   path to output file mapping node index (col 1) to cluster numbers (num nodes, num sequences)
-    --cluster-size  path to input file containing the cluster sizes
-    --color-file    path to a file containing a list of colors by cluster;
-                    if not specified defaults to 'colors.tab' in the script directory
+    --ssn               path to input SSN (XGMML) file
+    --color-ssn         path to output SSN (XGMML) file
+    --cluster-map       path to output file mapping node index (col 1) to cluster numbers (num nodes, num sequences)
+    --cluster-color-map path to output file mapping cluster number (sequence count) to a color
+    --cluster-size      path to input file containing the cluster sizes
+    --color-file        path to a file containing a list of colors by cluster;
+                        if not specified defaults to 'colors.tab' in the script directory
 
 HELP
     map { print "$_\n"; } @$errors;
@@ -160,10 +191,25 @@ sub new {
     $self->{colors} = $args{colors};
     $self->{cluster_map_file} = $args{cluster_map};
     $self->{cluster_sizes} = $args{cluster_sizes};
+    $self->{cluster_color_map} = {};
 
     $self->{anno} = new EFI::Annotations;
 
     return $self;
+}
+
+
+#
+# getClusterColors
+#
+# Returns a mapping of cluster numbers (based on number of sequences) to color
+#
+# Returns:
+#    hash ref of cluster number to hex color
+#
+sub getClusterColors {
+    my $self = shift;
+    return $self->{cluster_color_map};
 }
 
 
@@ -430,13 +476,17 @@ sub getClusterInfo {
     my $self = shift;
     my $seqId = shift;
 
+    # Cluster number by number of sequences in cluster
     my $seqNum = $self->{cluster_map}->{$seqId}->[0];
+    # Cluster number by number of nodes in cluster
     my $nodeNum = $self->{cluster_map}->{$seqId}->[1];
     my $seqCount = $self->{cluster_sizes}->{seq}->{$seqNum} // 0;
     my $nodeCount = $self->{cluster_sizes}->{node}->{$nodeNum} // 0;
     my $singNum = 0; #TODO
     my $seqColor = $self->{colors}->getColor($seqNum);
     my $nodeColor = $self->{colors}->getColor($nodeNum);
+
+    $self->{cluster_color_map}->{$seqNum} = $seqColor;
 
     my @info;
     push @info, [SEQ_NUM_FIELD, $seqNum, "integer"];
