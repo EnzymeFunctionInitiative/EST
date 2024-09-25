@@ -106,12 +106,15 @@ process get_annotated_mapping_tables {
 process get_conv_ratio_table {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path mapping_table
+        path edgelist
+        path index_seqid_map
+        path cluster_id_map
+        path seqid_source_map
     output:
         path 'conv_ratio.txt', emit: 'conv_ratio'
     """
-    #TODO
-    touch conv_ratio.txt
+    perl $projectDir/../shared/perl/compute_conv_ratio.pl --cluster-map $cluster_id_map --index-seqid-map $index_seqid-map \
+        --edgelist $edgelist --seqid-source-map $seqid_source_map --conv-ratio conv_ratio.txt
     """
 }
 
