@@ -464,7 +464,8 @@ sub getAttAttr {
 #
 # Get the cluster number, size, and color info for the input sequence ID; the return
 # value can be passed directly into the 'emptyTag' method of the XML writer, and
-# uses the constants defined at the start of the module.
+# uses the constants defined at the start of the module.  If the sequence doesn't
+# exist in the cluster mapping, then it is a singleton and it is not colored.
 #
 # Parameters:
 #    $seqId - sequence ID (e.g. UniProt)
@@ -476,26 +477,30 @@ sub getClusterInfo {
     my $self = shift;
     my $seqId = shift;
 
-    # Cluster number by number of sequences in cluster
-    my $seqNum = $self->{cluster_map}->{$seqId}->[0];
-    # Cluster number by number of nodes in cluster
-    my $nodeNum = $self->{cluster_map}->{$seqId}->[1];
-    my $seqCount = $self->{cluster_sizes}->{seq}->{$seqNum} // 0;
-    my $nodeCount = $self->{cluster_sizes}->{node}->{$nodeNum} // 0;
-    my $singNum = 0; #TODO
-    my $seqColor = $self->{colors}->getColor($seqNum);
-    my $nodeColor = $self->{colors}->getColor($nodeNum);
-
-    $self->{cluster_color_map}->{$seqNum} = $seqColor;
-
     my @info;
-    push @info, [SEQ_NUM_FIELD, $seqNum, "integer"];
-    push @info, [NODE_NUM_FIELD, $nodeNum, "integer"];
-    push @info, [SINGLETON_FIELD, $singNum, "integer"];
-    push @info, [SEQ_NUM_COLOR_FIELD, $seqColor, "string"];
-    push @info, [NODE_NUM_COLOR_FIELD, $nodeColor, "string"];
-    push @info, [SEQ_COUNT_FIELD, $seqCount, "integer"];
-    push @info, [NODE_COUNT_FIELD, $nodeCount, "integer"];
+    my $cmap = $self->{cluster_map}->{$seqId};
+    if ($cmap) {
+        # Cluster number by number of sequences in cluster
+        my $seqNum = $cmap->[0];
+        # Cluster number by number of nodes in cluster
+        my $nodeNum = $cmap->[1];
+        my $seqCount = $self->{cluster_sizes}->{seq}->{$seqNum} // 0;
+        my $nodeCount = $self->{cluster_sizes}->{node}->{$nodeNum} // 0;
+        my $seqColor = $self->{colors}->getColor($seqNum);
+        my $nodeColor = $self->{colors}->getColor($nodeNum);
+
+        $self->{cluster_color_map}->{$seqNum} = $seqColor;
+
+        push @info, [SEQ_NUM_FIELD, $seqNum, "integer"];
+        push @info, [NODE_NUM_FIELD, $nodeNum, "integer"];
+        push @info, [SEQ_NUM_COLOR_FIELD, $seqColor, "string"];
+        push @info, [NODE_NUM_COLOR_FIELD, $nodeColor, "string"];
+        push @info, [SEQ_COUNT_FIELD, $seqCount, "integer"];
+        push @info, [NODE_COUNT_FIELD, $nodeCount, "integer"];
+    } else {
+        my $singNum = 0; #TODO
+        push @info, [SINGLETON_FIELD, $singNum, "integer"];
+    }
 
     return \@info;
 }
