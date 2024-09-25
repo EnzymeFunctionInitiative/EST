@@ -3,15 +3,18 @@ process get_id_list {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path cluster_id_map
+        path singletons
         path seqid_source_map
     output:
         path 'id_lists/', emit: 'id_lists'
+        path 'cluster_sizes.txt', emit: 'cluster_sizes'
     """
     mkdir id_lists
     mkdir id_lists/uniprot_ids id_lists/uniref90_ids id_lists/uniref50_ids
-    perl $projectDir/../shared/perl/get_id_lists.pl --cluster-map $cluster_id_map \
+    perl $projectDir/../shared/perl/get_id_lists.pl --cluster-map $cluster_id_map --singletons $singletons \
         --uniprot id_lists/uniprot_ids --uniref90 id_lists/uniref90_ids --uniref50 id_lists/uniref50_ids \
-        --seqid-source-map $seqid_source_map --config ${params.efi_config} --db-name ${params.efi_db}
+        --seqid-source-map $seqid_source_map --cluster-sizes cluster_sizes.txt \
+        --config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
 
@@ -132,12 +135,14 @@ process compute_clusters {
     input:
         path edgelist
         path index_seqid_map
+        path seqid_source_map
     output:
         path 'cluster_id_map.txt', emit: 'cluster_id_map'
-        path 'cluster_size_map.txt', emit: 'cluster_sizes'
+        path 'singletons.txt', emit: 'singletons'
+        path 'cluster_num_map.txt', emit: 'cluster_num_map'
     """
     python $projectDir/../shared/python/compute_clusters.py --edgelist $edgelist --index-seqid-map $index_seqid_map \
-        --clusters cluster_id_map.txt --cluster-info cluster_size_map.txt
+        --clusters cluster_id_map.txt --singletons singletons.txt --cluster-num-map cluster_num_map.txt
     """
 }
 
@@ -155,29 +160,29 @@ workflow color_and_retrieve {
         // Compute the clusters
         compute_info = compute_clusters(ssn_data.edgelist, ssn_data.index_seqid_map)
 
+        id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map)
+
         // Color the SSN based on the computed clusters
         colored_ssn = color_ssn(ssn_file, compute_info.cluster_id_map, compute_info.cluster_sizes)
 
-        id_list_dir = get_id_list(compute_info.cluster_id_map, ssn_data.seqid_source_map)
-
-        fasta_dir = get_fasta(id_list_dir)
+        fasta_dir = get_fasta(id_list_data.id_lists)
 
         anno_tables = get_annotated_mapping_tables(compute_info.cluster_id_map, ssn_data.seqid_source_map, colored_ssn.cluster_colors)
 
-        cr_table = get_conv_ratio_table(compute_info.cluster_id_map)
+        cr_table = get_conv_ratio_table(ssn_data.edgelist, ssn_data.index_seqid_map, compute_info.cluster_id_map, ssn_data.seqid_source_map)
 
-        cluster_data = get_cluster_stats(compute_info.cluster_id_map)
+        cluster_data = get_cluster_stats(compute_info.cluster_id_map, ssn_data.seqid_source_map, compute_info.singletons)
 
     emit:
         ssn_file
         ssn_output = colored_ssn.ssn_output
-        id_list_dir
+        id_list_dir = id_list_data.id_lists
         fasta_dir
         mapping_table = anno_tables.mapping_table
         sp_clusters = anno_tables.swissprot_table
         cr_table
         cluster_stats = cluster_data.stats
-        cluster_sizes = cluster_data.cluster_sizes
-        cluster_num_map = cluster_data.cluster_num_map
+        cluster_sizes = id_list_data.cluster_sizes
+        cluster_num_map = compute_info.cluster_num_map
 }
 

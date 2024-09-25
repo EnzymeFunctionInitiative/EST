@@ -45,7 +45,7 @@ class SsnNetworkGraph:
         self.components = self.G.connected_components(mode='weak')
 
         # Calculate the cluster sizes by two different metrics (number of nodes and number of sequences)
-        self.cluster_size_by_node, self.cluster_size_by_seq = self.compute_cluster_sizes()
+        self.cluster_size_by_node, self.cluster_size_by_seq, self.singletons = self.compute_cluster_sizes()
 
         # Sort by cluster node size and then assign a cluster number to each node, with the numbering
         # done according to the number of nodes in the cluster
@@ -69,6 +69,8 @@ class SsnNetworkGraph:
         cluster_size_by_node = {}
         # This is a mapping of node index to cluster sizes computed by number of sequences in the cluster
         cluster_size_by_seq = {}
+        # Map of singletons (i.e. nodes that have one sequence in them)
+        singletons = {}
 
         # Loop over every cluster (e.g. component) and assign cluster numbers to the nodes (by number of nodes in cluster)
         cluster_idx = 0
@@ -81,11 +83,14 @@ class SsnNetworkGraph:
                 size_by_seq += num_seqs_in_node
             size_by_node = len(comp_list)
             # Save the expanded size (e.g. accounting for UniRef/repnodes) of the cluster
-            cluster_size_by_seq[cluster_idx] = size_by_seq
-            cluster_size_by_node[cluster_idx] = size_by_node
-            cluster_idx += 1
+            if size_by_seq <= 1:
+                singletons[cluster_idx] = 1
+            else:
+                cluster_size_by_seq[cluster_idx] = size_by_seq
+                cluster_size_by_node[cluster_idx] = size_by_node
+                cluster_idx += 1
 
-        return cluster_size_by_node, cluster_size_by_seq
+        return cluster_size_by_node, cluster_size_by_seq, singletons
 
 
     def compute_cluster_numbers(self, cluster_sizes):
@@ -95,24 +100,27 @@ class SsnNetworkGraph:
         Parameters
         ----------
             cluster_sizes
-                mapping of cluster index (from self.components) to size (based on a metric)
+                mapping of cluster index (from self.components) to size (either number
+                of sequences of number of nodes)
 
         Returns
         -------
             dict mapping node index to cluster number
+            dict mapping original cluster number to computed cluster number
         """
         # Order by cluster size
         cluster_size_order = dict(sorted(cluster_sizes.items(), key=lambda item: item[1], reverse=True))
         cluster_idx = 0
-        node_cluster = {}
+        idx_cluster = {}
         cluster_num_map = {} # Map the old numbering (e.g. index into self.components) to the new numbering
         # Assign numbers; idx is the old (self.components) index, but the dict is sorted based on the value (cluster size)
         for idx in cluster_size_order:
-            for node_idx in self.components[idx]:
-                node_cluster[node_idx] = cluster_idx + 1
-            cluster_num_map[idx] = cluster_idx + 1
-            cluster_idx += 1
-        return node_cluster, cluster_num_map
+            if idx not in this.singletons:
+                for node_idx in self.components[idx]:
+                    idx_cluster[node_idx] = cluster_idx + 1
+                cluster_num_map[idx] = cluster_idx + 1
+                cluster_idx += 1
+        return idx_cluster, cluster_num_map
 
     
     def save_cluster_info(self, info_file):
@@ -126,15 +134,34 @@ class SsnNetworkGraph:
                 path to a file to output cluster info to
         """
         with open(info_file, "w") as fh:
-            fh.write("cluster_num_by_seq\tcluster_size_by_seq\tcluster_num_by_node\tcluster_size_by_node\n")
-            # The dict index here represents the old (self.components) cluster number; sorting
+            # No header, because this is used internally by the web interface which assumes
+            # there is no header
+            #fh.write("cluster_num_by_seq\tcluster_size_by_seq\tcluster_num_by_node\tcluster_size_by_node\n")
+            # The dict idx here represents the old (self.components) cluster number; sorting
             # in the file will be done by sequence number
             for idx in self.cluster_num_map_by_seq:
                 cluster_num_seq = self.cluster_num_map_by_seq[idx]
                 cluster_num_node = self.cluster_num_map_by_node[idx]
                 cluster_size_seq = self.cluster_size_by_seq[idx]
                 cluster_size_node = self.cluster_size_by_node[idx]
-                fh.write(f"{cluster_num_seq}\t{cluster_size_seq}\t{cluster_num_node}\t{cluster_size_node}\n");
+                fh.write(f"{cluster_num_seq}\t{cluster_num_node}\t{cluster_size_seq}\t{cluster_size_node}\n");
+
+
+    def save_singletons(self, singletons_file):
+        """
+        Save the list of singletons to a file, formatted as a single column with a header
+
+        Parameters
+        ----------
+            singletons_file
+                path to a file to output singleton list to
+        """
+        with open(singletons_file, "w") as fh:
+            fh.write("sequence_id")
+            ids = this.singletons.keys()
+            ids.sort()
+            for id in ids:
+                fh.write(f"{id}\n")
 
 
     def save_clusters(self, cluster_file):

@@ -14,7 +14,8 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument("--edgelist", required=True, type=str, help="The edgelist file to compute on")
     parser.add_argument("--index-seqid-map", required=True, type=str, help="The file containing a mapping of edgelist node indices (col 1) to node sequence ID (col 2) and node size (col 3; for UniRef/repnode)")
     parser.add_argument("--clusters", required=True, type=str, help="The output file to store node sequence ID (col 1) to cluster num (col 2 by seq, col 3 by seq)")
-    parser.add_argument("--cluster-info", required=True, type=str, help="The output file to store cluster size information in")
+    parser.add_argument("--singletons", required=True, type=str, help="The output file to store singletons (clusters with only one sequence) in")
+    parser.add_argument("--cluster-num-map", required=True, type=str, help="path to an output file containing a mapping of cluster number based on sequences to number based on nodes")
 
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -34,7 +35,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     args.edgelist = os.path.abspath(args.edgelist)
     args.index_seqid_map = os.path.abspath(args.index_seqid_map)
     args.clusters = os.path.abspath(args.clusters)
-    args.cluster_info = os.path.abspath(args.cluster_info)
+    args.singletons = os.path.abspath(args.singletons)
+    args.cluster_num_map = os.path.abspath(args.cluster_num_map)
 
     return args
 
@@ -73,7 +75,8 @@ if __name__ == "__main__":
     net_graph.load_from_edgelist(args.edgelist)
     net_graph.compute_clusters()
     net_graph.save_clusters(args.clusters)
-    net_graph.save_cluster_info(args.cluster_info)
+    net_graph.save_cluster_info(args.cluster_num_map)
+    net_graph.save_singletons(args.singletons)
 
 
 

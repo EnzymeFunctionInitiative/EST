@@ -57,9 +57,91 @@ saveIdLists($clusterToId, $unirefMap, $dirs);
 
 
 
+saveSingletons($opts->{singletons}, $dirs, $unirefMap);
+
+saveClusterSizes($opts->{cluster_sizes}, $clusterToId, $unirefMap);
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+#
+# saveClusterSizes
+#
+# Save a mapping of cluster number to cluster sizes, including UniRef if present
+#
+# Parameters:
+#    $file - path to output file
+#    $clusterToId - mapping of cluster number to list of IDs
+#    $unirefMap - mapping of UniRef IDs per cluster
+#
+sub saveClusterSizes {
+    my $file = shift;
+    my $clusterToId = shift;
+    my $unirefMap = shift;
+
+    open my $fh, ">", $file or die "Unable to write to cluster size file '$file': $!";
+
+    my @headers = ("Cluster Number", "UniProt Cluster Size");
+    push @headers, "UniRef90 Cluster Size" if $unirefMap->{uniref90};
+    push @headers, "UniRef50 Cluster Size" if $unirefMap->{uniref50};
+
+    $fh->print(join("\t", @headers), "\n");
+
+    my @clusters = sort { $a <=> $b } keys %$clusterToId;
+    foreach my $cnum (@clusters) {
+        my $uniprotSize = @{ $clusterToId->{$cnum} };
+        my $uniref90Size = @{ $unirefMap->{uniref90}->{$cnum} } if $unirefMap->{uniref90};
+        my $uniref50Size = @{ $unirefMap->{uniref50}->{$cnum} } if $unirefMap->{uniref50};
+        my @row = ($cnum, $uniprotSize);
+        push @row, $uniref90Size if $uniref90Size;
+        push @row, $uniref50Size if $uniref50Size;
+
+        $fh->print(join("\t", @row), "\n");
+    }
+
+    close $fh;
+}
+
+
+#
+# saveSingletons
+#
+# Copy the singletons file to the ID lists directories; does nothing if the file does
+# not exist or is not specified
+#
+# Parameters:
+#    $file - path to singletons file
+#    $dirs - hash ref of directories
+#    $unirefMap - hash ref of UniRef sequence IDs, used to determine which directories
+#       to copy the singletons file to
+#
+sub saveSingletons {
+    my $file = shift;
+    my $dirs = shift;
+    my $unirefMap = shift;
+
+    return if (not $file or not -f $file);
+
+    #TODO: look at UniRef implementation to see how singletons are handled
+    copy($file, "$dirs->{uniprot}/singleton_All.txt");
+    if ($unirefMap->{uniref90} or $unirefMap->{uniref50}) {
+        copy($file, "$dirs->{uniref90}/singleton_All.txt");
+    }
+    if ($unirefMap->{uniref50}) {
+        copy($file, "$dirs->{uniref50}/singleton_All.txt");
+    }
+}
 
 
 #
