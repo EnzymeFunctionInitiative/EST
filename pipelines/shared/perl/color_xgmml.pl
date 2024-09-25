@@ -5,20 +5,17 @@ use warnings;
 use Getopt::Long;
 use FindBin;
 
+use lib "$FindBin::Bin/../../../lib";
+
+use EFI::Options;
 
 
 
-my ($err, $opts) = validateAndProcessOptions();
 
-if ($opts->{help}) {
-    printHelp($0);
-    exit(0);
-}
+# Exits if help is requested or errors are encountered
+my $opts = validateAndProcessOptions();
 
-if (@$err) {
-    printHelp($0, $err);
-    die "\n";
-}
+
 
 
 my $colors = getColorizer($opts->{color_file});
@@ -97,60 +94,29 @@ sub getColorizer {
 
 
 sub validateAndProcessOptions {
-    my $opts = {};
-    my $result = GetOptions(
-        $opts,
-        "ssn=s",
-        "color-ssn=s",
-        "cluster-map=s",
-        "cluster-size=s",
-        "cluster-color-map=s",
-        "color-file=s",
-        "help",
-    );
 
-    foreach my $opt (keys %$opts) {
-        my $newOpt = $opt =~ s/\-/_/gr;
-        my $val = $opts->{$opt};
-        delete $opts->{$opt};
-        $opts->{$newOpt} = $val;
+    my $optParser = new EFI::Options(app_name => $0, desc => "Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes based on cluster");
+
+    $optParser->addOption("ssn=s", 1, "path to input XGMML (XML) SSN file", OPT_FILE);
+    $optParser->addOption("color-ssn=s", 1, "path to output colored SSN (XGMML) file", OPT_FILE);
+    $optParser->addOption("cluster-map=s", 1, "path to output file mapping node index (col 1) to cluster numbers (num nodes, num sequences)", OPT_FILE);
+    $optParser->addOption("cluster-size=s", 1, "path to input file containing the cluster sizes", OPT_FILE);
+    $optParser->addOption("cluster-color-map=s", 0, "path to output file mapping cluster number (sequence count) to a color", OPT_FILE);
+    $optParser->addOption("color-file=s", 0, "path to a file containing a list of colors by cluster; if not specified defaults to 'colors.tab' in the script directory", OPT_FILE);
+
+    if (not $optParser->parseOptions()) {
+        my $text = $optParser->printHelp(OPT_ERRORS);
+        die "$text\n";
+        exit(1);
     }
 
-    my @errors;
-    push @errors, "Missing --ssn file argument or does not exist" if not $opts->{ssn};
-    push @errors, "Missing --color-ssn file argument" if not $opts->{color_ssn};
-    push @errors, "Missing --cluster-map file argument" if not $opts->{cluster_map};
-    push @errors, "Missing --cluster-size file argument" if not $opts->{cluster_size};
+    if ($optParser->wantHelp()) {
+        my $text = $optParser->printHelp();
+        print $text;
+        exit(0);
+    }
 
-    $opts->{color_file} = "$FindBin::Bin/colors.tab" if not $opts->{color_file};
-    push @errors, "Missing --color-file (or colors.tab in script directory)" if not $opts->{color_file} or not -f $opts->{color_file};
-
-    return \@errors, $opts;
-}
-
-
-sub printHelp {
-    my $script = shift || $0;
-    my $errors = shift || [];
-    print <<HELP;
-Usage: perl $script --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-size <FILE>
-    [--color-file <FILE>]
-
-Description:
-    Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering
-    the nodes based on cluster.
-
-Options:
-    --ssn               path to input SSN (XGMML) file
-    --color-ssn         path to output SSN (XGMML) file
-    --cluster-map       path to output file mapping node index (col 1) to cluster numbers (num nodes, num sequences)
-    --cluster-color-map path to output file mapping cluster number (sequence count) to a color
-    --cluster-size      path to input file containing the cluster sizes
-    --color-file        path to a file containing a list of colors by cluster;
-                        if not specified defaults to 'colors.tab' in the script directory
-
-HELP
-    map { print "$_\n"; } @$errors;
+    return $optParser->getOptions();
 }
 
 

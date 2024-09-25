@@ -9,21 +9,15 @@ use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Annotations::Fields;
 use EFI::SSN::XgmmlReader::IdList;
+use EFI::Options;
 
 
 
 
-my ($err, $opts) = validateAndProcessOptions();
+# Exits if help is requested or errors are encountered
+my $opts = validateAndProcessOptions();
 
-if ($opts->{help}) {
-    printHelp($0);
-    exit(0);
-}
 
-if (@$err) {
-    printHelp($0, $err);
-    die "\n";
-}
 
 
 my $parser = EFI::SSN::XgmmlReader::IdList->new(xgmml_file => $opts->{ssn});
@@ -171,61 +165,28 @@ sub saveMapping {
 
 
 sub validateAndProcessOptions {
-    my $opts = {};
-    my $result = GetOptions(
-        $opts,
-        "ssn=s",
-        "edgelist=s",
-        "index-seqid=s",
-        "id-index=s",
-        "seqid-source-map=s",
-        "help",
-    );
 
-    foreach my $opt (keys %$opts) {
-        my $newOpt = $opt =~ s/\-/_/gr;
-        my $val = $opts->{$opt};
-        delete $opts->{$opt};
-        $opts->{$newOpt} = $val;
+    my $optParser = new EFI::Options(app_name => $0, desc => "Parses an XGMML file to retrieve an edgelist and mapping info");
+
+    $optParser->addOption("ssn=s", 1, "path to XGMML (XML) SSN file", OPT_FILE);
+    $optParser->addOption("edgelist=s", 1, "path to an output edgelist file (two column space-separated file)", OPT_FILE);
+    $optParser->addOption("index-seqid=s", 1, "path to an output file mapping node index to XGMML nodeseqid (and optionally node size for UniRef/repnodes)", OPT_FILE);
+    $optParser->addOption("id-index=s", 1, "path to an output file mapping XGMML node ID to node index", OPT_FILE);
+    $optParser->addOption("seqid-source-map=s", 1, "path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty", OPT_FILE);
+
+    if (not $optParser->parseOptions()) {
+        my $text = $optParser->printHelp(OPT_ERRORS);
+        die "$text\n";
+        exit(1);
     }
 
-    my @errors;
-    push @errors, "Missing --ssn file argument or doesn't exist" if not ($opts->{ssn});
-    push @errors, "Missing --edgelist file argument" if not $opts->{edgelist};
-    push @errors, "Missing --index-seqid file argument" if not $opts->{index_seqid};
-    push @errors, "Missing --id-index file argument" if not $opts->{id_index};
-    push @errors, "Missing --seqid-source-map file argument" if not $opts->{seqid_source_map};
+    if ($optParser->wantHelp()) {
+        my $text = $optParser->printHelp();
+        print $text;
+        exit(0);
+    }
 
-    return \@errors, $opts;
+    return $optParser->getOptions();
 }
 
-
-sub printHelp {
-    my $app = shift || $0;
-    my $errors = shift || [];
-    print <<HELP;
-Usage: perl $app --ssn <FILE> --edgelist <FILE> --index-seqid <FILE> --id-index <FILE>
-    [--seqid-source-map <FILE>]
-
-Description:
-    Parses an XGMML file to retrieve an edgelist and mapping info.
-
-Options:
-    --ssn               path to XGMML (XML) SSN file
-    --edgelist          path to an output edgelist file (two column space-separated file)
-    --index-seqid       path to an output file mapping node index to XGMML nodeseqid 
-                        (and optionally node size for UniRef/repnodes)
-    --id-index          path to an output file mapping XGMML node ID to node index
-    --seqid-source-map  path to an output file for mapping metanodes (e.g. RepNode or
-                        UniRef node) to UniProt nodes [optional]; the file is created
-                        regardless, but if the input IDs are UniProt the file is empty
-
-HELP
-    map { print "$_\n"; } @$errors;
-}
-
-
-
-1;
-__END__
 
