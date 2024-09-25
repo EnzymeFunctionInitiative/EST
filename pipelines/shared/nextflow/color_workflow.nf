@@ -122,15 +122,13 @@ process get_cluster_stats {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path cluster_id_map
+        path seqid_source_map
+        path singletons
     output:
         path 'stats.txt', emit: 'stats'
-        path 'cluster_sizes.txt', emit: 'cluster_sizes'
-        path 'cluster_num_map.txt', emit: 'cluster_num_map'
     """
-    #TODO
-    touch stats.txt
-    touch cluster_sizes.txt
-    touch cluster_num_map.txt
+    perl $projectDir/../shared/perl/compute_stats.pl --cluster-map $cluster_id_map --seqid-source-map $seqid_source_map \
+        --singletons $singletons --stats stats.txt
     """
 }
 
