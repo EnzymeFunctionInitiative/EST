@@ -41,16 +41,16 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     return args
 
 
-def create_parser():
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Compute clusters from a SSN edgelist")
     add_args(parser)
     return parser
 
 
-def get_node_id_mapping(id_map_file):
+def get_node_id_mapping(id_map_file: str) -> tuple[dict, dict]:
 
-    idx_seqid_map = dict()
-    idx_node_size = dict()
+    idx_seqid_map = {}
+    idx_node_size = {}
 
     with open(id_map_file) as fh:
         header = fh.readline()
