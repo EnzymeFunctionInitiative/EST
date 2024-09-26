@@ -84,11 +84,11 @@ class SsnNetworkGraph:
             size_by_node = len(comp_list)
             # Save the expanded size (e.g. accounting for UniRef/repnodes) of the cluster
             if size_by_seq <= 1:
-                singletons[cluster_idx] = 1
+                singletons[comp_list[0]] = self.idx_label_map[comp_list[0]]
             else:
                 cluster_size_by_seq[cluster_idx] = size_by_seq
                 cluster_size_by_node[cluster_idx] = size_by_node
-                cluster_idx += 1
+            cluster_idx += 1
 
         return cluster_size_by_node, cluster_size_by_seq, singletons
 
@@ -113,11 +113,15 @@ class SsnNetworkGraph:
         cluster_idx = 0
         idx_cluster = {}
         cluster_num_map = {} # Map the old numbering (e.g. index into self.components) to the new numbering
-        # Assign numbers; idx is the old (self.components) index, but the dict is sorted based on the value (cluster size)
+        # Assign numbers; idx is the old cluster (self.components) index, but the dict is sorted based on the value (cluster size)
         for idx in cluster_size_order:
-            if idx not in this.singletons:
-                for node_idx in self.components[idx]:
+            is_singleton = False
+            for node_idx in self.components[idx]:
+                if node_idx not in self.singletons:
                     idx_cluster[node_idx] = cluster_idx + 1
+                else:
+                    is_singleton = True
+            if not is_singleton:
                 cluster_num_map[idx] = cluster_idx + 1
                 cluster_idx += 1
         return idx_cluster, cluster_num_map
@@ -157,8 +161,8 @@ class SsnNetworkGraph:
                 path to a file to output singleton list to
         """
         with open(singletons_file, "w") as fh:
-            fh.write("sequence_id")
-            ids = this.singletons.keys()
+            fh.write("sequence_id\n")
+            ids = list(self.singletons.values())
             ids.sort()
             for id in ids:
                 fh.write(f"{id}\n")
@@ -175,14 +179,13 @@ class SsnNetworkGraph:
                 path to a file to output cluster connectivity to
         """
         with open(cluster_file, "w") as fh:
-            i = 1
             fh.write("node_label\tcluster_num_by_node\tcluster_num_by_seq\n")
             for comp_list in self.components:
                 for node_idx in comp_list:
-                    label_id = self.idx_label_map.get(node_idx, "")
-                    cnum_node = self.cluster_num_by_node[node_idx]
-                    cnum_seq = self.cluster_num_by_seq[node_idx]
-                    fh.write(f"{label_id}\t{cnum_node}\t{cnum_seq}\n")
-                i = i + 1
+                    if node_idx not in self.singletons:
+                        label_id = self.idx_label_map.get(node_idx, "")
+                        cnum_node = self.cluster_num_by_node[node_idx]
+                        cnum_seq = self.cluster_num_by_seq[node_idx]
+                        fh.write(f"{label_id}\t{cnum_node}\t{cnum_seq}\n")
 
 
