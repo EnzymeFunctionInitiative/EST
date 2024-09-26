@@ -59,7 +59,7 @@ process color_ssn {
         path 'cluster_colors.txt', emit: 'cluster_colors'
     """
     perl $projectDir/../shared/perl/color_xgmml.pl --ssn $ssn_file --color-ssn ssn_colored.xgmml --cluster-map $cluster_id_map \
-        --cluster-size $cluster_sizes --cluster-color-map cluster_colors.txt
+        --cluster-size $cluster_sizes --cluster-color-map cluster_colors.txt --color-file $projectDir/../shared/perl/colors.tab
     """
 }
 
@@ -113,7 +113,7 @@ process get_conv_ratio_table {
     output:
         path 'conv_ratio.txt', emit: 'conv_ratio'
     """
-    perl $projectDir/../shared/perl/compute_conv_ratio.pl --cluster-map $cluster_id_map --index-seqid-map $index_seqid-map \
+    perl $projectDir/../shared/perl/compute_conv_ratio.pl --cluster-map $cluster_id_map --index-seqid-map $index_seqid_map \
         --edgelist $edgelist --seqid-source-map $seqid_source_map --conv-ratio conv_ratio.txt
     """
 }
@@ -136,7 +136,6 @@ process compute_clusters {
     input:
         path edgelist
         path index_seqid_map
-        path seqid_source_map
     output:
         path 'cluster_id_map.txt', emit: 'cluster_id_map'
         path 'singletons.txt', emit: 'singletons'
@@ -164,7 +163,7 @@ workflow color_and_retrieve {
         id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map)
 
         // Color the SSN based on the computed clusters
-        colored_ssn = color_ssn(ssn_file, compute_info.cluster_id_map, compute_info.cluster_sizes)
+        colored_ssn = color_ssn(ssn_file, compute_info.cluster_id_map, id_list_data.cluster_sizes)
 
         fasta_dir = get_fasta(id_list_data.id_lists)
 

@@ -9,7 +9,7 @@ use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
 use EFI::Annotations;
-use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file);
+use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file);
 use EFI::Options;
 
 

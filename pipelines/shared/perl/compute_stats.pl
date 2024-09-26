@@ -73,7 +73,7 @@ sub computeStats {
     my @clusters = sort { $a <=> $b } keys %$clusterToId;
     foreach my $cnum (@clusters) {
         $numNodes += @{ $clusterToId->{$cnum} };
-        $numSequences += @{ $sourceIdMap->{$cnum} };
+        $numSequences += @{ $fullClusterToId->{$cnum} };
     }
 
     my $numClusters = @clusters;
