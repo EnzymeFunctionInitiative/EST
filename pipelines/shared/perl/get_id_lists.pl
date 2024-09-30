@@ -40,18 +40,6 @@ if ($idType =~ m/uniref(\d+)/) {
 my $dirs = {uniprot => $opts->{uniprot}, uniref90 => $opts->{uniref90}, uniref50 => $opts->{uniref50}};
 saveIdLists($clusterToId, $unirefMap, $dirs);
 
-
-
-
-
-
-
-
-
-
-
-
-
 saveSingletons($opts->{singletons}, $dirs, $unirefMap);
 
 saveClusterSizes($opts->{cluster_sizes}, $clusterToId, $unirefMap);
@@ -165,8 +153,8 @@ sub getUniRefMapping {
 
     my $dbh = $db->getHandle();
 
-    my $uniref90 = {};
-    my $uniref50 = {};
+    my $uniref90Raw = {};
+    my $uniref50Raw = {};
 
     my $sql = "SELECT * FROM uniref WHERE accession = ?";
     my $sth = $dbh->prepare($sql);
@@ -180,17 +168,30 @@ sub getUniRefMapping {
             # If it is a hash ref, then it is a RepNode->UniRef mapping
             if (ref $ids eq "HASH") {
                 foreach my $repnodeId (keys %$ids) {
-                    addUniRefIds($cnum, $ids->{$repnodeId}, $sth, $uniref90, $uniref50);
+                    addUniRefIds($cnum, $ids->{$repnodeId}, $sth, $uniref90Raw, $uniref50Raw);
                 }
             } else {
                 # UniRef->UniProt mapping
-                addUniRefIds($cnum, $ids, $sth, $uniref90, $uniref50);
+                addUniRefIds($cnum, $ids, $sth, $uniref90Raw, $uniref50Raw);
             }
         }
     }
 
+    # Convert hash to array (use hash to account for duplicate entries)
+    my $uniref90 = {};
+    foreach my $cnum (keys %$uniref90Raw) {
+        push @{ $uniref90->{$cnum} }, keys %{ $uniref90Raw->{$cnum} };
+    }
     my $retval = {uniref90 => $uniref90};
-    $retval->{uniref50} = $uniref50 if $idType eq "uniref50";
+
+    if ($idType eq "uniref50") {
+        my $uniref50 = {};
+        foreach my $cnum (keys %$uniref50Raw) {
+            push @{ $uniref50->{$cnum} }, keys %{ $uniref50Raw->{$cnum} };
+        }
+        $retval->{uniref50} = $uniref50;
+    }
+
     return $retval;
 }
 
@@ -217,8 +218,10 @@ sub addUniRefIds {
         $sth->execute($uniprotId);
         my $row = $sth->fetchrow_hashref();
         if ($row) {
-            push @{ $uniref90->{$cnum} }, $row->{uniref90_seed};
-            push @{ $uniref50->{$cnum} }, $row->{uniref50_seed};
+            # Use a hash because the unirefXX_seed value is not unique (i.e. it may occur
+            # more than once)
+            $uniref90->{$cnum}->{$row->{uniref90_seed}} = 1;
+            $uniref50->{$cnum}->{$row->{uniref50_seed}} = 1;
         }
     }
 }
