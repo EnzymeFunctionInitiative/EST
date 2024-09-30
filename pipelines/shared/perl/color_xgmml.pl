@@ -136,6 +136,8 @@ use IO::File;
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Annotations;
+use EFI::SSN::Util::ID qw(get_cluster_num_cols);
+
 
 use constant SEQ_NUM_FIELD => "Sequence Count Cluster Number";
 use constant NODE_NUM_FIELD => "Node Count Cluster Number";
@@ -488,10 +490,14 @@ sub parseClusterFile {
     open my $fh, "<", $clusterFile or die "Unable to read cluster file '$clusterFile': $!";
 
     my $header = <$fh>;
+    return if not $header;
+    my ($seqNumCol, $nodeNumCol) = get_cluster_num_cols($header);
 
     while (my $line = <$fh>) {
         chomp $line;
-        my ($seqId, $seqNum, $nodeNum) = split(m/\t/, $line);
+        my ($seqId, @p) = split(m/\t/, $line);
+        my $seqNum = $p[$seqNumCol];
+        my $nodeNum = $p[$nodeNumCol];
         $self->{cluster_map}->{$seqId} = [$seqNum, $nodeNum];
     }
 

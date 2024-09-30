@@ -154,7 +154,6 @@ class SsnNetworkGraph:
                 path to a file to output singleton list to
         """
         with open(singletons_file, "w") as fh:
-            fh.write("sequence_id\n")
             ids = list(self.singletons.values())
             ids.sort()
             for id in ids:
@@ -163,7 +162,7 @@ class SsnNetworkGraph:
     def save_clusters(self, cluster_file: str):
         """
         Save the cluster connectivity (connected components) to a file, formatted as
-        "node_label\tcluster_num_by_node\tcluster_num_by_seq"
+        "node_label\tcluster_num_by_seq\tcluster_num_by_node"
 
         Parameters
         ----------
@@ -171,11 +170,14 @@ class SsnNetworkGraph:
                 path to a file to output cluster connectivity to
         """
         with open(cluster_file, "w") as fh:
-            fh.write("node_label\tcluster_num_by_node\tcluster_num_by_seq\n")
-            for comp_list in self.components:
+            fh.write("node_label\tcluster_num_by_seq\tcluster_num_by_node\n")
+            # Write the file in order of sequence cluster number
+            for idx in self.cluster_num_map_by_seq:
+                comp_list = self.components[idx]
                 for node_idx in comp_list:
                     if node_idx not in self.singletons:
                         label_id = self.idx_label_map.get(node_idx, "")
                         cnum_node = self.cluster_num_by_node[node_idx]
                         cnum_seq = self.cluster_num_by_seq[node_idx]
-                        fh.write(f"{label_id}\t{cnum_node}\t{cnum_seq}\n")
+                        fh.write(f"{label_id}\t{cnum_seq}\t{cnum_node}\n")
+

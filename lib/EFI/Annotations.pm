@@ -533,7 +533,7 @@ sub is_expandable_attr {
     my $result = 0;
     if (not $flag or $flag == REPNODE_ONLY) {
         $result = (
-            $attr eq FIELD_REPNODE_IDS  or $attr eq $anno->{&FIELD_REPNODE_IDS}->{display}               or 
+            $attr eq FIELD_REPNODE_IDS  or $attr eq $anno->{&FIELD_REPNODE_IDS}->{display}
         );
     }
     if (not $flag or $flag == UNIREF_ONLY) {

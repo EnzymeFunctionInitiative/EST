@@ -7,8 +7,30 @@ use warnings;
 use Exporter qw(import);
 
 
-our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_file);
+our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_file get_cluster_num_cols);
 
+
+
+
+#
+# get_cluster_num_cols
+#
+# Return the column numbers of the node and sequence cluster numbers
+#
+# Parameters:
+#    $header - header line (tab separated)
+#
+# Returns:
+#    two values (sequence col #, node col #)
+#
+sub get_cluster_num_cols {
+    my $header = shift;
+    return () if not $header;
+    my @ph = split(m/\t/, $header);
+    my $seqNumCol = $ph[1] =~ /seq/ ? 1 : 2;
+    my $nodeNumCol = $ph[1] =~ /node/ ? 1 : 2;
+    return ($seqNumCol, $nodeNumCol);
+}
 
 
 #
@@ -17,7 +39,7 @@ our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_fi
 # Parse the file that maps cluster numbers to sequence IDs (or metanodes)
 #
 # Parameters:
-#    $file - file containing a map of cluster numbers to IDs (two columns, with header)
+#    $file - file containing a map of cluster numbers to IDs (two-three columns, with header)
 #
 # Returns:
 #    hash ref mapping cluster number to IDs in cluster
@@ -27,7 +49,10 @@ sub parse_cluster_map_file {
 
     open my $fh, "<", $file or die "Unable to open cluster map file '$file' for reading: $!";
 
-    chomp(my $header = <$fh>);
+    my $header = <$fh>;
+    return {} if not $header;
+    my ($seqNumCol, $nodeNumCol) = get_cluster_num_cols($header);
+
     # "node_label\tcluster_num_by_node\tcluster_num_by_seq
     my @header = split(m/\t/, $header);
     my $clusterToId = {};
@@ -35,8 +60,8 @@ sub parse_cluster_map_file {
     while (my $line = <$fh>) {
         chomp $line;
         my @p = split(m/\t/, $line);
-        if ($p[1]) {
-            push @{ $clusterToId->{$p[1]} }, $p[0];
+        if ($p[$seqNumCol]) {
+            push @{ $clusterToId->{$p[$seqNumCol]} }, $p[0];
         }
     }
 
@@ -73,26 +98,25 @@ sub parse_metanode_map_file {
 
     # This file can have the following column cases:
     #     repnode   uniprot
-    #     repnode   uniref90    uniprot
-    #     repnode   uniref50    uniprot
+    #     repnode   uniref90
+    #     repnode   uniref50
     #     uniref90  uniprot
     #     uniref50  uniprot
     my ($metaCol, $seqTypeCol, $otherCol) = split(m/\t/, $header);
 
+    # $type will be uniprot if it is a repnode network because it gets expanded
     my $type = "uniprot";
     my $ids = {};
 
-    if ($metaCol eq "repnode_id" or $seqTypeCol =~ m/uniref(\d+)_id/) {
+    if ($metaCol =~ m/uniref(\d+)_id/) {
         $type = "uniref$1";
-    } elsif ($metaCol =~ m/uniref(\d+)_id/) {
-        $type = "uniref$1";
+    } elsif ($metaCol eq "repnode_id") {
+        $type = "repnode";
     }
 
     while (my $line = <$fh>) {
         chomp $line;
         my ($metaId, @p) = split(m/\t/, $line);
-        # If there are three parts to this line, then it is a RepNode -> UniRef -> UniProt mapping;
-        # otherwise it is a UniRef or RepNode -> UniProt mapping
         if ($p[1]) {
             push @{ $ids->{$metaId}->{$p[0]} }, $p[1];
         } else {
@@ -124,7 +148,8 @@ sub resolve_mapping {
                 }
             # uniref ID or repnode ID -> uniprot ID
             } else {
-                push @{ $newMap->{$clusterNum} }, @{ $ids };
+                my @ids = @{ $ids };
+                push @{ $newMap->{$clusterNum} }, @ids;
             }
         }
     }
