@@ -353,8 +353,8 @@ sub get_annotation_fields {
         push @fields, {name => "swissprot_description",     field_type => "ssn",                                    display => "SwissProt Description",         base_ssn => 1};
         push @fields, {name => "seq_len",                   field_type => "db",     type_spec => "INT",             display => "Sequence Length",               base_ssn => 1,  ssn_num_type => 1,                      db_primary_col => 1};
 
-        push @fields, {name => "ACC",                       field_type => "ssn",                                    display => "List of IDs in Rep Node"};
-        push @fields, {name => "Cluster Size",              field_type => "ssn",                                    display => "Number of IDs in Rep Node",                     ssn_num_type => 1};
+        push @fields, {name => FIELD_REPNODE_IDS,           field_type => "ssn",                                    display => "List of IDs in Rep Node"};
+        push @fields, {name => FIELD_REPNODE_SIZE,          field_type => "ssn",                                    display => "Number of IDs in Rep Node",                     ssn_num_type => 1};
         push @fields, {name => "Query_IDs",                 field_type => "ssn",                                    display => "Query IDs",                                                         ssn_list_type => 1};
         push @fields, {name => "Other_IDs",                 field_type => "ssn",                                    display => "Other IDs",                                                         ssn_list_type => 1};
 
@@ -411,8 +411,6 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_UNIREF90_CLUSTER_SIZE, field_type => "ssn",                                    display => "UniRef90 Cluster Size",                         ssn_num_type => 1};
         push @fields, {name => FIELD_UNIREF100_IDS,         field_type => "ssn",                                    display => "UniRef100 Cluster IDs",                                             ssn_list_type => 1};
         push @fields, {name => FIELD_UNIREF100_CLUSTER_SIZE,field_type => "ssn",                                    display => "UniRef100 Cluster Size",                        ssn_num_type => 1};
-        push @fields, {name => FIELD_REPNODE_IDS,           field_type => "ssn",                                    display => "CD-HIT IDs",                                                        ssn_list_type => 1};
-        push @fields, {name => FIELD_REPNODE_SIZE,          field_type => "ssn",                                    display => "CD-HIT Cluster Size",                           ssn_num_type => 1};
         push @fields, {name => "Sequence",                  field_type => "ssn",                                    display => "Sequence"};
         push @fields, {name => "User_IDs_in_Cluster",       field_type => "ssn",                                    display => "User IDs in Cluster",                                               ssn_list_type => 1};
 
@@ -536,7 +534,6 @@ sub is_expandable_attr {
     if (not $flag or $flag == REPNODE_ONLY) {
         $result = (
             $attr eq FIELD_REPNODE_IDS  or $attr eq $anno->{&FIELD_REPNODE_IDS}->{display}               or 
-            $attr eq FIELD_ID_ACC       or $attr eq $anno->{&FIELD_ID_ACC}->{display}
         );
     }
     if (not $flag or $flag == UNIREF_ONLY) {
@@ -553,7 +550,7 @@ sub is_expandable_attr {
 sub get_expandable_attr {
     my $self = shift;
     my $anno = $self->get_annotation_data();
-    my @fields = (FIELD_ID_ACC, FIELD_REPNODE_IDS, FIELD_UNIREF50_IDS, FIELD_UNIREF90_IDS, FIELD_UNIREF100_IDS);
+    my @fields = (FIELD_REPNODE_IDS, FIELD_UNIREF50_IDS, FIELD_UNIREF90_IDS, FIELD_UNIREF100_IDS);
     my %display = map { $_ => $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
     return (\@fields, \%display);
 }
@@ -958,8 +955,6 @@ These are:
     UniRef90 IDs
     UniRef100 IDs
     ACC
-    ACC_CDHIT
-    CD-HIT IDs
 
 =head4 Parameters
 
