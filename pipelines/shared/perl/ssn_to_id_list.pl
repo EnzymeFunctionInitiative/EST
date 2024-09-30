@@ -51,6 +51,7 @@ saveMetanodeMapping($opts->{seqid_source_map}, $metanodeMap, $metanodeType);
 # saveMetanodeMapping
 #
 # Save the mapping of metanodes (UniRef or RepNode) to UniProt sequence IDs
+# Networks that are RepNode + UniRef are converted into RepNode/UniProt
 #
 # Parameters:
 #    $mapFile - path to mapping file
@@ -66,7 +67,7 @@ sub saveMetanodeMapping {
 
     if ($metanodeType ne "uniprot") {
         $mmfh->print(join("\t", "${metanodeType}_id", "uniprot_id"), "\n");
-        foreach my $metanode (keys %$metanodeMap) {
+        foreach my $metanode (sort keys %$metanodeMap) {
             map { $mmfh->print(join("\t", $metanode, $_), "\n"); } @{ $metanodeMap->{$metanode} };
         }
     }

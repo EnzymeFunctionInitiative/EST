@@ -47,7 +47,7 @@ sub getIndexSeqIdMap {
         foreach my $idx (keys %{ $self->{idx_seqid} }) {
             my $id = $self->{idx_seqid}->{$idx};
             my $meta = $self->{meta_map}->{$id};
-            my $size = scalar @$meta;
+            my $size = keys %$meta;
             $idSizeMap->{$idx} = $size;
         }
     }
@@ -69,7 +69,11 @@ sub getMetanodeData {
         $idf = "uniref90" if $idf eq FIELD_UNIREF90_IDS;
         $idf = "uniref50" if $idf eq FIELD_UNIREF50_IDS;
     }
-    return $self->{meta_map}, $idf;
+    my $data = {};
+    foreach my $metanode (keys %{ $self->{meta_map} }) {
+        $data->{$metanode} = [ keys %{ $self->{meta_map}->{$metanode} } ];
+    }
+    return $data, $idf;
 }
 
 
@@ -77,6 +81,7 @@ sub parse {
     my $self = shift;
 
     my $reader = XML::LibXML::Reader->new(location => $self->{input}) or die "cannot read $self->{input}\n";
+    $self->{current_node_id} = "";
     while ($reader->read) {
         $self->processXmlNode($reader);
     }
@@ -90,15 +95,13 @@ sub processXmlNode {
     my $nname = $reader->name;
     return if $ntype == XML_READER_TYPE_WHITESPACE || $ntype == XML_READER_TYPE_SIGNIFICANT_WHITESPACE;
 
-    my $currentNodeId = "";
-
     if ($ntype == XML_READER_TYPE_ELEMENT) {
         if ($nname eq "node") {
-            $currentNodeId = $self->processNode($reader);
+            $self->processNode($reader);
         } elsif ($nname eq "att") {
             # An 'empty' element is a leaf (e.g. no child elements; <att X="Y" /> is empty)
             if ($reader->isEmptyElement()) {
-                $self->processAtt($reader, $currentNodeId);
+                $self->processAtt($reader);
             }
         } elsif ($nname eq "edge") {
             $self->processEdge($reader);
@@ -115,6 +118,9 @@ sub processNode {
     $self->{id_idx}->{$id} = $self->{node_idx};
     $self->{idx_seqid}->{$self->{node_idx}} = $seqid;
     $self->{node_idx}++;
+    $self->{current_node_id} = $seqid;
+    # Initialize the list of sequences in the meta node (in the case that the network is a meta network)
+    $self->{meta_map}->{$seqid}->{$seqid} = 1;
 }
 
 
@@ -132,10 +138,12 @@ sub processEdge {
 sub processAtt {
     my $self = shift;
     my $reader = shift;
-    my $currentNodeId = shift;
+
     my $name = $reader->getAttribute("name");
     my $value = $reader->getAttribute("value");
     my $type = $reader->getAttribute("type") // "string";
+
+    my $currentNodeId = $self->{current_node_id};
     if ($currentNodeId) {
         my $fieldName = $self->{id_list_fields}->{$name};
         if ($fieldName and (
@@ -145,8 +153,19 @@ sub processAtt {
                             $fieldName eq FIELD_UNIREF100_IDS
                             )
         ) {
-            $self->{id_type} = $fieldName;
-            push @{ $self->{meta_map}->{$currentNodeId} }, $value;
+            # If RepNode + UniRef, there could be a "None" value and we need to skip that
+            return if $value eq "None";
+
+            # ID type is always RepNode if there is UniRef IDs present in addition to RepNode
+            if ($fieldName eq FIELD_REPNODE_IDS) {
+                $self->{id_type} = FIELD_REPNODE_IDS;
+            } else {
+                $self->{id_type} = $fieldName;
+            }
+
+            # Store the value in a hash ref in the case that the network is UniRef+RepNode
+            # (in that case there will be duplicates because of the FIELD_REPNODE_IDS values)
+            $self->{meta_map}->{$currentNodeId}->{$value} = 1;
         }
     }
 }
