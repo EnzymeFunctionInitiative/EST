@@ -53,13 +53,13 @@ process color_ssn {
     input:
         path ssn_file
         path cluster_id_map
-        path cluster_sizes
+        path cluster_num_map
     output:
         path 'ssn_colored.xgmml', emit: 'ssn_output'
         path 'cluster_colors.txt', emit: 'cluster_colors'
     """
     perl $projectDir/../shared/perl/color_xgmml.pl --ssn $ssn_file --color-ssn ssn_colored.xgmml --cluster-map $cluster_id_map \
-        --cluster-size $cluster_sizes --cluster-color-map cluster_colors.txt --color-file $projectDir/../shared/perl/colors.tab
+        --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt --color-file $projectDir/../shared/perl/colors.tab
     """
 }
 
@@ -81,9 +81,23 @@ process unzip_input {
     input:
         path ssn_zipped
     output:
-        path "ssn.xgmml"
+        path "ssn____local.xgmml"
     """
-    perl $projectDir/../shared/perl/unzip_xgmml_file.pl --in $ssn_zipped --out ssn.xgmml
+    perl $projectDir/../shared/perl/unzip_xgmml_file.pl --in $ssn_zipped --out ssn____local.xgmml
+    """
+}
+
+// This is necessary to avoid Docker mounting the same directory twice; this occurs
+// because we need to mount the root of the project so that we can get access to the
+// lib directory. When using a SSN that is inside the project directory then the project
+// directory is also mounted.
+process copy_input {
+    input:
+        path ssn_file
+    output:
+        path "ssn____local.xgmml"
+    """
+    cp $ssn_file ssn____local.xgmml
     """
 }
 
@@ -151,7 +165,7 @@ workflow color_and_retrieve {
         if (params.ssn_input =~ /\.zip/) {
             ssn_file = unzip_input(params.ssn_input)
         } else {
-            ssn_file = params.ssn_input
+            ssn_file = copy_input(params.ssn_input)
         }
 
         // Get the index and ID mapping tables and edgelist
@@ -163,7 +177,7 @@ workflow color_and_retrieve {
         id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map)
 
         // Color the SSN based on the computed clusters
-        colored_ssn = color_ssn(ssn_file, compute_info.cluster_id_map, id_list_data.cluster_sizes)
+        colored_ssn = color_ssn(ssn_file, compute_info.cluster_id_map, compute_info.cluster_num_map)
 
         fasta_dir = get_fasta(id_list_data.id_lists)
 

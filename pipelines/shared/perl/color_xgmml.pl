@@ -10,6 +10,7 @@ use lib "$FindBin::Bin/../../../lib";
 use EFI::Options;
 use EFI::SSN::XgmmlWriter::Color;
 use EFI::SSN::Util::Colors;
+use EFI::SSN::Util::ID qw(get_cluster_num_cols);
 
 
 
@@ -21,10 +22,10 @@ my $opts = validateAndProcessOptions();
 
 
 my $colors = getColors($opts->{color_file});
-my $clusterSizes = parseClusterSizeFile($opts->{cluster_size});
+my $clusterSizes = parseClusterSizeFile($opts->{cluster_num_map});
 my $clusterMap = parseClusterFile($opts->{cluster_map});
 
-my $xwriter = EFI::SSN::XgmmlWriter::Color->new(ssn => $opts->{ssn}, color_ssn => $opts->{color_ssn}, cluster_map => $clusterMap, cluster_sizes => $clusterSizes, colors => $colors);
+my $xwriter = new EFI::SSN::XgmmlWriter::Color(ssn => $opts->{ssn}, color_ssn => $opts->{color_ssn}, cluster_map => $clusterMap, cluster_sizes => $clusterSizes, colors => $colors);
 
 $xwriter->write();
 
@@ -172,7 +173,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("ssn=s", 1, "path to input XGMML (XML) SSN file", OPT_FILE);
     $optParser->addOption("color-ssn=s", 1, "path to output colored SSN (XGMML) file", OPT_FILE);
     $optParser->addOption("cluster-map=s", 1, "path to output file mapping node index (col 1) to cluster numbers (num by seq, num by nodes)", OPT_FILE);
-    $optParser->addOption("cluster-size=s", 1, "path to input file containing the cluster sizes", OPT_FILE);
+    $optParser->addOption("cluster-num-map=s", 1, "path to input file containing the mapping of cluster number to cluster sizes", OPT_FILE);
     $optParser->addOption("cluster-color-map=s", 0, "path to output file mapping cluster number (sequence count) to a color", OPT_FILE);
     $optParser->addOption("color-file=s", 0, "path to a file containing a list of colors by cluster; if not specified defaults to 'colors.tab' in the script directory", OPT_FILE);
 

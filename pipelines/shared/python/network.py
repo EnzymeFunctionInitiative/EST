@@ -132,9 +132,7 @@ class SsnNetworkGraph:
                 path to a file to output cluster info to
         """
         with open(info_file, "w") as fh:
-            # No header, because this is used internally by the web interface which assumes
-            # there is no header
-            # fh.write("cluster_num_by_seq\tcluster_size_by_seq\tcluster_num_by_node\tcluster_size_by_node\n")
+            fh.write("cluster_num_by_seq\tcluster_size_by_seq\tcluster_num_by_node\tcluster_size_by_node\n")
             # The dict idx here represents the old (self.components) cluster number; sorting
             # in the file will be done by sequence number
             for idx in self.cluster_num_map_by_seq:
@@ -142,7 +140,7 @@ class SsnNetworkGraph:
                 cluster_num_node = self.cluster_num_map_by_node[idx]
                 cluster_size_seq = self.cluster_size_by_seq[idx]
                 cluster_size_node = self.cluster_size_by_node[idx]
-                fh.write(f"{cluster_num_seq}\t{cluster_num_node}\t{cluster_size_seq}\t{cluster_size_node}\n")
+                fh.write(f"{cluster_num_seq}\t{cluster_size_seq}\t{cluster_num_node}\t{cluster_size_node}\n")
 
     def save_singletons(self, singletons_file: str):
         """

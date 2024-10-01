@@ -1,18 +1,18 @@
 
-package EFI::SSN::XgmmlWriter::Colored;
+package EFI::SSN::XgmmlWriter::Color;
 
 use strict;
 use warnings;
 
 use XML::LibXML::Reader;
 use XML::Writer;
-use FindBin;
 use IO::File;
 
-use lib "$FindBin::Bin/../../..";
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../..";
 
 use EFI::Annotations;
-use EFI::SSN::Util::ID qw(get_cluster_num_cols);
 use EFI::Annotations::Fields qw(:color);
 
 
@@ -30,6 +30,7 @@ sub new {
     $self->{cluster_map} = $args{cluster_map};
     $self->{cluster_sizes} = $args{cluster_sizes};
     $self->{cluster_color_map} = {};
+    $self->{singleton_num} = 1;
 
     $self->{anno} = new EFI::Annotations;
 
@@ -350,7 +351,7 @@ sub getClusterInfo {
         push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_COUNT}, $seqCount, "integer"];
         push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_COUNT}, $nodeCount, "integer"];
     } else {
-        my $singNum = 0; #TODO
+        my $singNum = $self->{singleton_num}++;
         push @info, [$self->{color_fields}->{&FIELD_COLOR_SINGLETON}, $singNum, "integer"];
     }
 
