@@ -22,6 +22,7 @@ use constant ANNO_FIELDS_SSN_DISPLAY => 1;
 use constant ANNO_FIELDS_BASE_SSN => 2;
 use constant ANNO_FIELDS_SSN_NUMERIC => 4;
 use constant ANNO_FIELDS_DB_USER => 8;
+use constant ANNO_FIELDS_SSN_COLOR => 16;
 
 use constant ANNO_ROW_SEP => "^";
 
@@ -331,7 +332,8 @@ sub get_annotation_data {
 #
 # Parameters:
 #     $type - a subset of field names to retrieve. One of
-#         ANNO_FIELDS_SSN_DISPLAY, ANNO_FIELDS_BASE_SSN, ANNO_FIELDS_SSN_NUMERIC, ANNO_FIELDS_DB_USER
+#         ANNO_FIELDS_SSN_DISPLAY, ANNO_FIELDS_BASE_SSN, ANNO_FIELDS_SSN_NUMERIC, ANNO_FIELDS_DB_USER,
+#         ANNO_FIELDS_SSN_COLOR
 #
 # Returns:
 #     an array of metadata, with each entry in the array being a hash ref representing a field and it's metadata
@@ -416,6 +418,13 @@ sub get_annotation_fields {
 
         push @fields, {name => "is_fragment",               field_type => "db",     type_spec => "BOOL",            display => "Sequence Status",               base_ssn => 1,                                          db_primary_col => 1,index_name => "is_fragment_idx"};
         push @fields, {name => "oc_domain",                 field_type => "db",                                     display => "",                                                                                                                      json_type_spec => "str",    db_hidden => 1};
+        push @fields, {name => FIELD_COLOR_SEQ_NUM,         field_type => "color",                                  display => "Sequence Count Cluster Number"};
+        push @fields, {name => FIELD_COLOR_NODE_NUM,        field_type => "color",                                  display => "Node Count Cluster Number"};
+        push @fields, {name => FIELD_COLOR_SINGLETON,       field_type => "color",                                  display => "Singleton Number"};
+        push @fields, {name => FIELD_COLOR_SEQ_NUM_COLOR,   field_type => "color",                                  display => "node.fillColor"};
+        push @fields, {name => FIELD_COLOR_NODE_NUM_COLOR,  field_type => "color",                                  display => "Node Count Fill Color"};
+        push @fields, {name => FIELD_COLOR_SEQ_COUNT,       field_type => "color",                                  display => "Cluster Sequence Count"};
+        push @fields, {name => FIELD_COLOR_NODE_COUNT,      field_type => "color",                                  display => "Cluster Node Count"};
 
         $self->{fields} = \@fields;
     }
@@ -428,6 +437,8 @@ sub get_annotation_fields {
         return grep { $_->{ssn_num_type} ? 1 : 0  } @{ $self->{fields} };
     } elsif ($type == ANNO_FIELDS_DB_USER) {
         return grep { $_->{field_type} eq "db" and not $_->{db_primary_col} } @{ $self->{fields} };
+    } elsif ($type == ANNO_FIELDS_SSN_COLOR) {
+        return grep { $_->{field_type} eq "color" and not $_->{db_primary_col} } @{ $self->{fields} };
     } else {
         return @{ $self->{fields} };
     }
@@ -528,7 +539,7 @@ sub is_expandable_attr {
     my $flag = 0;
     $flag = $flag == UNIREF_ONLY;
 
-    my $anno = $self->get_annotation_data() if not exists $self->{anno};
+    my $anno = $self->get_annotation_data();
 
     my $result = 0;
     if (not $flag or $flag == REPNODE_ONLY) {
@@ -551,6 +562,15 @@ sub get_expandable_attr {
     my $self = shift;
     my $anno = $self->get_annotation_data();
     my @fields = (FIELD_REPNODE_IDS, FIELD_UNIREF50_IDS, FIELD_UNIREF90_IDS, FIELD_UNIREF100_IDS);
+    my %display = map { $_ => $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
+    return (\@fields, \%display);
+}
+
+
+sub get_color_fields {
+    my $self = shift;
+    my $anno = $self->get_annotation_data();
+    my @fields = (FIELD_COLOR_SEQ_NUM, FIELD_COLOR_NODE_NUM, FIELD_COLOR_SINGLETON, FIELD_COLOR_SEQ_NUM_COLOR, FIELD_COLOR_NODE_NUM_COLOR, FIELD_COLOR_SEQ_COUNT, FIELD_COLOR_NODE_COUNT);
     my %display = map { $_ => $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
     return (\@fields, \%display);
 }
@@ -983,8 +1003,17 @@ expanded into multiple IDs. See C<is_expandable_attr()> for a list of the curren
 
 =head4 Returns
 
-An array ref of SSN field names (from C<EFI::Annotations::Fields>) and a hash ref mapping SSN field
-names to display name for each expandable field in C<EFI::Annotations::Fields>.
+=over
+
+=item C<$fields>
+
+An array ref of fields from C<EFI::Annotations::Fields> relating to expandable attributes.
+
+=item C<$display>
+
+A hash ref mapping field name to field display for each element in C<$fields>.
+
+=back
 
 =head4 Example Usage
 
@@ -1011,6 +1040,34 @@ A string representing a SSN column heading (e.g. display name).
         # Insert a copy of the current SSN column
         # Append the color and cluster number column values
     }
+
+=head3 get_color_fields()
+
+Gets a list of color SSN attribute display names (such as cluster number and color).
+
+=head4 Returns
+
+=over
+
+=item C<$fields>
+
+An array ref of fields from C<EFI::Annotations::Fields> of the C<color> group.
+
+=item C<$display>
+
+A hash ref of field name to field display (e.g. FIELD_COLOR_SEQ_NUM => "Sequence Count Cluster Number").
+
+=back
+
+=head4 Example Usage
+
+    my $ssnField = "Sequence Count Cluster Number";
+    my ($attrFields, $attrDisplay) = $anno->get_color_fields();
+    my %attr = map { $attrDisplay->{$_} => $_ } @$attrFields;
+    if (exists $attr->{$ssnField}) {
+        print "The SSN field $ssnField is one of the color fields\n";
+    }
+
 
 =cut
 
