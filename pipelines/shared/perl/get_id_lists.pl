@@ -329,4 +329,87 @@ sub validateAndProcessOptions {
     return $optParser->getOptions();
 }
 
+1;
+__END__
+
+=head1 get_id_lists.pl
+
+=head2 NAME
+
+C<get_id_lists.pl> - gets ID lists from the input SSN and stores them in files by cluster
+
+=head2 SYNOPSIS
+
+    get_id_lists.pl --cluster-map <FILE> --uniprot <DIR> --cluster-sizes <FILE>
+        --config <FILE> --db-name <NAME>
+        [--uniref90 <DIR> --uniref50 <DIR> --seqid-source-map <FILE> --singletons <FILE>]
+
+=head2 DESCRIPTION
+
+C<get_id_lists.pl> gets all of the IDs in the SSN and writes them to files organized
+by sequence type and cluster number. Each directory contains the following files:
+
+    cluster_<SOURCE>_All.txt
+    cluster_<SOURCE>_Cluster_1.txt
+    cluster_<SOURCE>_Cluster_2.txt
+    ...
+    singletons.txt
+
+Where C<<SOURCE>> is C<UniProt>, C<UniRef90>, or C<UniRef50>.
+
+If a RepNode network is the input to the pipeline the nodes are expanded into the full
+set of sequences before writing the cluster files.
+
+For UniRef networks, the script assumes that the input to the script via C<--cluster-map>
+are UniRef sequences and those are validated first. Then the sequences are reverse-mapped
+to UniProt to obtain the UniProt sequences that correspond to the UniRef equivalent
+sequence.
+
+=head3 Arguments
+
+=over
+
+=item C<--cluster-map>
+
+Path to a file that maps UniProt sequence ID to a cluster number
+
+=item C<--uniprot>
+
+Path to an existing directory that will contain the ID lists for UniProt sequences
+
+=item C<--uniref90>
+
+Optional path to an existing directory for UniRef90 IDs
+
+=item C<--uniref50>
+
+Optional path to an existing directory for UniRef50 IDs
+
+=item C<--cluster-sizes>
+
+Path to an output file containing the mapping of clusters to sizes. If the input
+is a UniProt network, then there will be two columns, cluster number and UniProt size.
+If the input is a UniRef90 network, then there will be a third column for UniRef90
+cluster size. If the input is a UniRef50 network, then there will be a fourth column
+for UniRef50 cluster size.
+
+=item C<--config>
+
+Path to the C<efi.config> file used for database connection options
+
+=item C<--db-name>
+
+Name of the database to use (path to file for SQLite)
+
+=item C<--seqid-source-map>
+
+Optional path to a file that maps metanodes (e.g. RepNodes) that are in the SSN
+to sequence IDs that are within the metanode. Used when the input network is a RepNode SSN.
+
+=item C<--singletons>
+
+Path to a file listing the singletons in the network (e.g. nodes without any edges)
+
+=back
+
 

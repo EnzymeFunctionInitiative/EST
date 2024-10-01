@@ -44,5 +44,16 @@ Further Reading
 ---------------
 
 .. toctree::
-   create_colorssn_nextflow_params
    :maxdepth: 1
+
+   create_colorssn_nextflow_params
+   ../shared/perl/unzip_xgmml_file.rst
+   ../shared/perl/ssn_to_id_list.rst
+   ../shared/python/compute_clusters.rst
+   ../shared/perl/get_id_lists.rst
+   ../shared/perl/color_xgmml.rst
+   ../shared/perl/get_sequences.rst
+   ../shared/perl/annotate_mapping_table.rst
+   ../shared/perl/compute_conv_ratio.rst
+   ../shared/perl/compute_stats.rst
+

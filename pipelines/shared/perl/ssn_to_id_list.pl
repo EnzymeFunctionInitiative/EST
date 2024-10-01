@@ -190,4 +190,53 @@ sub validateAndProcessOptions {
     return $optParser->getOptions();
 }
 
+1;
+__END__
+
+=head1 ssn_to_id_list.pl
+
+=head2 NAME
+
+C<ssn_to_id_list.pl> - gets network information from a SSN
+
+=head2 SYNOPSIS
+
+    ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE> --index-seqid <FILE>
+        --id-index <FILE> --seqid-source-map <FILE>
+
+=head2 DESCRIPTION
+
+C<ssn_to_id_list.pl> parses a SSN and gets the network connectivity and ID mappings
+that are in the SSN. Nodes are assigned an index value as they are encountered in
+the file. Additionally, the node ID (which may differ from the sequence ID) is
+obtained and stored, as is the sequence ID (from the node C<label> field).
+
+=head3 Arguments
+
+=over
+
+=item C<--ssn>
+
+Path to the input SSN uploaded by the user
+
+=item C<--edgelist>
+
+Path to the output edgelist, consisting of space separated pairs of node indices
+
+=item C<--index-seqid>
+
+Path to an output file that contains a mapping of node index to sequence ID
+
+=item C<--id-index>
+
+Path to an output file that maps node ID (the C<id> attribute in a node) to
+node index
+
+=item C<--seqid-source-map>
+
+Path to an output file that maps metanodes (e.g. RepNodes or UniRef nodes) that are in the SSN
+to sequence IDs that are within the metanode.
+
+=back
+
 

@@ -219,3 +219,58 @@ sub validateAndProcessOptions {
     return $optParser->getOptions();
 }
 
+
+__END__
+
+=head1 annotate_mapping_table.pl
+
+=head2 NAME
+
+C<annotate_mapping_table.pl> - create a table that has UniProt IDs with associated attributes
+
+=head2 SYNOPSIS
+
+    annotate_mapping_table.pl --cluster-map <FILE> --seqid-source-map <FILE> --mapping-table <FILE>
+        --config <FILE> --db-name <NAME> [--cluster-color-map <FILE> --swissprot-table <FILE>]
+
+=head2 DESCRIPTION
+
+C<annotate_mapping_table.pl> creates a table of UniProt IDs with cluster number,
+cluster color, taxonomy ID, and species as additional columns.
+
+=head3 Arguments
+
+=over
+
+=item C<--cluster-map>
+
+Path to a file that maps UniProt sequence ID to a cluster number
+
+=item C<--seqid-source-map>
+
+Path to a file that maps metanode ID to list of sequence IDs (the output table is expanded
+to include all of these IDs, not just the metanodes)
+
+=item C<--mapping-table>
+
+Path to the output file to store the table in
+
+=item C<--cluster-color-map>
+
+Optional path to a file that maps cluster number based on sequence count to the color
+as determined by the pipeline upstream
+
+=item C<--swissprot-table>
+
+Optional path to an output file to store UniProt and associated SwissProt data
+
+=item C<--config>
+
+Path to the C<efi.config> file used for database connection options
+
+=item C<--db-name>
+
+Name of the database to use (path to file for SQLite)
+
+=back
+

@@ -244,4 +244,51 @@ sub validateAndProcessOptions {
     return $optParser->getOptions();
 }
 
+1;
+__END__
+
+=head1 compute_conv_ratio.pl
+
+=head2 NAME
+
+C<compute_conv_ratio.pl> - compute the cluster-based convergence ratio
+
+=head2 SYNOPSIS
+
+    compute_conv_ratio.pl --cluster-map <FILE> --index-seqid-map <FILE> --edgelist <FILE>
+        --conv-ratio <FILE> [--seqid-source-map <FILE>]
+
+=head2 DESCRIPTION
+
+C<compute_conv_ratio.pl> computes the convergence ratio for each cluster in the input
+cluster map file and outputs it to a tab-separated table.
+
+=head3 Arguments
+
+=over
+
+=item C<--cluster-map>
+
+Path to a file that maps UniProt sequence ID to a cluster number
+
+=item C<--index-seqid-map>
+
+Path to a file that maps the node index (value in the edgelist) to the sequence ID (e.g node label)
+
+=item C<--edgelist>
+
+Path to a file containing the edgelist of the SSN; each line is space-separated pair of node indices
+
+=item C<--conv-ratio>
+
+Path to an output file to store the convergence ratios in
+
+=item C<--seqid-source-map>
+
+Optional path to a file that maps metanodes (e.g. RepNodes or UniRef IDs) that are in the SSN
+to sequence IDs that are within the metanode. If present the convergence ratio is calculated
+by taking into account the full cluster size.
+
+=back
+
 

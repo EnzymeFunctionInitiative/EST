@@ -75,3 +75,9 @@ colour
 colours
 neccessary
 pallette
+SwissProt
+metanode
+metanodes
+XGMML
+edgelist
+DOM
