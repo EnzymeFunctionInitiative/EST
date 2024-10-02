@@ -3,7 +3,7 @@ Compute Clusters
 ================
 
 Clusters are computed based on node connectivity using igraph. The input is a simple
-edgelist file for performance reasons (i.e. the graph isn't contructed on the
+edgelist file for performance reasons (i.e. the graph isn't constructed on the
 fly as a file is parsed). An edgelist is an array of length N, where each
 element of the array is another array of size two. Each value is a node index,
 starting at zero and ordered in the way the nodes appear in the SSN.
