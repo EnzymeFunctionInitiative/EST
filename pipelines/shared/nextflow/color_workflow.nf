@@ -87,20 +87,6 @@ process unzip_input {
     """
 }
 
-// This is necessary to avoid Docker mounting the same directory twice; this occurs
-// because we need to mount the root of the project so that we can get access to the
-// lib directory. When using a SSN that is inside the project directory then the project
-// directory is also mounted.
-process copy_input {
-    input:
-        path ssn_file
-    output:
-        path "ssn____local.xgmml"
-    """
-    cp $ssn_file ssn____local.xgmml
-    """
-}
-
 process get_annotated_mapping_tables {
     publishDir params.final_output_dir, mode: 'copy'
     input:
@@ -165,7 +151,7 @@ workflow color_and_retrieve {
         if (params.ssn_input =~ /\.zip/) {
             ssn_file = unzip_input(params.ssn_input)
         } else {
-            ssn_file = copy_input(params.ssn_input)
+            ssn_file = params.ssn_input
         }
 
         // Get the index and ID mapping tables and edgelist
