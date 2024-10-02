@@ -35,6 +35,9 @@ if (not -f $zipFile or not $outFile) {
 
 $outputExt = "xgmml" if not $outputExt;
 
+if (not isZip($zipFile)) {
+    die "Invalid file type: not a zip\n";
+}
 
 my $tempDir = "$outFile.tempunzip";
 
@@ -64,6 +67,15 @@ sub wanted {
     if (not $firstFile and $_ =~ /\.$outputExt$/i) {
         $firstFile = $File::Find::name;
     }
+}
+
+sub isZip {
+    my $file = shift;
+    open my $fh, "<", $file or die "Unable to check $file for zip: $!";
+    my $num;
+    read $fh, $num, 4;
+    close $fh;
+    return $num =~ m/^[PK\003\004]/;
 }
 
 1;
