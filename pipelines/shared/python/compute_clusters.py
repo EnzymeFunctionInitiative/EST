@@ -47,6 +47,22 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+"""
+Load a file that maps node index to sequence ID and sequence metanode size
+(e.g. the file has node_idx, seq_id, seq_size for column names). If the
+input network is UniProt (i.e. not UniRef or RepNode) then the size column
+will always be zero.
+
+Parameters
+----------
+    id_map_file
+        path to the file that contains the mapping
+
+Returns
+-------
+    dict mapping node index to sequence ID
+    dict mapping node index to metanode size
+"""
 def get_node_id_mapping(id_map_file: str) -> tuple[dict, dict]:
 
     idx_seqid_map = {}
@@ -59,7 +75,10 @@ def get_node_id_mapping(id_map_file: str) -> tuple[dict, dict]:
             if len(parts) >= 2:
                 idx = int(parts[0])
                 idx_seqid_map[idx] = parts[1]
-                idx_node_size[idx] = int(parts[2]) if len(parts) >= 3 and parts[2] else 1
+                if len(parts) >= 3 and int(parts[2]) > 0:
+                    idx_node_size[idx] = int(parts[2])
+                else:
+                    idx_node_size[idx] = 1
 
     return idx_seqid_map, idx_node_size
 
