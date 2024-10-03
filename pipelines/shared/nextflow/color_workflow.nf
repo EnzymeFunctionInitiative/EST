@@ -1,50 +1,47 @@
 
+cluster_data_dir = 'cluster-data'
+
 process get_id_list {
-    publishDir params.final_output_dir, mode: 'copy'
+    publishDir "$params.final_output_dir", pattern: "$cluster_data_dir/id_lists/uniprot/*.txt", mode: 'copy'
+    publishDir "$params.final_output_dir", pattern: "$cluster_data_dir/id_lists/uniref90/*.txt", mode: 'copy'
+    publishDir "$params.final_output_dir", pattern: "$cluster_data_dir/id_lists/uniref50/*.txt", mode: 'copy'
     input:
         path cluster_id_map
         path singletons
         path seqid_source_map
     output:
-        path 'id_lists/', emit: 'id_lists'
         path 'cluster_sizes.txt', emit: 'cluster_sizes'
+        path "$cluster_data_dir/id_lists/*/*.txt", emit: 'id_lists'
     """
-    mkdir id_lists
-    mkdir id_lists/uniprot_ids id_lists/uniref90_ids id_lists/uniref50_ids
+    id_list_dir="$cluster_data_dir/id_lists"
     perl $projectDir/../shared/perl/get_id_lists.pl --cluster-map $cluster_id_map --singletons $singletons \
-        --uniprot id_lists/uniprot_ids --uniref90 id_lists/uniref90_ids --uniref50 id_lists/uniref50_ids \
+        --uniprot \$id_list_dir/uniprot --uniref90 \$id_list_dir/uniref90 --uniref50 \$id_list_dir/uniref50 \
         --seqid-source-map $seqid_source_map --cluster-sizes cluster_sizes.txt \
         --config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
 
 process get_fasta {
-    publishDir params.final_output_dir, mode: 'copy'
+    publishDir (
+        path: "$params.final_output_dir",
+        mode: 'copy',
+        pattern: '*.fasta',
+        saveAs: {
+            fn ->
+                if (fn.contains("UniProt")) { "$cluster_data_dir/fasta/uniprot/${fn}" }
+                else if (fn.contains("UniRef90")) { "$cluster_data_dir/fasta/uniref90/${fn}" }
+                else if (fn.contains("UniRef50")) { "$cluster_data_dir/fasta/uniref50/${fn}" }
+                else { "$cluster_data_dir/fasta/${fn}" }
+        }
+    )
     input:
-        path id_list_dir
+        path id_file
     output:
-        path 'fasta/'
+        path '*.fasta', emit: 'fasta'
     """
-    mkdir fasta
-    mkdir fasta/uniprot_ids fasta/uniref90_ids fasta/uniref50_ids
-    for id_file in $id_list_dir/uniprot_ids/*.txt; do
-        [ -e "\${id_file}" ] || continue
-        fasta_file=\${id_file/%.txt/.fasta}
-        fasta_file=\${fasta_file/#$id_list_dir/fasta}
-        perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file \${id_file} --output-sequence-file \${fasta_file}
-    done
-    for id_file in $id_list_dir/uniref90_ids/*.txt; do
-        [ -e "\${id_file}" ] || continue
-        fasta_file=\${id_file/%.txt/.fasta}
-        fasta_file=\${fasta_file/#$id_list_dir/fasta}
-        perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file \${id_file} --output-sequence-file \${fasta_file}
-    done
-    for id_file in $id_list_dir/uniref50_ids/*.txt; do
-        [ -e "\${id_file}" ] || continue
-        fasta_file=\${id_file/%.txt/.fasta}
-        fasta_file=\${fasta_file/#$id_list_dir/fasta}
-        perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file \${id_file} --output-sequence-file \${fasta_file}
-    done
+    base_filename=\$(basename $id_file .txt)
+    fasta_file="\${base_filename}.fasta"
+    perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file ${id_file} --output-sequence-file \${fasta_file}
     """
 }
 
@@ -64,6 +61,7 @@ process color_ssn {
 }
 
 process get_ssn_id_info {
+    publishDir params.final_output_dir, mode: 'copy'
     input:
         path ssn_file
     output:
@@ -162,10 +160,10 @@ workflow color_and_retrieve {
 
         id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map)
 
+        get_fasta(id_list_data.id_lists.flatten())
+
         // Color the SSN based on the computed clusters
         colored_ssn = color_ssn(ssn_file, compute_info.cluster_id_map, compute_info.cluster_num_map)
-
-        fasta_dir = get_fasta(id_list_data.id_lists)
 
         anno_tables = get_annotated_mapping_tables(compute_info.cluster_id_map, ssn_data.seqid_source_map, colored_ssn.cluster_colors)
 
@@ -176,8 +174,7 @@ workflow color_and_retrieve {
     emit:
         ssn_file
         ssn_output = colored_ssn.ssn_output
-        id_list_dir = id_list_data.id_lists
-        fasta_dir
+        cluster_data_dir = cluster_data_dir
         mapping_table = anno_tables.mapping_table
         sp_clusters = anno_tables.swissprot_table
         cr_table

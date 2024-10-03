@@ -5,6 +5,7 @@ use warnings;
 use Getopt::Long;
 use FindBin;
 use File::Copy;
+use File::Path qw(make_path remove_tree);
 
 use lib "$FindBin::Bin/../../../lib";
 
@@ -38,6 +39,8 @@ if ($idType =~ m/uniref(\d+)/) {
 }
 
 my $dirs = {uniprot => $opts->{uniprot}, uniref90 => $opts->{uniref90}, uniref50 => $opts->{uniref50}};
+makeDirs($dirs, $unirefMap);
+
 saveIdLists($clusterToId, $unirefMap, $dirs);
 
 saveSingletons($opts->{singletons}, $dirs, $unirefMap);
@@ -117,12 +120,12 @@ sub saveSingletons {
     return if (not $file or not -f $file);
 
     #TODO: look at UniRef implementation to see how singletons are handled
-    copy($file, "$dirs->{uniprot}/singleton_All.txt");
+    copy($file, "$dirs->{uniprot}/singleton_UniProt_All.txt");
     if ($unirefMap->{uniref90} or $unirefMap->{uniref50}) {
-        copy($file, "$dirs->{uniref90}/singleton_All.txt");
+        copy($file, "$dirs->{uniref90}/singleton_UniRef90_All.txt");
     }
     if ($unirefMap->{uniref50}) {
-        copy($file, "$dirs->{uniref50}/singleton_All.txt");
+        copy($file, "$dirs->{uniref50}/singleton_UniRef50_All.txt");
     }
 }
 
@@ -297,6 +300,32 @@ sub saveClusterIdList {
     }
 
     close $allIdsFh;
+}
+
+
+#
+# makeDirs
+#
+# Creates the directories for the ID lists
+#
+# Parameters:
+#    $dirs - hash ref of uniprot, uniref90, uniref50 dirs
+#    $unirefMap - if uniref90 present, create uniref90 dir; if uniref50 present, create uniref50 dir
+#
+sub makeDirs {
+    my $dirs = shift;
+    my $unirefMap = shift;
+
+    my $makeDir = sub {
+        my $dir = shift;
+        if (not -d $dir) {
+            make_path($dir);
+        }
+    };
+
+    $makeDir->($dirs->{uniprot});
+    $makeDir->($dirs->{uniref90}) if $unirefMap->{uniref90};
+    $makeDir->($dirs->{uniref50}) if $unirefMap->{uniref50};
 }
 
 
