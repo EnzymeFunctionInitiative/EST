@@ -1,17 +1,16 @@
 process import_data {
-    containerOptions "-v ${params.blast_parquet}:${params.blast_parquet} -v ${params.fasta_file}:${params.fasta_file} -v ${params.seq_meta_file}:${params.seq_meta_file}"
     input:
-        val existing_blast_output
-        val existing_fasta_file
-        val existing_seq_meta_file
+        path existing_blast_output
+        path existing_fasta_file
+        path existing_seq_meta_file
     output:
-        path '1.out.parquet', emit: blast_output
-        path 'sequences.fa', emit: fasta
-        path 'sequence_metadata.tab', emit: seq_meta_file
+        path '_1.out.parquet', emit: blast_output
+        path '_sequences.fa', emit: fasta
+        path '_sequence_metadata.tab', emit: seq_meta_file
     """
-    cp $existing_blast_output 1.out.parquet
-    cp $existing_fasta_file sequences.fa
-    cp $existing_seq_meta_file sequence_metadata.tab
+    cp $existing_blast_output _1.out.parquet
+    cp $existing_fasta_file _sequences.fa
+    cp $existing_seq_meta_file _sequence_metadata.tab
     """
 }
 
