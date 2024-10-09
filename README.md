@@ -10,7 +10,25 @@ This respository contains the analysis code that these services use.
 Please see our [documentation](docs/index.rst) for comprehensive information on using the
 pipelines.
 
-## Citing
+# Contributors
+
+The EFI tools were originally created by Daniel Davidson (dbdavids@illinois.edu),
+and further developed by David Slater (dslater@illinois.edu), Hunter DeMeyer
+(demeyer3@illinois.edu), and Nils Oberg (noberg@illinois.edu).  Additional
+contributors were Rémi Zallot, Katie Whalen, Heidi Imker, and Boris Sadkhin.
+John Gerlt (j-gerlt@illinois.edu) envisioned the project and provided continual
+oversight and feedback.
+
+# Copyright and License Information
+
+The EFI tools are copyright 2012-2024 University of Illinois and are licensed
+under the GPL v3 license (see LICENSE).
+
+Third-party tools are used in the pipelines but are not included in the
+EFI source code repository, and therefore do not fall under the license and
+copyright of this project.
+
+# Citing
 Please cite your use of EFI-EST.
 
 >Rémi Zallot, Nils Oberg, and John A. Gerlt, *The EFI Web Resource for Genomic
