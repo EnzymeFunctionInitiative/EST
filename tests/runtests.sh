@@ -1,12 +1,7 @@
 #!/bin/bash
 
-# TO DO:
-# add tests for job script creation (issue 63)
-# add tests for results check (no issue yet)
-
 set -e
 
-# def control functions
 function ctrl_c() {
     echo "Stopping all tests"
     exit 0
@@ -55,11 +50,11 @@ for file in $(ls tests/modules|grep '\.sh$'); do
     echo "Executing tests in '$file'"
     tmp_dir="$(mktemp -d $TEST_RESULTS_DIR/XXXXXX)"
     echo "Temporary directories/files will be written in '$tmp_dir'"
-    bash "tests/modules/$file" $tmp_dir $CONFIG_FILE 2> >(tee $tmp_dir/err.log >&2)
+    bash "tests/modules/$file" $tmp_dir $CONFIG_FILE #2> >(tee $tmp_dir/err.log >&2)
     if [[ $? -eq 0 ]]; then
-	echo "Tests in '$file' passed"
-	echo "Cleaning up tmp dir '$tmp_dir'"
-        rm -rf $tmp_dir
+        echo "Tests in '$file' passed"
+        echo "Cleaning up tmp dir '$tmp_dir'"
+        #rm -rf $tmp_dir
     fi
 done;
 
