@@ -1,15 +1,17 @@
 #!/bin/bash
 
+# TO DO:
+# add tests for job script creation (issue 63)
+# add tests for results check (no issue yet)
+
 set -e
 
+# def control functions
 function ctrl_c() {
     echo "Stopping all tests"
     exit 0
 }
-
 trap ctrl_c SIGINT
-
-TEST_RESULTS_DIR=test_results
 
 # rough test to see if we are in repo root
 if [[ ! -e pipelines/generatessn/generatessn.nf || ! -e pipelines/est/est.nf ]]; then
@@ -25,16 +27,18 @@ fi
 
 echo "Using $CONFIG_FILE config files for processes"
 
-rm -rf $TEST_RESULTS_DIR
-mkdir -p $TEST_RESULTS_DIR
+TEST_RESULTS_DIR=/tmp/nextflow/efi_tests
+if [ ! -d $TEST_RESULTS_DIR ]; then 
+    mkdir -p $TEST_RESULTS_DIR
+fi
 
 set +e
 
 if [[ -z ${EFI_CONFIG_FILE+1} || -z ${EFI_DB_NAME+1} || -z ${EFI_FASTA_DB+1} || -z ${EFI_TEST_ACC_FILE+1} || -z ${EFI_TEST_FASTA_FILE+1} || -z ${EFI_TEST_BLAST_SEQ+1} || -z ${EFI_TEST_ENV+1} || -z ${EFI_TEST_FAMILY_ID+1} ]];
 then
-    echo "Test environment setup not found, please source tests/test_db_env.sh mysql or sqlite"
+    echo "Test environment variables not found, please source tests/test_env.sh mysql or sqlite"
     exit 1
-elif [[ "$EFI_TEST_ENV" != "mysql" && ! -e "$EFI_TEST_DATA_DIR" ]]; then
+elif [[ "$EFI_TEST_ENV" != "mysql" && ! -d "$EFI_TEST_DATA_DIR" ]]; then
     echo "Test data directory not found, attempting to download"
     test_data_dir="tests/test_data/smalldata"
     mkdir -p $test_data_dir
@@ -48,6 +52,14 @@ fi
 #exit
 for file in $(ls tests/modules|grep \.sh); do
     echo "================================================================================"
-    echo "Executing test in '$file'"
-    bash "tests/modules/$file" $TEST_RESULTS_DIR $CONFIG_FILE
+    echo "Executing tests in '$file'"
+    tmp_dir="$(mktemp -d $TEST_RESULTS_DIR/XXXXXX)"
+    echo "Temporary directories/files will be written in '$tmp_dir'"
+    bash "tests/modules/$file" $tmp_dir $CONFIG_FILE 2> >(tee $tmp_dir/err.log >&2)
+    if [[ $? -eq 0 ]]; then
+	echo "Tests in '$file' passed"
+	echo "Cleaning up tmp dir '$tmp_dir'"
+        rm -rf $tmp_dir
+    fi
 done;
+
