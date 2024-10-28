@@ -27,7 +27,9 @@ sub new {
     $self->{anno} = new EFI::Annotations;
     my ($attrNames, $attrDisplay) = $self->{anno}->get_expandable_attr();
     $self->{id_list_fields} = { map { $attrDisplay->{$_} => $_ } @$attrNames };
-    $self->{meta_map} = undef;
+    $self->{sp_field_name} = FIELD_SWISSPROT_DESC;
+    $self->{metadata} = {};
+    $self->{meta_map} = undef; # Metanode -> IDs in metanode mapping
     $self->{id_type} = "uniprot";
 
     return $self;
@@ -69,11 +71,17 @@ sub getMetanodeData {
         $idf = "uniref90" if $idf eq FIELD_UNIREF90_IDS;
         $idf = "uniref50" if $idf eq FIELD_UNIREF50_IDS;
     }
-    my $data = {};
+    my $fullIds = {};
     foreach my $metanode (keys %{ $self->{meta_map} }) {
-        $data->{$metanode} = [ keys %{ $self->{meta_map}->{$metanode} } ];
+        $fullIds->{$metanode} = [ keys %{ $self->{meta_map}->{$metanode} } ];
     }
-    return $data, $idf;
+    return $fullIds, $idf;
+}
+
+
+sub getMetadata {
+    my $self = shift;
+    return $self->{metadata};
 }
 
 
@@ -186,26 +194,29 @@ sub processAtt {
     my $currentNodeId = $self->{current_node_id};
     if ($currentNodeId) {
         my $fieldName = $self->{id_list_fields}->{$name};
-        if ($fieldName and (
-                            $fieldName eq FIELD_REPNODE_IDS or
-                            $fieldName eq FIELD_UNIREF50_IDS or
-                            $fieldName eq FIELD_UNIREF90_IDS or
-                            $fieldName eq FIELD_UNIREF100_IDS
-                            )
-        ) {
-            # If RepNode + UniRef, there could be a "None" value and we need to skip that
-            return if $value eq "None";
+        if ($fieldName) {
+            if ($fieldName eq FIELD_REPNODE_IDS or
+                $fieldName eq FIELD_UNIREF50_IDS or
+                $fieldName eq FIELD_UNIREF90_IDS or
+                $fieldName eq FIELD_UNIREF100_IDS)
+            {
+                # If RepNode + UniRef, there could be a "None" value and we need to skip that
+                return if $value eq "None";
 
-            # ID type is always RepNode if there is UniRef IDs present in addition to RepNode
-            if ($fieldName eq FIELD_REPNODE_IDS) {
-                $self->{id_type} = FIELD_REPNODE_IDS;
-            } else {
-                $self->{id_type} = $fieldName;
+                # ID type is always RepNode if there is UniRef IDs present in addition to RepNode
+                if ($fieldName eq FIELD_REPNODE_IDS) {
+                    $self->{id_type} = FIELD_REPNODE_IDS;
+                } else {
+                    $self->{id_type} = $fieldName;
+                }
+
+                # Store the value in a hash ref in the case that the network is UniRef+RepNode
+                # (in that case there will be duplicates because of the FIELD_REPNODE_IDS values)
+                $self->{meta_map}->{$currentNodeId}->{$value} = 1;
+            # SwissProt
+            } elsif ($fieldName eq $self->{sp_field_name}) {
+                $self->{metadata}->{$currentNodeId}->{swissprot} = $value if $value;
             }
-
-            # Store the value in a hash ref in the case that the network is UniRef+RepNode
-            # (in that case there will be duplicates because of the FIELD_REPNODE_IDS values)
-            $self->{meta_map}->{$currentNodeId}->{$value} = 1;
         }
     }
 }
@@ -374,6 +385,37 @@ One of C<uniprot>, C<uniref90>, C<uniref50>, C<repnode>
     if ($metanodeType ne "uniprot") {
         foreach my $metanode (sort keys %$metanodeMap) {
             map { print join("\t", $metanode, $_), "\n"; } @{ $metanodeMap->{$metanode} };
+        }
+    }
+
+
+
+=head3 getMetadata
+
+Gets the metadata (node attributes) that is saved during parsing (currently only SwissProt
+description).  This is primarily used in the case that the network is UniProt; in that
+case the EFI database is not queried to obtain metadata information.  If the network is
+UniRef, then the database is queried and the SwissProt information from the queries is
+used instead of the saved node attribute.
+
+=head4 Returns
+
+A hash ref with keys being the sequence ID (metanode ID), with each value being another
+hash ref with each saved node attribute.  Currently only the C<swissprot> hash ref key
+is supported.  Only sequence IDs with attribute values are in the hash ref.
+
+    {
+        "UNIPROT_ID" => {
+            "swissprot" => "Description"
+        }
+    }
+
+=head4 Example Usage
+
+    my $metadata = $parser->getMetadata();
+    foreach my $id (keys %$metadata) {
+        foreach my $md (keys %{ $metadata->{$id} }) {
+            print "$id\t$md\t$metadata->{$id}->{$md}\n";
         }
     }
 
