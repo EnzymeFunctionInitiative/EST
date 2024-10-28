@@ -1,6 +1,7 @@
 **/__pycache__
 efi.cfg
 efi.config
+tests/test_data/
 tests/test.config
 tests/testEnvironment.sh
 *.bak
