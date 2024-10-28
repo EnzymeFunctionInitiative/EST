@@ -37,7 +37,8 @@ sub addOption {
     my $optSpec = shift;
     my $required = shift;
     my $help = shift;
-    my $resultType = shift || OPT_VALUE;
+    my $resultType = shift;
+    my $defaultVal = shift;
 
     # $optSpec == --test-arg=s
     my $getoptName = $optSpec =~ s/^\-+//r;
@@ -50,7 +51,7 @@ sub addOption {
     my $argType = $optValType ? KEY_VALUE : FLAG;
 
     if (not $self->{options}->{$keyName}) {
-        $self->{options}->{$keyName} = {getopt => $getoptName, opt => $baseName, key => $keyName, required => $required ? 1 : 0, help => $help // "", arg_type => $argType, result_type => $resultType, result => ""};
+        $self->{options}->{$keyName} = {getopt => $getoptName, opt => $baseName, key => $keyName, required => $required ? 1 : 0, help => $help // "", arg_type => $argType, result_type => $resultType, result => "", default => $defaultVal};
         $self->{opt_map}->{$baseName} = $keyName;
         push @{ $self->{opt_order} }, $keyName;
         return 1;
@@ -124,7 +125,8 @@ sub processOptions {
     my $result = GetOptions($opts, @optionNames);
     foreach my $opt (keys %$opts) {
         my $optKey = $self->{opt_map}->{$opt};
-        $self->{options}->{$optKey}->{result} = $opts->{$opt};
+        my $val = $opts->{$opt} // $self->{options}->{$optKey}->{default};
+        $self->{options}->{$optKey}->{result} = $val;
     }
 }
 
