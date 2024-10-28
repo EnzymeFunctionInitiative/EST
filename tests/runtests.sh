@@ -32,7 +32,7 @@ set +e
 
 if [[ -z ${EFI_CONFIG_FILE+1} || -z ${EFI_DB_NAME+1} || -z ${EFI_FASTA_DB+1} || -z ${EFI_TEST_ACC_FILE+1} || -z ${EFI_TEST_FASTA_FILE+1} || -z ${EFI_TEST_BLAST_SEQ+1} || -z ${EFI_TEST_ENV+1} || -z ${EFI_TEST_FAMILY_ID+1} ]];
 then
-    echo "Test environment setup not found, please source tests/test_db_env.sh mysql or sqlite"
+    echo "Test environment setup not found, please run 'source tests/test_env.sh mysql' or 'source tests/test_env.sh sqlite'"
     exit 1
 elif [[ "$EFI_TEST_ENV" != "mysql" && ! -e "$EFI_TEST_DATA_DIR" ]]; then
     echo "Test data directory not found, attempting to download"
