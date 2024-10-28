@@ -2,6 +2,7 @@
 
 set -e
 
+# def control functions
 function ctrl_c() {
     echo "Stopping all tests"
     exit 0
@@ -22,7 +23,7 @@ fi
 
 echo "Using $CONFIG_FILE config files for processes"
 
-TEST_RESULTS_DIR=/tmp/nextflow/efi_tests
+TEST_RESULTS_DIR=test_results
 if [ ! -d $TEST_RESULTS_DIR ]; then 
     mkdir -p $TEST_RESULTS_DIR
 fi
@@ -48,13 +49,9 @@ fi
 for file in $(ls tests/modules|grep '\.sh$'); do
     echo "================================================================================"
     echo "Executing tests in '$file'"
-    tmp_dir="$(mktemp -d $TEST_RESULTS_DIR/XXXXXX)"
-    echo "Temporary directories/files will be written in '$tmp_dir'"
-    bash "tests/modules/$file" $tmp_dir $CONFIG_FILE #2> >(tee $tmp_dir/err.log >&2)
+    bash "tests/modules/$file" $TEST_RESULTS_DIR $CONFIG_FILE 2> >(tee $TEST_RESULTS_DIR/err.log >&2)
     if [[ $? -eq 0 ]]; then
-        echo "Tests in '$file' passed"
-        echo "Cleaning up tmp dir '$tmp_dir'"
-        #rm -rf $tmp_dir
+	echo "Tests in '$file' passed"
     fi
 done;
 
