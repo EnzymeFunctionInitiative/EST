@@ -25,7 +25,7 @@ my $db = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name
 
 
 
-my $clusterToId = parse_cluster_map_file($opts->{cluster_map});
+my ($clusterToId) = parse_cluster_map_file($opts->{cluster_map});
 
 # Determine if the IDs provided are UniRef and if so get the input file contents
 # that maps UniRef ID to UniProt ID

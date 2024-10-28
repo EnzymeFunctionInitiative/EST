@@ -55,19 +55,21 @@ sub parse_cluster_map_file {
 
     # "node_label\tcluster_num_by_node\tcluster_num_by_seq
     my @header = split(m/\t/, $header);
-    my $clusterToId = {};
+    my $seqClusterToId = {};
+    my $nodeClusterToId = {};
 
     while (my $line = <$fh>) {
         chomp $line;
         my @p = split(m/\t/, $line);
         if ($p[$seqNumCol]) {
-            push @{ $clusterToId->{$p[$seqNumCol]} }, $p[0];
+            push @{ $seqClusterToId->{$p[$seqNumCol]} }, $p[0];
+            push @{ $nodeClusterToId->{$p[$nodeNumCol]} }, $p[0];
         }
     }
 
     close $fh;
 
-    return $clusterToId;
+    return ($seqClusterToId, $nodeClusterToId);
 }
 
 #
@@ -171,12 +173,12 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
     use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file get_cluster_num_cols parse_metanode_map_file);
 
     # $clusterMapFile comes from another utility, the Python `compute_clusters.py` script
-    my $clusterToId = parse_cluster_map_file($clusterMapFile);
+    my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
 
     # $metanodeMapFile comes from another utility, ssn_to_id_list.pl
     my ($idType, $sourceIdMap) = parse_metanode_map_file($metanodeMapFile);
 
-    my $newClusterToId = resolve_mapping($clusterToId, $idType, $sourceIdMap);
+    my $newClusterToId = resolve_mapping($seqClusterToId, $idType, $sourceIdMap);
 
     # $header = "node_label      cluster_num_by_seq      cluster_num_by_node"
     my ($seqNumCol, $nodeNumCol) = get_cluster_num_cols($header);
@@ -209,6 +211,10 @@ second and third columns being the cluster numbers (by sequence and by node).
 
 =head4 Returns
 
+=over
+
+=item C<$seqClusterToId>
+
 A hash ref that maps cluster numbers to an array of sequence IDs within that cluster.
 The clusters that are returned are numbered by sequence (e.g. the C<cluster_num_seq>
 column in the input file). For example:
@@ -218,11 +224,24 @@ column in the input file). For example:
         2 => ["UNIPROT_ID3", "METANODE_ID2", "METANODE_ID3", ...],
         ...
     }
+
+=item C<$nodeClusterToId>
+
+A hash ref that maps cluster numbers to an array of sequence IDs within that cluster.
+The clusters that are returned are numbered by sequence (e.g. the C<cluster_num_seq>
+column in the input file). For example:
+
+    {
+        1 => ["UNIPROT_ID3", "UNIPROT_ID2", ...],
+        2 => ["UNIPROT_ID2", "METANODE_ID2", "METANODE_ID3", ...],
+        ...
+    }
+
+=back
     
 =head4 Example usage:
 
-    my $clusterToId = parse_cluster_map_file($clusterMapFile);
-
+    my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
 
 
 
