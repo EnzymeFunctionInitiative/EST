@@ -1,6 +1,6 @@
 all: docs build-pyEFI build-docker
 
-clean: docs-clean
+clean: docs-clean tests-clean
 
 build-pyEFI:
 	python -m build lib/pyEFI
@@ -35,4 +35,9 @@ test-pipelines:
 
 test-pyefi:
 	pytest lib/pyEFI
+
+tests-clean:
+	rm -rf /tmp/nextflow/efi_tests/
+	rm -rf .nextflow/
+	rm -rf tests/test_data/
 
