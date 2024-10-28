@@ -37,6 +37,5 @@ test-pyefi:
 	pytest lib/pyEFI
 
 tests-clean:
-	rm -rf /tmp/nextflow/efi_tests/
 	rm -rf .nextflow/
 
