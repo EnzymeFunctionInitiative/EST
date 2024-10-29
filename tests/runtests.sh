@@ -23,10 +23,16 @@ fi
 
 echo "Using $CONFIG_FILE config files for processes"
 
-TEST_RESULTS_DIR=test_results
+# if $TEST_RESULTS_DIR not defined already then set to default path
+if [[ -z ${TEST_RESULTS_DIR} ]]; 
+then
+    TEST_RESULTS_DIR=tests/test_results
+fi
+
 if [ ! -d $TEST_RESULTS_DIR ]; then 
     mkdir -p $TEST_RESULTS_DIR
 fi
+echo "Test results will be written in $TEST_RESULTS_DIR"
 
 set +e
 
@@ -49,7 +55,7 @@ fi
 for file in $(ls tests/modules|grep '\.sh$'); do
     echo "================================================================================"
     echo "Executing tests in '$file'"
-    bash "tests/modules/$file" $TEST_RESULTS_DIR $CONFIG_FILE 2> >(tee $TEST_RESULTS_DIR/err.log >&2)
+    bash "tests/modules/$file" $TEST_RESULTS_DIR $CONFIG_FILE
     if [[ $? -eq 0 ]]; then
 	echo "Tests in '$file' passed"
     fi
