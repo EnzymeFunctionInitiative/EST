@@ -39,5 +39,4 @@ test-pyefi:
 tests-clean:
 	rm -rf .nextflow/
 	rm -rf tests/test_results/
-	rm -rf tests/test_data/
 
