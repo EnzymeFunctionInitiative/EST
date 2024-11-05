@@ -15,7 +15,7 @@ if [[ ! -e pipelines/generatessn/generatessn.nf || ! -e pipelines/est/est.nf ]];
     exit 1
 fi
 
-if [ $# -ne 1 ]; then
+if [[ $# -ne 1 ]]; then
     CONFIG_FILE="docker.config"
 else
     CONFIG_FILE=$1
@@ -29,7 +29,7 @@ then
     TEST_RESULTS_DIR=tests/test_results
 fi
 
-if [ ! -d $TEST_RESULTS_DIR ]; then 
+if [[ ! -d $TEST_RESULTS_DIR ]]; then 
     mkdir -p $TEST_RESULTS_DIR
 fi
 echo "Test results will be written in $TEST_RESULTS_DIR"
