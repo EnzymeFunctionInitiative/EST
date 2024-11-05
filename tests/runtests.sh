@@ -24,8 +24,7 @@ fi
 echo "Using $CONFIG_FILE config files for processes"
 
 # if $TEST_RESULTS_DIR not defined already then set to default path
-if [[ -z ${TEST_RESULTS_DIR} ]]; 
-then
+if [[ -z ${TEST_RESULTS_DIR} ]]; then
     TEST_RESULTS_DIR=tests/test_results
 fi
 
@@ -36,8 +35,7 @@ echo "Test results will be written in $TEST_RESULTS_DIR"
 
 set +e
 
-if [[ -z ${EFI_CONFIG_FILE+1} || -z ${EFI_DB_NAME+1} || -z ${EFI_FASTA_DB+1} || -z ${EFI_TEST_ACC_FILE+1} || -z ${EFI_TEST_FASTA_FILE+1} || -z ${EFI_TEST_BLAST_SEQ+1} || -z ${EFI_TEST_ENV+1} || -z ${EFI_TEST_FAMILY_ID+1} ]];
-then
+if [[ -z ${EFI_CONFIG_FILE+1} || -z ${EFI_DB_NAME+1} || -z ${EFI_FASTA_DB+1} || -z ${EFI_TEST_ACC_FILE+1} || -z ${EFI_TEST_FASTA_FILE+1} || -z ${EFI_TEST_BLAST_SEQ+1} || -z ${EFI_TEST_ENV+1} || -z ${EFI_TEST_FAMILY_ID+1} ]]; then
     echo "Test environment variables not found, please run 'source tests/test_env.sh mysql' or 'source tests/test_env.sh sqlite'"
     exit 1
 elif [[ "$EFI_TEST_ENV" != "mysql" && ! -d "$EFI_TEST_DATA_DIR" ]]; then
