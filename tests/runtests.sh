@@ -42,7 +42,7 @@ elif [[ "$EFI_TEST_ENV" != "mysql" && ! -d "$EFI_TEST_DATA_DIR" ]]; then
     echo "Test data directory not found, attempting to download"
     test_data_dir="tests/test_data/smalldata"
     mkdir -p $test_data_dir
-    curl -o $test_data_dir/data.tar.gz https://efi.igb.illinois.edu/downloads/sample_data/kb_test_all.tar.gz
+    curl -o $test_data_dir/data.tar.gz https://efi.igb.illinois.edu/downloads/sample_data/kb_test_all/kb_test_all.tar.gz
     tar xzf $test_data_dir/data.tar.gz -C $test_data_dir
     echo "[database]" > $test_data_dir/efi.config
     echo "dbi=sqlite" >> $test_data_dir/efi.config
