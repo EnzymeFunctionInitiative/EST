@@ -33,8 +33,6 @@ if [[ ! -d $TEST_RESULTS_DIR ]]; then
 fi
 echo "Test results will be written in $TEST_RESULTS_DIR"
 
-set +e
-
 if [[ -z ${EFI_CONFIG_FILE+1} || -z ${EFI_DB_NAME+1} || -z ${EFI_FASTA_DB+1} || -z ${EFI_TEST_ACC_FILE+1} || -z ${EFI_TEST_FASTA_FILE+1} || -z ${EFI_TEST_BLAST_SEQ+1} || -z ${EFI_TEST_ENV+1} || -z ${EFI_TEST_FAMILY_ID+1} ]]; then
     echo "Test environment variables not found, please run 'source tests/test_env.sh mysql' or 'source tests/test_env.sh sqlite'"
     exit 1
@@ -47,6 +45,8 @@ elif [[ "$EFI_TEST_ENV" != "mysql" && ! -d "$EFI_TEST_DATA_DIR" ]]; then
     echo "[database]" > $test_data_dir/efi.config
     echo "dbi=sqlite" >> $test_data_dir/efi.config
 fi
+
+set +e
 
 #bash "tests/modules/05_colorssn_uniprot.sh" $TEST_RESULTS_DIR $CONFIG_FILE
 #exit
