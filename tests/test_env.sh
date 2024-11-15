@@ -1,11 +1,47 @@
 #!/bin/bash
+# usage: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path/to/data/directory]]
+# Optional inputs:
+#	--db-type, accepted values are mysql or sqlite
+#	--data-dir, a local or global path where the sample data will be untarred into
 
-if [[ "$1" == "mysql" ]]; then
-    DATA_DIR="tests/test_data/mysql"
+# loop over input arguments
+for (( index=1; index <= "$#"; index++ ))
+do
+	# get the next argument's index
+	idx=$((index+1))
+	# check if this argument matches a parameter string
+	if [[ ${!index} == "--db-type" ]]
+	then
+		# grab the value of the next argument and save it in a var
+		db_type="${!idx}"
+		echo "Using $db_type as the test environment"
+	# check if this argument matches a parameter string
+	elif [[ ${!index} == "--data-dir" ]]
+	then
+		# grab the value of the next argument and save it in a var
+		data_dir="${!idx}"
+		echo "Testing input data will be untarred in $data_dir"
+	fi
+done
+
+# apply default values if input arguments are not given
+if [[ -z $db_type ]]
+then
+	db_type="sqlite"
+fi
+
+if [[ -z $data_dir ]]
+then
+	data_dir="tests/test_data"
+fi
+
+# creating the necessary environment variables
+if [[ $db_type == "mysql" ]]; then
+    DATA_DIR="$data_dir/mysql"
     export EFI_DB_NAME="efi_db"
     export EFI_TEST_ENV="mysql"
 else
-    DATA_DIR="tests/test_data/smalldata"
+    DATA_DIR="$data_dir/smalldata"
     export EFI_DB_NAME="$DATA_DIR/efi_db.sqlite"
     export EFI_TEST_ENV="sqlite"
 fi
