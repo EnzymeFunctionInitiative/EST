@@ -16,21 +16,24 @@ It has command line arguments that can be included to control what type of SQL d
 Specifically, the usage of the `test_env.sh` script can be seen by running `./tests/test_env.sh --help`, returning:
 
 ```
-usage: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
+Usage information for test_env.sh:
+Must be in the EST root directory. 
+To run: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
 Optional inputs:
-	--db-type, accepted values are mysql or sqlite
+	--db-type, accepted values are mysql or sqlite, default: sqlite
 	--data-dir, a local or global path where the sample data will be 
-		    untarred into
+		    untarred into, default: tests/test_data
 	--results-dir, a local or global path where the results from the test 
-		       suite will be written
-	--help, prints usage information
+		       suite will be written, default: tests/test_results
+	--help, prints this usage information
 ```
 
 As demonstrated in the quick start section all of the command line arguments are optional. 
 
 ### `--db-type` argument
-The `--db-type` argument currently accepts any values but will only run the tests successfully if given "sqlite". 
-Giving a value of "mysql" requires more development/testing.
+The `--db-type` argument currently accepts any values but, if given an unexpected value, will fallback to the default "sqlite" value.
+Accepted values are `sqlite` or `mysql`. 
+Giving a value of "mysql" expects that the full EFI database files are stored locally; this functionality requires more development/testing.
 From the previous version of this README: 
 
 > Assuming that the MySQL dataset and database have been setup and BLAST database files have been installed in `tests/test_data/mysql`, the MySQL environment can be set up by running `source tests/test_env.sh mysql`.  To use the `smalldata` test case based on SQLite, run `source tests/test_env.sh`.
