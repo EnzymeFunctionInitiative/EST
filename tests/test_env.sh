@@ -61,15 +61,15 @@ Optional inputs:
 done
 
 # apply default values if input arguments are not given
-if [[ -z $db_type ]]; then
+if [[ -z ${db_type+1} ]]; then
 	db_type="sqlite"
 fi
 
-if [[ -z $data_dir ]]; then
+if [[ -z ${data_dir+1} ]]; then
 	data_dir="tests/test_data"
 fi
 
-if [[ -z $results_dir ]]; then	# consistency with runtests.sh
+if [[ -z ${results_dir+1} ]]; then
 	results_dir="tests/test_results"
 fi
 
