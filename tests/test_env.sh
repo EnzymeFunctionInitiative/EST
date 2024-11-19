@@ -30,8 +30,7 @@ do
 	# get the next argument's index
 	idx=$((index+1))
 	# check if this argument matches a parameter string
-	if [[ ${!index} == '--help' ]]
-	then
+	if [[ ${!index} == '--help' ]]; then
 		echo "Usage information for test_env.sh:
 Must be in the EST root directory. 
 To run: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
@@ -43,19 +42,18 @@ Optional inputs:
 		       suite will be written, default: tests/test_results
 	--help, prints this usage information"
 		exit
-	elif [[ ${!index} == "--db-type" ]]
-	then
+	# check if this argument matches a parameter string
+	elif [[ ${!index} == "--db-type" ]]; then
 		# grab the value of the next argument and save it in a var
 		db_type="${!idx}"
 		echo "Using $db_type as the test environment"
 	# check if this argument matches a parameter string
-	elif [[ ${!index} == "--data-dir" ]]
-	then
+	elif [[ ${!index} == "--data-dir" ]]; then
 		# grab the value of the next argument and save it in a var
 		data_dir="${!idx}"
 		echo "Testing input data will be untarred in $data_dir"
-	elif [[ ${!index} == "--results-dir" ]]
-	then
+	# check if this argument matches a parameter string
+	elif [[ ${!index} == "--results-dir" ]]; then
 		# grab the value of the next argument and save it in a var
 		results_dir="${!idx}"
 		echo "Testing results will be written in $results_dir"
@@ -63,18 +61,15 @@ Optional inputs:
 done
 
 # apply default values if input arguments are not given
-if [[ -z $db_type ]]
-then
+if [[ -z $db_type ]]; then
 	db_type="sqlite"
 fi
 
-if [[ -z $data_dir ]]
-then
+if [[ -z $data_dir ]]; then
 	data_dir="tests/test_data"
 fi
 
-if [[ -z $results_dir ]]
-then
+if [[ -z $results_dir ]]; then	# consistency with runtests.sh
 	results_dir="tests/test_results"
 fi
 
@@ -101,3 +96,4 @@ export EFI_TEST_SSN_UNIREF90="$DATA_DIR/ssn_uniref90.xgmml"
 export EFI_TEST_SSN_UNIREF50="$DATA_DIR/ssn_uniref50.xgmml"
 export EFI_TEST_SSN_REPNODE="$DATA_DIR/ssn_repnode70.xgmml"
 export EFI_TEST_RESULTS_DIR=$results_dir
+
