@@ -25,7 +25,7 @@ EFI_TEST_SSN_REPNODE=
 EFI_TEST_RESULTS_DIR=
 
 # loop over input arguments
-for (( index=1; index <= "$#"; index++ ))
+for (( index=1; index <= $#; index++ ))
 do
 	# get the next argument's index
 	idx=$((index+1))
@@ -61,15 +61,15 @@ Optional inputs:
 done
 
 # apply default values if input arguments are not given
-if [[ -z ${db_type+1} ]]; then
+if [[ -z "$db_type" ]]; then
 	db_type="sqlite"
 fi
 
-if [[ -z ${data_dir+1} ]]; then
+if [[ -z "$data_dir" ]]; then
 	data_dir="tests/test_data"
 fi
 
-if [[ -z ${results_dir+1} ]]; then
+if [[ -z "$results_dir" ]]; then
 	results_dir="tests/test_results"
 fi
 

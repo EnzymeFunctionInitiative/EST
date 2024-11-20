@@ -23,7 +23,7 @@ fi
 
 echo "Using $CONFIG_FILE config files for processes"
 
-if [[ -z ${EFI_CONFIG_FILE+1} || -z ${EFI_DB_NAME+1} || -z ${EFI_FASTA_DB+1} || -z ${EFI_TEST_ACC_FILE+1} || -z ${EFI_TEST_FASTA_FILE+1} || -z ${EFI_TEST_BLAST_SEQ+1} || -z ${EFI_TEST_ENV+1} || -z ${EFI_TEST_FAMILY_ID+1} ]]; then
+if [[ -z "$EFI_CONFIG_FILE" || -z "$EFI_DB_NAME" || -z "$EFI_FASTA_DB" || -z "$EFI_TEST_ACC_FILE" || -z "$EFI_TEST_FASTA_FILE" || -z "$EFI_TEST_BLAST_SEQ" || -z "$EFI_TEST_ENV" || -z "$EFI_TEST_FAMILY_ID" ]]; then
     echo "Test environment variables not found, please run 'source tests/test_env.sh'"
     exit 1
 elif [[ "$EFI_TEST_ENV" != "mysql" && ! -d "$EFI_TEST_DATA_DIR" ]]; then
