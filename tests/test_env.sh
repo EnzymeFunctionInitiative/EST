@@ -9,6 +9,9 @@
 #	--help, prints usage information
 
 # starting fresh
+db_type=
+data_dir=
+results_dir=
 EFI_DB_NAME=
 EFI_TEST_ENV=
 EFI_TEST_DATA_DIR=
@@ -36,10 +39,10 @@ Must be in the EST root directory.
 To run: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
 Optional inputs:
 	--db-type, accepted values are mysql or sqlite, default: sqlite
-	--data-dir, a local or global path where the sample data will be 
-		    untarred into, default: tests/test_data
-	--results-dir, a local or global path where the results from the test 
-		       suite will be written, default: tests/test_results
+	--data-dir, a global path where the sample data will be untarred into, 
+		    default: tests/test_data
+	--results-dir, a global path where the results from the test suite will 
+		       be written, default: tests/test_results
 	--help, prints this usage information"
 		exit
 	# check if this argument matches a parameter string
@@ -66,11 +69,11 @@ if [[ -z "$db_type" ]]; then
 fi
 
 if [[ -z "$data_dir" ]]; then
-	data_dir="tests/test_data"
+	data_dir="$(pwd)/tests/test_data"
 fi
 
 if [[ -z "$results_dir" ]]; then
-	results_dir="tests/test_results"
+	results_dir="$(pwd)/tests/test_results"
 fi
 
 # creating the necessary environment variables
