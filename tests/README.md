@@ -21,10 +21,10 @@ Must be in the EST root directory.
 To run: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
 Optional inputs:
 	--db-type, accepted values are mysql or sqlite, default: sqlite
-	--data-dir, a local or global path where the sample data will be 
-		    untarred into, default: tests/test_data
-	--results-dir, a local or global path where the results from the test 
-		       suite will be written, default: tests/test_results
+	--data-dir, a global path where the sample data will be untarred into, 
+		    default: tests/test_data
+	--results-dir, a global path where the results from the test suite will 
+		       be written, default: tests/test_results
 	--help, prints this usage information
 ```
 
