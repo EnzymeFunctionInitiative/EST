@@ -6,6 +6,7 @@ use warnings;
 
 use List::MoreUtils qw(uniq);
 use Array::Utils qw(:all);
+use Data::Dumper;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
@@ -115,6 +116,8 @@ sub processQuery {
     my $pos = $self->getQueryPositionData($neighborhoodSize, $row);
     my $data = $self->createAccessionData($queryAccession, $row, $pos);
 
+    $data->{neighbors} = [];
+
     return undef, $pos, $data;
 }
 
@@ -130,7 +133,8 @@ sub processQuery {
 #    $queryPos - hash ref of position data for the query
 #
 # Returns:
-#    hash ref of neighbor data if the neighbor is valid, undef otherwise
+#    hash ref of neighbor data if the neighbor is valid, return undef if the neighbor
+#       is the same as the query
 #
 sub processNeighbor {
     my $self = shift;
@@ -138,28 +142,25 @@ sub processNeighbor {
     my $queryData = shift;
     my $queryPos = shift;
 
-    my $noneFamily = shift;
-    my $pfamData = shift;
-    my $iproData = shift;
-    my $neighbors = shift;
-
-    my $pfamFam = join("-", sort {$a <=> $b} uniq split(",", $row->{pfam_fam}));
-    my $ipInfo = $self->parseInterpro($row);
-
     my $nbData = {
         id => $row->{AC},
         num => $row->{NUM},
-        pfam => $pfamFam,
-        interpro => $ipInfo,
     };
 
     $self->populateNeighborPositionData($row, $queryData, $queryPos, $nbData);
 
-    if ($nbData->{distance} != 0) {
-        return $nbData;
-    } else {
+    # distance will be zero if the row is the same as the query sequence
+    if ($nbData->{distance} == 0) {
         return undef;
     }
+
+    my $pfamFam = join("-", sort {$a <=> $b} uniq split(",", $row->{pfam_fam} // ""));
+    my $ipInfo = $self->parseInterpro($row);
+
+    $nbData->{pfam} = $pfamFam;
+    $nbData->{interpro} = $ipInfo;
+
+    return $nbData;
 }
 
 
@@ -238,12 +239,12 @@ sub createAccessionData {
     my $row = shift;
     my $pos = shift;
 
-    my $queryPfam = join("-", sort {$a <=> $b} uniq split(",", $row->{pfam_fam}));
+    my $queryPfam = join("-", sort {$a <=> $b} uniq split(",", $row->{pfam_fam} // ""));
     my $ipInfo = $self->parseInterpro($row);
 
     my $data = {
         id => $accession,
-        genome_id => $row->{ID},
+        embl_id => $row->{ID},
         num => $pos->{query_num},
         direction => $row->{DIRECTION} == 0 ? "complement" : "normal",
         start => $pos->{query_start_coord},
@@ -411,7 +412,7 @@ sub getEmblId {
     my $self = shift;
     my $accession = shift;
 
-    my $checkSql = "SELECT * FROM ena FROM AC = ? ORDER BY TYPE LIMIT 1";
+    my $checkSql = "SELECT * FROM ena WHERE AC = ? ORDER BY TYPE LIMIT 1";
     my $sth = $self->{dbh}->prepare($checkSql);
     $sth->execute($accession);
 
@@ -495,17 +496,17 @@ sub initializeNeighborQuery {
     my $query = "SELECT $self->{col_sql} FROM ena $self->{join_sql} WHERE ena.ID = ?";
 
     # Handle circular case
-    if ($queryData->{acc_type} eq "circular") {
+    if ($queryData->{type} eq "circular") {
         my ($circHigh, $circLow, $clause) = $self->getCircularPos($neighborhoodSize, $pos);
         $pos->{circ_high} = $circHigh;
         $pos->{circ_low} = $circLow;
         $query .= " AND $clause";
     } else {
-        $query .= " AND ena.num >= $pos->{low_window} AND ena.num <= $pos->{high_window}";
+        $query .= " AND ena.NUM >= $pos->{low_window} AND ena.NUM <= $pos->{high_window}";
     }
 
     my $nbSth = $self->{dbh}->prepare($query);
-    $nbSth->execute($queryData->{id});
+    $nbSth->execute($queryData->{embl_id});
 
     return $nbSth;
 }
@@ -529,7 +530,7 @@ sub parseInterpro {
     my $self = shift;
     my $row = shift;
 
-    return if not exists $row->{ipro_fam};
+    return [] if (not $row->{ipro_fam} or not $row->{ipro_type});
 
     my @fams = split m/,/, $row->{ipro_fam};
     my @types = split m/,/, $row->{ipro_type};
