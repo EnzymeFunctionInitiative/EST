@@ -27,6 +27,7 @@ extensions = ["sphinx.ext.autodoc",       # parses docstrings from python code
               "sphinx_autodoc_typehints", # reads types from signature and includes in description
               "sphinx.ext.coverage",      # reports percentage of functions which have documentation
               "sphinxcontrib.spelling",    # spell checking
+              "sphinxcontrib.mermaid",    # enable mermaid diagrams to be visualized in docs
               "sphinxarg.ext"
               ]
 

@@ -182,12 +182,10 @@ Nextflow DAG Diagram
 Flowchart for the FASTA (Option C) import mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-```{mermaid} est_fasta_nf.mmd
-```
+.. mermaid:: est_fasta_nf.mmd
 
 Flowchart for the other import modes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-```{mermaid} est_family_blast_accession_nf.mmd
-```
+.. mermaid:: est_family_blast_accession_nf.mmd
 
