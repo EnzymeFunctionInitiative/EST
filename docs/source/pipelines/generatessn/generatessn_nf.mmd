@@ -1,0 +1,26 @@
+flowchart TB
+    subgraph " "
+    v0["existing_blast_output"]
+    v1["existing_fasta_file"]
+    v2["existing_seq_meta_file"]
+    end
+    v3([import_data])
+    v4([filter_blast])
+    v5([filter_fasta])
+    v6([get_annotations])
+    v7([create_full_ssn])
+    v8([compute_stats])
+    subgraph " "
+    v9[" "]
+    end
+    v0 --> v3
+    v1 --> v3
+    v2 --> v3
+    v3 --> v4
+    v3 --> v5
+    v4 --> v7
+    v5 --> v7
+    v5 --> v6
+    v6 --> v7
+    v7 --> v8
+    v8 --> v9

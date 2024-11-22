@@ -40,6 +40,11 @@ This can then be submitted to the cluster with ::
 
    sbatch run_nextflow.sh
 
+Nextflow DAG Diagram
+--------------------
+```{mermaid} colorssn_nf.mmd
+```
+
 Further Reading
 ---------------
 

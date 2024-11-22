@@ -1,0 +1,49 @@
+flowchart TB
+    v0([get_sequence_ids])
+    subgraph " "
+    v1[" "]
+    v2[" "]
+    v3[" "]
+    v4[" "]
+    v18[" "]
+    v19[" "]
+    v21[" "]
+    end
+    v5([split_sequence_ids])
+    v7([get_sequences])
+    v9([cat_fasta_files])
+    v10([create_blast_db])
+    v11([blastreduce_transcode_fasta])
+    v12([split_fasta])
+    v14([all_by_all_blast])
+    v16([blastreduce])
+    v17([compute_stats])
+    v20([visualize])
+    v6(( ))
+    v8(( ))
+    v13(( ))
+    v15(( ))
+    v0 --> v5
+    v0 --> v4
+    v0 --> v3
+    v0 --> v2
+    v0 --> v1
+    v5 --> v6
+    v6 --> v7
+    v7 --> v8
+    v8 --> v9
+    v9 --> v10
+    v9 --> v11
+    v9 --> v12
+    v10 --> v14
+    v11 --> v16
+    v11 --> v17
+    v12 --> v13
+    v13 --> v14
+    v14 --> v15
+    v15 --> v16
+    v16 --> v17
+    v17 --> v20
+    v17 --> v19
+    v17 --> v18
+    v20 --> v21
