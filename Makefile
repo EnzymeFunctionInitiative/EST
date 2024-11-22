@@ -10,8 +10,10 @@ build-docker:
 
 docs: docs-html docs-coverage
 
-docs-html: docs-perlpod
+docs-html: 
+	echo "running sphinx-build"
 	sphinx-build -M html docs/ build/ -n
+	echo "done with sphinx-build"
 
 docs-coverage:
 	sphinx-build -b coverage docs/ build/
@@ -23,7 +25,9 @@ docs-clean:
 	rm -rf build/
 
 docs-perlpod:
+	echo "running perlpod"
 	find pipelines -name "*.pl" | xargs -d\\n -n1 scripts/pod2rst.sh
+	echo "done with perlpod"
 
 docs-spelling-perlpod:
 	perl scripts/podcheck --search pipelines --wordlist docs/spelling_wordlist.txt
