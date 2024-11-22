@@ -42,8 +42,8 @@ This can then be submitted to the cluster with ::
 
 Nextflow DAG Diagram
 --------------------
-```{mermaid} colorssn_nf.mmd
-```
+
+.. mermaid:: colorssn_nf.mmd
 
 Further Reading
 ---------------

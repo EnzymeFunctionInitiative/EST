@@ -6,8 +6,8 @@ Similarity Network (SSN).
 
 Nextflow DAG Diagram
 --------------------
-```{mermaid} generatessn_nf.mmd
-```
+
+.. mermaid:: generatessn_nf.mmd
 
 Stages
 ----------
