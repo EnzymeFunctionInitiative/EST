@@ -1,0 +1,78 @@
+<!--
+  ~ Copyright 2013-2024, Seqera Labs
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+</head>
+<body>
+<pre class="mermaid" style="text-align: center;">
+flowchart TB
+    subgraph " "
+    v0["ssn_file"]
+    v12["ssn_file"]
+    end
+    subgraph color_and_retrieve
+    v1([get_ssn_id_info])
+    v3([compute_clusters])
+    v4([get_id_list])
+    v10([get_fasta])
+    v13([color_ssn])
+    v15([get_annotated_mapping_tables])
+    v18([get_conv_ratio_table])
+    v20([get_cluster_stats])
+    v6(( ))
+    end
+    subgraph " "
+    v2[" "]
+    v5["cluster_sizes"]
+    v11[" "]
+    v14["ssn_output"]
+    v16["sp_clusters"]
+    v17["mapping_table"]
+    v19[" "]
+    v21["cluster_stats"]
+    end
+    v0 --> v1
+    v1 --> v3
+    v1 --> v2
+    v1 --> v4
+    v1 --> v15
+    v1 --> v18
+    v1 --> v20
+    v3 --> v4
+    v3 --> v13
+    v3 --> v15
+    v3 --> v18
+    v3 --> v20
+    v4 --> v5
+    v4 --> v6
+    v6 --> v10
+    v10 --> v11
+    v12 --> v13
+    v13 --> v14
+    v13 --> v15
+    v15 --> v17
+    v15 --> v16
+    v18 --> v19
+    v20 --> v21
+
+</pre>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true });
+</script>
+</body>
+</html>
