@@ -26,11 +26,12 @@ sub new {
 }
 
 
+# public
 sub getAnnotations {
     my $self = shift;
-    my $accession = shift;
-    my $pfamFams = shift;
-    my $interproFams = shift;
+    my $accessionData = shift;
+
+    my $accession = $accessionData->{id};
 
     my ($orgs, $taxIds, $status, $descs) = $self->getMultipleAnnotations($accession);
 
@@ -40,14 +41,15 @@ sub getAnnotations {
     my $desc = $descs->{$accession};
 
     my $pfamDesc = "";
-    if ($pfamFams) {
-        my $names = $self->getFamilyNames($pfamFams);
+    if ($accessionData->{pfam}) {
+        my $names = $self->getFamilyNames($accessionData->{pfam});
         $pfamDesc = join(";", map { $_->{short} } grep { $_->{family} =~ m/^PF/ } @$names);
     }
 
     my $interproDesc = "";
-    if ($interproFams) {
-        my $names = $self->getFamilyNames($interproFams);
+    my @interproFamilies = map { $_->{family} } @{ $accessionData->{interpro} };
+    if (@interproFamilies) {
+        my $names = $self->getFamilyNames(@interproFamilies);
         $interproDesc = join(";", map { $_->{short} } grep { $_->{family} =~ m/^IPR/ } @$names);
     }
 
@@ -55,13 +57,14 @@ sub getAnnotations {
 }
 
 
+# public
 sub getFamilyNames {
     my $self = shift;
-    my $families = shift;
+    my @families = @_;
 
     my @names;
 
-    foreach my $family (split("-", $families)){
+    foreach my $family (map { split(m/\-/, $_) } @families) {
         my $sth = $self->{dbh}->prepare("SELECT * FROM family_info WHERE family = ?");
         $sth->execute($family);
         my $row = $sth->fetchrow_hashref;
@@ -137,7 +140,6 @@ sub getMultipleAnnotations {
 }
 
 
-# public
 sub initPdbInfo {
     my $self = shift;
     my $source = shift;
@@ -145,7 +147,8 @@ sub initPdbInfo {
     my $clusters = $source->getClusters();
 
     foreach my $clusterNum (@$clusters) {
-        my $pfamHubIds = $source->getClusterHubAccessions($clusterNum);
+        #TODO: compute pdb info on a pfam hub basis
+        my $pfamHubIds = $source->getSequenceIds($clusterNum);
         foreach my $pfamHub (keys %$pfamHubIds) {
             my ($shape, $pdbInfo) = $self->retrieveHubPdbInfo($pfamHubIds->{$pfamHub});
             $self->{hub_pdb_info}->{$clusterNum}->{$pfamHub} = [$shape, $pdbInfo];
@@ -202,6 +205,8 @@ sub retrieveHubPdbInfo {
         $shape = "triangle"
     }
 
+    #TODO:
+    my $pdbInfo = {};
     return $shape, $pdbInfo;
 }
 
@@ -226,7 +231,7 @@ sub retrievePdbData {
 
     my $metadata = {};
     if ($row->{metadata}) {
-        $metadata = $self->{efi_anno}->decode_meta_struct($meta);
+        $metadata = $self->{efi_anno}->decode_meta_struct($row->{metadata});
     } else {
         $self->addWarning("WARNING: missing metadata for $accession; is entry obsolete? [1]\n");
     }

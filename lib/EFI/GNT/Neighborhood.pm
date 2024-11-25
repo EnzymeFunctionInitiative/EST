@@ -59,7 +59,7 @@ sub findNeighbors {
     }
 
     # Get statement handle, already executed, but nothing has been fetched
-    my $rows = $self->initializeNeighborQuery($queryData, $pos, $neighborhoodSize);
+    my $rows = $self->initializeNeighborQuery($queryData->{attributes}, $pos, $neighborhoodSize);
 
     # Check if there are actually any neighbors
     my $warnings = "";
@@ -70,7 +70,7 @@ sub findNeighbors {
 
     # Examine each neighbor
     while (my $row = $rows->fetchrow_hashref) {
-        my $neighbor = $self->processNeighbor($row, $queryData, $pos);
+        my $neighbor = $self->processNeighbor($row, $queryData->{attributes}, $pos);
         push @{ $queryData->{neighbors} }, $neighbor if $neighbor;
     }
 
@@ -114,8 +114,9 @@ sub processQuery {
     my $row = $sth->fetchrow_hashref;
 
     my $pos = $self->getQueryPositionData($neighborhoodSize, $row);
-    my $data = $self->createAccessionData($queryAccession, $row, $pos);
+    my $attributes = $self->createAccessionData($queryAccession, $row, $pos);
 
+    $data->{attributes} = $attributes;
     $data->{neighbors} = [];
 
     return undef, $pos, $data;
@@ -247,6 +248,7 @@ sub createAccessionData {
         embl_id => $row->{ID},
         num => $pos->{query_num},
         direction => $row->{DIRECTION} == 0 ? "complement" : "normal",
+        is_bound => $pos->{is_bound},
         start => $pos->{query_start_coord},
         stop => $pos->{query_stop_coord},
         rel_start => 0,
@@ -301,6 +303,12 @@ sub getQueryPositionData {
 
     $pos->{low_window} = $pos->{query_num} - $neighborhoodSize; # lower boundary of neighborhood search in number of sequences
     $pos->{high_window} = $pos->{query_num} + $neighborhoodSize; # upper boundary of neighborhood search in number of sequences
+
+    # Determine if the query window exceeds the genome boundary (for example,
+    # if the query position is 3 and the window is 10, this is true)
+    my $isBound = ($pos->{low_window} < 1 ? 1 : 0);
+    $isBound = $isBound | ($pos->{high_window} > $max ? 2 : 0);
+    $pos->{is_bound} = $isBound;
 
     return $pos;
 }
@@ -525,6 +533,7 @@ sub initializeNeighborQuery {
 #       an InterPro family associated with the sequence; each hash ref contains
 #       'type' key which is one of "domain", "family", or "homologous_superfamily",
 #       and 'family' which is the InterPro family ID
+#    info from array ref converted into a string
 #
 sub parseInterpro {
     my $self = shift;
@@ -547,7 +556,9 @@ sub parseInterpro {
         }
     }
 
-    return \@info;
+    my $infoStr = join("-", map { $_->{family} } @info);
+
+    return (\@info, $infoStr);
 }
 
 
@@ -635,7 +646,8 @@ complex and looks like this:
         type => "linear", "linear" or "circular"
         seq_len => 0, # length of sequence in bp
         pfam => "", # can be more than one family, separated by dash
-        interpro => [
+        interpro => "", # can be more than one family, separated by dash
+        interpro_data => [
             {
                 family => "", # InterPro family ID
                 type => "family", # InterPro family type ("family", "domain", "homologous_superfamily")
@@ -654,7 +666,8 @@ complex and looks like this:
                 type => "linear", # "linear" or "circular" indicating the genome type
                 seq_len => 0, # length of sequence in bp
                 pfam => "", # can be more than one family, separated by dash
-                interpro => [
+                interpro => "", # can be more than one family, separated by dash
+                interpro_data => [
                     {
                         family => "", # InterPro family ID
                         type => "family", # InterPro family type ("family", "domain", "homologous_superfamily")
@@ -671,42 +684,19 @@ complex and looks like this:
     
     # $data will contain:
     #    {
-    #       id => "B0SS77",
-    #       embl_id => "CP000786",
-    #       num => 1820,
-    #       direction => "normal",
-    #       start => 1953484,
-    #       stop => 1954533,
-    #       rel_start => 0,
-    #       rel_stop => 1049,
-    #       type => "linear",
-    #       seq_len => 349,
-    #       pfam => "PF07478-PF1820",
-    #       interpro => [
-    #           {
-    #               family => "IPR011761",
-    #               type => "domain"
-    #           },
-    #           {
-    #               family => "IPR013815",
-    #               type => "homologous_superfamily"
-    #           },
-    #           {
-    #               family => "IPR005905",
-    #               type => "family"
-    #           },
-    #           {
-    #               family => "IPR011095",
-    #               type => "domain"
-    #           },
-    #           {
-    #               family => "IPR011127",
-    #               type => "domain"
-    #           },
-    #           {
-    #               family => "IPR016185",
-    #               type => "homologous_superfamily"
-    #           }
+    #       attributes => {
+    #           id => "B0SS77",
+    #           embl_id => "CP000786",
+    #           num => 1820,
+    #           direction => "normal",
+    #           start => 1953484,
+    #           stop => 1954533,
+    #           rel_start => 0,
+    #           rel_stop => 1049,
+    #           type => "linear",
+    #           seq_len => 349,
+    #           pfam => "PF07478-PF1820",
+    #           interpro => "IPR011761-IPR13815-IPR005905-IPR011127-IPR016185",
     #       ],
     #       neighbors => [
     #           {
@@ -721,20 +711,7 @@ complex and looks like this:
     #               type => "linear",
     #               seq_len => 436,
     #               pfam => "PF00474",
-    #               interpro => [
-    #                   {
-    #                       family => "IPR038377",
-    #                       type => "homologous_superfamily"
-    #                   },
-    #                   {
-    #                       family => "IPR001734",
-    #                       type => "family"
-    #                   },
-    #                   {
-    #                       family => "IPR050277",
-    #                       type => "family"
-    #                   }
-    #               ]
+    #               interpro => "IPR038377-IPR001734-IPR050277",
     #           },
     #           {
     #               id => "B0SS78",
@@ -747,8 +724,7 @@ complex and looks like this:
     #               type => "linear",
     #               seq_len => 468,
     #               pfam => "",
-    #               interpro => [
-    #               ]
+    #               interpro => "",
     #           }
     #       ]
     #   }
