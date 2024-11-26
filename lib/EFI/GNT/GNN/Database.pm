@@ -33,15 +33,11 @@ sub new {
 }
 
 
-#TODO: document this
-#public
 sub save {
     my $self = shift;
     my $gnn = shift;
 
     my $clusterData = $gnn->getRawClusterData();
-
-    $self->beginTransaction();
 
     foreach my $clusterNum (sort { $a <=> $b } keys %$clusterData) {
         my $queryIdSortFn = sub { return queryIdSortFn($clusterData->{$clusterNum}, $a, $b); };
@@ -76,7 +72,9 @@ sub insertNeighbors {
         my $vals = join(", ", map { "?" } @{ $self->{neighbor_cols} });
         my $sql = "INSERT INTO neighbor ($colNames) VALUES ($vals)";
         my $sth = $self->{dbh}->prepare($sql);
-        #TODO: error check $sth
+        if (not $sth) {
+            die "Error preparing SQL query for inserting neighbors ($sql)";
+        }
         $self->{insert_neighbor_sth} = $sth;
     }
 
@@ -118,18 +116,13 @@ sub insertQuery {
         my $vals = join(", ", map { "?" } @{ $self->{query_cols} });
         my $sql = "INSERT INTO query ($colNames) VALUES ($vals)";
         my $sth = $self->{dbh}->prepare($sql);
-        #TODO: error check $sth
+        if (not $sth) {
+            die "Error preparing SQL query for inserting queries ($sql)";
+        }
         $self->{insert_query_sth} = $sth;
     }
 
-    $self->insert($sth, \@row);
-}
-
-
-# private
-sub beginTransaction {
-    my $self = shift;
-    #TODO: determine if needed and if so implement
+    $self->insert($self->{insert_query_sth}, \@row);
 }
 
 
@@ -319,4 +312,104 @@ sub queryIdSortFn {
 
 1;
 __END__
+
+=pod
+
+=head1 EFI::GNT::GNN::Database
+
+=head2 NAME
+
+EFI::GNT::GNN::Database - Perl module for writing and reading raw GNN data for
+the GNT pipeline
+
+=head2 SYNOPSIS
+
+    my $dbFile = "gnn_db.sqlite";
+    my $gnnDb = new EFI::GNT::GNN::Database(db_file => $dbFile);
+
+    my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap);
+    # Perform $gnn computations
+    $gnnDb->save($gnn);
+
+    #TODO: example of future script that uses the gnn db
+
+
+=head2 DESCRIPTION
+
+B<EFI::GNT::GNN::Database> is a Perl module for storing and retrieving raw GNN
+data for the GNT pipeline.  The data that is stored and retrieved comes from
+B<EFI::GNT::GNN> and is used by additional steps such as GND creation and table
+output.  This module should always be used as the official reference for the
+database schema, and only columns that are in this module are stored and
+retrieved.
+
+
+=head2 METHODS
+
+=head3 C<new(db_file => $dbFile)>
+
+Creates a new B<EFI::GNT::GNN::Database> module.  The database is initialized
+if not already created.
+
+=head4 Parameters
+
+=over
+
+=item C<db_file>
+
+Path to a SQLite database file.  If it exists, the data can be retrieved
+using the C<load> method.
+
+=back
+
+=head4 Example Usage
+
+    my $dbFile = "gnn_db.sqlite";
+    my $gnnDb = new EFI::GNT::GNN:Database(db_file => $dbFile);
+    # gnn_db.sqlite will now exist in the current directory
+
+
+=head3 C<save($gnn)>
+
+Saves data from the given GNN into the database file.
+
+=head4 Parameters
+
+=over
+
+=item C<$gnn>
+
+A B<EFI::GNT::GNN> object that has computed GNN data.  Raw data
+is obtained and stored.
+
+=back
+
+=head4 Example Usage
+
+    $gnnDb->save($gnn);
+
+
+=head2 SCHEMA
+
+The B<EFI::GNT::GNN> module stores raw cluster data that is in a cluster-centric
+structure that maps cluster numbers to lists of query sequences, and each
+sequence contains a list of neighbors.  This structure contains metadata such
+as position on the genome, taxonomic identifier, family data, plus more.  The
+structure is serialized into two tables, the C<query> table with one row for
+every ID in the cluster and the C<neighbor> table for the neighbors of each
+query.  The C<neighbor> table is linked to the C<query> table through the use
+of the C<query_sort_key> field which maps to the query C<sort_key> field.
+
+This module is closely linked to B<EFI::GNT::Neighborhood> and B<EFI::GNT::GNN>
+and is designed to work with those modules and other scripts in the GNT
+pipeline.  B<EFI::GNT::GNN::Database> is not a general purpose module for
+interacting with GNN data since it is assumed that the schema is understood by
+the scripts that use it.
+
+GND databases contain tables that are nearly identical to the tables in the
+databases output from this module.
+
+
+=cut
+
 
