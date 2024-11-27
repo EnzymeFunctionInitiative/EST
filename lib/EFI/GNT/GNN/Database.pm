@@ -29,7 +29,7 @@ sub new {
     $self->{query_cols} = getQuerySchema();
     $self->{neighbor_cols} = getNeighborSchema();
 
-    $self->initializeDatabase();
+    $self->{has_data} = $self->initializeDatabase();
 }
 
 
@@ -50,6 +50,24 @@ sub save {
     }
 
     $self->commit();
+
+    $self->{has_data} = 1;
+}
+
+
+sub getClusterData {
+    my $self = shift;
+
+    return undef if not $self->{has_data};
+
+    my ($clusterData, $sortKeyMap) = $self->getClusterDataQuery();
+
+    # Directly modify $clusterData by inserting neighbors into the
+    # data structures specified by $sortKeyMap.  This is probably
+    # quicker than doing a SQL join of query and neighbor tables
+    $self->getClusterDataNeighbor($clusterData, $sortKeyMap);
+
+    return $clusterData;
 }
 
 
@@ -127,6 +145,62 @@ sub insertQuery {
 
 
 #
+# getClusterDataQuery - private method
+#
+# Retrieves data for each query in the clusters.
+#
+# Returns:
+#    $clusterData - maps cluster number to list of queries for each cluster
+#    $sortKeyMap - directly maps sort_key to hash ref of each query;
+#        this allows direct modification of the data structure.
+#
+sub getClusterDataQuery {
+    my $self = shift;
+
+    my $clusterData = {};
+    my $sortKeyMap = {}; # map sort key to cluster number/query ID
+
+    my $querySql = "SELECT * FROM query";
+    my $sth = $self->{dbh}->prepare($querySql);
+    $sth->execute();
+
+    while (my $row = $sth->fetchrow_hashref()) {
+        my $query = {attributes => $row, neighbors => []};
+        $sortKeyMap->{$row->{sort_key}} = $query;
+        push @{ $clusterData->{$row->{cluster_num}} }, $query;
+    }
+
+    return ($clusterData, $sortKeyMap);
+}
+
+
+#
+# getClusterDataNeighbor - private method
+#
+# Retrieves the neighbor data for each query.  The input $clusterData
+# data structure is modified by adding a neighbor data structure to
+# the 'neighbors' array ref for each query in the cluster.
+#
+# Parameters:
+#    $sortKeyMap - directly maps sort_key to hash ref of each query;
+#        this allows direct modification of the data structure.
+#
+sub getClusterDataNeighbor {
+    my $self = shift;
+    my $sortKeyMap = shift;
+
+    my $neighborSql = "SELECT * FROM neighbor";
+    my $sth = $self->{dbh}->prepare($neighborSql);
+    $sth->execute();
+
+    while (my $row = $sth->fetchrow_hashref()) {
+        my $query = $sortKeyMap->{$row->{query_sort_key}};
+        push @{ $query->{neighbors} }, $row;
+    }
+}
+
+
+#
 # insert - private method
 #
 # Inserts data into a table.  Insertions are done in a transaction
@@ -147,7 +221,7 @@ sub insert {
     # Commit the transaction if we've reached a certain number of statments
     if (++$self->{insert_count} % $self->{insert_max} == 0) {
         $self->{insert_count} = 0;
-        $self->{dbh}->commit;
+        $self->{dbh}->commit();
     }
     $self->{dbh}->execute(@$row);
 }
@@ -156,10 +230,20 @@ sub insert {
 #
 # initializeDatabase - private method
 #
-# Creates the tables and indexes necessary to store data for a GNN.
+# Creates the tables and indexes necessary to store data for a GNN.  If
+# none or not all of the expected tables exist then any existing data is
+# overwritten.
+#
+# Returns:
+#    1 if the database already exists, 0 otherwise
 #
 sub initializeDatabase {
     my $self = shift;
+
+    # If the database exists and is initialized then we do nothing
+    if ($self->isInitialized()) {
+        return 1;
+    }
 
     my @queryIndexCols = $self->initializeTable("query");
     my @neighborIndexCols = $self->initializeTable("neighbor");
@@ -175,9 +259,37 @@ sub initializeDatabase {
             my $indexName = "${tableName}_$col";
             my $sql = "CREATE INDEX $indexName ON $tableName ($col)";
             $self->{dbh}->do($sql);
-            $self->{dbh}->commit;
+            $self->{dbh}->commit();
         }
     }
+
+    return 0;
+}
+
+
+#
+# isInitialized - private method
+#
+# Checks if all of the expected tables are present in the database
+# file if it already exists.
+#
+# Returns:
+#    1 if the database is initialized, 0 if any of the tables are missing
+#
+sub isInitialized {
+    my $self = shift;
+
+    my @expectedTables = ("query", "neighbor");
+    foreach my $table (@expectedTables) {
+        my $sql = "SELECT name FROM sqlite_master WHERE type = 'table' AND name = '$table'";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute();
+        if (not $sth->fetchrow_hashref()) {
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 
@@ -215,13 +327,17 @@ sub initializeTable {
         push @cols, $spec;
     }
 
+    # Drop the table if the database is partially initialized or is out of date
+    $self->{dbh}->do("DROP TABLE IF EXISTS $tableName");
+    $self->commit();
+
     my $cols = join(", ", @cols);
     my $pk = join(", ", @pk);
     $cols .= " PRIMARY KEY ($pk)" if $pk;
     my $sql = "CREATE TABLE $tableName ($cols)";
 
     $self->{dbh}->do($sql);
-    $self->{dbh}->commit;
+    $self->{dbh}->commit();
 
     return @indexCols;
 }
@@ -257,6 +373,7 @@ sub getQuerySchema {
         {name => "desc", type => "TEXT"}, # SwissProt or sequence description from UniProt DB
         {name => "family_desc", type => "TEXT"}, # Pfam long name
         {name => "ipro_family_desc", type => "TEXT"}, # InterPro long name
+        {name => "cluster_num", type => "INT"}, # cluster number that this query belongs to
     ];
 }
 
@@ -327,11 +444,13 @@ the GNT pipeline
     my $dbFile = "gnn_db.sqlite";
     my $gnnDb = new EFI::GNT::GNN::Database(db_file => $dbFile);
 
+    # Perform $gnn computations and save data
     my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap);
-    # Perform $gnn computations
     $gnnDb->save($gnn);
 
-    #TODO: example of future script that uses the gnn db
+    # Load an existing GNN database
+    $gnnDb = new EFI::GNT::GNN::Database(db_file => $dbFile);
+    my $clusterData = $gndDb->getClusterData();
 
 
 =head2 DESCRIPTION
@@ -349,7 +468,9 @@ retrieved.
 =head3 C<new(db_file => $dbFile)>
 
 Creates a new B<EFI::GNT::GNN::Database> module.  The database is initialized
-if not already created.
+if not already created.  If the database already exists then the schema is
+valid (verifies that the expected tables are present), and if it is not
+valid then the database is reinitialized.
 
 =head4 Parameters
 
@@ -387,6 +508,37 @@ is obtained and stored.
 =head4 Example Usage
 
     $gnnDb->save($gnn);
+
+
+=head3 C<getClusterData()>
+
+Retrieves the cluster data from the database tables.  Returns a data structure
+that is similar to the one that is passed from B<EFI::GNT::GNN>.  This method
+requires knowledge of the schema and is not general purpose for accessing GNN
+data.
+
+=head4 Returns
+
+Hash ref mapping cluster numbers to lists of query sequences, with each query
+sequence containing metadata and lists of neighbors.
+
+=head4 Example Usage
+
+    my $clusterData = $gnnDb->getClusterData();
+    print Dumper($clusterData);
+
+    # The output will be the following hash ref:
+    # {
+    #     cluster_number => [
+    #         query_hash_ref,
+    #         query_hash_ref,
+    #         ...
+    #     ]
+    # }
+    #
+    # The elements in the cluster_number array are hash refs that come from
+    # the 'findNeighbors()' method in the EFI::GNT::Neighborhood module.
+    # See that module for details on the structure.
 
 
 =head2 SCHEMA
