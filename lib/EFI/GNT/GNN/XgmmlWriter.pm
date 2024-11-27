@@ -50,10 +50,30 @@ sub close {
 sub writeField {
     my $self = shift;
     my $field = shift;
-    $self->{writer}->emptyTag("att", %$field);
+
+    return if not $field->{type} or not $field->{name} or not $field->{value};
+
+    if (ref $field->{value} eq "ARRAY") {
+        $self->writeListField($field);
+    } else {
+        $self->{writer}->emptyTag("att", %$field);
+    }
 }
 
 
+#
+# writeListField - private method
+#
+# Writes a list field, which is an 'att' tag with nested 'att' tags for each
+# element in the list
+#
+# Parameters:
+#    $field - field data (type, name, value)
+#    $sortValues -
+#        Optional parameter; if specified and non-zero then the values are sorted before being
+#        written to the file as a series of C<att> tags.  A default perl C<sort> is performed
+#        without checking for numeric or string types.
+#
 sub writeListField {
     my $self = shift;
     my $field = shift;
@@ -100,6 +120,30 @@ sub emptyTag {
 }
 
 
+sub writeEdge {
+    my $self = shift;
+    my $source = shift;
+    my $target = shift;
+    $self->startTag("edge", label => "$source to $target", source => $source, target => $target);
+}
+
+
+sub writeNode {
+    my $self = shift;
+    my $nodeId = shift;
+    my $nodeLabel = shift;
+    my $attr = shift || [];
+
+    $self->startTag("node", id => $nodeId, label => $nodeLabel);
+
+    foreach my $field (@$attr) {
+        $self->writeField($field);
+    }
+
+    $self->endTag("node");
+}
+
+
 1;
 __END__
 
@@ -115,15 +159,17 @@ EFI::GNT::GNN::XgmmlWriter - Perl interface for writing XGMML files for various 
 
     use EFI::GNT::GNN::XgmmlWriter::PfamHub; # or ClusterHub
 
-    my $xwriter = EFI::GNT::GNN::XgmmlWriter::PfamHub->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::GNT::GNN::XgmmlWriter::PfamHub->new(gnn_file => $gnnFile, gnt_anno => $gntAnno);
     $xwriter->open();
 
-    $xwriter->startTag("test", attr => "value");
-    $xwriter->writeField(att_field => "value", type => "string");
-    $xwriter->writeListField({name => "att_name", type => "string", value => ["1", "2", "3"]}, 0);
+    $xwriter->startTag("test", "attr_name" => "value");
+    $xwriter->writeField({name => "att_field", "value" => "value", type => "string"});
     $xwriter->endTag();
 
-    $xwriter->emptyTag("test_empty", attr => "value");
+    # Writes a list field
+    $xwriter->startTag("test_list", "attr_name" => "value");
+    $xwriter->writeField({name => "att_name", type => "string", value => ["1", "2", "3"]});
+    $xwriter->endTag();
 
     $xwriter->close();
 
@@ -136,7 +182,7 @@ writing methods.
 
 =head2 METHODS
 
-=head3 new(output_file => $outputFile)
+=head3 C<new(output_file => $outputFile)>
 
 Creates a new C<EFI::GNT::GNN::XgmmlWriter> object.  Called from sub classes.
 
@@ -157,7 +203,7 @@ Path to a file in XGMML format that is to be created.
     my $xwriter = EFI::GNT::GNN::XgmmlWriter::ClusterHub->new(output_file => $outputFile);
 
 
-=head3 open()
+=head3 C<open()>
 
 Opens the XGMML file for writing.
 
@@ -170,7 +216,7 @@ Opens the XGMML file for writing.
     $xwriter->open();
 
 
-=head3 close()
+=head3 C<close()>
 
 Finishes writing the XGMML file and closes the file handle.
 
@@ -183,7 +229,7 @@ Finishes writing the XGMML file and closes the file handle.
     $xwriter->close();
 
 
-=head3 emptyTag($tagName, %attrs)
+=head3 C<emptyTag($tagName, %attrs)>
 
 Writes an empty tag with the specified attributes in key-value format.
 An empty tag is a tag without a termination element (e.g. C<E<lt>elem/E<gt>>).
@@ -209,7 +255,7 @@ Key-values pairs of attributes of the element
     # renders as:   <elem key1="value1" key2="value2" />
 
 
-=head3 startTag($tagName, %attrs)
+=head3 C<startTag($tagName, %attrs)>
 
 Writes a start XML tag with the tag name and attributes to the XGMML file.
 
@@ -234,7 +280,7 @@ Key-values pairs of attributes of the element
     # renders as:   <elem key1="value1" key2="value2">
 
 
-=head3 endTag($tagName)
+=head3 C<endTag($tagName)>
 
 Writes an end XML tag with the tag name.
 
@@ -254,11 +300,13 @@ Name of the element tag
     # renders as:   </elem>
 
 
-=head3 writeField($fieldData)
+=head3 C<writeField($fieldData)>
 
 Writes the given field data to the file as XML tags in the XGMML C<att> format. Field
 data is given as a hash ref with three key-value pairs: C<name>, C<value>, and C<type>.
-C<type> is one of B<string, real, integer>.
+C<type> is one of B<string, real, integer>.  If the C<value> is an array ref then the
+output is an 'att' list field which is a nested list of 'att' tags, each corresponding
+to an element in the input list.  If the input is invalid then nothing is written.
 
 =head4 Parameters
 
@@ -267,7 +315,7 @@ C<type> is one of B<string, real, integer>.
 =item C<$field>
 
 Hash ref containing data to write.  Three key-values are expected: C<name>, C<value>,
-and C<type>.
+and C<type>.  C<value> can be an array ref.
 
 =back
 
@@ -281,49 +329,81 @@ and C<type>.
     $xwriter->writeField($field);
     # renders as:   <att name="field_name" value="2.0" type="real" />
 
+    my $field = {name => "field_name", value => ["value3", "value2", "value1"], type => "string"};
+    $xwriter->writeField($field);
+    # renders as:
+    # <att name="field_name" type="list">
+    #   <att name="field_name" value="value3" type="string" />
+    #   <att name="field_name" value="value2" type="string" />
+    #   <att name="field_name" value="value1" type="string" />
+    # </att>
 
-=head3 writeListField($fieldData, $sortValues)
 
-Writes the given field data to the file as XML tags in the nested XGMML C<att> list format.
-Field data is given as a hash ref with three key-value pairs: C<name>, C<value>, and C<type>.
-C<type> is one of B<string, real, integer>.  The C<value> value is an array ref.
+=head3 C<writeNode($nodeId, $labelId, $attr)>
+
+Writes a node start-end tag pair with the given ID and label parameters as
+well as attributes of the node in the form of nested C<att> tags.
 
 =head4 Parameters
 
 =over
 
-=item C<$fieldData>
+=item C<$nodeId>
 
-Hash ref containing data to write.  Three key-values are expected: C<name>, C<value>,
-and C<type>.  C<value> must be an array ref.
+The node ID (C<id> attribute in the tag)
 
-=item C<$sortValues>
+=item C<$labelId>
 
-Optional parameter; if specified and non-zero then the values are sorted before being
-written to the file as a series of C<att> tags.  A default perl C<sort> is performed
-without checking for numeric or string types.
+Node label value (C<label> attribute in the tag)
+
+=item C<$attr>
+
+Array ref of node attributes to be written as nested C<att> tags
 
 =back
 
 =head4 Example Usage
 
-    my $field = {name => "field_name", value => ["value3", "value2", "value1"], type => "string"};
-    $xwriter->writeListField($field);
-    # renders as:
-    # <att name="field_name" type="list">
-    #   <att name="field_name" value="value3" type="string" />
-    #   <att name="field_name" value="value2" type="string" />
-    #   <att name="field_name" value="value1" type="string" />
-    # </att>
+    my @fields = ({name => "field_name1", value => "field_value", type => "string"},
+                  {name => "field_name2", value => "2.0", type => "real"},
+                  {name => "field_name3", value => ["value3", "value2", "value1"], type => "string"});
+    $xwriter->writeNode("node_id", "node_label", \@fields);
 
-    my $field = {name => "field_name", value => ["value3", "value2", "value1"], type => "string"};
-    $xwriter->writeListField($field);
     # renders as:
-    # <att name="field_name" type="list">
-    #   <att name="field_name" value="value1" type="string" />
-    #   <att name="field_name" value="value2" type="string" />
-    #   <att name="field_name" value="value3" type="string" />
-    # </att>
+    # <node id="node_id" label="node_label">
+    #   <att name="field_name1" value="field_value" type="string" />
+    #   <att name="field_name2" value="2.0" type="real" />
+    #   <att name="field_name3" type="list">
+    #     <att name="field_name3" value="value3" type="string" />
+    #     <att name="field_name3" value="value2" type="string" />
+    #     <att name="field_name3" value="value1" type="string" />
+    #   </att>
+    # </node>
+
+
+=head3 C<writeEdge($sourceNodeId, $targetNodeId)>
+
+Writes an edge to the file.
+
+=head4 Parameters
+
+=over
+
+=item C<$sourceNodeId>
+
+The source node ID
+
+=item C<$targetNodeId>
+
+The target node Id
+
+=back
+
+=head4 Example Usage
+
+    $xwriter->writeEdge("cluster_id", "pfam_id", "cluster_id to pfam_id");
+    # renders as:
+    #   <edge source="cluster_id" target="pfam_id" label="cluster_id to pfam_id" />
 
 
 =cut
