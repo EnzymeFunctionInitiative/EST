@@ -50,7 +50,8 @@ sub findNeighbors {
     my $neighborsWithoutFamily = {};
 
     # Get information for the query accession
-    my ($error, $pos, $queryData) = $self->processQuery($queryId, $neighborhoodSize);
+    my ($error, $pos, $queryAttributes) = $self->processQuery($queryId, $neighborhoodSize);
+    my $queryData = {attributes => $queryAttributes, neighbors => []};
 
     # ID doesn't exist in the ENA database
     if ($error and not $pos and not $queryData) {
@@ -61,9 +62,10 @@ sub findNeighbors {
     # Get statement handle, already executed, but nothing has been fetched
     my $rows = $self->initializeNeighborQuery($queryData->{attributes}, $pos, $neighborhoodSize);
 
-    # Check if there are actually any neighbors
+    # Check if there are actually any neighbors; number of rows will be 1
+    # to account for the query sequence
     my $warnings = "";
-    if ($rows->rows == 0) {
+    if ($rows->rows < 2) {
         $warnings = "$queryId has no neighbors";
     }
     $warnings = "$error\n$warnings" if ($error and $warnings);
@@ -116,10 +118,7 @@ sub processQuery {
     my $pos = $self->getQueryPositionData($neighborhoodSize, $row);
     my $attributes = $self->createAccessionData($queryAccession, $row, $pos);
 
-    $data->{attributes} = $attributes;
-    $data->{neighbors} = [];
-
-    return undef, $pos, $data;
+    return undef, $pos, $attributes;
 }
 
 

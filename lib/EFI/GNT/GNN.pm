@@ -25,8 +25,7 @@ sub new {
 
     $self->{dbh} = $args{dbh} || die "Require dbh EFI::Database argument" if not $args{dbh};
     $self->{network} = $args{seq_cluster_id_map} || die "Require seq_cluster_id_map argument";
-
-    $self->{incfrac} = 1; #TODO
+    $self->{gnt_anno} = $args{gnt_anno} || die "Require gnt_anno EFI::GNT::Annotations argument";
 
     if ($args{neighborhood_size} and $args{neighborhood_size} > MAX_NB_SIZE) {
         $self->{neighborhood_size} = $args{neighborhood_size};
@@ -43,33 +42,13 @@ sub new {
     $self->{nb_warnings} = [];
     $self->{warnings} = [];
 
-    $self->{gnt_anno} = new EFI::GNT::Annotations(dbh => $self->{dbh});
     $self->{efi_anno} = new EFI::Annotations;
 
     return $self;
 }
 
 
-# public
-sub getNeighborhoodWarnings {
-    my $self = shift;
-    return $self->{nb_warnings};
-}
-
-
-sub computeNeighborhoods {
-    my $self = shift;
-
-    $self->retrieveClusterHubData();
-}
-
-
-#
-# retrieveClusterHubData - private method
-#
-# Retrieves the neighbors and annotations for all of the sequences in the input cluster.
-#
-sub retrieveClusterHubData {
+sub retrieveClusterData {
     my $self = shift;
 
     my @clusterIds = sort { $b <=> $a } keys %{ $self->{network} }; # descending
@@ -146,32 +125,30 @@ sub getSequenceIds {
 }
 
 
-# private
+#
+# addWarning - private method
+#
+# Adds a warning (such as missing metadata or neighborhood) to the internal
+# warnings list.
+#
 sub addWarning {
     my $self = shift;
     push @{ $self->{warnings} }, @_;
 }
 
 
-# public
 sub getWarnings {
     my $self = shift;
     return @{ $self->{warnings} };
 }
 
 
-# public, but shouldn't be documented in POD because it is internal to the
-# app ecosystem
-sub getRawClusterData {
+# public, but the behavior shouldn't be extensively documented in POD
+# because it is internal to the app ecosystem
+sub getClusterData {
     my $self = shift;
     return $self->{cluster_data};
 }
-
-
-
-
-
-
 
 
 1;
@@ -187,62 +164,52 @@ EFI::GNT::GNN - Perl module for creating genome neighborhood networks
 
 =head2 SYNOPSIS
 
-    #new idea:
-
-    my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap);
-    $gnn->computeNeighborhoods();
-    $gnn->saveData($dbFile);
-    # saves raw cluster data and computed pfam hubs to a serializable file
-    # separate scripts for each step:
-    #    save pfam centric
-    #    save cluster centric
-    #    save pfam nb tables
-    #    save other tables
-    #    compute gnds from original data
-
-    # previous idea:
-    use EFI::GNT::GNN;
-
     my $idMap = {}; # mapping of clusters (numbered by sequences) to IDs in the cluster
     my $dbh = EFI::Database->new()->getHandle();
+    my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 
-    my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap);
+    my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno);
+    $gnn->retrieveClusterData();
 
-    $gnn->computeNeighborhoods();
+    # Save the raw GNN data to a database that can be used by additional scripts
+    my $gnnDb = new EFI::GNT::GNN::Database(db_file => $gnnDbFile);
+    $gnnDb->save($gnn);
 
-    my $pfamWriter = new EFI::GNT::GNN::XgmmlWriter::PfamCentric(file => $pfamGnnFile);
-    $pfamWriter->saveGnn($gnn);
+    # Compute the family hub data that is used to generate the Pfam and cluster
+    # hub GNNs
+    my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => 0.20);
 
-    my $clusterWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterCentric(file => $clusterGnnFile);
-    $clusterWriter->saveGnn($gnn);
+    # Save the GNN xgmml files
+    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(gnn_file => $pfamGnnFile, gnt_anno => $gntAnno);
+    $pfamHubWriter->write($hubs);
+    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
+    $clusterHubWriter->write($hubs);
 
-    my $pfamWriter = new EFI::GNT::GNN::TableWriter::PfamNeighborhoods(output_dir => $pfamNbDataDir);
-    $pfamWriter->saveTables($gnn);
+    my $tables = new EFI::GNT::GNN::TableWriter(); 
+    $tables->loadFromGnn($gnn);
+    $tables->savePfamNeighborhoods($pfamNeighborOutputDir);
+    $tables->saveUnclassifiedIds($unclassifiedIdsDir);
+    $tables->saveStatistics($statsFile);
+    $tables->saveConvergenceRatio($convRatioFile);
+    $tables->savePfamCoocurrence($pfamCoocFile);
 
-    my $unclassifiedWriter = new EFI::GNT::GNN::TableWriter::UnclassifiedIds(output_dir => $unclassifiedDir);
-    $unclassifiedWriter->saveTables($gnn);
-
-    my $statsWriter = new EFI::GNT::GNN::TableWriter::Statistics(file => $statsFile);
-    $statsWriter->saveTable($gnn);
-
-    my $crWriter = new EFI::GNT::GNN::TableWriter::ConvergenceRatio(file => $convRatioFile);
-    $crWriter->saveTable($gnn);
-
-    my $coocWriter = new EFI::GNT::GNT::TableWriter::PfamCoocurrence(file => $pfamCoocFile);
-    $coocWriter->saveTable($gnn);
+    my $gnd = new EFI::GNT::GNN::GND(dbh => $dbh);
+    $gnd->convertFromGnn($gnn);
+    $gnd->save($gndFile);
 
 
 =head2 DESCRIPTION
 
-EFI::GNT::Annotations is a Perl module for retrieving metadata annotations from
-the EFI database.  Metadata retrieved are the organism, taxonomy ID, annotation
-status (e.g. TrEMBL or SwissProt), and SwissProt description.
+B<EFI::GNT::GNN> is a Perl module for retrieving and computing genome neighborhood
+network data such as query sequence neighborhoods and computing clusters by
+family (in contrast to the cluster-centric view provided by SSNs).
+
 
 =head2 METHODS
 
-=head3 C<new(dbh => $dbh)>
+=head3 C<new(dbh => $dbh, seq_cluster_id_map => $idMap)>
 
-Creates a new C<EFI::GNT::Annotations> object.
+Creates a new C<EFI::GNT::GNN> object.
 
 =head4 Parameters
 
@@ -250,66 +217,62 @@ Creates a new C<EFI::GNT::Annotations> object.
 
 =item C<dbh>
 
-Database handle that comes from C<EFI::Database>.
+Perl DBI database handle, typically generated by C<EFI::Database>.
+
+=item C<seq_cluster_id_map>
+
+Hash ref that corresponds to the C<cluster_id_map.txt> file generated by the
+B<Color SSN> (C<pipelines/shared/nextflow/color_workflow.nf>) pipeline.  Each
+key of the hash ref corresponds to a cluster number and the value is an array
+ref of sequence IDs.  The input can be clusters numbered by cluster node size
+or cluster sequence size but is typically numbered by sequence not node.
+The data for this structure should come from the B<parse_cluster_map_file>
+function in the B<EFI::SSN::Util::ID> module.
 
 =back
 
 =head4 Example Usage
 
-    my $annoUtil = new EFI::GNT::Annotations(dbh => $dbh);
+    my $idMap = {1 => ["ID1", "ID2", "ID3"], 2 => [...], ...};
+    my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap);
 
 
-=head3 C<getAnnotations($id, $pfamFamilies, $interproFamilies)>
+=head3 C<retrieveClusterData()>
 
-Retrieves the annotations for the sequence ID C<$id>.
+Retrieves the neighbors for each query in each cluster as well as metadata
+for each query and neighbor and stores the data internally rather than
+returning to the user.  Metadata that is computed includes genome position,
+taxonomic identifier, family names, etc.
 
-=head4 Parameters
+=head4 Example Usage
 
-=over
+    $gnn->retrieveClusterData();
 
-=item C<$id>
 
-Sequence ID to retrieve metadata for.
+=head3 C<getWarnings()>
 
-=item C<$pfamFamilies>
-
-Hyphen-separated list of Pfam families associated with the sequence.
-
-=item C<$interproFamilies>
-
-Hyphen-separated list of InterPro families associated with the sequence.
-
-=back
+Returns a list of warnings that were generated when retrieving the
+cluster data.  Warnings include missing metadata and sequences without
+neighborhoods.
 
 =head4 Returns
 
-A hash ref with the keys pointing to metadata values:
-
-    {
-        organism => "organism",
-
-        # NCBI taxonomy ID
-        taxonomy_id => 1,
-
-        # 1 for swissprot, 0 otherwise
-        status => 1,
-
-        desc => "SwissProt description",
-
-        # description for each Pfam family
-        pfam_desc => "Pfam descriptions",
-
-        # description for each InterPro family
-        interpro_desc => "InterPro descriptions"
-    }
+An array ref of strings
 
 =head4 Example Usage
 
-    my $annoData = $annoUtil->getAnnotations($id, $pfamFamilies, $interproFamilies);
-    foreach my $annoKey (keys %$annoData) {
-        print "$annoKey: $annoData->{$annoKey}\n";
+    my $warnings = $gnn->getWarnings();
+    foreach my $warning (@$warnings) {
+        print "WARNING: $warning\n";
     }
 
-=cut
 
+=head3 C<getClusterData()>
+
+WARNING: this is to be used by the family of B<EFI::GNT::GNN*> modules
+only.  This method returns the raw cluster data that is used to
+generate neighborhood diagrams (GNDs) and family/cluster hubs.
+
+
+=cut
 
