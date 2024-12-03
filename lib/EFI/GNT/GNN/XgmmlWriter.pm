@@ -153,7 +153,7 @@ __END__
 
 =head2 NAME
 
-EFI::GNT::GNN::XgmmlWriter - Perl interface for writing XGMML files for various GNN types.
+B<EFI::GNT::GNN::XgmmlWriter> - Perl interface for writing XGMML files for various GNN types.
 
 =head2 SYNOPSIS
 
@@ -171,12 +171,16 @@ EFI::GNT::GNN::XgmmlWriter - Perl interface for writing XGMML files for various 
     $xwriter->writeField({name => "att_name", type => "string", value => ["1", "2", "3"]});
     $xwriter->endTag();
 
+    $xwriter->writeNode("node1", "Node 1", [{name => "att_field", "value" => "value", type => "string"}]);
+    $xwriter->writeNode("node2", "Node 2", [{name => "att_field", "value" => "value", type => "string"}]);
+    $xwriter->writeEdge("node1", "node2");
+
     $xwriter->close();
 
 
 =head2 DESCRIPTION
 
-EFI::GNT::GNN::XgmmlWriter is a Perl interface providing standard API to facilitate writing of
+B<EFI::GNT::GNN::XgmmlWriter> is a Perl interface providing standard API to facilitate writing of
 various GNN files in XGMML format.  It provides low-level XML tag access as well as XGMML-specific
 writing methods.
 
@@ -184,7 +188,7 @@ writing methods.
 
 =head3 C<new(output_file => $outputFile)>
 
-Creates a new C<EFI::GNT::GNN::XgmmlWriter> object.  Called from sub classes.
+Creates a new B<EFI::GNT::GNN::XgmmlWriter> object.  Should only be called from sub classes.
 
 =head4 Parameters
 
@@ -358,7 +362,8 @@ Node label value (C<label> attribute in the tag)
 
 =item C<$attr>
 
-Array ref of node attributes to be written as nested C<att> tags
+Array ref of node attributes to be written as nested C<att> tags.  See B<writeField>
+for the expected structure of this array ref.
 
 =back
 
