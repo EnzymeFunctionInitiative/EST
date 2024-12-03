@@ -13,8 +13,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../";
 
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:color);
-
-
+use EFI::Util::Colors;
 
 
 sub new {
@@ -24,6 +23,7 @@ sub new {
     bless($self, $class);
 
     $self->{output_file} = $args{output_file};
+    $self->{colors} = new EFI::Util::Colors;
 
     return $self;
 }

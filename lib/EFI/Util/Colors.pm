@@ -1,17 +1,26 @@
 
-package EFI::SSN::Util::Colors;
+package EFI::Util::Colors;
 
 use strict;
 use warnings;
+
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
 
 
 sub new {
     my ($class, %args) = @_;
 
+    my $colorFile = $args{color_file};
+    if (not $colorFile or not -f $colorFile) {
+        $colorFile = dirname(abs_path(__FILE__)) . "/../../assets/colors.tab";
+    }
+
     my $self = {colors => {}, default_color => "#6495ED"};
+    $self->{color_file} = $colorFile;
     bless($self, $class);
 
-    $self->parseColorFile($args{color_file});
+    $self->parseColorFile($self->{color_file});
 
     return $self;
 }

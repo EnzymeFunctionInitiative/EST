@@ -90,7 +90,7 @@ sub insertAnnotationData {
     my $data = shift;
     my $sortKey = shift;
 
-    my $anno = $self->{gnt_anno}->getAnnotations($data);
+    my $anno = $self->{gnt_anno}->getGnnIdAnnotations($data);
     $data->{attributes}->{sort_order} = $sortKey;
     $data->{attributes}->{organism} = $anno->{organism};
     $data->{attributes}->{taxon_id} = $anno->{taxonomy_id};
@@ -100,7 +100,7 @@ sub insertAnnotationData {
     $data->{attributes}->{ipro_family_desc} = $anno->{interpro_desc};
 
     foreach my $nbObj (@{ $data->{neighbors} }) {
-        my $nbAnno = $self->{gnt_anno}->getAnnotations($nbObj);
+        my $nbAnno = $self->{gnt_anno}->getGnnIdAnnotations($nbObj);
         $nbObj->{taxon_id} = $nbAnno->{taxonomy_id};
         $nbObj->{anno_status} = $nbAnno->{status};
         $nbObj->{desc} = $nbAnno->{desc};

@@ -10,7 +10,7 @@ use lib "$FindBin::Bin/../../../lib";
 use EFI::Options;
 use EFI::SSN::XgmmlWriter;
 use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
-use EFI::SSN::Util::Colors;
+use EFI::Util::Colors;
 use EFI::SSN::Util::ID qw(get_cluster_num_cols);
 
 
