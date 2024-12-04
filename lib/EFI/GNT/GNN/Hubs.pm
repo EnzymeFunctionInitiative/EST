@@ -150,13 +150,13 @@ sub makeHubData {
 
     my $data = {
         num_ids_with_neighbors  => $numIdsWithNeighbors, #NOTE old 'withneighbors'
-        num_ids_in_pfam         => $numIdsInPfam, #NOTE old 'orig'
+        num_query_ids_in_pfam   => $numIdsInPfam, #NOTE old 'orig'
         num_cluster_ids         => $numClusterIds,
         cooccurrence            => $cooccurrence,
         cooccurrence_ratio      => $coocRatio,
         num_neighbors           => $numNeighbors,
         arrangement             => $pfamHub->{genome_arrangement}, #NOTE old 'dist'
-        ids_in_pfam             => $pfamHub->{query_ids}, #NOTE old 'orig'
+        query_ids_in_pfam       => $pfamHub->{query_ids}, #NOTE old 'orig'
         neighbors               => $pfamHub->{neighbors}, #NOTE old 'neighlist'
         neighbors_query         => $pfamHub->{neighbors_query}, #NOTE old 'neigh'
         average_distance        => sprintf("%.2f", $averageDist),

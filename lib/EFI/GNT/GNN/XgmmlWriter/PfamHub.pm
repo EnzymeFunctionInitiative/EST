@@ -93,25 +93,25 @@ sub getSpokeData {
     }
 
     my @fields;
-    push @fields, {name => "Pfam",                                          value => "",                                type => "string"};
-    push @fields, {name => "Pfam Description",                              value => "",                                type => "string"};
-    push @fields, {name => "Cluster Number",                                value => $clusterNum,                       type => "integer"};
-    push @fields, {name => "# of Sequences in SSN Cluster",                 value => $spoke->{num_cluster_ids},         type => "integer"};
-    push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $spoke->{num_ids_in_pfam},         type => "integer"};
-    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_ids_with_neighbors},  type => "integer"};
-    push @fields, {name => "# of Pfam Neighbors",                           value => $spoke->{num_neighbors},           type => "integer"};
-    push @fields, {name => "Query Accessions",                              value => $spoke->{ids_in_pfam},             type => "string"};
-    push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,               type => "string"};
-    push @fields, {name => "Query-Neighbor Arrangement",                    value => $spoke->{arrangement},             type => "string"};
-    push @fields, {name => "Average Distance",                              value => $spoke->{average_distance},        type => "real"};
-    push @fields, {name => "Median Distance",                               value => $spoke->{median_distance},         type => "real"};
-    push @fields, {name => "Co-occurrence",                                 value => $spoke->{cooccurrence},            type => "real"};
-    push @fields, {name => "Co-occurrence Ratio",                           value => $spoke->{cooccurrence_ratio},      type => "string"};
-    push @fields, {name => "Hub Average and Median Distances",              value => [],                                type => "string"};
-    push @fields, {name => "Hub Co-occurrence and Ratio",                   value => [],                                type => "string"};
-    push @fields, {name => "node.fillColor",                                value => $color,                            type => "string"};
-    push @fields, {name => "node.shape",                                    value => $shape,                            type => "string"};
-    push @fields, {name => "node.size",                                     value => $nodeSize,                         type => "string"};
+    push @fields, {name => "Pfam",                                          value => "",                                        type => "string"};
+    push @fields, {name => "Pfam Description",                              value => "",                                        type => "string"};
+    push @fields, {name => "Cluster Number",                                value => $clusterNum,                               type => "integer"};
+    push @fields, {name => "# of Sequences in SSN Cluster",                 value => $spoke->{num_cluster_ids},                 type => "integer"};
+    push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $spoke->{num_query_ids_in_pfam},           type => "integer"};
+    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_query_ids_with_neighbors},    type => "integer"};
+    push @fields, {name => "# of Pfam Neighbors",                           value => $spoke->{num_neighbors},                   type => "integer"};
+    push @fields, {name => "Query Accessions",                              value => $spoke->{query_ids_in_pfam},               type => "string"};
+    push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,                       type => "string"};
+    push @fields, {name => "Query-Neighbor Arrangement",                    value => $spoke->{arrangement},                     type => "string"};
+    push @fields, {name => "Average Distance",                              value => $spoke->{average_distance},                type => "real"};
+    push @fields, {name => "Median Distance",                               value => $spoke->{median_distance},                 type => "real"};
+    push @fields, {name => "Co-occurrence",                                 value => $spoke->{cooccurrence},                    type => "real"};
+    push @fields, {name => "Co-occurrence Ratio",                           value => $spoke->{cooccurrence_ratio},              type => "string"};
+    push @fields, {name => "Hub Average and Median Distances",              value => [],                                        type => "string"};
+    push @fields, {name => "Hub Co-occurrence and Ratio",                   value => [],                                        type => "string"};
+    push @fields, {name => "node.fillColor",                                value => $color,                                    type => "string"};
+    push @fields, {name => "node.shape",                                    value => $shape,                                    type => "string"};
+    push @fields, {name => "node.size",                                     value => $nodeSize,                                 type => "string"};
 
     return \@fields;
 }
@@ -145,7 +145,7 @@ sub getHubData {
     my $numClusterIds = sum( map { $hub->{$_}->{num_cluster_ids} } @clusterNums );
     my $numIdsWithNeighbors = sum( map { $hub->{$_}->{num_ids_with_neighbors} } @clusterNums );
     my $numNeighbors = sum( map { $hub->{$_}->{num_neighbors} } @clusterNums );
-    my $numQueryPfam = sum( map { $hub->{$_}->{num_ids_in_pfam} } @clusterNums );
+    my $numQueryPfam = sum( map { $hub->{$_}->{num_query_ids_in_pfam} } @clusterNums );
 
     my @arrangement = map { @{ $hub->{$_}->{arrangement} } } @clusterNums;
     my @queryNbList = map { @{ $hub->{$_}->{neighbors_query} } } @clusterNums;
