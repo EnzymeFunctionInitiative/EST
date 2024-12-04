@@ -31,25 +31,25 @@ sub write {
 
     my @pfamHubNames = $hubs->getPfamHubNames();
 
+    my $filterOnCooccurrence = 1;
     foreach my $pfamHubName (@pfamHubNames) {
-        my $hub = $hubs->getPfamHub($pfamHubName);
+        my $hub = $hubs->getPfamHub($pfamHubName, $filterOnCooccurrence);
+        my @clusterNums = sort keys %$hub;
 
-        foreach my $clusterNum (keys %$hub) {
+        foreach my $clusterNum (@clusterNums) {
             my $spokeNodeId = "$pfamHubName:$clusterNum";
             my @nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{$clusterNum});
-
-            #TODO: figure out where the threshold should go
-            # if (int($numWithNeighbors / $numQueryable * 100) / 100 >= $self->{incfrac}) {
-            # int($hub->{$clusterNum}->{num_ids_in_pfam} / $hub->{$clusterNum}->{num_ids_with_neighbors} * 100) / 100 >= ...
 
             $self->writeNode($spokeNodeId, "$clusterNum", \@nodeAttr);
             $self->writeEdge($pfamHubName, $spokeNodeId);
         }
 
-        my @nodeAttr = $self->getHubData($pfamHubName, $hub);
-        my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
-
-        $self->writeNode($pfamHubName, "$pfamShortName", \@nodeAttr);
+        # Only write a hub node if there were spoke nodes
+        if (@clusterNums) {
+            my @nodeAttr = $self->getHubData($pfamHubName, $hub);
+            my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
+            $self->writeNode($pfamHubName, "$pfamShortName", \@nodeAttr);
+        }
     }
 }
 

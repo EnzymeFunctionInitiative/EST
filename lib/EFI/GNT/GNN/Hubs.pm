@@ -101,11 +101,11 @@ sub computePfamHubs {
         # Clusters that are associated with this Pfam
         my $clusters = {};
 
+        # Compute the spoke (cluster) nodes that connect to the Pfam hub
         foreach my $clusterNum (@{ $pfams{$pfam} }) {
             my $pfamHub = $self->{cluster_pfam}->{$clusterNum}->{pfam}->{$pfam};
             my $data = $self->makeHubData($clusterNum, $pfamHub);
             $clusters->{$clusterNum} = $data;
-            #TODO: threshold in output, [if ($numIdsWithNeighbors > 1 and $cooccurrence >= $self->{cooc_threshold}) {]
         }
 
         $self->{pfam_hubs}->{$pfam} = $clusters;
@@ -187,11 +187,11 @@ sub computeClusterHubs {
         # Pfams that are associated with this cluster
         my $pfams = {};
 
+        # Compute the spoke (Pfam) nodes that connect to the cluster hub
         foreach my $pfam (sort keys %{ $self->{cluster_pfam}->{$clusterNum}->{pfam} }) {
             my $pfamHub = $self->{cluster_pfam}->{$clusterNum}->{pfam}->{$pfam};
             my $data = $self->makeHubData($clusterNum, $pfamHub, $numIdsWithNeighbors, $numClusterIds);
             $pfams->{$pfam} = $data;
-            #TODO: threshold in output if ($cooccurrence > $self->{cooc_threshold}) {
         }
 
         $self->{cluster_hubs}->{$clusterNum} = $pfams;
@@ -233,11 +233,22 @@ sub getClusterHubNumbers {
 sub getClusterHub {
     my $self = shift;
     my $clusterNum = shift;
-    my $allClusters = shift || 0;
+    my $filterSpokes = shift || 1;
 
     return {} if not $self->{cluster_hubs}->{$clusterNum};
 
-    my $data = $self->{cluster_hubs}->{$clusterNum}->{ $allClusters ? "clusters" : "all_clusters" };
+    my $hub = $self->{cluster_hubs}->{$clusterNum};
+    return $hub if not $filterSpokes;
+
+    my $filteredSpokes = {};
+
+    foreach my $pfam (keys %$hub) {
+        if ($hub->{$pfam}->{cooccurrence} >= $self->{cooc_threshold}) {
+            $filteredSpokes->{$pfam} = $hub->{$pfam};
+        }
+    }
+
+    return $filteredSpokes;
 }
 
 
@@ -252,7 +263,23 @@ sub getPfamHubNames {
 sub getPfamHub {
     my $self = shift;
     my $pfam = shift;
-    return $self->{pfam_hubs}->{$pfam} // {};
+    my $filterSpokes = shift || 1;
+
+    return {} if not $self->{pfam_hubs}->{$pfam};
+
+    my $hub = $self->{pfam_hubs}->{$pfam};
+    return $hub if not $filterSpokes;
+
+    my $filteredSpokes = {};
+
+    foreach my $clusterNum (keys %$hub) {
+        my $spoke = $hub->{$clusterNum};
+        if ($spoke->{num_ids_with_neighbors} > 1 and $spoke->{cooccurrence} >= $self->{cooc_threshold}) {
+            $filteredSpokes->{$clusterNum} = $spoke;
+        }
+    }
+
+    return $filteredSpokes;
 }
 
 
