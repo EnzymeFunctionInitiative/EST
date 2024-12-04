@@ -302,10 +302,16 @@ B<EFI::GNT::GNN::Hubs> - Perl helper module for computing Pfam and cluster GNN d
     $hubs->compute();
 
     my $clusterNums = $hubs->getClusterHubNumbers();
-    my $cluster1Hub = $hubs->getClusterHub($clusterNums[0]);
+    my $cluster1Spokes = $hubs->getClusterHub($clusterNums[0]);
+    foreach my $pfamHubName (keys %$cluster1Hub) {
+        print "Pfam hub $pfamHubName is in $clusterNums[0]\n";
+    }
     
     my $pfamHubNames = $hubs->getPfamHubNames();
     my $pfamHub = $hubs->getPfamHub($pfamHubNames[0]);
+    foreach my $clusterNum (keys %$pfamHub) {
+        print "Cluster number $clusterNum is in Pfam hub $pfamHubNames[0]\n";
+    }
 
 
 =head2 DESCRIPTION
@@ -332,8 +338,8 @@ A B<EFI::GNT::GNN> object.
 =over C<cooc_threshold>
 
 The cooccurrence threshold, used to determine if a cluster hub or Pfam hub should be
-included in the output network.  A numerical value > 0 and <= 1.  If not specified,
-defaults to C<0.20>.
+included in the output network.  A numerical value > C<0> and <= C<1>.
+If not specified, defaults to C<0.20>.
 
 =back
 
@@ -355,8 +361,8 @@ for computing is obtained from the C<gnn> parameter passed to the constructor.
 
 =head3 C<getClusterHubNumbers()>
 
-Returns the list of cluster hub numbers that are in the GNN.  These are
-the same as the cluster numbers in the input network.
+Returns all of the cluster numbers that are in the GNN; no filtering is done
+on cooccurrence.
 
 =head4 Returns
 
@@ -370,9 +376,11 @@ An array of numerical cluster numbers.
     }
 
 
-=head3 C<getClusterHub($clusterNum, $allClusters)>
+=head3 C<getClusterHub($clusterNum, $filterSpokes)>
 
-Returns cluster hub data for a given cluster number.
+Returns Pfam hubs for a given cluster number, optionally filtering out
+spoke nodes (Pfam hubs) that have a cooccurrence less than the threshold
+provided to C<new()>.
 
 =head4 Parameters
 
@@ -382,10 +390,11 @@ Returns cluster hub data for a given cluster number.
 
 Numerical cluster number.
 
-=item C<$allClusters>
+=item C<$filterSpokes>
 
-If specified and non-zero, then all clusters are returned, even those not meeting
-the cooccurrence threshold.  Defaults to 0.
+If specified and zero, then all clusters are returned, even those not meeting
+the cooccurrence threshold.  Optional, and defaults to 1 (filter according to
+cooccurrence threshold).
 
 =back
 
@@ -393,31 +402,80 @@ the cooccurrence threshold.  Defaults to 0.
 
 A hash ref pointing to an array of hash refs, each with data about a cluster hub.
 
-    [
-        {}
-        {}
-    ]
+    {
+        {
+            "pfam_a" => {
+                # Number of query IDs in the cluster that have neighbors with Pfams
+                num_query_ids_with_neighbors  => 2,
+
+                # Number of query IDs in the cluster that are in this cluster/Pfam hub ("pfam_a"); size of 'query_ids_in_pfam'
+                num_query_ids_in_pfam   => 1,
+
+                # Number of query IDs in the cluster
+                num_cluster_ids         => 1,
+
+                # Cooccurrence of Pfam in cluster
+                cooccurrence            => 0.4,
+
+                # Cooccurrence expressed in ratio form
+                cooccurrence_ratio      => "",
+
+                # Total number of neighbors in the cluster/Pfam
+                num_neighbors           => 1,
+
+                # Genome arrangement (direction and distance of neighbors from query IDs in the Pfam)
+                arrangement             => [],
+
+                # IDs in the cluster that are in this cluster/Pfam hub ("pfam_a")
+                query_ids_in_pfam       => [],
+
+                # IDs of neighbors of each query ID in this cluster/Pfam hub
+                neighbors               => [],
+
+                # IDs of neighbors of each query ID in this cluster/Pfam hub, prefixed with the query IDs in the cluster
+                neighbors_query         => [],
+
+                # Average distance of neighbors from query IDs in this cluster/Pfam hub
+                average_distance        => "3.00",
+
+                # Median distance of neighbors from query IDs in this cluster/Pfam hub
+                median_distance         => "2.00"
+            },
+            "pfam_b" => {
+                ...
+                cooccurrence            => 0.1,
+                ...
+            },
+            ...
+        }
+    }
 
 =head4 Example Usage
 
     my $data = $hubs->getClusterHub(1);
     foreach my $pfam (@$data) {
-        print "Pfam $pfam is in cluster 1 and meets the cooccurrence threshold of 0.20\n";
+        print "Pfam $pfam is in cluster 1 and meets the cooccurrence threshold\n";
     }
+    # Results in:
+    #   Pfam pfam_a is in cluster 1 and meets the cooccurrence threshold
 
-    my $data = $hubs->getClusterHub(1, 1);
+    my $data = $hubs->getClusterHub(1, 0);
     foreach my $pfam (@$data) {
-        print "Pfam $pfam is in cluster 1\n";
+        print "Pfam $pfam is in cluster 1 and may or may not meet the cooccurrence threshold\n";
     }
+    # Results in:
+    #   Pfam pfam_a is in cluster 1 and may or may not meet the cooccurrence threshold
+    #   Pfam pfam_b is in cluster 1 and may or may not meet the cooccurrence threshold
 
 
 =head3 C<getPfamHubNames()>
 
-Returns the list of Pfam hub names that are in the GNN.
+Returns all of the Pfam hub names that are in the GNN; no filtering is done
+on cooccurrence.
 
 =head4 Returns
 
-An array of Pfam hub IDs (can be dash-separated).
+An array of Pfam hub names (family IDs, can be hyphen-separated).
 
 =head4 Example Usage
 
@@ -427,17 +485,25 @@ An array of Pfam hub IDs (can be dash-separated).
     }
 
 
-=head3 C<getPfamHub($pfamName)>
+=head3 C<getPfamHub($pfamHubName, $filterSpokes)>
 
-Returns Pfam hub data for a given Pfam hub name.
+Returns clusters from the given Pfam hub name, optionally filtering out
+spoke nodes (clusters) that have a cooccurrence less than the threshold
+provided to C<new()>.
 
 =head4 Parameters
 
 =over
 
-=item C<$pfamName>
+=item C<$pfamHubName>
 
 Pfam hub name that is in the GNN.
+
+=item C<$filterSpokes>
+
+If specified and zero, then all clusters are returned, even those not meeting
+the cooccurrence threshold.  Optional, and defaults to 1 (filter according to
+cooccurrence threshold).
 
 =back
 
@@ -448,20 +514,225 @@ Pfam hub even those that do not meet the cooccurrence threshold, and one that
 only contains clusters in the Pfam hub that meet the cooccurrence threshold.
 
     {
-        pfams => [1, 3, ...],
-        all_pfams => [1, 2, 3, ...]
+        {
+            "1" => {
+                # Number of query IDs in the cluster that have neighbors with Pfams
+                num_query_ids_with_neighbors  => 2,
+
+                # Number of query IDs in the cluster that are in this cluster/Pfam hub ("pfam_a"); size of 'query_ids_in_pfam'
+                num_query_ids_in_pfam   => 1,
+
+                # Number of IDs in the cluster
+                num_cluster_ids         => 1,
+
+                # Cooccurrence of Pfam in cluster
+                cooccurrence            => 0.4,
+
+                # Cooccurrence expressed in ratio form
+                cooccurrence_ratio      => "",
+
+                # Total number of neighbors in the cluster/Pfam
+                num_neighbors           => 1,
+
+                # Genome arrangement (direction and distance of neighbors from query IDs in the Pfam)
+                arrangement             => [],
+
+                # Query IDs in the cluster that are in this cluster/Pfam hub ("pfam_a")
+                query_ids_in_pfam       => [],
+
+                # Query IDs of neighbors of each ID in this cluster/Pfam hub
+                neighbors               => [],
+
+                # IDs of neighbors of each query ID in this cluster/Pfam hub, prefixed with the query ID in the cluster
+                neighbors_query         => [],
+
+                # Average distance of neighbors from query IDs in this cluster/Pfam hub
+                average_distance        => "3.00",
+
+                # Median distance of neighbors from query IDs in this cluster/Pfam hub
+                median_distance         => "2.00"
+            },
+            "2" => {
+                ...
+                cooccurrence            => 0.1,
+                ...
+            },
+            ...
+        }
     }
 
 =head4 Example Usage
 
-    my $data = $hubs->getPfamHub("PF05544-PF01911");
-    foreach my $(@{ $data->{pfams} }) {
-        print "Pfam $pfam is in cluster 1 and meets the cooccurrence threshold of 0.20\n";
+    my $data = $hubs->getPfamHub("PF07478-PF1820");
+    foreach my $cluster (@$data) {
+        print "Cluster $cluster is in Pfam hub PF07478-PF1820 and meets the cooccurrence threshold\n";
     }
-    foreach my $pfam (@{ $data->{all_clusters} }) {
-        print "Pfam $pfam is in cluster 1\n";
-    }
+    # Results in:
+    #    Cluster 1 is in Pfam hub PF07478-PF1820 and meets the cooccurrence threshold
 
+    my $data = $hubs->getClusterHub(1, 0);
+    foreach my $pfam (@$data) {
+        print "Cluster $cluster is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold\n";
+    }
+    # Results in:
+    #    Cluster 1 is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold
+    #    Cluster 2 is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold
+
+
+
+=head2 GNN Concepts
+
+Genome neighborhood networks (GNNs) are generated from sequence similarity
+networks (SSNs) by creating networks that show the relationship between
+Pfams in sequences that are (genome) neighbors to sequences in SSN clusters.
+GNNs are displayed in a hub-spoke model, with each hub representing a Pfam
+or cluster (depending on the type of GNN) and each spoke representing
+the associated cluster (for Pfam hubs) or Pfam (for cluster hubs).
+
+                        ┌───┐             ┌───┐             
+                        │HHH│             │GGG│             
+         ┌───┐          └───┘             └───┘             
+         │AAA│            xx             xx                 
+         └───┘            xx            xx                  
+              xxx          xx         xxx                   
+                xxx        xx         x                     
+                  xxx ┌──────────────┐                      
+    ┌───┐             │              │           ┌───┐      
+    │BBB│             │              │  xxxxxxxxx│FFF│      
+    └───┘ xxxxxxxxxxx │              │xxx        └───┘      
+                      │  Cluster X   │                      
+                      │              │                      
+                      │              │                      
+                 xxxx │              │                      
+     ┌───┐    xxxx    └──────────────┘                      
+     │CCC│xxxx             x        xx                      
+     └───┘                xx         xxxx                   
+                          x             xxx                 
+                          x               x───┐             
+                         xx               │EEE│             
+                         x                └───┘             
+                     ┌───┐                                  
+                     │DDD│                                  
+                     └───┘                                  
+
+This figure represents a cluster-Pfam hub-spoke GNN, and in a Pfam-cluster
+hub-spoke GNN the hub node represents a Pfam and the spoke nodes represent
+clusters.  There will be many such hub-spoke models in a GNN.
+
+
+=head3 Terminology
+
+Terms that will be used throughout this document include:
+
+=over
+
+=item Cluster
+
+A cluster defined in the input SSN.
+
+=item Query ID
+
+A query ID is an ID from the original cluster as opposed to neighbor IDs
+which are not in the cluster.
+
+=item Pfam hub
+
+One or more Pfams that have been found in the neighbors; if more than one
+Pfam is identified in the neighboring sequences then the family identifiers
+are separated by hyphens (e.g. C<"PF07478-PF1820">).
+
+=item Cluster hub
+
+Represents a cluster from the original SSN.
+
+=item Hub node
+
+The central node in a hub-spoke model, representing either a Pfam hub or
+a cluster hub.
+
+=item Spoke node
+
+The nodes at the ends of the spokes connected to the hub node, representing
+either a Pfam hub or a cluster depending on the GNN.
+
+=item Pfam IDs
+
+The list of query IDs in the original cluster that are associated with a
+Pfam hub.  This is determined by grouping together all of the original
+query IDs by Pfam hubs determined by the neighboring sequences.
+
+=back
+
+
+=head3 Return Value Structure
+
+The return structure from C<getClusterHub()> and C<getPfamHub()> is quite large
+and is designed to be a summary of the spokes in each hub-spoke model.
+Some of the values are self-evident, while others require explanation.  The
+C<arrangement>, C<neighbors>, and C<neighbors_query> values are array refs
+with the same size.
+
+=over
+
+=item C<num_query_ids_with_neighbors>
+
+The number of query IDs in the Pfam hub that have neighbors.  This may be the
+same as C<num_query_ids_in_pfam> but typically is larger.
+
+=item C<num_query_ids_in_pfam>
+
+Number of query IDs in the cluster that are in the cluster/Pfam hub.
+
+=item C<num_cluster_ids>
+
+The number of query IDs in the SSN cluster that the Pfam hub belongs to.
+
+=item C<cooccurrence>
+
+The cooccurrence of the Pfam hub in the cluster (e.g. the number of query IDs
+in the Pfam in relation to the number of query IDs with neighbors); given as a
+number > C<0> and <= C<1.0>.
+
+=item C<cooccurrence_ratio>
+
+The cooccurrence expressed in ratio form (i.e.
+C<num_query_ids_in_pfam / num_query_ids_with_neighbors>) (e.g. C<"33/101">).
+
+=item C<arrangement>
+
+An array that contains the genome arrangement for each neighbor in the spoke.
+This is measured by the direction and distance of neighbors from query IDs in
+the cluster that are in the Pfam hub.  The format is
+C<ID:ID_direction:NEIGHBOR_ID:NEIGHBOR_direction:NEIGHBOR_distance>
+and an example is C<B0SS77:-1:B0SS79:1:2> or C<B0SS77:-1:B0SS75:-1:-2>.  The
+direction is negative if the gene is in complement form and positive if it is
+normal.  The distance is the distance in number of genes from the neighbor
+to the query ID.
+
+=item C<query_ids_in_pfam>
+
+An array ref containing a list of query IDs in the cluster-Pfam hub combination.
+
+=item C<neighbors>
+
+An array that contains the neighbor IDs.  For example, C<["B0SS75", "B0SS79"]>.
+
+=item C<neighbors_query>
+
+An array that contains the neighbor IDs prefixed with the query ID.
+For example, C<["B0SS77:B0SS75", "B0SS77:B0SS79"]>.
+
+=item C<average_distance>
+
+Average distance of neighbors from query IDs in this cluster/Pfam hub
+combination.  For the examples given above, this would be C<2.00>.
+
+=item C<median_distance>
+
+Median distance of neighbors from query IDs in this cluster/Pfam hub
+combination.  For the examples given above, this would be C<2.00>.
+
+=back
 
 =cut
 
