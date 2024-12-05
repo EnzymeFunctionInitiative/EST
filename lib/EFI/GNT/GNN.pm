@@ -4,8 +4,6 @@ package EFI::GNT::GNN;
 use strict;
 use warnings;
 
-use List::MoreUtils qw(uniq);
-
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
@@ -48,6 +46,7 @@ sub new {
 }
 
 
+# public
 sub retrieveClusterData {
     my $self = shift;
 
@@ -107,21 +106,6 @@ sub insertAnnotationData {
         $nbObj->{family_desc} = $nbAnno->{pfam_desc};
         $nbObj->{ipro_family_desc} = $nbAnno->{interpro_desc};
     }
-}
-
-
-# public
-sub getClusters {
-    my $self = shift;
-    return [ keys %{ $self->{network} } ];
-}
-
-
-# public
-sub getSequenceIds {
-    my $self = shift;
-    my $clusterNum = shift;
-    return $self->{network}->{$clusterNum} // [];
 }
 
 
@@ -185,8 +169,7 @@ B<EFI::GNT::GNN> - Perl module for creating genome neighborhood networks
     my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
     $clusterHubWriter->write($hubs);
 
-    my $tables = new EFI::GNT::GNN::TableWriter(); 
-    $tables->loadFromGnn($gnn);
+    my $tables = new EFI::GNT::GNN::TableWriter(gnn => $gnn, hubs => $hubs); 
     $tables->savePfamNeighborhoods($pfamNeighborOutputDir);
     $tables->saveUnclassifiedIds($unclassifiedIdsDir);
     $tables->saveStatistics($statsFile);

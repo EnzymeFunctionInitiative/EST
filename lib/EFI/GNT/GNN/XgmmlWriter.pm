@@ -23,7 +23,7 @@ sub new {
     bless($self, $class);
 
     $self->{output_file} = $args{output_file};
-    $self->{colors} = new EFI::Util::Colors;
+    $self->{colors} = $args{colors} // new EFI::Util::Colors;
 
     return $self;
 }
