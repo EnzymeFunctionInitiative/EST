@@ -32,7 +32,6 @@ sub new {
     #TODO: do something with gnn and hubs
 
     $self->{efi_anno} = new EFI::Annotations();
-    $self->{pfam_writer} = new EFI::GNT::GNN::TableWriter::PfamHubs(colors => $self->{colors});
 
     return $self;
 }
@@ -42,20 +41,22 @@ sub savePfamNeighborhoods {
     my $self = shift;
     my $outputDir = shift;
 
-    # Create directories for all of the Pfam neighborhood tables
-    $self->{pfam_writer}->initFilteredHubTableDirs($outputDir);
-    $self->{pfam_writer}->initAllHubTableDirs($outputDir);
-
-    my @pfamHubNames = $self->{hubs}->getPfamHubNames();
+    my $writer = new EFI::GNT::GNN::TableWriter::PfamHubs(hubs => $self->{hubs}, colors => $self->{colors}, output_dir => $outputDir);
 
     my $filterOnCooccurrence = 1;
+
+    my @pfamHubNames = $self->{hubs}->getPfamHubNames();
     foreach my $pfamHubName (@pfamHubNames) {
+        my $hub = $self->{hubs}->getPfamHub($pfamHubName, !$filterOnCooccurrence);
         # All clusters, no cooccurrence filtering
-        $self->{pfam_writer}->writeHubTables($pfamHubName, !$filterOnCooccurrence);
+        $writer->writeAllHubTables($pfamHubName, $hub);
+
         # Filter on cooccurrence
-        $self->{pfam_writer}->writeHubTables($pfamHubName, $filterOnCooccurrence);
+        $hub = $self->{hubs}->getPfamHub($pfamHubName, $filterOnCooccurrence);
+        $writer->writeFilteredHubTables($pfamHubName, $hub);
     }
 
+    $writer->finish();
 }
 
 
