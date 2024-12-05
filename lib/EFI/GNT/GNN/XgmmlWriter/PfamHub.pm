@@ -12,6 +12,8 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
+use EFI::GNT::GNN::XgmmlWriter::Util;
+
 
 sub new {
     my $class = shift;
@@ -80,17 +82,9 @@ sub getSpokeData {
     my ($spokeAnno, $numPdb, $numSwissProt) = $self->{gnt_anno}->getHubAnnotations($spoke->{neighbors});
     my $shape = $self->{gnt_anno}->getHubShape($numPdb, $numSwissProt);
 
-    # Create the 'Query-Neighbor Accessions' list.  The format is
-    #    Query_ID:Neighbor_ID:EC_num:PDB_num:None:None:SwissProt_Status
-    # An example is:
-    #    B0SS77:B0SS79:6.3.2.4::None:None:Reviewed
+    my @arrangement;
     my @queryNeighborInfo;
-    foreach my $idx (0..($spoke->{num_neighbors})) {
-        my $nbQuery = $spoke->{neighbors_query}->[$idx];
-        my $nb = $spoke->{neighbors}->[$idx];
-        my $anno = $spokeAnno->{$nb};
-        push @queryNeighborInfo, "$nbQuery:$anno";
-    }
+    populate_arrangement($spoke, \@arrangement, \@queryNeighborInfo, {anno => $spokeAnno});
 
     my @fields;
     push @fields, {name => "Pfam",                                          value => "",                                        type => "string"};
@@ -102,7 +96,7 @@ sub getSpokeData {
     push @fields, {name => "# of Pfam Neighbors",                           value => $spoke->{num_neighbors},                   type => "integer"};
     push @fields, {name => "Query Accessions",                              value => $spoke->{query_ids_in_pfam},               type => "string"};
     push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,                       type => "string"};
-    push @fields, {name => "Query-Neighbor Arrangement",                    value => $spoke->{arrangement},                     type => "string"};
+    push @fields, {name => "Query-Neighbor Arrangement",                    value => \@arrangement,                             type => "string"};
     push @fields, {name => "Average Distance",                              value => $spoke->{average_distance},                type => "real"};
     push @fields, {name => "Median Distance",                               value => $spoke->{median_distance},                 type => "real"};
     push @fields, {name => "Co-occurrence",                                 value => $spoke->{cooccurrence},                    type => "real"};
@@ -147,8 +141,11 @@ sub getHubData {
     my $numNeighbors = sum( map { $hub->{$_}->{num_neighbors} } @clusterNums );
     my $numQueryPfam = sum( map { $hub->{$_}->{num_query_ids_in_pfam} } @clusterNums );
 
-    my @arrangement = map { @{ $hub->{$_}->{arrangement} } } @clusterNums;
-    my @queryNbList = map { @{ $hub->{$_}->{neighbors_query} } } @clusterNums;
+    my @arrangement;
+    my @queryNeighborInfo;
+    foreach my $clusterNum (@clusterNums) {
+        populate_arrangement($hub->{$clusterNum}, \@arrangement, \@queryNeighborInfo);
+    }
 
     my @distances;
     my @coocData;
@@ -165,7 +162,7 @@ sub getHubData {
     push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $numIdsWithNeighbors,  type => "integer"};
     push @fields, {name => "# of Queries with Pfam Neighbors",              value => $numQueryPfam,         type => "integer"};
     push @fields, {name => "# of Pfam Neighbors",                           value => $numNeighbors,         type => "integer"};
-    push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNbList,         type => "string"};
+    push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,   type => "string"};
     push @fields, {name => "Query-Neighbor Arrangement",                    value => \@arrangement,         type => "string"};
     push @fields, {name => "Hub Average and Median Distances",              value => \@distances,           type => "string"};
     push @fields, {name => "Hub Co-occurrence and Ratio",                   value => \@coocData,            type => "string"};

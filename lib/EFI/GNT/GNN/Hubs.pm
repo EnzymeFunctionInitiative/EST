@@ -41,30 +41,24 @@ sub compute {
 
     foreach my $clusterNum (keys %{ $self->{cluster_data} }) {
         my $pfamData = {};
-        # Maps Pfams of query neighbors to the query ID.  Used to determine the
-        # unique list of query IDs within each neighboring Pfam
-        my $neighborPfamQuery = {};
         foreach my $query (@{ $self->{cluster_data}->{$clusterNum} }) {
             my $attributes = $query->{attributes};
             my @neighborIds = @{ $query->{neighbors} };
             foreach my $nb (@neighborIds) {
-                push @{ $pfamData->{$nb->{pfam}}->{genome_arrangement} },   "$attributes->{id}:$attributes->{direction}:$nb->{id}:$nb->{direction}:$nb->{distance}"; #NOTE: old 'dist'
-                push @{ $pfamData->{$nb->{pfam}}->{distances} },            $nb->{distance}; #NOTE: old 'stats'
-                push @{ $pfamData->{$nb->{pfam}}->{neighbors_query} },      "$attributes->{id}:$nb->{id}"; #NOTE: old 'neigh'
-                push @{ $pfamData->{$nb->{pfam}}->{neighbors} },            $nb->{id}; #NOTE: old 'neighlist'
-                $neighborPfamQuery->{$nb->{pfam}}->{$attributes->{id}} = 1; #NOTE old 'orig'
+                my $data = {
+                    neighbor => $nb->{id},
+                    direction => $nb->{direction},
+                    distance => $nb->{distance},
+                };
+                push @{ $pfamData->{$nb->{pfam}}->{$attributes->{id}} }, $data;
             }
         }
     
         # Get the unique list of query IDs in each neighboring Pfam as well as
         # the list of query IDs in the cluster that have neighbors
         my $hubIdsWithNeighbors = {};
-        foreach my $pfam (keys %$neighborPfamQuery) {
-            my @ids = sort keys %{ $neighborPfamQuery->{$pfam} };
-            #NOTE query_ids is equivalent to the 'orig' output from the old module, except this is
-            # unique whereas the old one wasn't
-            $pfamData->{$pfam}->{query_ids} = \@ids;
-            # $neighborPfamQuery will only contain a Pfam/list of IDs if the query has neighbors
+        foreach my $pfam (keys %$pfamData) {
+            my @ids = sort keys %{ $pfamData->{$pfam} };
             map { $hubIdsWithNeighbors->{$_} = $pfam } @ids;
         }
 
@@ -135,16 +129,23 @@ sub makeHubData {
     my $numIdsWithNeighbors = shift;
     my $numClusterIds = shift;
 
+    # Can cache these values outside and pass in for more efficiency when creating cluster GNN
     $numIdsWithNeighbors = @{ $self->{cluster_pfam}->{$clusterNum}->{hub_ids} } if not defined $numIdsWithNeighbors; #NOTE old 'withneighbors'
     $numClusterIds = @{ $self->{cluster_data}->{$clusterNum} } if not defined $numClusterIds;
 
-    my $numIdsInPfam = @{ $pfamHub->{query_ids} }; #NOTE old 'orig'
+    my @queryIds = sort keys %$pfamHub;
+    my $numIdsInPfam = @queryIds;
     my $cooccurrence = int($numIdsInPfam / $numIdsWithNeighbors * 100) / 100;
     my $coocRatio = "$numIdsInPfam/$numIdsWithNeighbors";
-    my $numNeighbors = @{ $pfamHub->{neighbors_query} }; #NOTE old 'neigh'
 
-    my $distanceSum = sum( @{ $pfamHub->{distances} } ); #NOTE old 'stats'
-    my $distanceMedian = median( @{ $pfamHub->{distances} } ); #NOTE old 'stats'
+    my @distances;
+    foreach my $queryId (@queryIds) {
+        push @distances, map { $_->{distance} } @{ $pfamHub->{$queryId} };
+    }
+
+    my $numNeighbors = @distances;
+    my $distanceMedian = median( sort @distances );
+    my $distanceSum = sum(@distances);
     my $averageDist = int( $distanceSum / $numNeighbors * 100 ) / 100;
     my $medianDist = int( $distanceMedian * 100 ) / 100;
 
@@ -152,13 +153,11 @@ sub makeHubData {
         num_ids_with_neighbors  => $numIdsWithNeighbors, #NOTE old 'withneighbors'
         num_query_ids_in_pfam   => $numIdsInPfam, #NOTE old 'orig'
         num_cluster_ids         => $numClusterIds,
+        num_neighbors           => $numNeighbors,
         cooccurrence            => $cooccurrence,
         cooccurrence_ratio      => $coocRatio,
-        num_neighbors           => $numNeighbors,
-        arrangement             => $pfamHub->{genome_arrangement}, #NOTE old 'dist'
-        query_ids_in_pfam       => $pfamHub->{query_ids}, #NOTE old 'orig'
-        neighbors               => $pfamHub->{neighbors}, #NOTE old 'neighlist'
-        neighbors_query         => $pfamHub->{neighbors_query}, #NOTE old 'neigh'
+        query_ids_in_pfam       => \@queryIds,
+        query_neighbors         => $pfamHub,
         average_distance        => sprintf("%.2f", $averageDist),
         median_distance         => sprintf("%.2f", $medianDist),
     };
@@ -414,26 +413,17 @@ A hash ref pointing to an array of hash refs, each with data about a cluster hub
                 # Number of query IDs in the cluster
                 num_cluster_ids         => 1,
 
+                # Total number of neighbors in the cluster/Pfam
+                num_neighbors           => 1,
+
                 # Cooccurrence of Pfam in cluster
                 cooccurrence            => 0.4,
 
                 # Cooccurrence expressed in ratio form
                 cooccurrence_ratio      => "",
 
-                # Total number of neighbors in the cluster/Pfam
-                num_neighbors           => 1,
-
-                # Genome arrangement (direction and distance of neighbors from query IDs in the Pfam)
-                arrangement             => [],
-
-                # IDs in the cluster that are in this cluster/Pfam hub ("pfam_a")
-                query_ids_in_pfam       => [],
-
-                # IDs of neighbors of each query ID in this cluster/Pfam hub
-                neighbors               => [],
-
-                # IDs of neighbors of each query ID in this cluster/Pfam hub, prefixed with the query IDs in the cluster
-                neighbors_query         => [],
+                # Mapping of query in the Pfam to the neighbors
+                query_neighbors         => {},
 
                 # Average distance of neighbors from query IDs in this cluster/Pfam hub
                 average_distance        => "3.00",
@@ -525,26 +515,17 @@ only contains clusters in the Pfam hub that meet the cooccurrence threshold.
                 # Number of IDs in the cluster
                 num_cluster_ids         => 1,
 
+                # Total number of neighbors in the cluster/Pfam
+                num_neighbors           => 1,
+
                 # Cooccurrence of Pfam in cluster
                 cooccurrence            => 0.4,
 
                 # Cooccurrence expressed in ratio form
                 cooccurrence_ratio      => "",
 
-                # Total number of neighbors in the cluster/Pfam
-                num_neighbors           => 1,
-
-                # Genome arrangement (direction and distance of neighbors from query IDs in the Pfam)
-                arrangement             => [],
-
-                # Query IDs in the cluster that are in this cluster/Pfam hub ("pfam_a")
-                query_ids_in_pfam       => [],
-
-                # Query IDs of neighbors of each ID in this cluster/Pfam hub
-                neighbors               => [],
-
-                # IDs of neighbors of each query ID in this cluster/Pfam hub, prefixed with the query ID in the cluster
-                neighbors_query         => [],
+                # Mapping of query in the Pfam to the neighbors
+                query_neighbors         => {},
 
                 # Average distance of neighbors from query IDs in this cluster/Pfam hub
                 average_distance        => "3.00",
@@ -687,6 +668,10 @@ Number of query IDs in the cluster that are in the cluster/Pfam hub.
 
 The number of query IDs in the SSN cluster that the Pfam hub belongs to.
 
+=item C<num_neighbors>
+
+The total number of neighbors of all of the queries in the cluster/Pfam hub.
+
 =item C<cooccurrence>
 
 The cooccurrence of the Pfam hub in the cluster (e.g. the number of query IDs
@@ -698,29 +683,25 @@ number > C<0> and <= C<1.0>.
 The cooccurrence expressed in ratio form (i.e.
 C<num_query_ids_in_pfam / num_query_ids_with_neighbors>) (e.g. C<"33/101">).
 
-=item C<arrangement>
+=item C<query_neighbors>
 
-An array that contains the genome arrangement for each neighbor in the spoke.
-This is measured by the direction and distance of neighbors from query IDs in
-the cluster that are in the Pfam hub.  The format is
-C<ID:ID_direction:NEIGHBOR_ID:NEIGHBOR_direction:NEIGHBOR_distance>
-and an example is C<B0SS77:-1:B0SS79:1:2> or C<B0SS77:-1:B0SS75:-1:-2>.  The
-direction is negative if the gene is in complement form and positive if it is
-normal.  The distance is the distance in number of genes from the neighbor
-to the query ID.
+Hash ref that maps query ID in the Pfam hub to the neighbors of the query.  This
+looks like:
 
-=item C<query_ids_in_pfam>
-
-An array ref containing a list of query IDs in the cluster-Pfam hub combination.
-
-=item C<neighbors>
-
-An array that contains the neighbor IDs.  For example, C<["B0SS75", "B0SS79"]>.
-
-=item C<neighbors_query>
-
-An array that contains the neighbor IDs prefixed with the query ID.
-For example, C<["B0SS77:B0SS75", "B0SS77:B0SS79"]>.
+    {
+        "query_id" => {
+            direction => 0, # query direction
+            neighbors => [
+                {
+                    id => "neighbor_id",
+                    distance => 0, # neighbor distance
+                    direction => 0, # neighbor direction
+                },
+                ...
+            ],
+        },
+        ...
+    }
 
 =item C<average_distance>
 

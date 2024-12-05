@@ -12,7 +12,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
-use EFI::Util::Colors;
+use EFI::GNT::GNN::XgmmlWriter::Util;
 
 
 sub new {
@@ -22,7 +22,7 @@ sub new {
     my $self = $class->SUPER::new(%args);
     $self->{gnn_file} = $args{gnn_file} || die "Require GNN file gnn_file output arg";
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
-    $self->{colors} = new EFI::Util::Colors;
+    #$self->{colors} is created by the parent class
     $self->{cooc_threshold} = 0.20; #TODO: set this somewhere
 
     return $self;
@@ -87,15 +87,9 @@ sub getSpokeData {
     my ($spokeAnno, $numPdb, $numSwissProt) = $self->{gnt_anno}->getHubAnnotations($spoke->{neighbors});
     my $shape = $self->{gnt_anno}->getHubShape($numPdb, $numSwissProt);
 
+    my @arrangement;
     my @queryNeighborInfo;
-    foreach my $idx (0..($spoke->{num_neighbors})) {
-        my $nbQuery = $spoke->{neighbors_query}->[$idx];
-        my $nb = $spoke->{neighbors}->[$idx];
-        my $anno = $spokeAnno->{$nb};
-        push @queryNeighborInfo, "$nbQuery:$anno";
-    }
-
-    my @arrangement = map { "$pfam:$_" } @{ $spoke->{arrangement} };
+    populate_arrangement($spoke, \@arrangement, \@queryNeighborInfo, {pfam => $pfam, anno => $spokeAnno});
 
     my @fields;
     push @fields, {name => "SSN Cluster Number",                            value => $clusterNum,                               type => "integer"};
@@ -157,13 +151,10 @@ sub getHubData {
     my @coocData;
     foreach my $pfam (@pfams) {
         my $spoke = $hub->{$pfam};
-        my $cooc = int($spoke->{num_query_ids_in_pfam} / $spoke->{num_query_ids_with_neighbors} * 100) / 100;
-        if ($cooc > $self->{cooc_threshold}) {
-            push @queryNeighbors, "$clusterNum:$pfam:$spoke->{num_query_ids_in_pfam}";
-            push @pfamNeighbors, "$clusterNum:$pfam:$spoke->{num_neighbors}";
-            push @distances, "$clusterNum:$pfam:$spoke->{average_distance}:$spoke->{median_distance}";
-            push @coocData, "$clusterNum:$pfam:$spoke->{cooccurrence}:$spoke->{cooccurrence_ratio}";
-        }
+        push @queryNeighbors, "$clusterNum:$pfam:$spoke->{num_query_ids_in_pfam}";
+        push @pfamNeighbors, "$clusterNum:$pfam:$spoke->{num_neighbors}";
+        push @distances, "$clusterNum:$pfam:$spoke->{average_distance}:$spoke->{median_distance}";
+        push @coocData, "$clusterNum:$pfam:$spoke->{cooccurrence}:$spoke->{cooccurrence_ratio}";
     }
 
     my @fields;
