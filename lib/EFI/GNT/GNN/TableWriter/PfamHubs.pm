@@ -74,7 +74,7 @@ sub writeHubTables {
     my $hub = shift;
     my $filterOnCooccurrence = shift;
 
-    my @clusterNums = sort keys %$hub;
+    my @clusterNums = sort keys %{ $hub->{spokes} };
 
     my $tableType = $filterOnCooccurrence ? PFAM_HUB_COOC : PFAM_HUB_ALL;
 
@@ -94,7 +94,7 @@ sub writeHubTables {
     push @handles, $self->getTableFileHandle($tableType | MERGED_TABLE);
 
     foreach my $clusterNum (@clusterNums) {
-        my $cluster = $hub->{$clusterNum};
+        my $cluster = $hub->{spokes}->{$clusterNum};
         my $color = $self->{colors}->getColor($clusterNum);
 
         foreach my $queryId (keys %$cluster) {

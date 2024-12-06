@@ -38,13 +38,13 @@ sub write {
     my $filterOnCooccurrence = 1;
     foreach my $clusterNum (@clusterNums) {
         my $hub = $hubs->getClusterHub($clusterNum, $filterOnCooccurrence);
-        my @pfamHubNames = @{ $hub->{pfams} };
+        my @pfamHubNames = keys %{ $hub->{spokes} };
 
         foreach my $pfamHubName (@pfamHubNames) {
             my $spokeNodeId = "$clusterNum:$pfamHubName";
             my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
 
-            my @nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{$pfamHubName}, $pfamLongName);
+            my @nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{spokes}->{$pfamHubName}, $pfamLongName);
 
             $self->writeNode($spokeNodeId, "$pfamShortName", \@nodeAttr);
             $self->writeEdge($clusterNum, $spokeNodeId);
@@ -140,17 +140,17 @@ sub getHubData {
     my $shape = "hexagon";
     my $nodeSize = "70.0";
 
-    my @pfams = sort keys %$hub;
+    my @pfams = sort keys %{ $hub->{spokes} };
 
-    my $numClusterIds = sum( map { $hub->{$_}->{num_cluster_ids} } @pfams );
-    my $numIdsWithNeighbors = sum( map { $hub->{$_}->{num_ids_with_neighbors} } @pfams );
+    my $numClusterIds = sum( map { $hub->{spokes}->{$_}->{num_cluster_ids} } @pfams );
+    my $numIdsWithNeighbors = sum( map { $hub->{spokes}->{$_}->{num_ids_with_neighbors} } @pfams );
 
     my @queryNeighbors;
     my @pfamNeighbors;
     my @distances;
     my @coocData;
     foreach my $pfam (@pfams) {
-        my $spoke = $hub->{$pfam};
+        my $spoke = $hub->{spokes}->{$pfam};
         push @queryNeighbors, "$clusterNum:$pfam:$spoke->{num_query_ids_in_pfam}";
         push @pfamNeighbors, "$clusterNum:$pfam:$spoke->{num_neighbors}";
         push @distances, "$clusterNum:$pfam:$spoke->{average_distance}:$spoke->{median_distance}";

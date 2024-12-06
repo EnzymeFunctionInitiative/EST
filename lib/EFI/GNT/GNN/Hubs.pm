@@ -213,7 +213,7 @@ sub median {
     my @vals = sort {$a <=> $b} @_;
     my $len = @vals;
 
-    if ($len % 2) { # returns non-zero value if it is not even
+    if ($len % 2 != 0) {
         return $vals[int($len / 2)];
     } else {
         return ($vals[int($len / 2) - 1] + $vals[int($len / 2)]) / 2;
@@ -234,20 +234,24 @@ sub getClusterHub {
     my $clusterNum = shift;
     my $filterSpokes = shift || 1;
 
-    return {} if not $self->{cluster_hubs}->{$clusterNum};
+    my $spokes = { num_ids_with_neighbors  => 0, num_cluster_ids => 0, spokes => {} };
+    return $spokes if not $self->{cluster_hubs}->{$clusterNum};
 
     my $hub = $self->{cluster_hubs}->{$clusterNum};
-    return $hub if not $filterSpokes;
 
-    my $filteredSpokes = {};
+    # Return all the spokes if filtering is disabled
+    if (not $filterSpokes) {
+        $spokes->{spokes} = $hub;
+        return $hub;
+    }
 
     foreach my $pfam (keys %$hub) {
         if ($hub->{$pfam}->{cooccurrence} >= $self->{cooc_threshold}) {
-            $filteredSpokes->{$pfam} = $hub->{$pfam};
+            $spokes->{spokes}->{$pfam} = $hub->{$pfam};
         }
     }
 
-    return $filteredSpokes;
+    return $spokes;
 }
 
 
@@ -267,6 +271,8 @@ sub getPfamHub {
     return {} if not $self->{pfam_hubs}->{$pfam};
 
     my $hub = $self->{pfam_hubs}->{$pfam};
+
+    # Return all the spokes if filtering is disabled
     return $hub if not $filterSpokes;
 
     my $filteredSpokes = {};
@@ -399,10 +405,18 @@ cooccurrence threshold).
 
 =head4 Returns
 
-A hash ref pointing to an array of hash refs, each with data about a cluster hub.
+A hash ref with a key that points to a hash ref that maps cluster numbers to
+cluster data (hash ref) associated with the Pfam hub.  The hash ref also
+contains two keys/values containing cluster size information.
 
     {
-        {
+        # Number of query IDs in the cluster that have neighbors with Pfams
+        num_query_ids_with_neighbors => 2,
+
+        # Number of query IDs in the cluster
+        num_cluster_ids => 2,
+
+        spokes => {
             "pfam_a" => {
                 # Number of query IDs in the cluster that have neighbors with Pfams
                 num_query_ids_with_neighbors  => 2,
@@ -443,14 +457,14 @@ A hash ref pointing to an array of hash refs, each with data about a cluster hub
 =head4 Example Usage
 
     my $data = $hubs->getClusterHub(1);
-    foreach my $pfam (@$data) {
+    foreach my $pfam (keys %{ $data->{spokes} }) {
         print "Pfam $pfam is in cluster 1 and meets the cooccurrence threshold\n";
     }
     # Results in:
     #   Pfam pfam_a is in cluster 1 and meets the cooccurrence threshold
 
     my $data = $hubs->getClusterHub(1, 0);
-    foreach my $pfam (@$data) {
+    foreach my $pfam (keys %{ $data->{spokes} }) {
         print "Pfam $pfam is in cluster 1 and may or may not meet the cooccurrence threshold\n";
     }
     # Results in:
@@ -499,12 +513,11 @@ cooccurrence threshold).
 
 =head4 Returns
 
-A hash ref pointing to two arrays, one with all of the clusters in the
-Pfam hub even those that do not meet the cooccurrence threshold, and one that
-only contains clusters in the Pfam hub that meet the cooccurrence threshold.
+A hash ref with a key that points to a hash ref that maps cluster numbers to
+Pfam data (hash ref) associated with the cluster.
 
     {
-        {
+        spokes => {
             "1" => {
                 # Number of query IDs in the cluster that have neighbors with Pfams
                 num_query_ids_with_neighbors  => 2,
@@ -545,14 +558,14 @@ only contains clusters in the Pfam hub that meet the cooccurrence threshold.
 =head4 Example Usage
 
     my $data = $hubs->getPfamHub("PF07478-PF1820");
-    foreach my $cluster (@$data) {
+    foreach my $cluster (keys %{ $data->{spokes} }) {
         print "Cluster $cluster is in Pfam hub PF07478-PF1820 and meets the cooccurrence threshold\n";
     }
     # Results in:
     #    Cluster 1 is in Pfam hub PF07478-PF1820 and meets the cooccurrence threshold
 
-    my $data = $hubs->getClusterHub(1, 0);
-    foreach my $pfam (@$data) {
+    my $data = $hubs->getPfamHub("PF07478-PF1820", 0);
+    foreach my $cluster (keys %{ $data->{spokes} }) {
         print "Cluster $cluster is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold\n";
     }
     # Results in:
