@@ -100,11 +100,11 @@ sub getClusterInfo {
     my $cmap = $self->{cluster_map}->{$seqId};
     if ($cmap) {
         # Cluster number by number of sequences in cluster
-        my $seqNum = $cmap->[0];
+        my $seqNum = $cmap->[0] || 0;
         # Cluster number by number of nodes in cluster
-        my $nodeNum = $cmap->[1] // $seqNum;
+        my $nodeNum = $cmap->[1] || $seqNum;
         my $seqCount = $self->{cluster_sizes}->{seq}->{$seqNum} // 0;
-        my $nodeCount = $self->{cluster_sizes}->{node}->{$nodeNum} // 0;
+        my $nodeCount = $self->{cluster_sizes}->{node}->{$nodeNum} // $seqCount;
         my $seqColor = $self->{colors}->getColor($seqNum);
         my $nodeColor = $self->{colors}->getColor($nodeNum);
 
