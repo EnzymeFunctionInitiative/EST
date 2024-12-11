@@ -139,7 +139,7 @@ __END__
 
 =pod
 
-=head1 EFI::SSN::XgmmlWriter::Color
+=head1 EFI::SSN::XgmmlWriter::AttributeHandler::Color
 
 =head2 NAME
 
@@ -191,7 +191,7 @@ in cluster and the second element is the cluster number based on nodes in cluste
 
 =item C<colors>
 
-A C<EFI::SSN::Util::Colors> object used for retrieving the color of a node based
+A C<EFI::Util::Colors> object used for retrieving the color of a node based
 on cluster number.
 
 =item C<cluster_sizes>
