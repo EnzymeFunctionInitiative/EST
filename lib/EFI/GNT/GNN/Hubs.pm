@@ -24,7 +24,7 @@ sub new {
     $self->{cluster_hubs} = {};
     # Pfam-centric GNN hub-spoke data
     $self->{pfam_hubs} = {};
-    # Coocurrence threshold
+    # Cooccurrence threshold
     $self->{cooc_threshold} = $args{cooc_threshold} // 0.20;
 
     $self->computeHubsFromGnn($args{gnn});
@@ -92,6 +92,8 @@ sub computePfamHubs {
     }
 
     foreach my $pfam (sort keys %pfams) {
+        next if not $pfam; # This will happen when a neighbor doesn't have a Pfam
+
         # Clusters that are associated with this Pfam
         my $clusters = {};
 
@@ -183,17 +185,30 @@ sub computeClusterHubs {
 
         next if $numIdsWithNeighbors < 2;
 
+        # Neighbor IDs that don't have a Pfam family associated
+        my @unclassified;
+
         # Pfams that are associated with this cluster
         my $pfams = {};
 
         # Compute the spoke (Pfam) nodes that connect to the cluster hub
         foreach my $pfam (sort keys %{ $self->{cluster_pfam}->{$clusterNum}->{pfam} }) {
+            my $clusterPfam = $self->{cluster_pfam}->{$clusterNum}->{pfam}->{$pfam};
+            # This will happen when a neighbor doesn't have a Pfam
+            if (not $pfam) {
+                foreach my $queryId (keys %$clusterPfam) {
+                    push @unclassified, map { $_->{neighbor} } @{ $clusterPfam->{$queryId} };
+                }
+                next;
+            }
+
             my $pfamHub = $self->{cluster_pfam}->{$clusterNum}->{pfam}->{$pfam};
             my $data = $self->makeHubData($clusterNum, $pfamHub, $numIdsWithNeighbors, $numClusterIds);
             $pfams->{$pfam} = $data;
         }
 
-        $self->{cluster_hubs}->{$clusterNum} = $pfams;
+        $self->{cluster_hubs}->{$clusterNum}->{hub} = $pfams;
+        $self->{cluster_hubs}->{$clusterNum}->{unclassified} = \@unclassified;
     }
 }
 
@@ -237,7 +252,7 @@ sub getClusterHub {
     my $spokes = { num_ids_with_neighbors  => 0, num_cluster_ids => 0, spokes => {} };
     return $spokes if not $self->{cluster_hubs}->{$clusterNum};
 
-    my $hub = $self->{cluster_hubs}->{$clusterNum};
+    my $hub = $self->{cluster_hubs}->{$clusterNum}->{hub};
 
     # Return all the spokes if filtering is disabled
     if (not $filterSpokes) {
@@ -252,6 +267,15 @@ sub getClusterHub {
     }
 
     return $spokes;
+}
+
+
+# public
+sub getClusterUnclassified {
+    my $self = shift;
+    my $clusterNum = shift;
+    return [] if not $self->{cluster_hubs}->{$clusterNum};
+    return $self->{cluster_hubs}->{$clusterNum}->{unclassified};
 }
 
 
@@ -470,6 +494,34 @@ contains two keys/values containing cluster size information.
     # Results in:
     #   Pfam pfam_a is in cluster 1 and may or may not meet the cooccurrence threshold
     #   Pfam pfam_b is in cluster 1 and may or may not meet the cooccurrence threshold
+
+
+=head3 C<getClusterUnclassified($clusterNum)>
+
+Returns the list of neighbor IDs in the given cluster that do not have a Pfam
+associated with them.
+
+=head4 Parameters
+
+=over
+
+=item C<$clusterNum>
+
+The cluster number to retrieve the IDs from.
+
+=back
+
+=head4 Returns
+
+An array ref with neighbor accession IDs.
+
+=head4 Example Usage
+
+    my $clusterNum = 4;
+    my $ids = $hubs->getClusterUnclassified($clusterNum);
+    foreach my $id (@$ids) {
+        print "Neighbor ID $id is not classified with a Pfam family\n";
+    }
 
 
 =head3 C<getPfamHubNames()>

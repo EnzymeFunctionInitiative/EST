@@ -148,7 +148,10 @@ B<EFI::GNT::GNN> - Perl module for creating genome neighborhood networks
 
 =head2 SYNOPSIS
 
-    my $idMap = {}; # mapping of clusters (numbered by sequences) to IDs in the cluster
+    # Mapping of clusters (numbered by sequences) to IDs in the cluster;
+    # this should exclude singletons.  Comes from an external file, usually.
+    my $idMap = {}; 
+
     my $dbh = EFI::Database->new()->getHandle();
     my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 
@@ -169,12 +172,11 @@ B<EFI::GNT::GNN> - Perl module for creating genome neighborhood networks
     my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
     $clusterHubWriter->write($hubs);
 
-    my $tables = new EFI::GNT::GNN::TableWriter(gnn => $gnn, hubs => $hubs); 
+    my $tables = new EFI::GNT::GNN::TableWriter(hubs => $hubs); 
     $tables->savePfamNeighborhoods($pfamNeighborOutputDir);
     $tables->saveUnclassifiedIds($unclassifiedIdsDir);
-    $tables->saveStatistics($statsFile);
-    $tables->saveConvergenceRatio($convRatioFile);
-    $tables->savePfamCoocurrence($pfamCoocFile);
+    $tables->saveClusterStatistics($statsFile);
+    $tables->savePfamCooccurrence($pfamCoocFile);
 
     my $gnd = new EFI::GNT::GNN::GND(dbh => $dbh);
     $gnd->convertFromGnn($gnn);

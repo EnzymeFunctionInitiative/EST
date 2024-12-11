@@ -4,6 +4,7 @@ package EFI::GNT::GNN::TableWriter::PfamHubs;
 use strict;
 use warnings;
 
+use File::Path qw(make_path);
 
 # Pfam hub name, meeting cooccurrence threshold
 use constant PFAM_HUB_COOC => 1;
