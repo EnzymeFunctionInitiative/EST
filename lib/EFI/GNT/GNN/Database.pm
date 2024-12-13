@@ -4,7 +4,11 @@ package EFI::GNT::GNN::Database;
 use strict;
 use warnings;
 
+use Data::Dumper;
 use DBI;
+
+use constant SORT_KEY => "sort_key";
+use constant QUERY_SORT_KEY => "query_sort_key";
 
 
 sub new {
@@ -26,10 +30,12 @@ sub new {
     # Turn on transactions (e.g. don't automatically commit after every insert)
     $self->{dbh}->{AutoCommit} = 0;
 
-    $self->{query_cols} = getQuerySchema();
+    $self->{query_id_cols} = getQuerySchema();
     $self->{neighbor_cols} = getNeighborSchema();
 
     $self->{has_data} = $self->initializeDatabase();
+
+    return $self;
 }
 
 
@@ -37,19 +43,19 @@ sub save {
     my $self = shift;
     my $gnn = shift;
 
-    my $clusterData = $gnn->getRawClusterData();
+    my $clusterData = $gnn->getClusterData();
 
+    my $sortKey = 0;
     foreach my $clusterNum (sort { $a <=> $b } keys %$clusterData) {
-        my $queryIdSortFn = sub { return queryIdSortFn($clusterData->{$clusterNum}, $a, $b); };
-        my @queryIds = sort $queryIdSortFn keys %{ $clusterData->{$clusterNum} };
-        foreach my $id (@queryIds) {
-            my $queryData = $clusterData->{$clusterNum}->{$id}->{attributes};
-            $self->insertQuery($queryData->{sort_key}, $queryData);
-            $self->insertNeighbors($queryData->{sort_key}, $clusterData->{$clusterNum}->{$id}->{neighbors});
+        foreach my $idData (@{ $clusterData->{$clusterNum} }) {
+            my $queryData = $idData->{attributes};
+            $self->insertQueryId($sortKey, $queryData);
+            $self->insertNeighbors($sortKey, $idData->{neighbors});
+            $sortKey++;
         }
     }
 
-    $self->commit();
+    $self->{dbh}->commit();
 
     $self->{has_data} = 1;
 }
@@ -86,9 +92,13 @@ sub insertNeighbors {
     my $neighbors = shift;
 
     if (not $self->{insert_neighbor_sth}) {
-        my $colNames = join(", ", map { $_->{name} } @{ $self->{neighbor_cols} });
-        my $vals = join(", ", map { "?" } @{ $self->{neighbor_cols} });
+        my @cols = map { $_->{db_name} // $_->{name} } @{ $self->{neighbor_cols} };
+        my @vals = map { "?" } @{ $self->{neighbor_cols} };
+
+        my $colNames = join(", ", @cols);
+        my $vals = join(", ", @vals);
         my $sql = "INSERT INTO neighbor ($colNames) VALUES ($vals)";
+
         my $sth = $self->{dbh}->prepare($sql);
         if (not $sth) {
             die "Error preparing SQL query for inserting neighbors ($sql)";
@@ -99,10 +109,10 @@ sub insertNeighbors {
     foreach my $neighbor (@$neighbors) {
         my @row;
         foreach my $col (@{ $self->{neighbor_cols} }) {
-            if ($col->{name} eq "query_sort_key") {
+            if ($col->{name} eq QUERY_SORT_KEY) {
                 push @row, $sortKey;
             } else {
-                push @row, $neighbor->{$col};
+                push @row, $neighbor->{$col->{name}};
             }
         }
         $self->insert($self->{insert_neighbor_sth}, \@row);
@@ -111,7 +121,7 @@ sub insertNeighbors {
 
 
 #
-# insertQuery - private method
+# insertQueryId - private method
 #
 # Inserts a query row into the database.
 #
@@ -119,20 +129,24 @@ sub insertNeighbors {
 #    $sortKey - a unique number that corresponds to the query sequence
 #    $queryData - attributes that are associated with the query
 #
-sub insertQuery {
+sub insertQueryId {
     my $self = shift;
     my $sortKey = shift;
     my $queryData = shift;
 
-    my @row = ($sortKey);
-    foreach my $col (@{ $self->{query_cols} }) {
-        push @row, $queryData->{$col->{name}} // "";
+    my @row;
+    foreach my $col (@{ $self->{query_id_cols} }) {
+        push @row, $queryData->{$col->{db_name} // $col->{name}} // "";
     }
 
     if (not $self->{insert_query_sth}) {
-        my $colNames = join(", ", map { $_->{name} } @{ $self->{query_cols} });
-        my $vals = join(", ", map { "?" } @{ $self->{query_cols} });
+        my @cols = map { $_->{db_name} // $_->{name} } @{ $self->{query_id_cols} };
+        my @vals = map { "?" } @{ $self->{query_id_cols} };
+
+        my $colNames = join(", ", @cols);
+        my $vals = join(", ", @vals);
         my $sql = "INSERT INTO query ($colNames) VALUES ($vals)";
+
         my $sth = $self->{dbh}->prepare($sql);
         if (not $sth) {
             die "Error preparing SQL query for inserting queries ($sql)";
@@ -166,7 +180,7 @@ sub getClusterDataQuery {
 
     while (my $row = $sth->fetchrow_hashref()) {
         my $query = {attributes => $row, neighbors => []};
-        $sortKeyMap->{$row->{sort_key}} = $query;
+        $sortKeyMap->{$row->{&SORT_KEY}} = $query;
         push @{ $clusterData->{$row->{cluster_num}} }, $query;
     }
 
@@ -194,7 +208,7 @@ sub getClusterDataNeighbor {
     $sth->execute();
 
     while (my $row = $sth->fetchrow_hashref()) {
-        my $query = $sortKeyMap->{$row->{query_sort_key}};
+        my $query = $sortKeyMap->{$row->{&QUERY_SORT_KEY}};
         push @{ $query->{neighbors} }, $row;
     }
 }
@@ -223,7 +237,7 @@ sub insert {
         $self->{insert_count} = 0;
         $self->{dbh}->commit();
     }
-    $self->{dbh}->execute(@$row);
+    $sth->execute(@$row);
 }
 
 
@@ -245,8 +259,8 @@ sub initializeDatabase {
         return 1;
     }
 
-    my @queryIndexCols = $self->initializeTable("query");
-    my @neighborIndexCols = $self->initializeTable("neighbor");
+    my @queryIndexCols = $self->initializeTable("query", $self->{query_id_cols});
+    my @neighborIndexCols = $self->initializeTable("neighbor", $self->{neighbor_cols});
 
     my @indexCols;
     push @indexCols, ["query", \@queryIndexCols];
@@ -306,7 +320,7 @@ sub isInitialized {
 # Parameters:
 #    $tableName - name of the table to create
 #    $tableCols - column specification; array ref, each element
-#        is a hash ref
+#        is a hash ref (from getQuerySchema() or getNeighorSchema())
 #
 # Returns:
 #    list of column names that must be indexed
@@ -320,20 +334,21 @@ sub initializeTable {
     my @pk;
     my @indexCols;
     foreach my $col (@$tableCols) {
-        my $spec = "$col->{name} $col->{type}";
+        my $colName = $col->{db_name} // $col->{name};
+        my $spec = "$colName $col->{type}";
         $spec .= " NOT NULL" if $col->{not_null};
-        push @pk, $col->{name} if $col->{primary_key};
-        push @indexCols, $col->{name} if $col->{create_index};
+        push @pk, $colName if $col->{primary_key};
+        push @indexCols, $colName if $col->{create_index};
         push @cols, $spec;
     }
 
     # Drop the table if the database is partially initialized or is out of date
     $self->{dbh}->do("DROP TABLE IF EXISTS $tableName");
-    $self->commit();
+    $self->{dbh}->commit();
 
     my $cols = join(", ", @cols);
     my $pk = join(", ", @pk);
-    $cols .= " PRIMARY KEY ($pk)" if $pk;
+    $cols .= ", PRIMARY KEY ($pk)" if $pk;
     my $sql = "CREATE TABLE $tableName ($cols)";
 
     $self->{dbh}->do($sql);
@@ -353,7 +368,7 @@ sub initializeTable {
 #
 sub getQuerySchema {
     return [
-        {name => "sort_key", type => "INT", primary_key => 1, not_null => 1, create_index => 1},
+        {name => SORT_KEY, type => "INT", primary_key => 1, not_null => 1, create_index => 1},
         {name => "id", type => "VARCHAR(20)", primary_key => 1, not_null => 1, create_index => 1},
         {name => "embl_id", type => "VARCHAR(30)"},
         {name => "num", type => "VARCHAR(30)"},
@@ -370,7 +385,7 @@ sub getQuerySchema {
         {name => "organism", type => "TEXT"},
         {name => "taxon_id", type => "INT"}, # taxonomy ID
         {name => "anno_status", type => "INT"}, # 1 if SwissProt, 0 if TrEMBL
-        {name => "desc", type => "TEXT"}, # SwissProt or sequence description from UniProt DB
+        {name => "desc", db_name => "description", type => "TEXT"}, # SwissProt or sequence description from UniProt DB
         {name => "family_desc", type => "TEXT"}, # Pfam long name
         {name => "ipro_family_desc", type => "TEXT"}, # InterPro long name
         {name => "cluster_num", type => "INT"}, # cluster number that this query belongs to
@@ -388,7 +403,7 @@ sub getQuerySchema {
 #
 sub getNeighborSchema {
     return [
-        {name => "query_sort_key", type => "INT", primary_key => 1, not_null => 1, create_index => 1},
+        {name => QUERY_SORT_KEY, type => "INT", primary_key => 1, not_null => 1, create_index => 1},
         {name => "id", type => "VARCHAR(20)", primary_key => 1, not_null => 1, create_index => 1},
         {name => "num", type => "TEXT"}, # db NUM
         {name => "direction", type => "VARCHAR(10)"}, # "normal" or "complement"
@@ -402,28 +417,6 @@ sub getNeighborSchema {
         {name => "pfam", type => "TEXT"}, # can be more than one family, separated by dash
         {name => "interpro", type => "TEXT"}, # can be more than one family, separated by dash 
     ];
-}
-
-#
-# queryIdSortFn - private static function
-#
-# Helper function to sort IDs in a cluster by their sort_key.
-#
-# Parameters:
-#    $cdata - hash ref of all of the data for the cluster that the IDs belong to
-#    $a - left-side ID (from Perl sort)
-#    $b - right-side ID (from Perl sort)
-#
-# Returns:
-#    1 if left sort_key < right sort_key
-#    -1 if left sort_key > right sort_key
-#    0 if left sort_key == right sort_key
-#
-sub queryIdSortFn {
-    my $cdata = shift;
-    my $a = shift;
-    my $b = shift;
-    return $cdata->{$a}->{sort_key} <=> $cdata->{$b}->{sort_key};
 }
 
 
