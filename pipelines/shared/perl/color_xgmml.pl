@@ -208,7 +208,7 @@ C<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after addin
 =head2 SYNOPSIS
 
     color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
-        [--cluster-color-map <FILE> --color-file <FILE>]
+        [--cluster-color-map <FILE>] [--color-file <FILE>]
 
 =head2 DESCRIPTION
 
@@ -244,8 +244,8 @@ as determined by the pipeline upstream
 
 =item C<--color-file>
 
-Path to a file containing the master color list. If not present, then it is assumed that
-a file named C<color.tab> exists in the same directory as the script.
+Path to a file containing the master color list.  If not present then the color map in
+C<EFI::Util::Colors> is used.
 
 =back
 
