@@ -21,8 +21,10 @@ sub new {
     my $self = {};
     bless $self, $class;
 
+    die "Require dbh parameter" if not $args{dbh};
+
     $self->{dbh} = $args{dbh};
-    $self->{debug} = $args{debug} // 0;
+    $self->{warning} = "";
     
     $self->{anno} = new EFI::Annotations;
 
@@ -42,6 +44,7 @@ sub new {
 }
 
 
+# public
 sub findNeighbors {
     my $self = shift;
     my $queryId = shift;
@@ -50,46 +53,51 @@ sub findNeighbors {
     my $neighborsWithoutFamily = {};
 
     # Get information for the query accession
-    my ($error, $pos, $queryAttributes) = $self->processQuery($queryId, $neighborhoodSize);
-    my $queryData = {attributes => $queryAttributes, neighbors => []};
+    my ($error, $pos, $queryAttributes) = $self->processQueryId($queryId, $neighborhoodSize);
+    my $queryIdData = {attributes => $queryAttributes, neighbors => []};
 
     # ID doesn't exist in the ENA database
-    if ($error and not $pos and not $queryData) {
-        #TODO: do something with $error?
+    if ($error and not $pos and not $queryAttributes) {
+        $self->{warning} = $error;
         return undef;
     }
 
     # Get statement handle, already executed, but nothing has been fetched
-    my $rows = $self->initializeNeighborQuery($queryData->{attributes}, $pos, $neighborhoodSize);
+    my $rows = $self->initializeNeighborDbQuery($queryIdData->{attributes}, $pos, $neighborhoodSize);
 
     # Check if there are actually any neighbors; number of rows will be 1
     # to account for the query sequence
-    my $warnings = "";
-    if ($rows->rows < 2) {
-        $warnings = "$queryId has no neighbors";
+    if ($rows->rows == 1) {
+        $self->{warning} = "$queryId has no neighbors";
+        return $queryIdData;
     }
-    $warnings = "$error\n$warnings" if ($error and $warnings);
 
     # Examine each neighbor
     while (my $row = $rows->fetchrow_hashref) {
-        my $neighbor = $self->processNeighbor($row, $queryData->{attributes}, $pos);
-        push @{ $queryData->{neighbors} }, $neighbor if $neighbor;
+        my $neighbor = $self->processNeighbor($row, $queryIdData->{attributes}, $pos);
+        push @{ $queryIdData->{neighbors} }, $neighbor if $neighbor;
     }
 
-    #TODO: do something with $warnings?
-    return $queryData;
+    return $queryIdData;
+}
+
+
+# public
+sub getWarning {
+    my $self = shift;
+    return $self->{warning};
 }
 
 
 #
-# processQuery - private method
+# processQueryId - private method
 #
 # Get position and attribute data for the given accession.  Typicaly returns
-# three values; if only the first value is defined then there was a fatal error
-# (e.g. the ID doesn't exist in ENA).
+# three values; if only one value is returned, then the first value is defined and
+# equal to a string; there was a fatal error because the ID doesn't exist in ENA.
 #
 # Parameters:
-#    $queryAccession - query accession ID
+#    $queryId - query accession ID
 #    $neighborhoodSize - neighborhood window
 #
 # Returns:
@@ -97,26 +105,26 @@ sub findNeighbors {
 #    $pos - data for the position on the genome for the query ID
 #    $data - query attributes
 #
-sub processQuery {
+sub processQueryId {
     my $self = shift;
-    my $queryAccession = shift;
+    my $queryId = shift;
     my $neighborhoodSize = shift;
 
-    my $emblId = $self->getEmblId($queryAccession);
+    my $emblId = $self->getEmblId($queryId);
 
     # There was no genome/ENA data for the given UniProt accession
     if (not $emblId) {
-        my $errorMessage = "No match in the ENA table for $queryAccession";
+        my $errorMessage = "No match in the ENA table for $queryId";
         return $errorMessage;
     }
 
     my $sql = "SELECT $self->{col_sql} FROM ena $self->{join_sql} WHERE ena.ID = ? AND AC = ? GROUP BY ena.AC LIMIT 1;";
     my $sth = $self->{dbh}->prepare($sql);
-    $sth->execute($emblId, $queryAccession);
+    $sth->execute($emblId, $queryId);
     my $row = $sth->fetchrow_hashref;
 
-    my $pos = $self->getQueryPositionData($neighborhoodSize, $row);
-    my $attributes = $self->createAccessionData($queryAccession, $row, $pos);
+    my $pos = $self->getQueryIdPositionData($neighborhoodSize, $row);
+    my $attributes = $self->createAccessionData($queryId, $row, $pos);
 
     return undef, $pos, $attributes;
 }
@@ -129,8 +137,8 @@ sub processQuery {
 #
 # Parameters:
 #    $row - row from the database corresponding to a neighbor
-#    $queryData - hash ref of data for the query
-#    $queryPos - hash ref of position data for the query
+#    $queryIdData - hash ref of data for the query ID
+#    $queryIdPos - hash ref of position data for the query ID
 #
 # Returns:
 #    hash ref of neighbor data if the neighbor is valid, return undef if the neighbor
@@ -139,26 +147,26 @@ sub processQuery {
 sub processNeighbor {
     my $self = shift;
     my $row = shift;
-    my $queryData = shift;
-    my $queryPos = shift;
+    my $queryIdData = shift;
+    my $queryIdPos = shift;
 
     my $nbData = {
         id => $row->{AC},
         num => $row->{NUM},
     };
 
-    $self->populateNeighborPositionData($row, $queryData, $queryPos, $nbData);
+    $self->populateNeighborPositionData($row, $queryIdData, $queryIdPos, $nbData);
 
     # distance will be zero if the row is the same as the query sequence
     if ($nbData->{distance} == 0) {
         return undef;
     }
 
-    my $pfamFam = join("-", sort {$a <=> $b} uniq split(",", $row->{pfam_fam} // ""));
-    my $ipInfo = $self->parseInterpro($row);
+    my $pfamFam = join("-", sort {$a cmp $b} uniq split(",", $row->{pfam_fam} // ""));
+    my ($ipInfo, $interproFam) = $self->parseInterpro($row);
 
     $nbData->{pfam} = $pfamFam;
-    $nbData->{interpro} = $ipInfo;
+    $nbData->{interpro} = $interproFam;
 
     return $nbData;
 }
@@ -174,15 +182,15 @@ sub processNeighbor {
 #
 # Parameters:
 #    $row - database row (hash ref) corresponding to a neighbor
-#    $queryData - hash ref of data for the query accession
-#    $queryPos - hash ref of position data for query accession
+#    $queryIdData - hash ref of data for the query accession
+#    $queryIdPos - hash ref of position data for query accession
 #    $nbData - hash ref that will be populated with data
 #
 sub populateNeighborPositionData {
     my $self = shift;
     my $row = shift;
-    my $queryData = shift;
-    my $queryPos = shift;
+    my $queryIdData = shift;
+    my $queryIdPos = shift;
     my $nbData = shift;
 
     my $nbStart = int($row->{start});
@@ -196,17 +204,17 @@ sub populateNeighborPositionData {
     my $relNbStart;
     my $relNbStop;
     my $distance;
-    if ($neighNum > $queryPos->{high_window} and exists $queryPos->{circ_high}) {
-        $distance = $neighNum - $queryData->{num} - $queryPos->{max_num};
-        $relNbStart = $nbStart - $queryPos->{max_coord};
-    } elsif ($neighNum < $queryPos->{low_window} and $queryPos->{circ_low}) {
-        $distance = $neighNum - $queryData->{num} + $queryPos->{max_num};
-        $relNbStart = $queryPos->{max_coord} + $nbStart;
+    if ($neighNum > $queryIdPos->{high_window} and exists $queryIdPos->{circ_high}) {
+        $distance = $neighNum - $queryIdData->{num} - $queryIdPos->{max_num};
+        $relNbStart = $nbStart - $queryIdPos->{max_coord};
+    } elsif ($neighNum < $queryIdPos->{low_window} and $queryIdPos->{circ_low}) {
+        $distance = $neighNum - $queryIdData->{num} + $queryIdPos->{max_num};
+        $relNbStart = $queryIdPos->{max_coord} + $nbStart;
     } else {
-        $distance = $neighNum - $queryData->{num};
+        $distance = $neighNum - $queryIdData->{num};
         $relNbStart = $nbStart;
     }
-    $relNbStart = int($relNbStart - $queryData->{start});
+    $relNbStart = int($relNbStart - $queryIdData->{start});
     $relNbStop = int($relNbStart + $nbSeqLen);
 
     $nbData->{start} = $nbStart;
@@ -215,7 +223,7 @@ sub populateNeighborPositionData {
     $nbData->{rel_stop} = $relNbStop;
     $nbData->{seq_len} = $nbSeqLenBp;
     $nbData->{distance} = $distance; # include distance here in addition to num, because the num is hard to compute in rare circular DNA cases
-    $nbData->{type} = $row->{TYPE} == 0 ? "circular" : "linear";
+    $nbData->{type} = ($row->{TYPE} == 0 ? "circular" : "linear");
     $nbData->{direction} = $row->{DIRECTION} == 0 ? "complement" : "normal";
 }
 
@@ -223,12 +231,12 @@ sub populateNeighborPositionData {
 #
 # createAccessionData - private method
 #
-# Create the data structure for the query accession.
+# Create the data structure for the query accession ID.
 #
 # Parameters:
-#    $queryAccession - query accession ID
+#    $accession - query accession ID
 #    $row - database row (hash ref) for query sequence
-#    $pos - position data as calculated by getQueryPositionData()
+#    $pos - position data as calculated by getQueryIdPositionData()
 #
 # Returns:
 #    hash ref with ID information, direction, position, and family data
@@ -239,8 +247,8 @@ sub createAccessionData {
     my $row = shift;
     my $pos = shift;
 
-    my $queryPfam = join("-", sort {$a <=> $b} uniq split(",", $row->{pfam_fam} // ""));
-    my $ipInfo = $self->parseInterpro($row);
+    my $queryIdPfam = join("-", sort {$a cmp $b} uniq split(",", $row->{pfam_fam} // ""));
+    my ($ipInfo, $queryIdInterpro) = $self->parseInterpro($row);
 
     my $data = {
         id => $accession,
@@ -252,10 +260,10 @@ sub createAccessionData {
         stop => $pos->{query_stop_coord},
         rel_start => 0,
         rel_stop => $pos->{query_stop_coord} - $pos->{query_start_coord}, 
-        type => $row->{TYPE} == 0 ? "circular" : "linear",
+        type => ($row->{TYPE} == 0 ? "circular" : "linear"),
         seq_len => $pos->{query_seq_len},
-        pfam => $queryPfam,
-        interpro => $ipInfo,
+        pfam => $queryIdPfam,
+        interpro => $queryIdInterpro,
     };
 
     return $data;
@@ -263,7 +271,7 @@ sub createAccessionData {
 
 
 #
-# getQueryPositionData - private method
+# getQueryIdPositionData - private method
 #
 # Get position data and window bounds for the query sequence.
 #
@@ -274,7 +282,7 @@ sub createAccessionData {
 # Returns:
 #    hash ref containing query position, coordinates, length, window max and bounds
 #
-sub getQueryPositionData {
+sub getQueryIdPositionData {
     my $self = shift;
     my $neighborhoodSize = shift;
     my $row = shift;
@@ -482,38 +490,38 @@ SQL
 
 
 #
-# initializeNeighborQuery - private method
+# initializeNeighborDbQuery - private method
 #
 # Get the SQL query that finds the neighbors of the input sequence.
 #
 # Parameters:
-#    $queryData - hash containing the query data (e.g. ID)
-#    $pos - hash containing data for the query position (comes from getQueryPositionData())
+#    $queryIdData - hash containing the query data (e.g. ID)
+#    $pos - hash containing data for the query position (comes from getQueryIdPositionData())
 #    $neighborhoodSize - integer indicating the window size (left or right) e.g. 20 == total width of 41
 #
 # Returns:
 #    DBI statement handle
 #
-sub initializeNeighborQuery {
+sub initializeNeighborDbQuery {
     my $self = shift;
-    my $queryData = shift;
+    my $queryIdData = shift;
     my $pos = shift;
     my $neighborhoodSize = shift;
 
     my $query = "SELECT $self->{col_sql} FROM ena $self->{join_sql} WHERE ena.ID = ?";
 
     # Handle circular case
-    if ($queryData->{type} eq "circular") {
+    if ($queryIdData->{type} eq "circular") {
         my ($circHigh, $circLow, $clause) = $self->getCircularPos($neighborhoodSize, $pos);
         $pos->{circ_high} = $circHigh;
         $pos->{circ_low} = $circLow;
-        $query .= " AND $clause";
+        $query .= " AND $clause" if $clause;
     } else {
         $query .= " AND ena.NUM >= $pos->{low_window} AND ena.NUM <= $pos->{high_window}";
     }
 
     my $nbSth = $self->{dbh}->prepare($query);
-    $nbSth->execute($queryData->{embl_id});
+    $nbSth->execute($queryIdData->{embl_id});
 
     return $nbSth;
 }
@@ -532,6 +540,13 @@ sub initializeNeighborQuery {
 #       an InterPro family associated with the sequence; each hash ref contains
 #       'type' key which is one of "domain", "family", or "homologous_superfamily",
 #       and 'family' which is the InterPro family ID
+#           [
+#               {
+#                   type => "domain",
+#                   family => "IPR"
+#               },
+#               ...
+#           ]
 #    info from array ref converted into a string
 #
 sub parseInterpro {
@@ -580,6 +595,10 @@ EFI::GNT::Neighborhood - Perl module for retrieving the genome neighborhood of a
     my $accession = "B0SS77";
     my $neighborhoodSize = 20;
     my $nbData = $nbUtil->findNeighbors($accession, $neighborhoodSize);
+
+    if (not $nbData) {
+        print $nbData->getWarning(), "\n";
+    }
 
 
 =head2 DESCRIPTION
@@ -630,28 +649,26 @@ this is 10, then a maximum of 21 sequences will be retrieved (10 left, 10 right,
 
 =head4 Returns
 
-A hashref containing information regarding neighbors and families for neighbors.  This is
-complex and looks like this:
+If the data retrieval was successful, a hash ref containing information regarding neighbors
+and families for neighbors is returned.  If there was an error (either due to the query ID
+not being present in ENA or there not being neighbors for the query ID), then the return
+value is undefined.  The return hash ref looks like this:
 
     {
-        id => "",
-        embl_id => "",
-        num => 0, # database NUM
-        direction => "normal", # "normal" or "complement"
-        start => 0, # start of sequence on genome in bp
-        stop => 0, # end of sequence on genome in bp
-        rel_start => 0, # start of sequence on genome in bp, accounting for a circular genome
-        rel_stop => 0, # end of sequence on genome in bp, accounting for a circular genome
-        type => "linear", "linear" or "circular"
-        seq_len => 0, # length of sequence in bp
-        pfam => "", # can be more than one family, separated by dash
-        interpro => "", # can be more than one family, separated by dash
-        interpro_data => [
-            {
-                family => "", # InterPro family ID
-                type => "family", # InterPro family type ("family", "domain", "homologous_superfamily")
-            }
-        ],
+        attributes => {
+            id => "",
+            embl_id => "",
+            num => 0, # database NUM
+            direction => "normal", # "normal" or "complement"
+            start => 0, # start of sequence on genome in bp
+            stop => 0, # end of sequence on genome in bp
+            rel_start => 0, # start of sequence on genome in bp, accounting for a circular genome
+            rel_stop => 0, # end of sequence on genome in bp, accounting for a circular genome
+            type => "linear", "linear" or "circular"
+            seq_len => 0, # length of sequence in bp
+            pfam => "", # can be more than one family, separated by dash
+            interpro => "" # can be more than one family, separated by dash
+        }
         neighbors => [
             {
                 id => "",
@@ -665,13 +682,7 @@ complex and looks like this:
                 type => "linear", # "linear" or "circular" indicating the genome type
                 seq_len => 0, # length of sequence in bp
                 pfam => "", # can be more than one family, separated by dash
-                interpro => "", # can be more than one family, separated by dash
-                interpro_data => [
-                    {
-                        family => "", # InterPro family ID
-                        type => "family", # InterPro family type ("family", "domain", "homologous_superfamily")
-                    }
-                ],
+                interpro => "" # can be more than one family, separated by dash
             }
         ],
     }
@@ -680,6 +691,13 @@ complex and looks like this:
 
     my $queryId = "B0SS77";
     my $data = $nbUtil->findNeighbors($queryId, 1);
+
+    if (not $data) {
+        print "Error retrieving $queryId\n";
+    }
+    if (not @{ $data->{neighbors} }) {
+        print "Warning: $queryId doesn't have neighbors\n";
+    }
     
     # $data will contain:
     #    {
@@ -727,6 +745,28 @@ complex and looks like this:
     #           }
     #       ]
     #   }
+
+
+=head3 C<getWarning()>
+
+Returns a warning message for issues encountered during data retrieval; typically this
+is due to the input query ID not being in the ENA database or because no neighbors
+were found.
+
+=head4 Returns
+
+A string with the warning message; empty if no warning.
+
+=head4 Example Usage
+
+    my $queryId = "";
+    my $data = $nbUtil->findNeighbor(...);
+
+    if (not $data) {
+        my $message = $nbUtil->getWarning();
+        print "Unable to retrieve neighborhood data for $queryId: $message\n";
+    }
+
 
 =cut
 
