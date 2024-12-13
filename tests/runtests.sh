@@ -42,8 +42,6 @@ fi
 
 set +e
 
-#bash "tests/modules/05_colorssn_uniprot.sh" $EFI_TEST_RESULTS_DIR $CONFIG_FILE
-#exit
 for file in $(ls tests/modules|grep '\.sh$'); do
     echo "================================================================================"
     echo "Executing tests in '$file'"
