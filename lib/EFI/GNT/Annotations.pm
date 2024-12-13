@@ -35,14 +35,14 @@ sub getGnnIdAnnotations {
 
     my $pfamDesc = "";
     if ($accessionData->{pfam}) {
-        my $names = $self->getFamilyNames($accessionData->{pfam});
-        $pfamDesc = join(";", map { $_->{short} } grep { $_->{id} =~ m/^PF/ } @$names);
+        my ($names) = $self->getFamilyNames($accessionData->{pfam});
+        $pfamDesc = join(";", map { $_->{short} } grep { $_->{family} =~ m/^PF/ } @$names);
     }
 
     my $interproDesc = "";
     if ($accessionData->{interpro}) {
-        my $names = $self->getFamilyNames($accessionData->{interpro});
-        $interproDesc = join(";", map { $_->{short} } grep { $_->{id} =~ m/^IPR/ } @$names);
+        my ($names) = $self->getFamilyNames($accessionData->{interpro});
+        $interproDesc = join(";", map { $_->{short} } grep { $_->{family} =~ m/^IPR/ } @$names);
     }
 
     my $annoData = {
@@ -367,8 +367,8 @@ and C<long>).  C<short> is the family short name, and C<long> is the family long
 For example:
 
     [
-        {id => "PF05544", short => "Pro_racemase", long => "Proline racemase"},
-        {id => "PF07197", short => "DUF1409", long => "Protein of unknown function (DUF1409)"}
+        {family => "PF05544", short => "Pro_racemase", long => "Proline racemase"},
+        {family => "PF07197", short => "DUF1409", long => "Protein of unknown function (DUF1409)"}
     ]
 
 =item C<$allShort>
@@ -388,10 +388,10 @@ C<"Proline racemase-Protein of unknown function (DUF1409)">.
     my $pfamHub = "PF05544-PF07197";
     my ($nameInfo, $allShort, $allLong) = $gntAnno->getFamilyNames($pfamHub);
     foreach my $info (@$nameInfo) {
-        print "Family ID: $info->{id}, Short name: $info->{short}, Long name: $info->{long}\n";
+        print "Family ID: $info->{family}, Short name: $info->{short}, Long name: $info->{long}\n";
     }
 
-    my $pfamDesc = join("; ", map { $_->{long} } grep { $_->{id} =~ m/^PF/ } @$nameInfo);
+    my $pfamDesc = join("; ", map { $_->{long} } grep { $_->{family} =~ m/^PF/ } @$nameInfo);
 
 
 =head3 C<getHubAnnotations($ids)>
