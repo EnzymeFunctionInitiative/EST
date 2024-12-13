@@ -33,10 +33,7 @@ As demonstrated in the quick start section all of the command line arguments are
 ### `--db-type` argument
 The `--db-type` argument currently accepts any values but, if given an unexpected value, will fallback to the default "sqlite" value.
 Accepted values are `sqlite` or `mysql`. 
-Giving a value of "mysql" expects that the full EFI database files are stored locally; this functionality requires more development/testing.
-From the previous version of this README: 
-
-> Assuming that the MySQL dataset and database have been setup and BLAST database files have been installed in `tests/test_data/mysql`, the MySQL environment can be set up by running `source tests/test_env.sh mysql`.  To use the `smalldata` test case based on SQLite, run `source tests/test_env.sh`.
+Giving a value of "mysql" expects that the full EFI database files are stored locally.
 
 ### `--data-dir` argument
 The `--data-dir` argument currently accepts any values but expects a global or local path to a directory where the sample data will be written to. 
