@@ -4,12 +4,15 @@ package EFI::GNT::GNN;
 use strict;
 use warnings;
 
+use Data::Dumper;
+
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 
 use EFI::Annotations;
 use EFI::GNT::Annotations;
+use EFI::GNT::Neighborhood;
 
 use constant MAX_NB_SIZE => 20;
 
@@ -21,9 +24,13 @@ sub new {
     my $self = {};
     bless $self, $class;
 
-    $self->{dbh} = $args{dbh} || die "Require dbh EFI::Database argument" if not $args{dbh};
-    $self->{network} = $args{seq_cluster_id_map} || die "Require seq_cluster_id_map argument";
-    $self->{gnt_anno} = $args{gnt_anno} || die "Require gnt_anno EFI::GNT::Annotations argument";
+    die "Require dbh EFI::Database argument" if not $args{dbh};
+    die "Require seq_cluster_id_map argument" if not $args{seq_cluster_id_map};
+    die "Require gnt_anno EFI::GNT::Annotations argument" if not $args{gnt_anno};
+
+    $self->{dbh} = $args{dbh};
+    $self->{network} = $args{seq_cluster_id_map};
+    $self->{gnt_anno} = $args{gnt_anno};
 
     if ($args{neighborhood_size} and $args{neighborhood_size} > MAX_NB_SIZE) {
         $self->{neighborhood_size} = $args{neighborhood_size};
@@ -65,9 +72,13 @@ sub retrieveClusterData {
 
             # Find the neighbors and query attributes
             my $accessionData = $nbFind->findNeighbors($accession, $self->{neighborhood_size});
+            if (not $accessionData) {
+                $self->addWarning($nbFind->getWarning());
+                next;
+            }
             push @{ $self->{cluster_data}->{$clusterId} }, $accessionData;
 
-            $self->insertAnnotationData($accessionData, $sortKey);
+            $self->insertAnnotationData($accessionData->{attributes}, $sortKey);
             $sortKey++;
         }
     }
@@ -178,7 +189,7 @@ B<EFI::GNT::GNN> - Perl module for creating genome neighborhood networks
     $tables->saveClusterStatistics($statsFile);
     $tables->savePfamCooccurrence($pfamCoocFile);
 
-    my $gnd = new EFI::GNT::GNN::GND(dbh => $dbh);
+    my $gnd = new EFI::GNT::GND(dbh => $dbh);
     $gnd->convertFromGnn($gnn);
     $gnd->save($gndFile);
 

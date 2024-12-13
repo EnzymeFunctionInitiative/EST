@@ -35,6 +35,8 @@ sub new {
     $self->{handles} = {};
 
     $self->initializeTableOutputs($self->{output_dir});
+
+    return $self;
 }
 
 
@@ -121,7 +123,7 @@ sub finish {
 
     foreach my $tableType (keys %{ $self->{handles} }) {
         foreach my $name (keys %{ $self->{handles}->{$tableType} }) {
-            $self->{handles}->{$tableType}->close();
+            $self->{handles}->{$tableType}->{$name}->close();
         }
     }
 }
@@ -154,7 +156,7 @@ sub getTableFileHandle {
         return $self->{handles}->{$tableType}->{$name};
     }
 
-    my $outputDir = $self->getOutputDir($tableType);
+    my $outputDir = $self->getOutputDir($tableType & ~MERGED_TABLE);
 
     my $filePath = "$outputDir/pfam_neighbors_$name.txt";
     if ($tableType & MERGED_TABLE) {

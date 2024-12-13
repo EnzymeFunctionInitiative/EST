@@ -27,13 +27,20 @@ sub new {
     # Cooccurrence threshold
     $self->{cooc_threshold} = $args{cooc_threshold} // 0.20;
 
-    $self->computeHubsFromGnn($args{gnn});
+    $self->compute($args{gnn});
 
     return $self;
 }
 
 
-# public
+#
+# compute - private method
+#
+# Computes all of the hub data necessary for creating GNNs.
+#
+# Parameters:
+#    $gnn - EFI::GNT::GNN object
+#
 sub compute {
     my $self = shift;
     my $gnn = shift;
@@ -328,7 +335,6 @@ B<EFI::GNT::GNN::Hubs> - Perl helper module for computing Pfam and cluster GNN d
     my $cooccurrenceThreshold = 0.20;
     my $gnn = new EFI::GNT::GNN(...);
     my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => $cooccurrenceThreshold);
-    $hubs->compute();
 
     my $clusterNums = $hubs->getClusterHubNumbers();
     my $cluster1Spokes = $hubs->getClusterHub($clusterNums[0]);
@@ -376,16 +382,6 @@ If not specified, defaults to C<0.20>.
 
     my $cooccurrenceThreshold = 0.20;
     my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => $cooccurrenceThreshold);
-
-
-=head3 C<compute()>
-
-Computes hub connectivity for the Pfam and Cluster hub GNNs.  The data used
-for computing is obtained from the C<gnn> parameter passed to the constructor.
-
-=head4 Example Usage
-
-    $hubs->compute();
 
 
 =head3 C<getClusterHubNumbers()>
