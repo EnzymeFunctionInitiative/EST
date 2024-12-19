@@ -40,17 +40,17 @@ sub write {
 
         foreach my $clusterNum (@clusterNums) {
             my $spokeNodeId = "$pfamHubName:$clusterNum";
-            my @nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{$clusterNum});
+            my $nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{$clusterNum});
 
-            $self->writeNode($spokeNodeId, "$clusterNum", \@nodeAttr);
+            $self->writeNode($spokeNodeId, "$clusterNum", $nodeAttr);
             $self->writeEdge($pfamHubName, $spokeNodeId);
         }
 
         # Only write a hub node if there were spoke nodes
         if (@clusterNums) {
-            my @nodeAttr = $self->getHubData($pfamHubName, $hub);
+            my $nodeAttr = $self->getHubData($pfamHubName, $hub);
             my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
-            $self->writeNode($pfamHubName, "$pfamShortName", \@nodeAttr);
+            $self->writeNode($pfamHubName, "$pfamShortName", $nodeAttr);
         }
     }
 }
@@ -82,9 +82,10 @@ sub getSpokeData {
     my ($spokeAnno, $numPdb, $numSwissProt) = $self->{gnt_anno}->getHubAnnotations($spoke->{neighbors});
     my $shape = $self->{gnt_anno}->getHubShape($numPdb, $numSwissProt);
 
+    my @queryIds;
     my @arrangement;
     my @queryNeighborInfo;
-    populate_arrangement($spoke, \@arrangement, \@queryNeighborInfo, {anno => $spokeAnno});
+    populate_arrangement($spoke, \@arrangement, \@queryNeighborInfo, \@queryIds, {anno => $spokeAnno});
 
     my @fields;
     push @fields, {name => "Pfam",                                          value => "",                                        type => "string"};
@@ -92,9 +93,10 @@ sub getSpokeData {
     push @fields, {name => "Cluster Number",                                value => $clusterNum,                               type => "integer"};
     push @fields, {name => "# of Sequences in SSN Cluster",                 value => $spoke->{num_cluster_ids},                 type => "integer"};
     push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $spoke->{num_query_ids_in_pfam},           type => "integer"};
-    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_query_ids_with_neighbors},    type => "integer"};
+    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_ids_with_neighbors},          type => "integer"};
     push @fields, {name => "# of Pfam Neighbors",                           value => $spoke->{num_neighbors},                   type => "integer"};
     push @fields, {name => "Query Accessions",                              value => $spoke->{query_ids_in_pfam},               type => "string"};
+    push @fields, {name => "Query Accessions",                              value => \@queryIds,                                type => "string"};
     push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,                       type => "string"};
     push @fields, {name => "Query-Neighbor Arrangement",                    value => \@arrangement,                             type => "string"};
     push @fields, {name => "Average Distance",                              value => $spoke->{average_distance},                type => "real"};
@@ -141,10 +143,11 @@ sub getHubData {
     my $numNeighbors = sum( map { $hub->{$_}->{num_neighbors} } @clusterNums );
     my $numQueryPfam = sum( map { $hub->{$_}->{num_query_ids_in_pfam} } @clusterNums );
 
+    my @queryIds;
     my @arrangement;
     my @queryNeighborInfo;
     foreach my $clusterNum (@clusterNums) {
-        populate_arrangement($hub->{$clusterNum}, \@arrangement, \@queryNeighborInfo);
+        populate_arrangement($hub->{$clusterNum}, \@arrangement, \@queryNeighborInfo, \@queryIds);
     }
 
     my @distances;

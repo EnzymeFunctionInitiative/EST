@@ -22,7 +22,7 @@ sub new {
     my $self = {};
     bless($self, $class);
 
-    $self->{output_file} = $args{output_file};
+    $self->{output_file} = $args{gnn_file};
     $self->{colors} = $args{colors} // new EFI::Util::Colors;
 
     return $self;

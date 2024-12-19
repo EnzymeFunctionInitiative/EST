@@ -44,16 +44,16 @@ sub write {
             my $spokeNodeId = "$clusterNum:$pfamHubName";
             my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
 
-            my @nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{spokes}->{$pfamHubName}, $pfamLongName);
+            my $nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{spokes}->{$pfamHubName}, $pfamLongName);
 
-            $self->writeNode($spokeNodeId, "$pfamShortName", \@nodeAttr);
+            $self->writeNode($spokeNodeId, "$pfamShortName", $nodeAttr);
             $self->writeEdge($clusterNum, $spokeNodeId);
         }
 
         # Only write a hub node if there were spoke nodes
         if (@pfamHubNames) {
-            my @nodeAttr = $self->getHubData($clusterNum, $hub);
-            $self->writeNode($clusterNum, "$clusterNum", \@nodeAttr);
+            my $nodeAttr = $self->getHubData($clusterNum, $hub);
+            $self->writeNode($clusterNum, "$clusterNum", $nodeAttr);
         }
     }
 }
@@ -81,25 +81,26 @@ sub getSpokeData {
     my $spoke = shift;
     my $pfamLongName = shift;
 
-    my $nodeSize = max(1, int($spoke->{num_query_ids_in_pfam} / $spoke->{num_query_ids_with_neighbors} * 100));
+    my $nodeSize = max(1, int($spoke->{num_query_ids_in_pfam} / $spoke->{num_ids_with_neighbors} * 100));
     my $color = "#EEEEEE";
 
     my ($spokeAnno, $numPdb, $numSwissProt) = $self->{gnt_anno}->getHubAnnotations($spoke->{neighbors});
     my $shape = $self->{gnt_anno}->getHubShape($numPdb, $numSwissProt);
 
+    my @queryIds;
     my @arrangement;
     my @queryNeighborInfo;
-    populate_arrangement($spoke, \@arrangement, \@queryNeighborInfo, {pfam => $pfam, anno => $spokeAnno});
+    populate_arrangement($spoke, \@arrangement, \@queryNeighborInfo, \@queryIds, {pfam => $pfam, anno => $spokeAnno});
 
     my @fields;
     push @fields, {name => "SSN Cluster Number",                            value => $clusterNum,                               type => "integer"};
     push @fields, {name => "Pfam",                                          value => $pfam,                                     type => "string"};
     push @fields, {name => "Pfam Description",                              value => $pfamLongName,                             type => "string"};
-    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_query_ids_with_neighbors},    type => "integer"};
+    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_ids_with_neighbors},          type => "integer"};
     push @fields, {name => "# of Pfam Neighbors",                           value => $spoke->{num_neighbors},                   type => "integer"};
     push @fields, {name => "# of Sequences in SSN Cluster",                 value => $spoke->{num_cluster_ids},                 type => "integer"};
     push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $spoke->{num_query_ids_in_pfam},           type => "integer"};
-    push @fields, {name => "Query Accessions",                              value => $spoke->{query_ids_in_pfam},               type => "string"};
+    push @fields, {name => "Query Accessions",                              value => \@queryIds,                                type => "string"};
     push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,                       type => "string"};
     push @fields, {name => "Query-Neighbor Arrangement",                    value => \@arrangement,                             type => "string"};
     push @fields, {name => "Average Distance",                              value => $spoke->{average_distance},                type => "real"};

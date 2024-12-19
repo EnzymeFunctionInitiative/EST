@@ -4,8 +4,6 @@ package EFI::GNT::GNN;
 use strict;
 use warnings;
 
-use Data::Dumper;
-
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
@@ -78,7 +76,7 @@ sub retrieveClusterData {
             }
             push @{ $self->{cluster_data}->{$clusterId} }, $accessionData;
 
-            $self->insertAnnotationData($accessionData->{attributes}, $sortKey);
+            $self->insertAnnotationData($accessionData, $sortKey);
             $sortKey++;
         }
     }
@@ -100,7 +98,7 @@ sub insertAnnotationData {
     my $data = shift;
     my $sortKey = shift;
 
-    my $anno = $self->{gnt_anno}->getGnnIdAnnotations($data);
+    my $anno = $self->{gnt_anno}->getGnnIdAnnotations($data->{attributes});
     $data->{attributes}->{sort_order} = $sortKey;
     $data->{attributes}->{organism} = $anno->{organism};
     $data->{attributes}->{taxon_id} = $anno->{taxonomy_id};

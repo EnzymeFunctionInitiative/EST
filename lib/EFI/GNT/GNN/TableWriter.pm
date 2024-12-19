@@ -73,8 +73,8 @@ sub saveUnclassifiedIds {
         my $file = "$outputDir/no_pfam_neighbors_$clusterNum.txt";
         open my $fh, ">", $file or die "Unable to write to unclassified IDs file $file: $!";
 
-        my @ids = $self->{hubs}->getClusterUnclassified($clusterNum);
-        foreach my $id (@ids) {
+        my $ids = $self->{hubs}->getClusterUnclassified($clusterNum);
+        foreach my $id (@$ids) {
             $fh->print("$id\n");
         }
 
