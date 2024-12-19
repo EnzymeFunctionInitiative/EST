@@ -4,7 +4,7 @@ package EFI::GNT::GNN::TableWriter::PfamHubs;
 use strict;
 use warnings;
 
-use File::Path qw(make_path);
+use File::Path qw(make_path remove_tree);
 
 # Pfam hub name, meeting cooccurrence threshold
 use constant PFAM_HUB_COOC => 1;
@@ -114,6 +114,8 @@ sub writeHubTables {
             }
         }
     }
+
+    $self->finish();
 }
 
 
@@ -125,6 +127,7 @@ sub finish {
         foreach my $name (keys %{ $self->{handles}->{$tableType} }) {
             $self->{handles}->{$tableType}->{$name}->close();
         }
+        $self->{handles}->{$tableType} = {};
     }
 }
 
@@ -163,7 +166,7 @@ sub getTableFileHandle {
         $filePath = "$outputDir/$name.txt";
     }
 
-    open my $fh, ">", $filePath or die "Unable to write to Pfam table $filePath: $!";
+    open my $fh, ">>", $filePath or die "Unable to write to Pfam table $filePath: $!";
     $self->{handles}->{$tableType}->{$name} = $fh;
 
     my @headers = $self->getTableHeaders();
@@ -198,9 +201,8 @@ sub initializeTableOutputs {
 
     foreach my $tableType (keys %{ $self->{pfam_dirs} }) {
         my $dir = $self->getOutputDir($tableType);
-        if (not -d $dir) {
-            make_path($dir) or die "Unable to create table output directory $dir: $!";
-        }
+        remove_tree($dir) if -e $dir;
+        make_path($dir) or die "Unable to create table output directory $dir: $!";
         $self->{handles}->{$tableType} = {};
     }
 }
