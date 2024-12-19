@@ -421,7 +421,8 @@ sub getCircularPos {
 #    $accession - query accession ID
 #
 # Returns:
-#    ENA ID (gene ID)
+#    ENA ID (gene ID), or undef if the input accession ID does not exist
+#        in the database
 #
 sub getEmblId {
     my $self = shift;
@@ -434,7 +435,7 @@ sub getEmblId {
     # Check if there was no match in the ENA table; i.e. there is no genomic information for the sequence ID
     my $row = $sth->fetchrow_hashref;
     if (not $row) {
-        return "";
+        return undef;
     }
 
     my $emblId = "";
@@ -448,7 +449,7 @@ sub getEmblId {
 
         my $row = $sth->fetchrow_hashref;
         if (not $row) {
-            die "Unable to execute query $sql";
+            return undef;
         }
 
         $emblId = $row->{ID};
@@ -630,7 +631,10 @@ Database handle that comes from C<EFI::Database>.
 =head3 C<findNeighbors($accession, $neighborhoodSize)>
 
 Retrieves data for the given accession ID as as the neighbors of the query C<$accession>
-ID as well as metadata.
+ID as well as metadata.  If the return value is undefined, then the query <$accession>
+ID is not present in the ENA table.  This can happen because the input is from an
+eukaryote organism (in which case genome context is not available), or because the
+ENA and UniProt databases are not in sync yet.
 
 =head4 Parameters
 
@@ -650,9 +654,8 @@ this is 10, then a maximum of 21 sequences will be retrieved (10 left, 10 right,
 =head4 Returns
 
 If the data retrieval was successful, a hash ref containing information regarding neighbors
-and families for neighbors is returned.  If there was an error (either due to the query ID
-not being present in ENA or there not being neighbors for the query ID), then the return
-value is undefined.  The return hash ref looks like this:
+and families for neighbors is returned.  If there was an error retrieving information for
+the query ID, undef is returned.  The return hash ref looks like this:
 
     {
         attributes => {
@@ -693,7 +696,7 @@ value is undefined.  The return hash ref looks like this:
     my $data = $nbUtil->findNeighbors($queryId, 1);
 
     if (not $data) {
-        print "Error retrieving $queryId\n";
+        print "Error: $queryId isn't in ENA\n";
     }
     if (not @{ $data->{neighbors} }) {
         print "Warning: $queryId doesn't have neighbors\n";

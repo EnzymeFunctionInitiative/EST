@@ -32,6 +32,9 @@ sub getGnnIdAnnotations {
     my $accessionData = shift;
 
     my $data = $self->retrieveIdAnnotations($accessionData->{id});
+    if (not $data) {
+        return undef;
+    }
 
     my $pfamDesc = "";
     if ($accessionData->{pfam}) {
@@ -98,7 +101,8 @@ sub getFamilyNames {
 #
 # Returns:
 #    a hash ref containing is_swissprot, pdb, ec, organism, taxonomy_id, and
-#        desc (SwissProt description) fields
+#        desc (SwissProt description) fields, or undef if the ID doesn't
+#        exist in the EFI annotations database
 #
 sub retrieveIdAnnotations {
     my $self = shift;
@@ -116,15 +120,12 @@ sub retrieveIdAnnotations {
 
     my $row = $sth->fetchrow_hashref();
     if (not $row) {
-        $self->addWarning("WARNING: $id missing from EFI database; is entry obsolete?");
         return undef;
     }
 
     my $metadata = {};
     if ($row->{metadata}) {
         $metadata = $self->{efi_anno}->decode_meta_struct($row->{metadata});
-    } else {
-        $self->addWarning("WARNING: missing metadata for $id; is entry obsolete?");
     }
 
     my $data = {
@@ -156,6 +157,7 @@ sub getHubAnnotations {
     my $hubInfo = {};
     foreach my $accession (@$ids) {
         my $data = $self->retrieveIdAnnotations($accession, $sth);
+        next if not $data;
 
         my $pdbEvalue = "None";
         my $closestPdbNumber = "None";
@@ -218,8 +220,6 @@ sub getHubIdAnnotations {
     my $metadata = {};
     if ($row->{metadata}) {
         $metadata = $self->{efi_anno}->decode_meta_struct($row->{metadata});
-    } else {
-        $self->addWarning("WARNING: missing metadata for $accession; is entry obsolete? [1]\n");
     }
 
     my $pdbNumber = $metadata->{pdb} // "";
@@ -291,6 +291,8 @@ Database handle that comes from C<EFI::Database>.
 =head3 C<getGnnIdAnnotations($idData)>
 
 Retrieves annotations for the accession ID that are necessary to create a GNN.
+If the ID doesn't exist in the EFI annotations database, then C<undef> is
+returned.
 
 =head4 Parameters
 
@@ -331,11 +333,17 @@ A hash ref with the keys pointing to metadata values:
         interpro_desc => "ATP-grasp;ATP_grasp_subdomain_1;D_ala_D_ala;Dala_Dala_lig_C;Dala_Dala_lig_N;PreATP-grasp_dom_sf"
     }
 
+If the ID doesn't exist in the database then C<undef> is returned.
+
 =head4 Example Usage
 
     my $annoData = $annoUtil->getGnnIdAnnotations($id);
-    foreach my $annoKey (keys %$annoData) {
-        print "$annoKey: $annoData->{$annoKey}\n";
+    if (not $annoData) {
+        print "$id wasn't found in the database\n";
+    } else {
+        foreach my $annoKey (keys %$annoData) {
+            print "$annoKey: $annoData->{$annoKey}\n";
+        }
     }
 
 
