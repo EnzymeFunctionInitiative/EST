@@ -521,6 +521,8 @@ sub initializeNeighborDbQuery {
         $query .= " AND ena.NUM >= $pos->{low_window} AND ena.NUM <= $pos->{high_window}";
     }
 
+    $query .= " GROUP BY ena.AC ORDER BY NUM";
+
     my $nbSth = $self->{dbh}->prepare($query);
     $nbSth->execute($queryIdData->{embl_id});
 
