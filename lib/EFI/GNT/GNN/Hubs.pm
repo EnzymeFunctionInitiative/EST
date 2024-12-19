@@ -53,7 +53,7 @@ sub compute {
             my @neighborIds = @{ $query->{neighbors} };
             foreach my $nb (@neighborIds) {
                 my $data = {
-                    neighbor => $nb->{id},
+                    id => $nb->{id},
                     direction => $nb->{direction},
                     distance => $nb->{distance},
                 };
@@ -63,13 +63,13 @@ sub compute {
     
         # Get the unique list of query IDs in each neighboring Pfam as well as
         # the list of query IDs in the cluster that have neighbors
-        my $hubIdsWithNeighbors = {};
+        my %hubIdsWithNeighbors;
         foreach my $pfam (keys %$pfamData) {
             my @ids = sort keys %{ $pfamData->{$pfam} };
-            map { $hubIdsWithNeighbors->{$_} = $pfam } @ids;
+            map { $hubIdsWithNeighbors{$_} = $pfam } @ids;
         }
 
-        my @hubIdsWithNeighbors = [sort keys %$hubIdsWithNeighbors];
+        my @hubIdsWithNeighbors = sort keys %hubIdsWithNeighbors;
         #NOTE hub_ids is equivalent to the 'withneighbors' output from the old module
         $self->{cluster_pfam}->{$clusterNum} = {pfam => $pfamData, hub_ids => \@hubIdsWithNeighbors};
     }
@@ -126,7 +126,6 @@ sub computePfamHubs {
 #    $clusterNum - number of the cluster to use to create structure
 #    $pfamHub - the hub obtained from the cluster_pfam module variable
 #    $numIdsWithNeighbors - optional; used to reduce number of computations for cluster hubs
-#    $numClusterIds - optional; used to reduce number of computations for cluster hubs
 #
 # Returns:
 #    hash ref with keys corresponding to XGMML output attributes
@@ -136,21 +135,25 @@ sub makeHubData {
     my $clusterNum = shift;
     my $pfamHub = shift;
     my $numIdsWithNeighbors = shift;
-    my $numClusterIds = shift;
 
     # Can cache these values outside and pass in for more efficiency when creating cluster GNN
     $numIdsWithNeighbors = @{ $self->{cluster_pfam}->{$clusterNum}->{hub_ids} } if not defined $numIdsWithNeighbors; #NOTE old 'withneighbors'
-    $numClusterIds = @{ $self->{cluster_data}->{$clusterNum} } if not defined $numClusterIds;
+    my $numClusterIds = @{ $self->{cluster_data}->{$clusterNum} };
 
-    my @queryIds = sort keys %$pfamHub;
-    my $numIdsInPfam = @queryIds;
+    my @queryData;
+    my @distances;
+    foreach my $queryData (@{ $self->{cluster_data}->{$clusterNum} }) {
+        my $queryId = $queryData->{attributes}->{id};
+        # The ID may exist in the network, but not have genome context information
+        if ($pfamHub->{$queryId}) {
+            push @queryData, { id => $queryId, neighbors => $pfamHub->{$queryId}, direction => $queryData->{attributes}->{direction} };
+            push @distances, map { $_->{distance} } @{ $pfamHub->{$queryId} };
+        }
+    }
+
+    my $numIdsInPfam = @queryData;
     my $cooccurrence = int($numIdsInPfam / $numIdsWithNeighbors * 100) / 100;
     my $coocRatio = "$numIdsInPfam/$numIdsWithNeighbors";
-
-    my @distances;
-    foreach my $queryId (@queryIds) {
-        push @distances, map { $_->{distance} } @{ $pfamHub->{$queryId} };
-    }
 
     my $numNeighbors = @distances;
     my $distanceMedian = median( sort @distances );
@@ -165,8 +168,7 @@ sub makeHubData {
         num_neighbors           => $numNeighbors,
         cooccurrence            => $cooccurrence,
         cooccurrence_ratio      => $coocRatio,
-        query_ids_in_pfam       => \@queryIds,
-        query_neighbors         => $pfamHub,
+        query_ids_in_pfam       => \@queryData,
         average_distance        => sprintf("%.2f", $averageDist),
         median_distance         => sprintf("%.2f", $medianDist),
     };
@@ -199,18 +201,18 @@ sub computeClusterHubs {
         my $pfams = {};
 
         # Compute the spoke (Pfam) nodes that connect to the cluster hub
-        foreach my $pfam (sort keys %{ $self->{cluster_pfam}->{$clusterNum}->{pfam} }) {
-            my $clusterPfam = $self->{cluster_pfam}->{$clusterNum}->{pfam}->{$pfam};
+        my $clusterPfams = $self->{cluster_pfam}->{$clusterNum}->{pfam};
+        foreach my $pfam (sort keys %$clusterPfams) {
+            my $pfamHub = $clusterPfams->{$pfam};
             # This will happen when a neighbor doesn't have a Pfam
             if (not $pfam) {
-                foreach my $queryId (keys %$clusterPfam) {
-                    push @unclassified, map { $_->{neighbor} } @{ $clusterPfam->{$queryId} };
+                foreach my $queryId (keys %$pfamHub) {
+                    push @unclassified, map { $_->{id} } @{ $pfamHub->{$queryId} };
                 }
                 next;
             }
 
-            my $pfamHub = $self->{cluster_pfam}->{$clusterNum}->{pfam}->{$pfam};
-            my $data = $self->makeHubData($clusterNum, $pfamHub, $numIdsWithNeighbors, $numClusterIds);
+            my $data = $self->makeHubData($clusterNum, $pfamHub, $numIdsWithNeighbors);
             $pfams->{$pfam} = $data;
         }
 
@@ -297,7 +299,7 @@ sub getPfamHubNames {
 sub getPfamHub {
     my $self = shift;
     my $pfam = shift;
-    my $filterSpokes = shift || 1;
+    my $filterSpokes = shift // 1;
 
     return {} if not $self->{pfam_hubs}->{$pfam};
 
@@ -431,7 +433,7 @@ contains two keys/values containing cluster size information.
 
     {
         # Number of query IDs in the cluster that have neighbors with Pfams
-        num_query_ids_with_neighbors => 2,
+        num_ids_with_neighbors => 2,
 
         # Number of query IDs in the cluster
         num_cluster_ids => 2,
@@ -439,7 +441,7 @@ contains two keys/values containing cluster size information.
         spokes => {
             "pfam_a" => {
                 # Number of query IDs in the cluster that have neighbors with Pfams
-                num_query_ids_with_neighbors  => 2,
+                num_ids_with_neighbors  => 2,
 
                 # Number of query IDs in the cluster that are in this cluster/Pfam hub ("pfam_a"); size of 'query_ids_in_pfam'
                 num_query_ids_in_pfam   => 1,
@@ -457,7 +459,7 @@ contains two keys/values containing cluster size information.
                 cooccurrence_ratio      => "",
 
                 # Mapping of query in the Pfam to the neighbors
-                query_neighbors         => {},
+                query_ids_in_pfam       => [],
 
                 # Average distance of neighbors from query IDs in this cluster/Pfam hub
                 average_distance        => "3.00",
@@ -568,7 +570,7 @@ Pfam data (hash ref) associated with the cluster.
         spokes => {
             "1" => {
                 # Number of query IDs in the cluster that have neighbors with Pfams
-                num_query_ids_with_neighbors  => 2,
+                num_ids_with_neighbors  => 2,
 
                 # Number of query IDs in the cluster that are in this cluster/Pfam hub ("pfam_a"); size of 'query_ids_in_pfam'
                 num_query_ids_in_pfam   => 1,
@@ -586,7 +588,7 @@ Pfam data (hash ref) associated with the cluster.
                 cooccurrence_ratio      => "",
 
                 # Mapping of query in the Pfam to the neighbors
-                query_neighbors         => {},
+                query_ids_in_pfam       => [],
 
                 # Average distance of neighbors from query IDs in this cluster/Pfam hub
                 average_distance        => "3.00",
@@ -716,7 +718,7 @@ with the same size.
 
 =over
 
-=item C<num_query_ids_with_neighbors>
+=item C<num_ids_with_neighbors>
 
 The number of query IDs in the Pfam hub that have neighbors.  This may be the
 same as C<num_query_ids_in_pfam> but typically is larger.
@@ -742,15 +744,16 @@ number > C<0> and <= C<1.0>.
 =item C<cooccurrence_ratio>
 
 The cooccurrence expressed in ratio form (i.e.
-C<num_query_ids_in_pfam / num_query_ids_with_neighbors>) (e.g. C<"33/101">).
+C<num_query_ids_in_pfam / num_ids_with_neighbors>) (e.g. C<"33/101">).
 
-=item C<query_neighbors>
+=item C<query_ids_in_pfam>
 
-Hash ref that maps query ID in the Pfam hub to the neighbors of the query.  This
-looks like:
+Array ref that contains hash refs that map query ID in the Pfam hub to the
+neighbors of the query.  This looks like:
 
-    {
-        "query_id" => {
+    [
+        {
+            id => "query_id",
             direction => 0, # query direction
             neighbors => [
                 {
@@ -762,7 +765,7 @@ looks like:
             ],
         },
         ...
-    }
+    ]
 
 =item C<average_distance>
 

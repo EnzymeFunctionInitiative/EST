@@ -77,7 +77,7 @@ sub writeHubTables {
     my $hub = shift;
     my $filterOnCooccurrence = shift;
 
-    my @clusterNums = sort keys %{ $hub->{spokes} };
+    my @clusterNums = sort keys %$hub;
 
     my $tableType = $filterOnCooccurrence ? PFAM_HUB_COOC : PFAM_HUB_ALL;
 
@@ -97,13 +97,13 @@ sub writeHubTables {
     push @handles, $self->getTableFileHandle($tableType | MERGED_TABLE);
 
     foreach my $clusterNum (@clusterNums) {
-        my $cluster = $hub->{spokes}->{$clusterNum};
+        my $cluster = $hub->{$clusterNum};
         my $color = $self->{colors}->getColor($clusterNum);
 
-        foreach my $queryId (keys %$cluster) {
-            foreach my $nb (@{ $cluster->{$queryId}->{query_neighbors} }) {
+        foreach my $queryData (@{ $cluster->{query_ids_in_pfam} }) {
+            foreach my $nb (@{ $queryData->{neighbors} }) {
                 my $distance = sprintf("%02d", $nb->{distance});
-                my @line = ($queryId, $nb->{id}, $pfamHubName, $color, $distance, $nb->{direction});
+                my @line = ($queryData->{id}, $nb->{id}, $pfamHubName, $color, $distance, $nb->{direction});
                 my $line = join("\t", @line);
 
                 # Save the line to every handle that is related to this Pfam hub,
