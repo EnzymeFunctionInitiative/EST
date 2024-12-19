@@ -306,7 +306,7 @@ InterPro family IDs (multiple can be specified, hyphen-separated).  For example,
     {
         id => "B0SS77",
         pfam => "PF07478-PF01820",
-        interpro => "IPR011761-IPR013815-IPR005905-IPR011095-IPR011127-IPR016185"}
+        interpro => "IPR011761-IPR013815-IPR005905-IPR011095-IPR011127-IPR016185"
     }
 
 =back
@@ -337,7 +337,8 @@ If the ID doesn't exist in the database then C<undef> is returned.
 
 =head4 Example Usage
 
-    my $annoData = $annoUtil->getGnnIdAnnotations($id);
+    my $idData = { id => "B0SS77", pfam => "PF07478-PF01820", interpro => "IPR011761-IPR013815-IPR005905-IPR011095-IPR011127-IPR016185" };
+    my $annoData = $annoUtil->getGnnIdAnnotations($idData);
     if (not $annoData) {
         print "$id wasn't found in the database\n";
     } else {
