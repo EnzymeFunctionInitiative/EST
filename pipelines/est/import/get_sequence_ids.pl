@@ -6,7 +6,7 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use FindBin;
-use Time::HiRes;
+use Time::HiRes qw(time);
 
 use lib "$FindBin::Bin/../../../lib";
 
@@ -64,7 +64,7 @@ if (not $seqData) {
     $logger->error($source->getErrors());
     die "\n";
 }
-my $numIds = $stats->getValue("num_ids");
+my $numIds = $stats->getValue("num_blast_retr");
 
 my $_elapsed = int((time() - $_start) * 1000);
 $logger->message("Found $numIds UniProt sequence IDs in $_elapsed ms");
