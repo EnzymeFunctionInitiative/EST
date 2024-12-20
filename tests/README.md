@@ -1,8 +1,10 @@
 
-# Set up test environment
+# Testing Suite
 
-Assuming that the MySQL dataset and database have been setup and BLAST database
-files have been installed in `tests/test_data/mysql`, the MySQL environment can
-be set up by running `source tests/test_env.sh mysql`.  To use the `smalldata`
-test case based on SQLite, run `source tests/test_env.sh`.
+Testing documentation is provided at [docs/source/guides/testing.rst](https://github.com/EnzymeFunctionInitiative/EST/blob/9ff15f087a4f94a37bb43ebe0bd82979757fb0ae/docs/source/guides/testing.rst). 
+The `runtests.sh` script will run all testing modules defined in the `modules/` subdirectory. 
+The 'test_env.sh` script exports environment variables that are used across all testing modules. 
+
+To develop new testing modules, create the bash script in the modules subdirectory, following the `{zero_padded_index}_{test_descriptor}.sh` naming format.
+This formatting enables the full test suite to be run when `runtests.sh` is called.
 

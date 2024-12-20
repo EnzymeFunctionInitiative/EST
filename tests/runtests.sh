@@ -23,37 +23,29 @@ fi
 
 echo "Using $CONFIG_FILE config files for processes"
 
-# if $TEST_RESULTS_DIR not defined already then set to default path
-if [[ -z ${TEST_RESULTS_DIR} ]]; then
-    TEST_RESULTS_DIR=tests/test_results
-fi
-
-if [[ ! -d $TEST_RESULTS_DIR ]]; then 
-    mkdir -p $TEST_RESULTS_DIR
-fi
-echo "Test results will be written in $TEST_RESULTS_DIR"
-
-set +e
-
-if [[ -z ${EFI_CONFIG_FILE+1} || -z ${EFI_DB_NAME+1} || -z ${EFI_FASTA_DB+1} || -z ${EFI_TEST_ACC_FILE+1} || -z ${EFI_TEST_FASTA_FILE+1} || -z ${EFI_TEST_BLAST_SEQ+1} || -z ${EFI_TEST_ENV+1} || -z ${EFI_TEST_FAMILY_ID+1} ]]; then
-    echo "Test environment variables not found, please run 'source tests/test_env.sh mysql' or 'source tests/test_env.sh sqlite'"
+if [[ -z "$EFI_CONFIG_FILE" || -z "$EFI_DB_NAME" || -z "$EFI_FASTA_DB" || -z "$EFI_TEST_ACC_FILE" || -z "$EFI_TEST_FASTA_FILE" || -z "$EFI_TEST_BLAST_SEQ" || -z "$EFI_TEST_ENV" || -z "$EFI_TEST_FAMILY_ID" ]]; then
+    echo "Test environment variables not found, please run 'source tests/test_env.sh'"
     exit 1
 elif [[ "$EFI_TEST_ENV" != "mysql" && ! -d "$EFI_TEST_DATA_DIR" ]]; then
     echo "Test data directory not found, attempting to download"
-    test_data_dir="tests/test_data/smalldata"
-    mkdir -p $test_data_dir
-    curl -o $test_data_dir/data.tar.gz https://efi.igb.illinois.edu/downloads/sample_data/kb_test_all/kb_test_all.tar.gz
-    tar xzf $test_data_dir/data.tar.gz -C $test_data_dir
-    echo "[database]" > $test_data_dir/efi.config
-    echo "dbi=sqlite" >> $test_data_dir/efi.config
+    #test_data_dir="tests/test_data/smalldata"
+    mkdir -p $EFI_TEST_DATA_DIR
+    curl -o $EFI_TEST_DATA_DIR/data.tar.gz https://efi.igb.illinois.edu/downloads/sample_data/old/kb_test_all/kb_test_all.tar.gz
+    tar xzf $EFI_TEST_DATA_DIR/data.tar.gz -C $EFI_TEST_DATA_DIR
+    echo "[database]" > $EFI_TEST_DATA_DIR/efi.config
+    echo "dbi=sqlite" >> $EFI_TEST_DATA_DIR/efi.config
 fi
 
-#bash "tests/modules/05_colorssn_uniprot.sh" $TEST_RESULTS_DIR $CONFIG_FILE
-#exit
+if [[ ! -d $EFI_TEST_RESULTS_DIR ]]; then 
+    mkdir -p $EFI_TEST_RESULTS_DIR
+fi
+
+set +e
+
 for file in $(ls tests/modules|grep '\.sh$'); do
     echo "================================================================================"
     echo "Executing tests in '$file'"
-    bash "tests/modules/$file" $TEST_RESULTS_DIR $CONFIG_FILE
+    bash "tests/modules/$file" $EFI_TEST_RESULTS_DIR $CONFIG_FILE
     if [[ $? -eq 0 ]]; then
 	echo "Tests in '$file' passed"
     fi
