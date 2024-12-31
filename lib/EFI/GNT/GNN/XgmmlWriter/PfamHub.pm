@@ -95,7 +95,6 @@ sub getSpokeData {
     push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $spoke->{num_query_ids_in_pfam},           type => "integer"};
     push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_ids_with_neighbors},          type => "integer"};
     push @fields, {name => "# of Pfam Neighbors",                           value => $spoke->{num_neighbors},                   type => "integer"};
-    push @fields, {name => "Query Accessions",                              value => $spoke->{query_ids_in_pfam},               type => "string"};
     push @fields, {name => "Query Accessions",                              value => \@queryIds,                                type => "string"};
     push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,                       type => "string"};
     push @fields, {name => "Query-Neighbor Arrangement",                    value => \@arrangement,                             type => "string"};

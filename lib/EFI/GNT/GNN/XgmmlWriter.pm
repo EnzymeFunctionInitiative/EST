@@ -56,7 +56,7 @@ sub writeField {
     if (ref $field->{value} eq "ARRAY") {
         $self->writeListField($field);
     } else {
-        $self->{writer}->emptyTag("att", %$field);
+        $self->emptyTag("att", %$field);
     }
 }
 
@@ -89,7 +89,7 @@ sub writeListField {
     }
 
     foreach my $value (@values) {
-        $self->{writer}->emptyTag("att", "type" => $field->{type}, "name" => $field->{name}, "value" => $value);
+        $self->emptyTag("att", "type" => $field->{type}, "name" => $field->{name}, "value" => $value);
     }
 
     $self->endTag();
@@ -124,7 +124,7 @@ sub writeEdge {
     my $self = shift;
     my $source = shift;
     my $target = shift;
-    $self->startTag("edge", label => "$source to $target", source => $source, target => $target);
+    $self->emptyTag("edge", label => "$source to $target", source => $source, target => $target);
 }
 
 
