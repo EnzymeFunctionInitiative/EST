@@ -176,7 +176,7 @@ sub getHubAnnotations {
 
 
 # public
-sub getHubShape {
+sub getShape {
     my $self = shift;
     my $numPdb = shift;
     my $numSwissProt = shift;
@@ -187,7 +187,7 @@ sub getHubShape {
     } elsif ($numPdb > 0) {
         $shape = "square";
     } elsif ($numSwissProt > 0) {
-        $shape = "triangle"
+        $shape = "triangle";
     }
 
     return $shape;
@@ -258,7 +258,7 @@ EFI::GNT::Annotations - Perl module for retrieving annotations from the EFI data
     my $neighbors = ["B0SS77", "B0SS79"];
     my ($neighborData, $numPdb, $numSwissProt) = $annoUtil->getHubAnnotations($neighbors);
 
-    my $shape = $annoUtil->getHubShape($numPdb, $numSwissProt);
+    my $shape = $annoUtil->getShape($numPdb, $numSwissProt);
 
 
 =head2 DESCRIPTION
@@ -471,7 +471,7 @@ SwissProt).
 =head4 Example Usage
 
     my ($data, $numPdb, $numSwissProt) = $annoUtil->getHubAnnotations([...]);
-    my $shape = $annoUtil->getHubShape($numPdb, $numSwissProt);
+    my $shape = $annoUtil->getShape($numPdb, $numSwissProt);
     print "The Hub shape will be $shape\n";
 
 

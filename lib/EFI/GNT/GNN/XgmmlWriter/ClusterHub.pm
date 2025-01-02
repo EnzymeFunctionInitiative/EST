@@ -87,7 +87,7 @@ sub getSpokeData {
 
     my $nbIds = $self->{util}->getNeighborIds($spoke);
     my ($nbAnno, $numPdb, $numSwissProt) = $self->{gnt_anno}->getHubAnnotations($nbIds);
-    my $shape = $self->{gnt_anno}->getHubShape($numPdb, $numSwissProt);
+    my $shape = $self->{gnt_anno}->getShape($numPdb, $numSwissProt);
 
     my ($queryIds, $arrangement, $queryNeighborInfo) = $self->{util}->populateArrangement($spoke, {pfam => $pfam, anno => $nbAnno});
 
