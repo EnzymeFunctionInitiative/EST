@@ -30,6 +30,14 @@ sub new {
     # Cooccurrence threshold
     $self->{cooc_threshold} = $args{cooc_threshold} // 0.20;
 
+    if (not exists $args{cooc_threshold}) {
+        $self->{cooc_threshold} = 0.20;
+    } elsif ($args{cooc_threshold} >= 0 and $args{cooc_threshold} <= 1) {
+        $self->{cooc_threshold} = $args{cooc_threshold};
+    } else {
+        die "cooc_threshold is outside of range (>= 0 and <= 1)";
+    }
+
     $self->compute($args{gnn});
 
     return $self;
@@ -371,7 +379,7 @@ A B<EFI::GNT::GNN> object.
 =over C<cooc_threshold>
 
 The cooccurrence threshold, used to determine if a cluster hub or Pfam hub should be
-included in the output network.  A numerical value > C<0> and <= C<1>.
+included in the output network.  A numerical value >= C<0> and <= C<1>.
 If not specified, defaults to C<0.20>.
 
 =back
