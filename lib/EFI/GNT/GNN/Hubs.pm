@@ -12,9 +12,12 @@ sub new {
     my %args = @_;
 
     die "Require EFI::GNT::GNN gnn argument" if not $args{gnn};
+    die "Require seq_cluster_id_map argument" if not $args{seq_cluster_id_map};
 
     my $self = {};
     bless $self, $class;
+
+    $self->{network} = $args{seq_cluster_id_map};
 
     # Map cluster number to Pfams for the cluster
     $self->{cluster_pfam} = {};
@@ -44,10 +47,14 @@ sub new {
 sub compute {
     my $self = shift;
     my $gnn = shift;
+
     $self->{cluster_data} = $gnn->getClusterData();
+    $self->{cluster_size} = {};
 
     foreach my $clusterNum (keys %{ $self->{cluster_data} }) {
         my $pfamData = {};
+        my %queryIdsWithNeighbors;
+        $self->{cluster_size}->{$clusterNum} = @{ $self->{network}->{$clusterNum} };
         foreach my $query (@{ $self->{cluster_data}->{$clusterNum} }) {
             my $attributes = $query->{attributes};
             my @neighborIds = @{ $query->{neighbors} };
@@ -58,20 +65,14 @@ sub compute {
                     distance => $nb->{distance},
                 };
                 push @{ $pfamData->{$nb->{pfam}}->{$attributes->{id}} }, $data;
+                $queryIdsWithNeighbors{$attributes->{id}} = 1 if $nb->{pfam};
             }
         }
     
-        # Get the unique list of query IDs in each neighboring Pfam as well as
-        # the list of query IDs in the cluster that have neighbors
-        my %hubIdsWithNeighbors;
-        foreach my $pfam (keys %$pfamData) {
-            my @ids = sort keys %{ $pfamData->{$pfam} };
-            map { $hubIdsWithNeighbors{$_} = $pfam } @ids;
-        }
+        my $numIdsWithNeighbors = scalar keys %queryIdsWithNeighbors;
 
-        my @hubIdsWithNeighbors = sort keys %hubIdsWithNeighbors;
         #NOTE hub_ids is equivalent to the 'withneighbors' output from the old module
-        $self->{cluster_pfam}->{$clusterNum} = {pfam => $pfamData, hub_ids => \@hubIdsWithNeighbors};
+        $self->{cluster_pfam}->{$clusterNum} = {pfam => $pfamData, num_ids_with_neighbors => $numIdsWithNeighbors};
     }
 
     $self->computePfamHubs();
@@ -125,7 +126,6 @@ sub computePfamHubs {
 # Parameters:
 #    $clusterNum - number of the cluster to use to create structure
 #    $pfamHub - the hub obtained from the cluster_pfam module variable
-#    $numIdsWithNeighbors - optional; used to reduce number of computations for cluster hubs
 #
 # Returns:
 #    hash ref with keys corresponding to XGMML output attributes
@@ -134,11 +134,9 @@ sub makeHubData {
     my $self = shift;
     my $clusterNum = shift;
     my $pfamHub = shift;
-    my $numIdsWithNeighbors = shift;
 
-    # Can cache these values outside and pass in for more efficiency when creating cluster GNN
-    $numIdsWithNeighbors = @{ $self->{cluster_pfam}->{$clusterNum}->{hub_ids} } if not defined $numIdsWithNeighbors; #NOTE old 'withneighbors'
-    my $numClusterIds = @{ $self->{cluster_data}->{$clusterNum} };
+    my $numClusterIds = $self->{cluster_size}->{$clusterNum};
+    my $numIdsWithNeighbors = $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors};
 
     my @queryData;
     my @distances;
@@ -189,9 +187,7 @@ sub computeClusterHubs {
     my @clusterNums = sort { $a <=> $b } keys %{ $self->{cluster_pfam} };
 
     foreach my $clusterNum (@clusterNums) {
-        my $numIdsWithNeighbors = @{ $self->{cluster_pfam}->{$clusterNum}->{hub_ids} };
-        my $numClusterIds = @{ $self->{cluster_data}->{$clusterNum} };
-
+        my $numIdsWithNeighbors = $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors};
         next if $numIdsWithNeighbors < 2;
 
         # Neighbor IDs that don't have a Pfam family associated
@@ -212,7 +208,7 @@ sub computeClusterHubs {
                 next;
             }
 
-            my $data = $self->makeHubData($clusterNum, $pfamHub, $numIdsWithNeighbors);
+            my $data = $self->makeHubData($clusterNum, $pfamHub);
             $pfams->{$pfam} = $data;
         }
 

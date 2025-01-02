@@ -22,6 +22,7 @@ sub new {
     my $self = $class->SUPER::new(%args);
     $self->{gnn_file} = $args{gnn_file} || die "Require GNN file gnn_file output arg";
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
+    $self->{util} = new EFI::GNT::GNN::XgmmlWriter::Util(gnt_anno => $args{gnt_anno});
     #$self->{colors} is created by the parent class
     $self->{cooc_threshold} = 0.20; #TODO: set this somewhere
 
@@ -44,7 +45,7 @@ sub write {
             my $spokeNodeId = "$clusterNum:$pfamHubName";
             my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
 
-            my $nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{spokes}->{$pfamHubName}, $pfamLongName);
+            my $nodeAttr = $self->getSpokeData($clusterNum, $pfamHubName, $hub->{spokes}->{$pfamHubName}, $pfamLongName);
 
             $self->writeNode($spokeNodeId, "$pfamShortName", $nodeAttr);
             $self->writeEdge($clusterNum, $spokeNodeId);
@@ -84,25 +85,23 @@ sub getSpokeData {
     my $nodeSize = max(1, int($spoke->{num_query_ids_in_pfam} / $spoke->{num_ids_with_neighbors} * 100));
     my $color = "#EEEEEE";
 
-    my ($spokeAnno, $numPdb, $numSwissProt) = $self->{gnt_anno}->getHubAnnotations($spoke->{neighbors});
+    my $nbIds = $self->{util}->getNeighborIds($spoke);
+    my ($nbAnno, $numPdb, $numSwissProt) = $self->{gnt_anno}->getHubAnnotations($nbIds);
     my $shape = $self->{gnt_anno}->getHubShape($numPdb, $numSwissProt);
 
-    my @queryIds;
-    my @arrangement;
-    my @queryNeighborInfo;
-    populate_arrangement($spoke, \@arrangement, \@queryNeighborInfo, \@queryIds, {pfam => $pfam, anno => $spokeAnno});
+    my ($queryIds, $arrangement, $queryNeighborInfo) = $self->{util}->populateArrangement($spoke, {pfam => $pfam, anno => $nbAnno});
 
     my @fields;
     push @fields, {name => "SSN Cluster Number",                            value => $clusterNum,                               type => "integer"};
     push @fields, {name => "Pfam",                                          value => $pfam,                                     type => "string"};
     push @fields, {name => "Pfam Description",                              value => $pfamLongName,                             type => "string"};
-    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_ids_with_neighbors},          type => "integer"};
+    push @fields, {name => "# of Queries with Pfam Neighbors",              value => $spoke->{num_query_ids_in_pfam},           type => "integer"};
     push @fields, {name => "# of Pfam Neighbors",                           value => $spoke->{num_neighbors},                   type => "integer"};
     push @fields, {name => "# of Sequences in SSN Cluster",                 value => $spoke->{num_cluster_ids},                 type => "integer"};
-    push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $spoke->{num_query_ids_in_pfam},           type => "integer"};
-    push @fields, {name => "Query Accessions",                              value => \@queryIds,                                type => "string"};
-    push @fields, {name => "Query-Neighbor Accessions",                     value => \@queryNeighborInfo,                       type => "string"};
-    push @fields, {name => "Query-Neighbor Arrangement",                    value => \@arrangement,                             type => "string"};
+    push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $spoke->{num_ids_with_neighbors},          type => "integer"};
+    push @fields, {name => "Query Accessions",                              value => $queryIds,                                 type => "string"};
+    push @fields, {name => "Query-Neighbor Accessions",                     value => $queryNeighborInfo,                        type => "string"};
+    push @fields, {name => "Query-Neighbor Arrangement",                    value => $arrangement,                              type => "string"};
     push @fields, {name => "Average Distance",                              value => $spoke->{average_distance},                type => "real"};
     push @fields, {name => "Median Distance",                               value => $spoke->{median_distance},                 type => "real"};
     push @fields, {name => "Co-occurrence",                                 value => $spoke->{cooccurrence},                    type => "real"};
@@ -143,8 +142,8 @@ sub getHubData {
 
     my @pfams = sort keys %{ $hub->{spokes} };
 
-    my $numClusterIds = sum( map { $hub->{spokes}->{$_}->{num_cluster_ids} } @pfams );
-    my $numIdsWithNeighbors = sum( map { $hub->{spokes}->{$_}->{num_ids_with_neighbors} } @pfams );
+    my $numClusterIds = $hub->{num_cluster_ids};
+    my $numIdsWithNeighbors = $hub->{num_ids_with_neighbors};
 
     my @queryNeighbors;
     my @pfamNeighbors;
@@ -159,7 +158,7 @@ sub getHubData {
     }
 
     my @fields;
-    push @fields, {name => "SSN Cluster Number",                            value => $clusterNum,                       type => "integer"};
+    push @fields, {name => "SSN Cluster Number",                            value => $clusterNum,           type => "integer"};
     push @fields, {name => "# of Sequences in SSN Cluster",                 value => $numClusterIds,        type => "integer"};
     push @fields, {name => "# of Sequences in SSN Cluster with Neighbors",  value => $numIdsWithNeighbors,  type => "integer"};
     push @fields, {name => "Hub Queries with Pfam Neighbors",               value => \@queryNeighbors,      type => "string"};
