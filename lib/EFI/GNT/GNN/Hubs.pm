@@ -145,7 +145,7 @@ sub makeHubData {
         # The ID may exist in the network, but not have genome context information
         if ($pfamHub->{$queryId}) {
             push @queryData, { id => $queryId, neighbors => $pfamHub->{$queryId}, direction => $queryData->{attributes}->{direction} };
-            push @distances, map { $_->{distance} } @{ $pfamHub->{$queryId} };
+            push @distances, map { abs($_->{distance}) } @{ $pfamHub->{$queryId} };
         }
     }
 
