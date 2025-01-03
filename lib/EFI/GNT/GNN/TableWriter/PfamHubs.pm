@@ -34,6 +34,8 @@ sub new {
     $self->{pfam_dirs} = {};
     $self->{handles} = {};
 
+    $self->{print_headers} = 1;
+
     $self->initializeTableOutputs($self->{output_dir});
 
     return $self;
@@ -81,6 +83,45 @@ sub writeHubTables {
 
     my $tableType = $filterOnCooccurrence ? PFAM_HUB_COOC : PFAM_HUB_ALL;
 
+    my @lines;
+    foreach my $clusterNum (@clusterNums) {
+        my $cluster = $hub->{$clusterNum};
+        my $color = $self->{colors}->getColor($clusterNum);
+
+        foreach my $queryData (@{ $cluster->{query_ids_in_pfam} }) {
+            foreach my $nb (@{ $queryData->{neighbors} }) {
+                my $distance = sprintf("%02d", abs($nb->{distance}));
+                my $clusterId = $clusterNum || "none";
+                my @line = ($queryData->{id}, $nb->{id}, $pfamHubName, $clusterId, $color, $distance, "$queryData->{direction}-$nb->{direction}");
+                my $line = join("\t", @line);
+                push @lines, $line;
+            }
+        }
+    }
+
+    if (@lines) {
+        $self->saveRecordsToTables($tableType, $pfamHubName, \@lines);
+    }
+}
+
+
+# saveRecordsToTables - private method
+#
+# Save the records to all of the tables that the records belong to (e.g. the ALL_PFAM
+# and split pfam files, etc.).
+#
+# Parameters:
+#    $tableType - the type of table to save to [e.g. all (PFAM_HUB_ALL) or threshold
+#        (PFAM_HUB_COOC)]
+#    $pfamHubName - the dash-separated Pfam hub name
+#    $records - lines to save to the files
+#
+sub saveRecordsToTables {
+    my $self = shift;
+    my $tableType = shift;
+    my $pfamHubName = shift;
+    my $records = shift;
+
     # Get an output file handle for the Pfam hub name (all family IDs joined);
     # the file path depends on filtering
     my @handles;
@@ -95,23 +136,13 @@ sub writeHubTables {
 
     # Get an output file handle for ALL Pfams; the file path depends on filtering
     push @handles, $self->getTableFileHandle($tableType | MERGED_TABLE);
+    push @handles, $self->getTableFileHandle($tableType | PFAM_SPLIT | MERGED_TABLE);
 
-    foreach my $clusterNum (@clusterNums) {
-        my $cluster = $hub->{$clusterNum};
-        my $color = $self->{colors}->getColor($clusterNum);
-
-        foreach my $queryData (@{ $cluster->{query_ids_in_pfam} }) {
-            foreach my $nb (@{ $queryData->{neighbors} }) {
-                my $distance = sprintf("%02d", $nb->{distance});
-                my @line = ($queryData->{id}, $nb->{id}, $pfamHubName, $color, $distance, $nb->{direction});
-                my $line = join("\t", @line);
-
-                # Save the line to every handle that is related to this Pfam hub,
-                # including the ALL Pfam output
-                foreach my $fh (@handles) {
-                    $fh->print($line, "\n");
-                }
-            }
+    # Save the line to every handle that is related to this Pfam hub,
+    # including the ALL Pfam output
+    foreach my $line (@$records) {
+        foreach my $fh (@handles) {
+            $fh->print($line, "\n");
         }
     }
 
@@ -166,11 +197,15 @@ sub getTableFileHandle {
         $filePath = "$outputDir/$name.txt";
     }
 
+    my $fileExists = -e $filePath;
+
     open my $fh, ">>", $filePath or die "Unable to write to Pfam table $filePath: $!";
     $self->{handles}->{$tableType}->{$name} = $fh;
 
-    my @headers = $self->getTableHeaders();
-    $fh->print(join("\t", @headers), "\n");
+    if (not $fileExists and $self->{print_headers}) {
+        my @headers = $self->getTableHeaders();
+        $fh->print(join("\t", @headers), "\n");
+    }
 
     return $fh;
 }
