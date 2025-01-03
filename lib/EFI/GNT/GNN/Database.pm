@@ -4,7 +4,6 @@ package EFI::GNT::GNN::Database;
 use strict;
 use warnings;
 
-use Data::Dumper;
 use DBI;
 
 use constant SORT_KEY => "sort_key";
@@ -517,6 +516,7 @@ sequence containing metadata and lists of neighbors.
 
 =head4 Example Usage
 
+    use Data::Dumper;
     my $clusterData = $gnnDb->getClusterData();
     print Dumper($clusterData);
 
