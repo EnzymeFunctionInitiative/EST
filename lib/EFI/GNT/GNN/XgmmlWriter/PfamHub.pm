@@ -41,6 +41,9 @@ sub write {
         my @clusterNums = sort keys %$hub;
 
         foreach my $clusterNum (@clusterNums) {
+            # Skip singletons
+            next if not $clusterNum;
+
             my $spokeNodeId = "$pfamHubName:$clusterNum";
             my $nodeAttr = $self->getSpokeData($pfamHubName, $clusterNum, $hub->{$clusterNum});
 

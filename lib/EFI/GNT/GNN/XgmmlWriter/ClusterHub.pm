@@ -38,6 +38,9 @@ sub write {
 
     my $filterOnCooccurrence = 1;
     foreach my $clusterNum (@clusterNums) {
+        # Skip singletons
+        next if not $clusterNum;
+
         my $hub = $hubs->getClusterHub($clusterNum, $filterOnCooccurrence);
         my @pfamHubNames = keys %{ $hub->{spokes} };
 

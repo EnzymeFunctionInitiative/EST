@@ -14,6 +14,7 @@ use EFI::Annotations;
 use EFI::Util::Colors;
 
 use EFI::GNT::GNN::TableWriter::PfamHubs;
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM);
 
 
 sub new {
@@ -70,7 +71,8 @@ sub saveUnclassifiedIds {
 
     my @clusterNums = $self->{hubs}->getClusterHubNumbers();
     foreach my $clusterNum (@clusterNums) {
-        my $file = "$outputDir/no_pfam_neighbors_$clusterNum.txt";
+        my $fileName = $clusterNum ? "no_pfam_neighbors_$clusterNum.txt" : "no_pfam_neighbors_singletons.txt";
+        my $file = "$outputDir/$fileName";
         open my $fh, ">", $file or die "Unable to write to unclassified IDs file $file: $!";
 
         my $ids = $self->{hubs}->getClusterUnclassified($clusterNum);
@@ -95,6 +97,7 @@ sub saveClusterStatistics {
     my @clusterNums = sort { $a <=> $b } $self->{hubs}->getClusterHubNumbers();
     foreach my $clusterNum (@clusterNums) {
         my $hub = $self->{hubs}->getClusterHub($clusterNum);
+        my $clusterId = $clusterNum || "singletons";
         $fh->print(join("\t", $clusterNum, $hub->{num_ids_with_neighbors}, $hub->{num_cluster_ids}), "\n");
     }
 
@@ -125,7 +128,7 @@ sub savePfamCooccurrence {
     open my $fh, ">", $outputFile or die "Unable to write to Pfam cooccurrence file: $!";
 
     foreach my $pfam (sort keys %$pfamStats) {
-        next if $pfam =~ m/none/i;
+        next if $pfam eq NONE_PFAM;
         my @line = ($pfam);
         push @line, map { $pfamStats->{$pfam}->{$_} // 0 } keys %{ $pfamStats->{$pfam} };
         $fh->print(join("\t", @line), "\n");

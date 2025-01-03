@@ -6,6 +6,11 @@ use warnings;
 
 use List::Util qw(sum);
 
+use constant NONE_PFAM => "none";
+
+use Exporter qw(import);
+our @EXPORT_OK = qw(NONE_PFAM);
+
 
 sub new {
     my $class = shift;
@@ -72,7 +77,8 @@ sub compute {
                     direction => $nb->{direction},
                     distance => $nb->{distance},
                 };
-                push @{ $pfamData->{$nb->{pfam}}->{$attributes->{id}} }, $data;
+                my $nbPfam = $nb->{pfam} || NONE_PFAM;
+                push @{ $pfamData->{$nbPfam}->{$attributes->{id}} }, $data;
                 $queryIdsWithNeighbors{$attributes->{id}} = 1 if $nb->{pfam};
             }
         }
@@ -102,14 +108,12 @@ sub computePfamHubs {
 
     foreach my $clusterNum (@clusterNums) {
         my @pfams = keys %{ $self->{cluster_pfam}->{$clusterNum}->{pfam} };
-        foreach my $pfam (@pfams) {
+        foreach my $pfam (sort @pfams) {
             push @{ $pfams{$pfam} }, $clusterNum;
         }
     }
 
     foreach my $pfam (sort keys %pfams) {
-        next if not $pfam; # This will happen when a neighbor doesn't have a Pfam
-
         # Clusters that are associated with this Pfam
         my $clusters = {};
 
@@ -199,7 +203,7 @@ sub computeClusterHubs {
         next if $numIdsWithNeighbors < 2;
 
         # Neighbor IDs that don't have a Pfam family associated
-        my @unclassified;
+        my %unclassified;
 
         # Pfams that are associated with this cluster
         my $pfams = {};
@@ -209,9 +213,9 @@ sub computeClusterHubs {
         foreach my $pfam (sort keys %$clusterPfams) {
             my $pfamHub = $clusterPfams->{$pfam};
             # This will happen when a neighbor doesn't have a Pfam
-            if (not $pfam) {
+            if ($pfam eq NONE_PFAM) {
                 foreach my $queryId (keys %$pfamHub) {
-                    push @unclassified, map { $_->{id} } @{ $pfamHub->{$queryId} };
+                    map { $unclassified{$_->{id}} = 1 } @{ $pfamHub->{$queryId} };
                 }
                 next;
             }
@@ -221,7 +225,7 @@ sub computeClusterHubs {
         }
 
         $self->{cluster_hubs}->{$clusterNum}->{hub} = $pfams;
-        $self->{cluster_hubs}->{$clusterNum}->{unclassified} = \@unclassified;
+        $self->{cluster_hubs}->{$clusterNum}->{unclassified} = [keys %unclassified];
     }
 }
 
