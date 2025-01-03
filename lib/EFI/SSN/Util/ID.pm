@@ -61,10 +61,10 @@ sub parse_cluster_map_file {
     while (my $line = <$fh>) {
         chomp $line;
         my @p = split(m/\t/, $line);
-        if ($p[$seqNumCol]) {
-            push @{ $seqClusterToId->{$p[$seqNumCol]} }, $p[0];
-            push @{ $nodeClusterToId->{$p[$nodeNumCol]} }, $p[0];
-        }
+        my $seqNum = $p[$seqNumCol] || 0;
+        my $nodeNum = $p[$nodeNumCol] || 0;
+        push @{ $seqClusterToId->{$seqNum} }, $p[0];
+        push @{ $nodeClusterToId->{$nodeNum} }, $p[0];
     }
 
     close $fh;
@@ -205,7 +205,8 @@ Parses a file that contains a mapping of sequence IDs to cluster numbers.
 =item C<$clusterMapFile>
 
 A file that contains three columns; the first column being the sequence ID, with the
-second and third columns being the cluster numbers (by sequence and by node).
+second and third columns being the cluster numbers (by sequence and by node).  If the
+cluster number columns don't exist then the singleton number ('0') is assigned.
 
 =back
 
