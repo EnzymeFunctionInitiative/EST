@@ -35,24 +35,10 @@ sub write {
 
     my @pfamHubNames = $hubs->getPfamHubNames();
 
-    open my $fh1, ">", "gnn_test/test_cluster_pfam.txt";
-    open my $fh2, ">", "gnn_test/test_cluster_hubs.txt";
-    open my $fh3, ">", "gnn_test/test_pfam_hub.txt";
-    open my $fh4, ">", "gnn_test/test_cluster_data.txt";
-
-    $fh1->print(Dumper($hubs->{cluster_pfam}));
-    $fh2->print(Dumper($hubs->{cluster_hubs}));
-    $fh3->print(Dumper($hubs->{pfam_hubs}));
-    $fh4->print(Dumper($hubs->{cluster_data}));
-
     my $filterOnCooccurrence = 1;
     foreach my $pfamHubName (@pfamHubNames) {
-        print "PROCESSING hub $pfamHubName\n";
         my $hub = $hubs->getPfamHub($pfamHubName, $filterOnCooccurrence);
         my @clusterNums = sort keys %$hub;
-
-        print "\t" . join(",", @clusterNums), "\n";
-        print Dumper($hub);
 
         foreach my $clusterNum (@clusterNums) {
             my $spokeNodeId = "$pfamHubName:$clusterNum";
