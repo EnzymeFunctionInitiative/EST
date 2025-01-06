@@ -13,6 +13,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
 use EFI::GNT::GNN::XgmmlWriter::Util;
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE);
 
 
 sub new {

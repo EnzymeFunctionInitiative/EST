@@ -14,7 +14,7 @@ use EFI::Annotations;
 use EFI::Util::Colors;
 
 use EFI::GNT::GNN::TableWriter::PfamHubs;
-use EFI::GNT::GNN::Hubs qw(NONE_PFAM);
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS);
 
 
 sub new {
@@ -43,16 +43,14 @@ sub savePfamNeighborhoods {
 
     my $writer = new EFI::GNT::GNN::TableWriter::PfamHubs(hubs => $self->{hubs}, colors => $self->{colors}, output_dir => $outputDir);
 
-    my $filterOnCooccurrence = 1;
-
     my @pfamHubNames = $self->{hubs}->getPfamHubNames();
     foreach my $pfamHubName (@pfamHubNames) {
-        my $hub = $self->{hubs}->getPfamHub($pfamHubName, !$filterOnCooccurrence);
+        my $hub = $self->{hubs}->getPfamHub($pfamHubName, !FILTER_COOCCURRENCE);
         # All clusters, no cooccurrence filtering
         $writer->writeAllHubTables($pfamHubName, $hub);
 
         # Filter on cooccurrence
-        $hub = $self->{hubs}->getPfamHub($pfamHubName, $filterOnCooccurrence);
+        $hub = $self->{hubs}->getPfamHub($pfamHubName, FILTER_COOCCURRENCE);
         $writer->writeFilteredHubTables($pfamHubName, $hub);
     }
 

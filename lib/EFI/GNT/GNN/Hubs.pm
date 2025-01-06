@@ -7,9 +7,11 @@ use warnings;
 use List::Util qw(sum);
 
 use constant NONE_PFAM => "none";
+use constant FILTER_COOCCURRENCE => 1;
+use constant SKIP_SINGLETONS => 2;
 
 use Exporter qw(import);
-our @EXPORT_OK = qw(NONE_PFAM);
+our @EXPORT_OK = qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS);
 
 
 sub new {
@@ -256,7 +258,10 @@ sub median {
 # public
 sub getClusterHubNumbers {
     my $self = shift;
-    return sort { $a <=> $b } keys %{ $self->{cluster_hubs} };
+    my $skipSingletons = shift // 0;
+    my @clusterNums = sort { $a <=> $b } keys %{ $self->{cluster_hubs} };
+    @clusterNums = grep { $_ != 0 } @clusterNums if $skipSingletons;
+    return @clusterNums;
 }
 
 
@@ -264,17 +269,19 @@ sub getClusterHubNumbers {
 sub getClusterHub {
     my $self = shift;
     my $clusterNum = shift;
-    my $filterSpokes = shift || 1;
+    my $filterSpokes = shift // FILTER_COOCCURRENCE;
 
-    my $spokes = { num_ids_with_neighbors  => 0, num_cluster_ids => 0, spokes => {} };
+    my $spokes = { num_ids_with_neighbors => 0, num_cluster_ids => 0, spokes => {} };
     return $spokes if not $self->{cluster_hubs}->{$clusterNum};
 
     my $hub = $self->{cluster_hubs}->{$clusterNum}->{hub};
+    $spokes->{num_ids_with_neighbors} = $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors};
+    $spokes->{num_cluster_ids} = $self->{cluster_size}->{$clusterNum};
 
     # Return all the spokes if filtering is disabled
     if (not $filterSpokes) {
         $spokes->{spokes} = $hub;
-        return $hub;
+        return $spokes;
     }
 
     foreach my $pfam (keys %$hub) {
@@ -307,7 +314,7 @@ sub getPfamHubNames {
 sub getPfamHub {
     my $self = shift;
     my $pfam = shift;
-    my $filterSpokes = shift // 1;
+    my $filterSpokes = shift // FILTER_COOCCURRENCE;
 
     return {} if not $self->{pfam_hubs}->{$pfam};
 
