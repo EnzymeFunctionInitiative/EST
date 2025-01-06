@@ -92,11 +92,22 @@ sub saveClusterStatistics {
 
     $fh->print(join("\t", "ClusterNum", "NumQueryableSeq", "TotalNumSeq"), "\n");
 
+    my @singletons;
     my @clusterNums = sort { $a <=> $b } $self->{hubs}->getClusterHubNumbers();
     foreach my $clusterNum (@clusterNums) {
         my $hub = $self->{hubs}->getClusterHub($clusterNum);
-        my $clusterId = $clusterNum || "singletons";
-        $fh->print(join("\t", $clusterNum, $hub->{num_ids_with_neighbors}, $hub->{num_cluster_ids}), "\n");
+	    if ($clusterNum) {
+            $fh->print(join("\t", $clusterNum, $hub->{num_ids_with_neighbors}, $hub->{num_cluster_ids}), "\n");
+        } else {
+            push @singletons, $hub;
+        }
+    }
+
+    if (@singletons) {
+        my $numNb = 0;
+        my $numIds = 0;
+        map { $numNb += $_->{num_ids_with_neighbors}; $numIds += $_->{num_cluster_ids} } @singletons;
+        $fh->print(join("\t", "singletons", $numNb, $numIds), "\n");
     }
 
     close $fh;
