@@ -202,7 +202,7 @@ sub computeClusterHubs {
 
     foreach my $clusterNum (@clusterNums) {
         my $numIdsWithNeighbors = $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors};
-        next if $numIdsWithNeighbors < 2;
+        next if $numIdsWithNeighbors < 1;
 
         # Neighbor IDs that don't have a Pfam family associated
         my %unclassified;
