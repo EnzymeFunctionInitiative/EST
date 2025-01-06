@@ -123,10 +123,13 @@ sub savePfamCooccurrence {
 
     my $pfamStats = {};
 
-    my @clusterNums = $self->{hubs}->getClusterHubNumbers();
+    my @clusterNums = $self->{hubs}->getClusterHubNumbers(SKIP_SINGLETONS);
+    my @tableCols;
     foreach my $clusterNum (@clusterNums) {
-        my $hub = $self->{hubs}->getClusterHub($clusterNum);
+        my $hub = $self->{hubs}->getClusterHub($clusterNum, !FILTER_COOCCURRENCE);
+        # Skip clusters that only have one sequence with genome context
         next if $hub->{num_ids_with_neighbors} < 2;
+        push @tableCols, $clusterNum;
 
         foreach my $pfamHubName (keys %{ $hub->{spokes} }) {
             my $cooccurrence = $hub->{spokes}->{$pfamHubName}->{cooccurrence};
@@ -138,10 +141,12 @@ sub savePfamCooccurrence {
 
     open my $fh, ">", $outputFile or die "Unable to write to Pfam cooccurrence file: $!";
 
+    $fh->print(join("\t", "PFAM", @tableCols), "\n");
+
     foreach my $pfam (sort keys %$pfamStats) {
         next if $pfam eq NONE_PFAM;
         my @line = ($pfam);
-        push @line, map { $pfamStats->{$pfam}->{$_} // 0 } keys %{ $pfamStats->{$pfam} };
+        push @line, map { $pfamStats->{$pfam}->{$_} // 0 } @tableCols;
         $fh->print(join("\t", @line), "\n");
     }
 
