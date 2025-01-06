@@ -22,6 +22,7 @@ sub new {
     my %args = @_;
 
     die "Require EFI::GNT::GNN::Hubs argument" if not $args{hubs};
+    die "Require EFI::GNT::GNN argument" if not $args{gnn};
 
     my $self = {};
     bless $self, $class;
@@ -29,6 +30,7 @@ sub new {
     $self->{colors} = $args{colors} // new EFI::Util::Colors();
 
     $self->{hubs} = $args{hubs};
+    $self->{gnn} = $args{gnn};
 
     $self->{efi_anno} = new EFI::Annotations();
 
@@ -147,6 +149,27 @@ sub savePfamCooccurrence {
 }
 
 
+# public
+sub saveIdsWithNoContext {
+    my $self = shift;
+    my $outputFile = shift;
+
+    open my $fh, ">", $outputFile or die "Unable to write to no-context IDs file: $!";
+    $fh->print(join("\t", "UniProt ID", "No Match/No Neighbor"), "\n");
+
+    my %ids = map { $_ => 1 } @{ $self->{gnn}->getIdsWithNoData() };
+    map { $ids{$_} = 2 } @{ $self->{hubs}->getIdsWithNoNeighbors() };
+
+    my @ids = sort keys %ids;
+    foreach my $id (@ids) {
+        my $type = $ids{$id} == 1 ? "nomatch" : "noneighbor";
+        $fh->print(join("\t", $id, $type), "\n");
+    }
+
+    close $fh;
+}
+
+
 1;
 __END__
 
@@ -165,6 +188,7 @@ B<EFI::GNT::GNN::TableWriter> - Perl module for creating tables associated with 
     $tables->saveUnclassifiedIds($unclassifiedIdsDir);
     $tables->saveClusterStatistics($statsFile);
     $tables->savePfamCooccurrence($pfamCoocFile);
+    $tables->saveIdsWithNoContext($missingIdsFile);
 
 
 =head2 DESCRIPTION

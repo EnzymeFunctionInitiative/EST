@@ -36,6 +36,7 @@ sub new {
     $self->{pfam_hubs} = {};
     # Cooccurrence threshold
     $self->{cooc_threshold} = $args{cooc_threshold} // 0.20;
+    $self->{no_neighbors} = [];
 
     if (not exists $args{cooc_threshold}) {
         $self->{cooc_threshold} = 0.20;
@@ -65,6 +66,7 @@ sub compute {
 
     $self->{cluster_data} = $gnn->getClusterData();
     $self->{cluster_size} = {};
+    my @noNeighbors;
 
     foreach my $clusterNum (keys %{ $self->{cluster_data} }) {
         my $pfamData = {};
@@ -73,6 +75,7 @@ sub compute {
         foreach my $query (@{ $self->{cluster_data}->{$clusterNum} }) {
             my $attributes = $query->{attributes};
             my @neighborIds = @{ $query->{neighbors} };
+            push @noNeighbors, $attributes->{id} if not @neighborIds;
             foreach my $nb (@neighborIds) {
                 my $data = {
                     id => $nb->{id},
@@ -90,6 +93,8 @@ sub compute {
         #NOTE hub_ids is equivalent to the 'withneighbors' output from the old module
         $self->{cluster_pfam}->{$clusterNum} = {pfam => $pfamData, num_ids_with_neighbors => $numIdsWithNeighbors};
     }
+
+    $self->{no_neighbors} = \@noNeighbors;
 
     $self->computePfamHubs();
     $self->computeClusterHubs();
@@ -333,6 +338,13 @@ sub getPfamHub {
     }
 
     return $filteredSpokes;
+}
+
+
+# public
+sub getIdsWithNoNeighbors {
+    my $self = shift;
+    return $self->{no_neighbors};
 }
 
 
@@ -637,6 +649,22 @@ Pfam data (hash ref) associated with the cluster.
     #    Cluster 1 is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold
     #    Cluster 2 is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold
 
+
+=head3 C<getIdsWithNoNeighbors()>
+
+Return a list of IDs in the network that exist in the ENA database but do
+not have neighbors.
+
+=head4 Returns
+
+An array ref containing IDs that do not have neighbors.
+
+=head4 Example Usage
+
+    my $ids = $hubs->getIdsWithNoNeighbors();
+    foreach my $id (@$ids) {
+        print "$id has no neighbors\n";
+    }
 
 
 =head2 GNN Concepts
