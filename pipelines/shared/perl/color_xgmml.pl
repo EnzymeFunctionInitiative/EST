@@ -22,7 +22,7 @@ my $opts = validateAndProcessOptions();
 
 
 
-my $colors = getColors($opts->{color_file});
+my $colors = getColors();
 my $clusterSizes = parseClusterSizeFile($opts->{cluster_num_map});
 my $clusterMap = parseClusterFile($opts->{cluster_map});
 
@@ -164,7 +164,7 @@ sub parseClusterFile {
 #
 sub getColors {
     my $colorFile = shift;
-    return new EFI::SSN::Util::Colors(color_file => $colorFile);
+    return new EFI::Util::Colors();
 }
 
 
@@ -179,7 +179,6 @@ sub validateAndProcessOptions {
     $optParser->addOption("cluster-map=s", 1, "path to output file mapping node index (col 1) to cluster numbers (num by seq, num by nodes)", OPT_FILE);
     $optParser->addOption("cluster-num-map=s", 1, "path to input file containing the mapping of cluster number to cluster sizes", OPT_FILE);
     $optParser->addOption("cluster-color-map=s", 0, "path to output file mapping cluster number (sequence count) to a color", OPT_FILE);
-    $optParser->addOption("color-file=s", 0, "path to a file containing a list of colors by cluster; if not specified defaults to 'colors.tab' in the script directory", OPT_FILE);
 
     if (not $optParser->parseOptions()) {
         my $text = $optParser->printHelp(OPT_ERRORS);
