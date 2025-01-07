@@ -194,48 +194,6 @@ sub getShape {
 }
 
 
-#
-# getHubIdAnnotations - private method
-#
-# Retrieves SwissProt, PDB, and EC number for a given accession.  The
-# results are cached.
-#
-# Parameters:
-#    $accession - EFI database accession ID (typically for neighbors)
-#    $sth - database (DBI) handle; cached for performance
-#
-# Returns:
-#    hash ref structure with keys for SwissProt status, PDB number, and
-#        those annotations joined together into an info string
-#
-sub getHubIdAnnotations {
-    my $self = shift;
-    my $accession = shift;
-    my $sth = shift;
-
-    $sth->execute($accession);
-    my $row = $sth->fetchrow_hashref;
-    my $status = $row->{swissprot_status} ? "SwissProt" : "TrEMBL";
-
-    my $metadata = {};
-    if ($row->{metadata}) {
-        $metadata = $self->{efi_anno}->decode_meta_struct($row->{metadata});
-    }
-
-    my $pdbNumber = $metadata->{pdb} // "";
-    my $ecNum = $metadata->{ec_code} // "";
-    my $pdbEvalue = "None";
-    my $closestPdbNumber = "None";
-
-    my $info = {};
-    $info->{status} = $status;
-    $info->{pdb_num} = $pdbNumber;
-    $info->{all} = join(":", $ecNum, $pdbNumber, $closestPdbNumber, $pdbEvalue, $status);
-
-    return $info;
-}
-
-
 1;
 __END__
 
