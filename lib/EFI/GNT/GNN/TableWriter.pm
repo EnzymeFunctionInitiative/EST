@@ -14,7 +14,7 @@ use EFI::Annotations;
 use EFI::Util::Colors;
 
 use EFI::GNT::GNN::TableWriter::PfamHubs;
-use EFI::GNT::GNN::Hubs qw(NONE_PFAM);
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS);
 
 
 sub new {
@@ -22,6 +22,7 @@ sub new {
     my %args = @_;
 
     die "Require EFI::GNT::GNN::Hubs argument" if not $args{hubs};
+    die "Require EFI::GNT::GNN argument" if not $args{gnn};
 
     my $self = {};
     bless $self, $class;
@@ -29,6 +30,7 @@ sub new {
     $self->{colors} = $args{colors} // new EFI::Util::Colors();
 
     $self->{hubs} = $args{hubs};
+    $self->{gnn} = $args{gnn};
 
     $self->{efi_anno} = new EFI::Annotations();
 
@@ -43,16 +45,14 @@ sub savePfamNeighborhoods {
 
     my $writer = new EFI::GNT::GNN::TableWriter::PfamHubs(hubs => $self->{hubs}, colors => $self->{colors}, output_dir => $outputDir);
 
-    my $filterOnCooccurrence = 1;
-
     my @pfamHubNames = $self->{hubs}->getPfamHubNames();
     foreach my $pfamHubName (@pfamHubNames) {
-        my $hub = $self->{hubs}->getPfamHub($pfamHubName, !$filterOnCooccurrence);
+        my $hub = $self->{hubs}->getPfamHub($pfamHubName, !FILTER_COOCCURRENCE);
         # All clusters, no cooccurrence filtering
         $writer->writeAllHubTables($pfamHubName, $hub);
 
         # Filter on cooccurrence
-        $hub = $self->{hubs}->getPfamHub($pfamHubName, $filterOnCooccurrence);
+        $hub = $self->{hubs}->getPfamHub($pfamHubName, FILTER_COOCCURRENCE);
         $writer->writeFilteredHubTables($pfamHubName, $hub);
     }
 
@@ -94,11 +94,22 @@ sub saveClusterStatistics {
 
     $fh->print(join("\t", "ClusterNum", "NumQueryableSeq", "TotalNumSeq"), "\n");
 
+    my @singletons;
     my @clusterNums = sort { $a <=> $b } $self->{hubs}->getClusterHubNumbers();
     foreach my $clusterNum (@clusterNums) {
         my $hub = $self->{hubs}->getClusterHub($clusterNum);
-        my $clusterId = $clusterNum || "singletons";
-        $fh->print(join("\t", $clusterNum, $hub->{num_ids_with_neighbors}, $hub->{num_cluster_ids}), "\n");
+	    if ($clusterNum) {
+            $fh->print(join("\t", $clusterNum, $hub->{num_ids_with_neighbors}, $hub->{num_cluster_ids}), "\n");
+        } else {
+            push @singletons, $hub;
+        }
+    }
+
+    if (@singletons) {
+        my $numNb = 0;
+        my $numIds = 0;
+        map { $numNb += $_->{num_ids_with_neighbors}; $numIds += $_->{num_cluster_ids} } @singletons;
+        $fh->print(join("\t", "singletons", $numNb, $numIds), "\n");
     }
 
     close $fh;
@@ -112,10 +123,13 @@ sub savePfamCooccurrence {
 
     my $pfamStats = {};
 
-    my @clusterNums = $self->{hubs}->getClusterHubNumbers();
+    my @clusterNums = $self->{hubs}->getClusterHubNumbers(SKIP_SINGLETONS);
+    my @tableCols;
     foreach my $clusterNum (@clusterNums) {
-        my $hub = $self->{hubs}->getClusterHub($clusterNum);
+        my $hub = $self->{hubs}->getClusterHub($clusterNum, !FILTER_COOCCURRENCE);
+        # Skip clusters that only have one sequence with genome context
         next if $hub->{num_ids_with_neighbors} < 2;
+        push @tableCols, $clusterNum;
 
         foreach my $pfamHubName (keys %{ $hub->{spokes} }) {
             my $cooccurrence = $hub->{spokes}->{$pfamHubName}->{cooccurrence};
@@ -127,11 +141,34 @@ sub savePfamCooccurrence {
 
     open my $fh, ">", $outputFile or die "Unable to write to Pfam cooccurrence file: $!";
 
+    $fh->print(join("\t", "PFAM", @tableCols), "\n");
+
     foreach my $pfam (sort keys %$pfamStats) {
         next if $pfam eq NONE_PFAM;
         my @line = ($pfam);
-        push @line, map { $pfamStats->{$pfam}->{$_} // 0 } keys %{ $pfamStats->{$pfam} };
+        push @line, map { $pfamStats->{$pfam}->{$_} // 0 } @tableCols;
         $fh->print(join("\t", @line), "\n");
+    }
+
+    close $fh;
+}
+
+
+# public
+sub saveIdsWithNoContext {
+    my $self = shift;
+    my $outputFile = shift;
+
+    open my $fh, ">", $outputFile or die "Unable to write to no-context IDs file: $!";
+    $fh->print(join("\t", "UniProt ID", "No Match/No Neighbor"), "\n");
+
+    my %ids = map { $_ => 1 } @{ $self->{gnn}->getIdsWithNoData() };
+    map { $ids{$_} = 2 } @{ $self->{hubs}->getIdsWithNoNeighbors() };
+
+    my @ids = sort keys %ids;
+    foreach my $id (@ids) {
+        my $type = $ids{$id} == 1 ? "nomatch" : "noneighbor";
+        $fh->print(join("\t", $id, $type), "\n");
     }
 
     close $fh;
@@ -156,6 +193,7 @@ B<EFI::GNT::GNN::TableWriter> - Perl module for creating tables associated with 
     $tables->saveUnclassifiedIds($unclassifiedIdsDir);
     $tables->saveClusterStatistics($statsFile);
     $tables->savePfamCooccurrence($pfamCoocFile);
+    $tables->saveIdsWithNoContext($missingIdsFile);
 
 
 =head2 DESCRIPTION

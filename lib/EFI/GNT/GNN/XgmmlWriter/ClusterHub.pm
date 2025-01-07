@@ -13,6 +13,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
 use EFI::GNT::GNN::XgmmlWriter::Util;
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE);
 
 
 sub new {
@@ -36,12 +37,14 @@ sub write {
 
     my @clusterNums = $hubs->getClusterHubNumbers();
 
-    my $filterOnCooccurrence = 1;
     foreach my $clusterNum (@clusterNums) {
         # Skip singletons
         next if not $clusterNum;
 
-        my $hub = $hubs->getClusterHub($clusterNum, $filterOnCooccurrence);
+        my $hub = $hubs->getClusterHub($clusterNum, FILTER_COOCCURRENCE);
+        # Skip clusters that only have one sequence with genome context
+        next if $hub->{num_ids_with_neighbors} < 2;
+
         my @pfamHubNames = keys %{ $hub->{spokes} };
 
         foreach my $pfamHubName (@pfamHubNames) {

@@ -7,9 +7,11 @@ use warnings;
 use List::Util qw(sum);
 
 use constant NONE_PFAM => "none";
+use constant FILTER_COOCCURRENCE => 1;
+use constant SKIP_SINGLETONS => 2;
 
 use Exporter qw(import);
-our @EXPORT_OK = qw(NONE_PFAM);
+our @EXPORT_OK = qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS);
 
 
 sub new {
@@ -34,6 +36,7 @@ sub new {
     $self->{pfam_hubs} = {};
     # Cooccurrence threshold
     $self->{cooc_threshold} = $args{cooc_threshold} // 0.20;
+    $self->{no_neighbors} = [];
 
     if (not exists $args{cooc_threshold}) {
         $self->{cooc_threshold} = 0.20;
@@ -63,6 +66,7 @@ sub compute {
 
     $self->{cluster_data} = $gnn->getClusterData();
     $self->{cluster_size} = {};
+    my @noNeighbors;
 
     foreach my $clusterNum (keys %{ $self->{cluster_data} }) {
         my $pfamData = {};
@@ -71,6 +75,7 @@ sub compute {
         foreach my $query (@{ $self->{cluster_data}->{$clusterNum} }) {
             my $attributes = $query->{attributes};
             my @neighborIds = @{ $query->{neighbors} };
+            push @noNeighbors, $attributes->{id} if not @neighborIds;
             foreach my $nb (@neighborIds) {
                 my $data = {
                     id => $nb->{id},
@@ -88,6 +93,8 @@ sub compute {
         #NOTE hub_ids is equivalent to the 'withneighbors' output from the old module
         $self->{cluster_pfam}->{$clusterNum} = {pfam => $pfamData, num_ids_with_neighbors => $numIdsWithNeighbors};
     }
+
+    $self->{no_neighbors} = \@noNeighbors;
 
     $self->computePfamHubs();
     $self->computeClusterHubs();
@@ -200,7 +207,7 @@ sub computeClusterHubs {
 
     foreach my $clusterNum (@clusterNums) {
         my $numIdsWithNeighbors = $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors};
-        next if $numIdsWithNeighbors < 2;
+        next if $numIdsWithNeighbors < 1;
 
         # Neighbor IDs that don't have a Pfam family associated
         my %unclassified;
@@ -256,7 +263,10 @@ sub median {
 # public
 sub getClusterHubNumbers {
     my $self = shift;
-    return sort { $a <=> $b } keys %{ $self->{cluster_hubs} };
+    my $skipSingletons = shift // 0;
+    my @clusterNums = sort { $a <=> $b } keys %{ $self->{cluster_hubs} };
+    @clusterNums = grep { $_ != 0 } @clusterNums if $skipSingletons;
+    return @clusterNums;
 }
 
 
@@ -264,17 +274,19 @@ sub getClusterHubNumbers {
 sub getClusterHub {
     my $self = shift;
     my $clusterNum = shift;
-    my $filterSpokes = shift || 1;
+    my $filterSpokes = shift // FILTER_COOCCURRENCE;
 
-    my $spokes = { num_ids_with_neighbors  => 0, num_cluster_ids => 0, spokes => {} };
+    my $spokes = { num_ids_with_neighbors => 0, num_cluster_ids => 0, spokes => {} };
     return $spokes if not $self->{cluster_hubs}->{$clusterNum};
 
     my $hub = $self->{cluster_hubs}->{$clusterNum}->{hub};
+    $spokes->{num_ids_with_neighbors} = $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors};
+    $spokes->{num_cluster_ids} = $self->{cluster_size}->{$clusterNum};
 
     # Return all the spokes if filtering is disabled
     if (not $filterSpokes) {
         $spokes->{spokes} = $hub;
-        return $hub;
+        return $spokes;
     }
 
     foreach my $pfam (keys %$hub) {
@@ -307,7 +319,7 @@ sub getPfamHubNames {
 sub getPfamHub {
     my $self = shift;
     my $pfam = shift;
-    my $filterSpokes = shift // 1;
+    my $filterSpokes = shift // FILTER_COOCCURRENCE;
 
     return {} if not $self->{pfam_hubs}->{$pfam};
 
@@ -326,6 +338,13 @@ sub getPfamHub {
     }
 
     return $filteredSpokes;
+}
+
+
+# public
+sub getIdsWithNoNeighbors {
+    my $self = shift;
+    return $self->{no_neighbors};
 }
 
 
@@ -630,6 +649,22 @@ Pfam data (hash ref) associated with the cluster.
     #    Cluster 1 is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold
     #    Cluster 2 is in Pfam hub PF07478-PF1820 and may or may not meet the cooccurrence threshold
 
+
+=head3 C<getIdsWithNoNeighbors()>
+
+Return a list of IDs in the network that exist in the ENA database but do
+not have neighbors.
+
+=head4 Returns
+
+An array ref containing IDs that do not have neighbors.
+
+=head4 Example Usage
+
+    my $ids = $hubs->getIdsWithNoNeighbors();
+    foreach my $id (@$ids) {
+        print "$id has no neighbors\n";
+    }
 
 
 =head2 GNN Concepts

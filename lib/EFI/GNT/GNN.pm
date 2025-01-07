@@ -44,6 +44,8 @@ sub new {
     # Warnings when querying neighbors
     $self->{nb_warnings} = [];
     $self->{warnings} = [];
+    # IDs that don't exist in the ENA database
+    $self->{no_matches} = [];
 
     $self->{efi_anno} = new EFI::Annotations;
 
@@ -71,6 +73,7 @@ sub retrieveClusterData {
             # Find the neighbors and query attributes
             my $accessionData = $nbFind->findNeighbors($accession, $self->{neighborhood_size});
             if (not $accessionData) {
+                push @{ $self->{no_matches} }, $accession;
                 $self->addWarning($nbFind->getWarning());
                 next;
             }
@@ -83,7 +86,13 @@ sub retrieveClusterData {
 }
 
 
-#
+# public
+sub getIdsWithNoData {
+    my $self = shift;
+    return $self->{no_matches};
+}
+
+
 # insertAnnotationData - private
 #
 # Inserts annotations from the EFI attributes table into the given accession data structure
@@ -258,6 +267,23 @@ An array ref of strings
     my $warnings = $gnn->getWarnings();
     foreach my $warning (@$warnings) {
         print "WARNING: $warning\n";
+    }
+
+
+=head3 C<getIdsWithNoData()>
+
+Return a list of IDs that do not exist in the EFI/ENA database.  Most
+eukaryotic sequences do not have genome context in EFI/ENA databases.
+
+=head4 Returns
+
+An array ref of IDs
+
+=head4 Example Usage
+
+    my $ids = $gnn->getIdsWithNoData();
+    foreach my $id (@$ids) {
+        print "ID $id does not exist in the EFI/ENA database\n";
     }
 
 
