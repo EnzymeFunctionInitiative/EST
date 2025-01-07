@@ -5,9 +5,6 @@ use strict;
 use warnings;
 
 use XML::LibXML::Reader;
-use FindBin;
-
-use lib "$FindBin::Bin/../..";
 
 
 sub new {
