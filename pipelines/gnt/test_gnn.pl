@@ -10,8 +10,8 @@ use lib "lib";
 
 use EFI::Database;
 use EFI::GNT::Annotations;
+use EFI::GNT::GND;
 use EFI::GNT::GNN;
-use EFI::GNT::GNN::Database;
 use EFI::GNT::GNN::Hubs;
 use EFI::GNT::GNN::TableWriter;
 use EFI::GNT::GNN::XgmmlWriter::PfamHub;
@@ -19,7 +19,7 @@ use EFI::GNT::GNN::XgmmlWriter::ClusterHub;
 use EFI::SSN::Util::ID qw(parse_cluster_map_file);
 
 
-my $gnnDbFile = "gnn_test/test_gnn.sqlite";
+my $gndFile = "gnn_test/test_gnd.sqlite";
 my $pfamGnnFile = "gnn_test/pfam.xgmml";
 my $clusterGnnFile = "gnn_test/cluster.xgmml";
 my $pfamNeighborOutputDir = "gnn_test/pfam_nb";
@@ -29,11 +29,11 @@ my $pfamCoocFile = "gnn_test/cooc_table.txt";
 my $missingIdsFile = "gnn_test/nomatches_noneighbors.txt";
 
 
+unlink $gndFile;
+
 #my $dbName = "tests/test_data/smalldata/efi_db.sqlite";
-#my $dbName = "/mnt/g/efi_ip101.sqlite";
-#my $db = new EFI::Database(config => "tests/test_data/mysql/efi.config", db_name => $dbName);
+#my $db = new EFI::Database(config => "tests/test_data/smalldata/efi.config", db_name => $dbName);
 my $dbName = "efi_202410";
-#my $db = new EFI::Database(config => "/home/n-z/noberg/dev/EST/efi.config", db_name => $dbName);
 my $db = new EFI::Database(config => "tests/test_data/mysql/efi.config", db_name => $dbName);
 my $dbh = $db->getHandle();
 
@@ -46,13 +46,6 @@ my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 
 my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno);
 $gnn->retrieveClusterData();
-
-if (not -f $gnnDbFile) {
-    #unlink($gnnDbFile) if -f $gnnDbFile;
-    # Save the raw GNN data to a database that can be used by additional scripts
-    my $gnnDb = new EFI::GNT::GNN::Database(db_file => $gnnDbFile);
-    $gnnDb->save($gnn);
-}
 
 # Compute the family hub data that is used to generate the Pfam and cluster
 # hub GNNs
@@ -73,11 +66,7 @@ $tables->saveClusterStatistics($statsFile);
 $tables->savePfamCooccurrence($pfamCoocFile);
 $tables->saveIdsWithNoContext($missingIdsFile);
 
-#my $gnd = new EFI::GNT::GND(dbh => $dbh);
-#$gnd->convertFromGnn($gnn);
-#$gnd->save($gndFile);
-
-
-
+my $gnd = new EFI::GNT::GND();
+$gnd->save($gnn, $gndFile);
 
 
