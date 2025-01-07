@@ -173,5 +173,6 @@ workflow color_and_retrieve {
         cluster_sizes = id_list_data.cluster_sizes
         cluster_num_map = compute_info.cluster_num_map
         cluster_id_map = compute_info.cluster_id_map
+        singletons = compute_info.singletons
 }
 
