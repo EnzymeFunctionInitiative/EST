@@ -7,7 +7,9 @@ use warnings;
 use DBI;
 use Config::IniFiles;
 
-use constant MYSQL => "mysql";
+use constant DBI_MYSQL => "mysql";
+use constant DBI_MARIADB => "mariadb";
+use constant DBI_SQLITE => "sqlite";
 
 
 sub new {
@@ -28,7 +30,7 @@ sub new {
 
 sub isMysql {
     my $self = shift;
-    return ($self->{db} and $self->{db}->{dbi} eq MYSQL);
+    return ($self->{db} and ($self->{db}->{dbi} eq DBI_MYSQL or $self->{db}->{dbi} eq DBI_MARIADB));
 }
 
 
@@ -46,7 +48,7 @@ sub parseConfig {
     $db->{host} = $cfg->val("database", "host", "localhost");
     $db->{port} = $cfg->val("database", "port", "3306");
     $db->{ip_range} = $cfg->val("database", "ip_range", "");
-    $db->{dbi} = lc $cfg->val("database", "dbi", MYSQL);
+    $db->{dbi} = lc $cfg->val("database", "dbi", DBI_MYSQL);
 
     if ($dbName) {
         $db->{name} = $dbName;
@@ -55,7 +57,11 @@ sub parseConfig {
     }
     die "Missing database name\n" if not $db->{name};
 
-    if ($db->{dbi} eq MYSQL) {
+    if ($db->{dbi} ne DBI_MYSQL and $db->{dbi} ne DBI_MARIADB and $db->{dbi} ne DBI_SQLITE) {
+        die "Invalid database interface ($db->{dbi})\n";
+    }
+
+    if ($db->{dbi} eq DBI_MYSQL or $db->{dbi} eq DBI_MARIADB) {
         die "Missing database username\n" if not defined $db->{user};
         die "Missing database password\n" if not defined $db->{password};
     }
@@ -117,7 +123,7 @@ sub getCommandLineConnString {
     my ($self) = @_;
 
     my $connStr ="";
-    if ($self->{db}->{dbi} eq MYSQL) {
+    if ($self->{db}->{dbi} eq DBI_MYSQL or $self->{db}->{dbi} eq DBI_MARIADB) {
         $connStr =
             "mysql"
             . " -u " . $self->{db}->{user}
@@ -140,17 +146,18 @@ sub getHandle {
     }
 
     my $dbh;
-    if ($self->{db}->{dbi} eq MYSQL) {
+    if ($self->{db}->{dbi} eq DBI_MYSQL or $self->{db}->{dbi} eq DBI_MARIADB) {
+        my $dbi = $self->{db}->{dbi} eq DBI_MARIADB ? "MariaDB" : "mysql";
         my $connStr =
-            "DBI:mysql" .
+            "DBI:$dbi" .
             ":database=" . $self->{db}->{name} .
             ":host=" . $self->{db}->{host} .
             ":port=" . $self->{db}->{port};
         $connStr .= ";mysql_local_infile=1" if $self->{load_infile};
     
         $dbh = DBI->connect($connStr, $self->{db}->{user}, $self->{db}->{password});
-        $dbh->{mysql_auto_reconnect} = 1;
-    } else {
+        $dbh->{mysql_auto_reconnect} = 1 if $self->{db}->{dbi} eq DBI_MYSQL;
+    } elsif ($self->{db}->{dbi} eq DBI_SQLITE) {
         $dbh = DBI->connect("DBI:SQLite:dbname=$self->{db}->{name}","","");
     }
 
