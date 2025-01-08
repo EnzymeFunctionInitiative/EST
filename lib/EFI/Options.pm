@@ -37,7 +37,7 @@ sub addOption {
     my $optSpec = shift;
     my $required = shift;
     my $help = shift;
-    my $resultType = shift;
+    my $resultType = shift || KEY_VALUE;
     my $defaultVal = shift;
 
     # $optSpec == --test-arg=s
