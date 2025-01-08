@@ -19,7 +19,7 @@ SYNOPSIS
 ::
 
    color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
-       [--cluster-color-map <FILE> --color-file <FILE>]
+       [--cluster-color-map <FILE>] [--color-file <FILE>]
 
 
 
@@ -55,6 +55,5 @@ Arguments
    sequence count to the color as determined by the pipeline upstream
 
 ``--color-file``
-   Path to a file containing the master color list. If not present, then
-   it is assumed that a file named ``color.tab`` exists in the same
-   directory as the script.
+   Path to a file containing the master color list. If not present then
+   the color map in ``EFI::Util::Colors`` is used.

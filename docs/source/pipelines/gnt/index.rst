@@ -7,8 +7,8 @@ for the Pfam neighborhoods for clusters in the submitted SSN. Tables
 containing IDs of neighbors broken down by Pfam are saved. It is important
 to note that the analysis is based on the Pfams of sequences neighboring the
 sequences in the input SSN. The IDs that are analyzed only include those that
-are in the EFI/ENA database, which includes mostly sequences in the bacterial,
-archaeal, and viral kingdoms. Sequences in the eukaryote kingdom are not
+are in the EFI/ENA database, which includes mostly sequences in the bacteria,
+archaea, and virus kingdoms. Sequences in the eukaryote kingdom are not
 included because related sequences are not necessarily contiguous with each
 other.
 
@@ -91,13 +91,11 @@ This can then be submitted to the cluster with ::
 Further Reading
 ---------------
 
-In addition to the files below, documentation embedded in the
-``lib/EFI/GNT/Neighborhood.pm`` and ``lib/EFI/GNT/GNN/Hubs.pm`` files
-may be of interest for a more in-depth understanding of the computations.
-
 .. toctree::
    :maxdepth: 1
 
    create_gnns.rst
    ../colorssn/index.rst
+   /source/lib/EFI/GNT/Neighborhood.pm.rst
+   /source/lib/EFI/GNT/GNN/Hubs.pm.rst
 

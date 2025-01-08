@@ -395,13 +395,13 @@ Creates an object.
 
 =head4 Parameters
 
-=item
+=over
 
-=over C<gnn>
+=item C<gnn>
 
 A B<EFI::GNT::GNN> object.
 
-=over C<cooc_threshold>
+=item C<cooc_threshold>
 
 The cooccurrence threshold, used to determine if a cluster hub or Pfam hub should be
 included in the output network.  A numerical value >= C<0> and <= C<1>.

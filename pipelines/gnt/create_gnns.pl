@@ -74,7 +74,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("cluster-gnn=s", 1, "path to the output cluster hub-spoke GNN XGMML file", OPT_FILE);
     $optParser->addOption("pfam-gnn=s", 1, "path to the output Pfam hub-spoke GNN XGMML file", OPT_FILE);
     $optParser->addOption("gnd=s", 0, "path to the output GND file", OPT_FILE);
-    $optParser->addOption("cooc-table=s", 0, "path to the output Pfam cooccurence table file", OPT_FILE);
+    $optParser->addOption("cooc-table=s", 0, "path to the output Pfam co-occurence table file", OPT_FILE);
     $optParser->addOption("hub-count=s", 0, "path to the output hub count table file", OPT_FILE);
     $optParser->addOption("nb-pfam-list-dir=s", 0, "path to an output directory containing files for each Pfam hub", OPT_DIR_PATH);
     $optParser->addOption("no-context=s", 0, "path to an output file to save a list of input IDs that didn't have an ENA entry or didn't have neighbors", OPT_FILE);
@@ -146,7 +146,7 @@ to visualize genome neighborhood diagrams (GNDs).
 
 =item C<--cooc-table>
 
-Path to a file that will contain cooccurrences for every Pfam of every neighbor of
+Path to a file that will contain co-occurrences for every Pfam of every neighbor of
 every ID in the input ID list.
 
 =item C<--hub-count>
