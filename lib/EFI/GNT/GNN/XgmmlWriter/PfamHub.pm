@@ -33,6 +33,8 @@ sub write {
     my $self = shift;
     my $hubs = shift;
 
+    $self->open() if not $self->{output};
+
     my @pfamHubNames = $hubs->getPfamHubNames();
 
     my $filterOnCooccurrence = 1;
@@ -58,6 +60,8 @@ sub write {
             $self->writeNode($pfamHubName, "$pfamShortName", $nodeAttr);
         }
     }
+
+    $self->close();
 }
 
 

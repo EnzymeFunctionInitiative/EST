@@ -4,9 +4,7 @@ package EFI::Annotations;
 use strict;
 use warnings;
 
-use List::MoreUtils qw{uniq};
 use JSON;
-use Data::Dumper;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);

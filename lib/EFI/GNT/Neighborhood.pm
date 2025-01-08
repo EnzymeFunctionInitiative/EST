@@ -5,8 +5,6 @@ use strict;
 use warnings;
 
 use List::MoreUtils qw(uniq);
-use Array::Utils qw(:all);
-use Data::Dumper;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);

@@ -5,6 +5,8 @@ use strict;
 use warnings;
 
 use List::Util qw(sum);
+use Scalar::Util qw(looks_like_number);
+
 
 use constant NONE_PFAM => "none";
 use constant FILTER_COOCCURRENCE => 1;
@@ -38,7 +40,7 @@ sub new {
     $self->{cooc_threshold} = $args{cooc_threshold} // 0.20;
     $self->{no_neighbors} = [];
 
-    if (not exists $args{cooc_threshold}) {
+    if (not exists $args{cooc_threshold} or not looks_like_number($args{cooc_threshold})) {
         $self->{cooc_threshold} = 0.20;
     } elsif ($args{cooc_threshold} >= 0 and $args{cooc_threshold} <= 1) {
         $self->{cooc_threshold} = $args{cooc_threshold};

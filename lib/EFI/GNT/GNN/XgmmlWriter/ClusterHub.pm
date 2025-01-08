@@ -35,6 +35,8 @@ sub write {
     my $self = shift;
     my $hubs = shift;
 
+    $self->open() if not $self->{output};
+
     my @clusterNums = $hubs->getClusterHubNumbers();
 
     foreach my $clusterNum (@clusterNums) {
@@ -63,6 +65,8 @@ sub write {
             $self->writeNode($clusterNum, "$clusterNum", $nodeAttr);
         }
     }
+
+    $self->close();
 }
 
 
