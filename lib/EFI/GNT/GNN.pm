@@ -210,7 +210,7 @@ family (in contrast to the cluster-centric view provided by SSNs).
 
 =head2 METHODS
 
-=head3 C<new(dbh => $dbh, seq_cluster_id_map => $idMap)>
+=head3 C<new(dbh =E<gt> $dbh, seq_cluster_id_map =E<gt> $idMap)>
 
 Creates a new B<EFI::GNT::GNN> object.
 

@@ -205,7 +205,7 @@ statistics and other parameters.
 
 =head2 METHODS
 
-=head3 C<new(gnn => $gnn, hubs => $hubs)>
+=head3 C<new(gnn =E<gt> $gnn, hubs =E<gt> $hubs)>
 
 Creates a new B<EFI::GNT::GNN::TableWriter> object.
 

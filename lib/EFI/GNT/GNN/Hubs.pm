@@ -355,6 +355,8 @@ __END__
 
 =pod
 
+=encoding utf8
+
 =head1 EFI::GNT::GNN::Hubs
 
 =head2 NAME
@@ -389,7 +391,7 @@ B<EFI::GNT::GNN::XgmmlWriter::PfamHub> and B<EFI::GNT::GNN::XgmmlWriter::Cluster
 
 =head2 METHODS
 
-=head3 C<new(gnn => $gnn, cooc_threshold => $value)>
+=head3 C<new(gnn =E<gt> $gnn, cooc_threshold =E<gt> $value)>
 
 Creates an object.
 
@@ -404,7 +406,7 @@ A B<EFI::GNT::GNN> object.
 =item C<cooc_threshold>
 
 The cooccurrence threshold, used to determine if a cluster hub or Pfam hub should be
-included in the output network.  A numerical value >= C<0> and <= C<1>.
+included in the output network.  A numerical value E<gt>= C<0> and E<lt>= C<1>.
 If not specified, defaults to C<0.20>.
 
 =back
@@ -412,7 +414,7 @@ If not specified, defaults to C<0.20>.
 =head4 Example Usage
 
     my $cooccurrenceThreshold = 0.20;
-    my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => $cooccurrenceThreshold);
+    my $hubs = new EFI::GNT::GNN::Hubs(gnn =E<gt> $gnn, cooc_threshold => $cooccurrenceThreshold);
 
 
 =head3 C<getClusterHubNumbers()>

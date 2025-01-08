@@ -186,7 +186,7 @@ writing methods.
 
 =head2 METHODS
 
-=head3 C<new(output_file => $outputFile)>
+=head3 C<new(output_file =E<gt> $outputFile)>
 
 Creates a new B<EFI::GNT::GNN::XgmmlWriter> object.  Should only be called from sub classes.
 

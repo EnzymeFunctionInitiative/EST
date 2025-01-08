@@ -56,7 +56,7 @@ METHODS
 
 
 
-``new(gnn =`` $gnn, cooc_threshold => $value)>
+``new(gnn => $gnn, cooc_threshold => $value)``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creates an object.
@@ -82,7 +82,7 @@ Example Usage
 ::
 
    my $cooccurrenceThreshold = 0.20;
-   my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => $cooccurrenceThreshold);
+   my $hubs = new EFI::GNT::GNN::Hubs(gnn =E<gt> $gnn, cooc_threshold => $cooccurrenceThreshold);
 
 
 

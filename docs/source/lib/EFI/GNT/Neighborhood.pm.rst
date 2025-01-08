@@ -49,7 +49,7 @@ METHODS
 
 
 
-``new(dbh =`` $dbh)>
+``new(dbh => $dbh)``
 ~~~~~~~~~~~~~~~~~~~~
 
 Creates a new ``EFI::GNT::Neighborhood`` object.

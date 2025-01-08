@@ -609,7 +609,7 @@ that are neighbors to a query sequence.
 
 =head2 METHODS
 
-=head3 C<new(dbh => $dbh)>
+=head3 C<new(dbh =E<gt> $dbh)>
 
 Creates a new C<EFI::GNT::Neighborhood> object.
 
