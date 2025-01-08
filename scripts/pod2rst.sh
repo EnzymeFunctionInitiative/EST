@@ -23,7 +23,7 @@ fi
 usage=$(perl $1 --help | sed -e 's/\(^.*\)/\t\1/g')
 
 # generate HTML from POD and convert to reST
-rstpod=$(pod2html --infile $1 --noindex | grep -v '<h1 id="'$scriptname | pandoc --read html --write rst | sed -E "s/^\.\.\ \_.*://g")
+rstpod=$(pod2html --infile $1 --noindex --nopoderrors | grep -v '<h1 id="'$scriptname | pandoc --read html --write rst | sed -E "s/^\.\.\ \_.*://g")
 
 underline=$(python -c "print('=' * len('$scriptname'))")
 
