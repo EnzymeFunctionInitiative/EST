@@ -6,9 +6,6 @@ tests/test_results/
 .nextflow/
 tests/test.config
 tests/testEnvironment.sh
-*.bak
-.*.swp
-.*.swo
 **/build/
 **/dist/
 **/*.egg-info/
