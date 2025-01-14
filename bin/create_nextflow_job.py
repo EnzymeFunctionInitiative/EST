@@ -101,6 +101,7 @@ if __name__ == "__main__":
         print(f"Job type '{args.pipeline}' not known")
         exit(1)
 
+    efi_home = os.path.join(os.path.dirname(__file__), "..")
 
     env = Environment(loader=FileSystemLoader(args.templates_dir), autoescape=select_autoescape())
     sh_template = env.get_template("run_nextflow_slurm.sh.jinja")
@@ -113,6 +114,7 @@ if __name__ == "__main__":
                                            jobtype=args.pipeline,
                                            job_id=args.job_id,
                                            config_path=args.config_path,
+                                           efi_home=efi_home,
                                            load_modules=True)
     submission_script_output = os.path.join(args.output_dir, "run_nextflow.sh")
     with open(submission_script_output, "w") as f:
