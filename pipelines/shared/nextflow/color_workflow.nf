@@ -136,7 +136,7 @@ process compute_clusters {
 
 workflow color_and_retrieve {
     main:
-        if (params.ssn_input =~ /\.zip/) {
+        if (params.ssn_input =~ /\.zip$/) {
             ssn_file = unzip_input(params.ssn_input)
         } else {
             ssn_file = params.ssn_input

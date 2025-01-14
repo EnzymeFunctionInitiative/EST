@@ -156,6 +156,7 @@ sub getHubAnnotations {
 
     my $hubInfo = {};
     foreach my $accession (@$ids) {
+        $sth->execute($accession);
         my $data = $self->retrieveIdAnnotations($accession, $sth);
         next if not $data;
 

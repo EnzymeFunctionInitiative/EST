@@ -46,6 +46,11 @@ my $numIds = $seqDb->getSequences($inputIdsFile, $outputFile);
 
 my $_elapsed = int((time() - $_start) * 1000);
 
+if ($numIds == -1) {
+    $logger->message("Error retrieving FASTA sequences; unable to find BLAST programs");
+    exit(1);
+}
+
 $logger->message("Found $numIds IDs in FASTA file in $_elapsed ms"); 
 
 
