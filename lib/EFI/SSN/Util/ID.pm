@@ -188,9 +188,16 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
 
 EFI::SSN::Util::ID is a utility module that provides functions to parse and manipulate
 files and structures that contain sequence ID information such as cluster number to IDs
-and metanodes. Clusters can be numbered by sequence or by node; by sequence numbering
-takes into account all of the sequences in all of the metanodes in the cluster (if any),
-whereas by node numbering uses all of the nodes (or metanodes) in the cluster.
+and metanodes.  A metanode is a node in the network that represents one or more sequences.
+For example, networks generated using UniRef will contain nodes that correspond to
+UniRef sequences, which in turn represent one or more UniProt sequences.  Additionally,
+metanodes can represent multiple sequences that are grouped together in repnode networks
+to reduce the size of the network.  Clusters can be numbered by sequence or by node;
+by-sequence numbering takes into account all of the sequences in all of the metanodes
+in the cluster (effectively expanding the metanode), whereas by-node numbering uses only
+the metanodes in the cluster.  For UniProt networks metanodes are simply normal nodes
+and by-sequence and by-node numbering is identical.
+
 
 =head2 METHODS
 
@@ -218,23 +225,27 @@ cluster number columns don't exist then the singleton number ('0') is assigned.
 
 A hash ref that maps cluster numbers to an array of sequence IDs within that cluster.
 The clusters that are returned are numbered by sequence (e.g. the C<cluster_num_seq>
-column in the input file). For example:
+column in the input file). For example, a repnode network that contains cluster 1 with
+a metanode C<"REPNODE_ID1"> that represents C<"UNIPROT_ID1"> and C<"UNIPROT_ID2">),
+and cluster 2 with a metanode C<"REPNODE_ID2"> that represents C<"UNIPROT_ID3"> as
+well as a single node C<"REPNODE_ID3"> would look like:
 
     {
-        1 => ["UNIPROT_ID1", "UNIPROT_ID2", "METANODE_ID1", ...],
-        2 => ["UNIPROT_ID3", "METANODE_ID2", "METANODE_ID3", ...],
+        1 => ["UNIPROT_ID1", "UNIPROT_ID2", "REPNODE_ID1", ...],
+        2 => ["UNIPROT_ID3", "REPNODE_ID2", "REPNODE_ID3", ...],
         ...
     }
 
 =item C<$nodeClusterToId>
 
 A hash ref that maps cluster numbers to an array of sequence IDs within that cluster.
-The clusters that are returned are numbered by sequence (e.g. the C<cluster_num_seq>
-column in the input file). For example:
+The clusters that are returned are numbered by node/metanode (e.g. the
+C<cluster_num_node> column in the input file).  In the example given above
+(the C<$seqClusterToId> return value), the output would look like:
 
     {
-        1 => ["UNIPROT_ID3", "UNIPROT_ID2", ...],
-        2 => ["UNIPROT_ID2", "METANODE_ID2", "METANODE_ID3", ...],
+        1 => ["REPNODE_ID1", ...],
+        2 => ["REPNODE_ID2", "REPNODE_ID3", ...],
         ...
     }
 

@@ -389,6 +389,50 @@ cluster hubs.  Data can be retrieved after computation and used by modules such 
 B<EFI::GNT::GNN::XgmmlWriter::PfamHub> and B<EFI::GNT::GNN::XgmmlWriter::ClusterHub>.
 
 
+=head3 Terminology
+
+Terms that will be used throughout this document include:
+
+=over
+
+=item Cluster
+
+A cluster defined in the input SSN.
+
+=item Query ID
+
+A query ID is an ID from the original cluster as opposed to neighbor IDs
+which are not in the cluster.
+
+=item Pfam hub
+
+One or more Pfams that have been found in the neighbors; if more than one
+Pfam is identified in the neighboring sequences then the family identifiers
+are separated by hyphens (e.g. C<"PF07478-PF1820">).
+
+=item Cluster hub
+
+Represents a cluster from the original SSN.
+
+=item Hub node
+
+The central node in a hub-spoke model, representing either a Pfam hub or
+a cluster hub.
+
+=item Spoke node
+
+The nodes at the ends of the spokes connected to the hub node, representing
+either a Pfam hub or a cluster depending on the GNN.
+
+=item Pfam IDs
+
+The list of query IDs in the original cluster that are associated with a
+Pfam hub.  This is determined by grouping together all of the original
+query IDs by Pfam hubs determined by the neighboring sequences.
+
+=back
+
+
 =head2 METHODS
 
 =head3 C<new(gnn =E<gt> $gnn, cooc_threshold =E<gt> $value)>
@@ -709,50 +753,6 @@ the associated cluster (for Pfam hubs) or Pfam (for cluster hubs).
 This figure represents a cluster-Pfam hub-spoke GNN, and in a Pfam-cluster
 hub-spoke GNN the hub node represents a Pfam and the spoke nodes represent
 clusters.  There will be many such hub-spoke models in a GNN.
-
-
-=head3 Terminology
-
-Terms that will be used throughout this document include:
-
-=over
-
-=item Cluster
-
-A cluster defined in the input SSN.
-
-=item Query ID
-
-A query ID is an ID from the original cluster as opposed to neighbor IDs
-which are not in the cluster.
-
-=item Pfam hub
-
-One or more Pfams that have been found in the neighbors; if more than one
-Pfam is identified in the neighboring sequences then the family identifiers
-are separated by hyphens (e.g. C<"PF07478-PF1820">).
-
-=item Cluster hub
-
-Represents a cluster from the original SSN.
-
-=item Hub node
-
-The central node in a hub-spoke model, representing either a Pfam hub or
-a cluster hub.
-
-=item Spoke node
-
-The nodes at the ends of the spokes connected to the hub node, representing
-either a Pfam hub or a cluster depending on the GNN.
-
-=item Pfam IDs
-
-The list of query IDs in the original cluster that are associated with a
-Pfam hub.  This is determined by grouping together all of the original
-query IDs by Pfam hubs determined by the neighboring sequences.
-
-=back
 
 
 =head3 Return Value Structure
