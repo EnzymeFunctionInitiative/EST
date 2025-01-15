@@ -107,3 +107,6 @@ GND
 GNDs
 GNN
 GNNs
+GNT
+cooccurrence
+co-occurrence
