@@ -344,7 +344,7 @@ sub getQuerySchema {
         {name => "evalue", type => "REAL"},
         {name => "cluster_index", type => "INTEGER", create_index => 1},
     ];
-    # Add UniRef columns here
+    #TODO: Add UniRef columns here
 }
 
 

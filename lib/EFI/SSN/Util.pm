@@ -86,11 +86,8 @@ B<EFI::SSN::Util> - Perl module with various SSN-related helper functions
 
 =head2 DESCRIPTION
 
-EFI::SSN::Util::ID is a utility module that provides functions to parse and manipulate
-files and structures that contain sequence ID information such as cluster number to IDs
-and metanodes. Clusters can be numbered by sequence or by node; by sequence numbering
-takes into account all of the sequences in all of the metanodes in the cluster (if any),
-whereas by node numbering uses all of the nodes (or metanodes) in the cluster.
+EFI::SSN::Util is a utility module that provides a function to assist with SSN 
+type identification.
 
 =head2 METHODS
 

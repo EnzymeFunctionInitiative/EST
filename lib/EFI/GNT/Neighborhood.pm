@@ -193,7 +193,6 @@ sub populateNeighborPositionData {
 
     my $nbStart = int($row->{start});
     my $nbStop = int($row->{stop});
-    #TODO: shouuld add one, but need to verify
     my $nbSeqLen = abs($row->{stop} - $row->{start}) + 1; # needs abs in case direction is complement
     my $nbSeqLenBp = int($nbSeqLen / 3 - 1);
 
@@ -285,8 +284,6 @@ sub getQueryIdPositionData {
     my $neighborhoodSize = shift;
     my $row = shift;
 
-    #my $seqLen = int(abs($row->{stop} - $row->{start} + 1) / 3) - 1;
-    #TODO: need to verify if the +1 should go inside or outside abs
     my $seqLen = int( (abs($row->{stop} - $row->{start}) + 1) / 3) - 1;
     my $pos = {
         query_num => $row->{NUM},
@@ -630,8 +627,8 @@ Database handle that comes from C<EFI::Database>.
 
 =head3 C<findNeighbors($accession, $neighborhoodSize)>
 
-Retrieves data for the given accession ID as as the neighbors of the query C<$accession>
-ID as well as metadata.  If the return value is undefined, then the query <$accession>
+Retrieves data for the given accession ID as well as the neighbors of the query C<$accession>
+ID and associated metadata.  If the return value is undefined, then the query <$accession>
 ID is not present in the ENA table.  This can happen because the input is from an
 eukaryote organism (in which case genome context is not available), or because the
 ENA and UniProt databases are not in sync yet.
@@ -667,7 +664,7 @@ the query ID, undef is returned.  The return hash ref looks like this:
             stop => 0, # end of sequence on genome in bp
             rel_start => 0, # start of sequence on genome in bp, accounting for a circular genome
             rel_stop => 0, # end of sequence on genome in bp, accounting for a circular genome
-            type => "linear", "linear" or "circular"
+            type => "linear", # "linear" or "circular" indicating the genome type
             seq_len => 0, # length of sequence in bp
             pfam => "", # can be more than one family, separated by dash
             interpro => "" # can be more than one family, separated by dash
