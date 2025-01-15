@@ -76,9 +76,9 @@ Example Usage
 ``findNeighbors($accession, $neighborhoodSize)``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Retrieves data for the given accession ID as as the neighbors of the
-query ``$accession`` ID as well as metadata. If the return value is
-undefined, then the query <$accession> ID is not present in the ENA
+Retrieves data for the given accession ID as well as the neighbors of
+the query ``$accession`` ID and associated metadata. If the return value
+is undefined, then the query <$accession> ID is not present in the ENA
 table. This can happen because the input is from an eukaryote organism
 (in which case genome context is not available), or because the ENA and
 UniProt databases are not in sync yet.
@@ -118,7 +118,7 @@ return hash ref looks like this:
            stop => 0, # end of sequence on genome in bp
            rel_start => 0, # start of sequence on genome in bp, accounting for a circular genome
            rel_stop => 0, # end of sequence on genome in bp, accounting for a circular genome
-           type => "linear", "linear" or "circular"
+           type => "linear", # "linear" or "circular" indicating the genome type
            seq_len => 0, # length of sequence in bp
            pfam => "", # can be more than one family, separated by dash
            interpro => "" # can be more than one family, separated by dash

@@ -51,6 +51,42 @@ and used by modules such as **EFI::GNT::GNN::XgmmlWriter::PfamHub** and
 
 
 
+Terminology
+~~~~~~~~~~~
+
+Terms that will be used throughout this document include:
+
+Cluster
+   A cluster defined in the input SSN.
+
+Query ID
+   A query ID is an ID from the original cluster as opposed to neighbor
+   IDs which are not in the cluster.
+
+Pfam hub
+   One or more Pfams that have been found in the neighbors; if more than
+   one Pfam is identified in the neighboring sequences then the family
+   identifiers are separated by hyphens (e.g. ``"PF07478-PF1820"``).
+
+Cluster hub
+   Represents a cluster from the original SSN.
+
+Hub node
+   The central node in a hub-spoke model, representing either a Pfam hub
+   or a cluster hub.
+
+Spoke node
+   The nodes at the ends of the spokes connected to the hub node,
+   representing either a Pfam hub or a cluster depending on the GNN.
+
+Pfam IDs
+   The list of query IDs in the original cluster that are associated
+   with a Pfam hub. This is determined by grouping together all of the
+   original query IDs by Pfam hubs determined by the neighboring
+   sequences.
+
+
+
 METHODS
 -------
 
@@ -440,42 +476,6 @@ This figure represents a cluster-Pfam hub-spoke GNN, and in a
 Pfam-cluster hub-spoke GNN the hub node represents a Pfam and the spoke
 nodes represent clusters. There will be many such hub-spoke models in a
 GNN.
-
-
-
-Terminology
-~~~~~~~~~~~
-
-Terms that will be used throughout this document include:
-
-Cluster
-   A cluster defined in the input SSN.
-
-Query ID
-   A query ID is an ID from the original cluster as opposed to neighbor
-   IDs which are not in the cluster.
-
-Pfam hub
-   One or more Pfams that have been found in the neighbors; if more than
-   one Pfam is identified in the neighboring sequences then the family
-   identifiers are separated by hyphens (e.g. ``"PF07478-PF1820"``).
-
-Cluster hub
-   Represents a cluster from the original SSN.
-
-Hub node
-   The central node in a hub-spoke model, representing either a Pfam hub
-   or a cluster hub.
-
-Spoke node
-   The nodes at the ends of the spokes connected to the hub node,
-   representing either a Pfam hub or a cluster depending on the GNN.
-
-Pfam IDs
-   The list of query IDs in the original cluster that are associated
-   with a Pfam hub. This is determined by grouping together all of the
-   original query IDs by Pfam hubs determined by the neighboring
-   sequences.
 
 
 
