@@ -7,7 +7,7 @@ import os
 
 def add_args(parser: argparse.ArgumentParser):
     """
-    add argumdents for GNT pipeline to ``parser``
+    add arguments for GNT pipeline to ``parser``
     """
     parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
     parser.add_argument("--ssn-input", required=True, type=str, help="The SSN file to color and compute GNNs for, XGMML or zipped XGMML")
