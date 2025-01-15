@@ -24,6 +24,7 @@ docs-clean:
 
 docs-perlpod:
 	find pipelines -name "*.pl" | xargs -d\\n -n1 scripts/pod2rst.sh
+	perl scripts/color_palette_to_table.pl
 
 docs-spelling-perlpod:
 	perl scripts/podcheck --search pipelines --wordlist docs/spelling_wordlist.txt

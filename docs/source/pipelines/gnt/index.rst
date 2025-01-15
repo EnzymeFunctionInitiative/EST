@@ -55,7 +55,7 @@ The neighbor Pfam lists are broken down into four directories:
    * ``all_pfam_split``: ``pfam_split``, except all Pfams are included
      even those that don't meet the co-occurrence threshold
 
-Finally, the Color SSN pipeline is run which
+Finally, the :doc:`Color SSN pipeline <../colorssn/index>` is run which
 colors and numbers sequences by cluster. See the Color SSN pipeline
 documentation for more information on the pipeline. This process is run
 because the colored SSNs and related files are useful in GNT analyses.

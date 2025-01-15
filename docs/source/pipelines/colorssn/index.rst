@@ -12,6 +12,10 @@ The clusters are numbered and colored using two conventions:
     2. **Node Count Cluster Number:** assigned in order of decreasing number of
        nodes in the cluster.
 
+Colors for each cluster are assigned by the
+:doc:`EFI::Util::Colors Perl module <../../lib/EFI/Util/Colors.pm>` using a
+predefined list of colors.
+
 Running the Pipeline
 --------------------
 
@@ -47,6 +51,7 @@ Further Reading
    :maxdepth: 1
 
    create_colorssn_nextflow_params
+   /source/lib/EFI/Util/Colors.pm.rst
    ../shared/perl/unzip_xgmml_file.rst
    ../shared/perl/ssn_to_id_list.rst
    ../shared/python/compute_clusters.rst
