@@ -294,7 +294,12 @@ sub initializeTable {
 #
 # getSharedSchema - private static function
 #
-# Return schema that is shared between the attribute (query) and neighbors tables
+# Return schema that is shared between the attribute (query) and neighbors tables.
+# The 'name' field is both the input data structure and database field names, but
+# if the 'db_name' field is present then that value is used for the database name
+# column.  For example, the 'embl_id' field is in the input data structure, and
+# the 'db_name' field in the schema indicates that those values should be stored
+# in a column in the database named 'id'.
 #
 # Returns:
 #    array ref where each element corresponds to a column specification
@@ -358,33 +363,14 @@ sub getQuerySchema {
 #
 sub getNeighborSchema {
     my $sharedCols = getSharedSchema();
+    # Get rid of the embl_id column since it is the same as the attribute (query)
+    # embl_id value.
+    my @cols = grep { $_->{name} ne "embl_id" } @$sharedCols;
     # gene_key corresponds to the SORT_KEY field in the attribute (query) table
     return [
-        {name => SORT_KEY, type => "INTEGER", primary_key => 1, create_index => 1},
-        {name => "id", db_name => "accession", type => "VARCHAR(20)", create_index => 1},
-        #{name => "embl_id", db_name => "id", type => "VARCHAR(30)"},
-        #{name => "num", type => "INTEGER"},
-        #{name => "family", type => "TEXT"}, # can be more than one family, separated by dash
-        #{name => "ipro_family", type => "TEXT"}, # can be more than one family, separated by dash
-        #{name => "start", type => "INTEGER"}, # start of sequence on genome in bp
-        #{name => "stop", type => "INTEGER"}, # end of sequence on genome in bp
-        #{name => "rel_start", type => "INTEGER"}, # start of sequence on genome in bp, accounting for a circular genome
-        #{name => "rel_stop", type => "INTEGER"}, # end of sequence on genome in bp, accounting for a circular genome
-        #{name => "direction", type => "VARCHAR(10)"}, # "normal" or "complement"
-        #{name => "type", type => "VARCHAR(8)"}, # "linear" or "circular"
-        #{name => "seq_len", type => "INTEGER"}, # length of sequence in bp
-        #{name => "taxon_id", type => "INTEGER"}, # taxonomy ID
-        #{name => "anno_status", type => "INTEGER"}, # 1 if SwissProt, 0 if TrEMBL
-        #{name => "desc", db_name => "description", type => "TEXT"}, # SwissProt or sequence description from UniProt DB
-        #{name => "family_desc", type => "TEXT"}, # Pfam long name
-        #{name => "ipro_family_desc", type => "TEXT"}, # InterPro long name
-        #{name => "color", type => "VARCHAR(255)"},
-        #{name => QUERY_GENE_KEY, type => "INTEGER", create_index => 1}, 
-    ]
-    #return [
-    #    @$sharedCols,
-    #    {name => QUERY_GENE_KEY, type => "INTEGER", create_index => 1}, 
-    #];
+        @cols,
+        {name => QUERY_GENE_KEY, type => "INTEGER", create_index => 1}, 
+    ];
 }
 
 
