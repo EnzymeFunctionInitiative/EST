@@ -128,6 +128,7 @@ sub computePfamHubs {
 
         # Compute the spoke (cluster) nodes that connect to the Pfam hub
         foreach my $clusterNum (@{ $pfams{$pfam} }) {
+            next if $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors} < 1;
             my $pfamHub = $self->{cluster_pfam}->{$clusterNum}->{pfam}->{$pfam};
             my $data = $self->makeHubData($clusterNum, $pfamHub);
             $clusters->{$clusterNum} = $data;
@@ -208,8 +209,7 @@ sub computeClusterHubs {
     my @clusterNums = sort { $a <=> $b } keys %{ $self->{cluster_pfam} };
 
     foreach my $clusterNum (@clusterNums) {
-        my $numIdsWithNeighbors = $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors};
-        next if $numIdsWithNeighbors < 1;
+        next if $self->{cluster_pfam}->{$clusterNum}->{num_ids_with_neighbors} < 1;
 
         # Neighbor IDs that don't have a Pfam family associated
         my %unclassified;
