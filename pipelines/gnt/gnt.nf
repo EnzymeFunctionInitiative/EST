@@ -2,6 +2,7 @@ include { color_and_retrieve } from "../shared/nextflow/color_workflow.nf"
 cluster_data_dir = "cluster-data"
 
 process create_gnns {
+    publishDir params.final_output_dir, mode: "copy"
     publishDir "${params.final_output_dir}/${cluster_data_dir}/nb_pfam", pattern: "*.txt", mode: "copy"
     input:
         path cluster_id_map

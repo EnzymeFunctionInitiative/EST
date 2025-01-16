@@ -66,7 +66,7 @@ def create_parser():
 
 def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir, job_id):
     params = {
-        "output_dir": output_dir,
+        "final_output_dir": output_dir,
         "ssn_input": ssn_input,
         "efi_config": efi_config,
         "efi_db": efi_db,
