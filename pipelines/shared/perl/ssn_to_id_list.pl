@@ -27,13 +27,15 @@ $parser->parse();
 my $edgelist = $parser->getEdgeList();
 saveEdgelist($edgelist, $opts->{edgelist});
 
-my ($indexSeqIdMap, $nodeSizeMap) = $parser->getIndexSeqIdMap();
+my $indexSeqIdMap = $parser->getIndexSeqIdMap();
+my $nodeSizeMap = $parser->getMetanodeSizes();
 saveIndexSeqIdMapping($indexSeqIdMap, $nodeSizeMap, $opts->{index_seqid}, ["node_index", "node_seqid", "node_size"]);
 
 my $idIndexMap = $parser->getIdIndexMap();
 saveMapping($idIndexMap, $opts->{id_index}, ["node_id", "node_index"]);
 
-my ($metanodeMap, $metanodeType) = $parser->getMetanodeData();
+my $metanodeType = $parser->getMetanodeType();
+my $metanodeMap = $parser->getMetanodes();
 saveMetanodeMapping($opts->{seqid_source_map}, $metanodeMap, $metanodeType);
 
 

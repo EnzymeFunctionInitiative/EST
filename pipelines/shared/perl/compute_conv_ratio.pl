@@ -20,7 +20,7 @@ my $opts = validateAndProcessOptions();
 
 
 # Get the map of cluster number to list of IDs
-my $clusterToId = parse_cluster_map_file($opts->{cluster_map});
+my ($clusterToId) = parse_cluster_map_file($opts->{cluster_map});
 
 # Get the metanode data (mapping of repnode/UniRef to UniProt)
 my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});

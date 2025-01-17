@@ -4,9 +4,7 @@ package EFI::Annotations;
 use strict;
 use warnings;
 
-use List::MoreUtils qw{uniq};
 use JSON;
-use Data::Dumper;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
@@ -532,6 +530,18 @@ sub get_attribute_type {
 }
 
 
+sub get_attribute_info {
+    my $self = shift;
+    my $attrName = shift;
+    my $anno = $self->get_annotation_data();
+    if ($anno->{$attrName}) {
+        return $anno->{$attrName};
+    } else {
+        return {};
+    }
+}
+
+
 sub is_expandable_attr {
     my $self = shift;
     my $attr = shift;
@@ -1023,6 +1033,45 @@ A hash ref mapping field name to field display for each element in C<$fields>.
     if (exists $attr->{$ssnField}) {
         print "The SSN field $ssnField is expandable\n";
     }
+
+
+=head3 get_attribute_info($attrName)
+
+Gets information about the given attribute.
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+Attribute name as specified by the constants in B<EFI::Annotations::Fields>.
+
+=back
+
+=head4 Returns
+
+A hash ref containing the name of the attribute as well as the display name (the name that
+is used in the node attributes in the SSN):
+
+    {
+        name => "ATTR_NAME",
+        display => "Attribute Name"
+    }
+
+The hash ref may also contain the C<field_type>, C<type_spec>, C<base_ssn>, C<ssn_list_type>,
+C<ssn_num_type>, C<db_primary_col>, and C<index_name> key-values depending on the field.
+Of special interest are the C<ssn_list_type> and C<ssn_num_type> fields, which will be
+set and non-zero if they are XGMML list attribute types or numerical types, respectively.
+
+=head4 Example Usage
+
+    my $attrName = FIELD_UNIREF90_IDS;
+    my $info = $anno->get_attribute_info($attrName);
+    if ($info) {
+        print "$attrName displays as $info->{display}\n";
+    }
+
 
 =head3 get_cluster_info_insert_location()
 

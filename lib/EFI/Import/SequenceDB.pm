@@ -36,16 +36,20 @@ sub getSequences {
 
     #TODO: handle domains/domain_length_file
 
-    my @err;
+    my $tempFasta = "$fastaFile.tmp";
 
-    my @parms = ("fastacmd", "-d", $self->{fasta_db}, "-i", $idFile, "-o", "$fastaFile.tmp");
+    my @parms = ("fastacmd", "-d", $self->{fasta_db}, "-i", $idFile, "-o", $tempFasta);
     my ($fastacmdOutput, $fastaErr) = capture {
         system(@parms);
     };
-    push(@err, $fastaErr);
 
-    my $numIds = $self->convertSequences("$fastaFile.tmp", $fastaFile);
-    unlink("$fastaFile.tmp");
+    if (not -e $tempFasta) {
+        STDERR->print($fastaErr);
+        return -1;
+    }
+
+    my $numIds = $self->convertSequences($tempFasta, $fastaFile);
+    unlink($tempFasta);
     return $numIds;
 }
 

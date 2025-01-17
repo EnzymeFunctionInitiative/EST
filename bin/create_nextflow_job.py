@@ -7,6 +7,7 @@ import os
 import create_est_nextflow_params
 import create_generatessn_nextflow_params
 import create_colorssn_nextflow_params
+import create_gnt_nextflow_params
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -35,6 +36,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args = create_est_nextflow_params.check_args(args)
     elif args.pipeline == "generatessn":
         args = create_generatessn_nextflow_params.check_args(args)
+    elif args.pipeline == "gnt":
+        args = create_gnt_nextflow_params.check_args(args)
     else:
         print(f"Job type '{args.pipeline}' not known")
         exit(1)
@@ -69,6 +72,11 @@ def create_parser() -> argparse.ArgumentParser:
     generatessn_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the SSN nextflow workflow file")
     create_generatessn_nextflow_params.add_args(generatessn_parser)
 
+    gnt_parser = subparsers.add_parser("gnt", help="Create a GNT pipeline job script")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/gnt/gnt.nf")
+    gnt_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GNT workflow file")
+    create_gnt_nextflow_params.add_args(gnt_parser)
+
     return parser
 
 
@@ -87,10 +95,13 @@ if __name__ == "__main__":
         params_output = create_est_nextflow_params.render_params(**args_dict)
     elif args.pipeline == "generatessn":
         params_output = create_generatessn_nextflow_params.render_params(**args_dict)
+    elif args.pipeline == "gnt":
+        params_output = create_gnt_nextflow_params.render_params(**args_dict)
     else:
         print(f"Job type '{args.pipeline}' not known")
         exit(1)
 
+    efi_home = os.path.join(os.path.dirname(__file__), "..")
 
     env = Environment(loader=FileSystemLoader(args.templates_dir), autoescape=select_autoescape())
     sh_template = env.get_template("run_nextflow_slurm.sh.jinja")
@@ -103,9 +114,11 @@ if __name__ == "__main__":
                                            jobtype=args.pipeline,
                                            job_id=args.job_id,
                                            config_path=args.config_path,
+                                           efi_home=efi_home,
                                            load_modules=True)
     submission_script_output = os.path.join(args.output_dir, "run_nextflow.sh")
     with open(submission_script_output, "w") as f:
         f.write(submission_script)
         f.write("\n")
     print(f"Wrote submission script to {submission_script_output}")
+

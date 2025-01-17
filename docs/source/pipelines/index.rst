@@ -7,4 +7,5 @@ The Enzyme Function Initiative Tools offer several different pipelines.
     est/index
     generatessn/index
     colorssn/index
+    gnt/index
     :maxdepth: 1

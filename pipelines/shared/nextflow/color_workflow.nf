@@ -120,6 +120,7 @@ process get_cluster_stats {
 }
 
 process compute_clusters {
+    publishDir params.final_output_dir, mode: "copy"
     input:
         path edgelist
         path index_seqid_map
@@ -135,7 +136,7 @@ process compute_clusters {
 
 workflow color_and_retrieve {
     main:
-        if (params.ssn_input =~ /\.zip/) {
+        if (params.ssn_input =~ /\.zip$/) {
             ssn_file = unzip_input(params.ssn_input)
         } else {
             ssn_file = params.ssn_input
@@ -171,5 +172,7 @@ workflow color_and_retrieve {
         cluster_stats = cluster_data.stats
         cluster_sizes = id_list_data.cluster_sizes
         cluster_num_map = compute_info.cluster_num_map
+        cluster_id_map = compute_info.cluster_id_map
+        singletons = compute_info.singletons
 }
 
