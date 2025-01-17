@@ -1,0 +1,139 @@
+
+# Builing A SQLite Test Dataset
+
+There are several components to a testing dataset.  The following steps should
+be executed in order, and assume the working directory is
+`$EST_HOME/tests/test_data/small_data`.  The datasets are based on the Pfam
+family PF07476.
+
+## Step 0: Directory structure
+
+    EST_HOME=/path/to/EST/repository
+    EFI_FULL_DB=/path/to/EFI/blast/database/combined.fasta
+    helper_dir=$EST_HOME/pipelines/buildefi/test_dataset
+    data_dir=$EST_HOME/tests/test_data/smalldata
+    mkdir -p $data_dir/work
+    cd $data_dir
+    EFI_DB_NAME=...
+    EFI_DB_HOST=...
+    
+
+## Step 1: SQLite-based EFI database
+
+SQLite-based datasets are best used for installation testing.  Assuming that the
+helper scripts are located in `$EST_HOME/pipelines/buildefi/test_dataset`, use
+the following recipe to build one from an existing EFI MySQL database:
+
+    cat $helper_dir/get_subset_data.sql | mysql -N -h $EFI_DB_HOST -p $EFI_DB_NAME > work/raw_data
+    perl $helper_dir/split_raw_data.pl < work/raw_data > import_data.sql
+    
+    awk -f $helper_dir/mysql2sqlite $helper_dir/efi_db_schema.sql | sqlite3 efi_db.sqlite
+    
+    sqlite3 efi_db.sqlite < import_data.sql
+
+
+## Step 2: Config and ID files
+
+    echo 'PF07476' > family_id.txt
+    echo -e '[database]\ndbi=sqlite\n' > efi.config
+    cut -f2 work/PFAM.tab > accession_test.txt
+    echo -e 'node_label\tcluster_num_by_seq\tcluster_num_by_node' > gnd_id_list.txt
+    cat accession_test.txt >> gnd_id_list.txt
+
+    echo 'SELECT annotations.accession FROM annotations LEFT JOIN PFAM ON PFAM.accession = annotations.accession WHERE annotations.is_fragment = 0 AND PFAM.id = "PF07476"' | sqlite3 efi_db.sqlite > work/complete_ids.txt
+    echo 'SELECT DISTINCT uniref90_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession WHERE PFAM.id = "PF07476"' | sqlite3 efi_db.sqlite > work/uniref90_ids.txt
+    echo 'SELECT DISTINCT uniref90_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession LEFT JOIN annotations ON annotations.accession = uniref.accession WHERE PFAM.id = "PF07476" AND annotations.is_fragment = 0' | sqlite3 efi_db.sqlite > work/uniref90_complete_ids.txt
+    echo 'SELECT DISTINCT uniref50_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession WHERE PFAM.id = "PF07476"' | sqlite3 efi_db.sqlite > work/uniref50_ids.txt
+    echo 'SELECT DISTINCT uniref50_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession LEFT JOIN annotations ON annotations.accession = uniref.accession WHERE PFAM.id = "PF07476" AND annotations.is_fragment = 0' | sqlite3 efi_db.sqlite > work/uniref50_complete_ids.txt
+
+
+## Step 3: FASTA retrieval
+
+Assuming that the EFI BLAST sequence database is located at `$EFI_FULL_DB`
+and BLAST is installed on the system, the following recipe can be used:
+
+    mkdir blastdb
+    fastacmd -d $EFI_FULL_DB -i accession_test.txt -o fasta_test.fasta
+    fastacmd -d $EFI_FULL_DB -i work/complete_ids.txt -o blastdb/combined_nr.fasta
+    fastacmd -d $EFI_FULL_DB -i work/uniref90_ids.txt -o blastdb/uniref90.fasta
+    fastacmd -d $EFI_FULL_DB -i work/uniref90_complete_ids.txt -o blastdb/uniref90_nr.fasta
+    fastacmd -d $EFI_FULL_DB -i work/uniref50_ids.txt -o blastdb/uniref50.fasta
+    fastacmd -d $EFI_FULL_DB -i work/uniref50_complete_ids.txt -o blastdb/uniref50_nr.fasta
+    
+    seq_id=$(head -1 accession_test.txt)
+    fastacmd -d $EFI_FULL_DB -o blast_query.fa -s $seq_id
+    
+    cp fasta_test.fasta blastdb/combined.fasta
+    cd blastdb
+    formatdb -i combined.fasta -p T -o T
+    formatdb -i combined_nr.fasta -p T -o T
+    formatdb -i uniref90.fasta -p T -o T
+    formatdb -i uniref90_nr.fasta -p T -o T
+    formatdb -i uniref50.fasta -p T -o T
+    formatdb -i uniref50_nr.fasta -p T -o T
+    cd ..
+
+
+## Step 4: DIAMOND database
+
+The CGFP tools use DIAMOND, so DIAMOND databases should be created as follows:
+
+    mkdir -p diamonddb
+    diamond makedb --in blastdb/combined.fasta -d diamonddb/combined.fasta
+    diamond makedb --in blastdb/combined_nr.fasta -d diamonddb/combined_nr.fasta
+    diamond makedb --in blastdb/uniref90.fasta -d diamonddb/uniref90.fasta
+    diamond makedb --in blastdb/uniref90_nr.fasta -d diamonddb/uniref90_nr.fasta
+    diamond makedb --in blastdb/uniref50.fasta -d diamonddb/uniref50.fasta
+    diamond makedb --in blastdb/uniref50_nr.fasta -d diamonddb/uniref50_nr.fasta
+
+
+## Step 5: Cleanup
+
+    rm -rf work
+    rm import_data.sql
+
+
+# SSN files
+
+SSN files should be generated with the official EFI-EST tools using the Family option
+with PF07476 as the family.  Three jobs should be created: UniProt, UniRef90, 
+and UniRef50.  Two files should be downloaded from the UniProt job: a full SSN and
+a 70% repnode SSN.  The full SSN from both UniRef jobs should be downloaded.  These
+should be placed in the test dataset directory and named as follows:
+
+    ssn.xgmml.zip (compressed UniProt)
+    ssn_repnode70.xgmml.zip (compressed 70% repnode UniProt)
+    ssn_uniref90.xgmml.zip (compressed UniRef90)
+    ssn_uniref50.xgmml (uncompressed UniRef50)
+
+
+# Building A MySQL Dataset
+
+Step 0 is followed for both SQLite and MySQL dataset build processes.  Steps 1 and 2
+in the SQLite dataset build process are replaced with a single step, detailed below.
+This configuration assumes that the MySQL server will be accessible by the testing
+scripts.  After performing Step 1, follow Steps 3-5 in the SQLite dataset build
+process.
+
+## Step 1: Config and ID files
+
+    echo 'PF07476' > family_id.txt
+    if [[ ! -e "efi.config" ]]; then
+        # This string should be edited to replace USER, PASSWORD, HOST, and PORT with the
+        # relevant values
+        echo -e '[database]\nuser=$USER\npassword=$PASSWORD\nhost=$HOST\nport=$PORT\ndbi=mariadb\n' > efi.config
+        echo 'Configure efi.config before running tests'
+    fi
+    
+    # This string should be edited to the relevant value
+    EFI_DB_NAME=efi_db
+    echo 'SELECT accession FROM PFAM WHERE id = "PF07476"' | mysql -N -h $HOST -p $EFI_DB_NAME > accession_test.txt
+    echo -e 'node_label\tcluster_num_by_seq\tcluster_num_by_node' > gnd_id_list.txt
+    cat accession_test.txt >> gnd_id_list.txt
+
+    echo 'SELECT annotations.accession FROM annotations LEFT JOIN PFAM ON PFAM.accession = annotations.accession WHERE annotations.is_fragment = 0 AND PFAM.id = "PF07476"' | mysql -N -h $HOST -p $EFI_DB_NAME > work/complete_ids.txt
+    echo 'SELECT DISTINCT uniref90_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession WHERE PFAM.id = "PF07476"' | mysql -N -h $HOST -p $EFI_DB_NAME > work/uniref90_ids.txt
+    echo 'SELECT DISTINCT uniref90_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession LEFT JOIN annotations ON annotations.accession = uniref.accession WHERE PFAM.id = "PF07476" AND annotations.is_fragment = 0' | mysql -N -h $HOST -p $EFI_DB_NAME > work/uniref90_complete_ids.txt
+    echo 'SELECT DISTINCT uniref50_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession WHERE PFAM.id = "PF07476"' | mysql -N -h $HOST -p $EFI_DB_NAME > work/uniref50_ids.txt
+    echo 'SELECT DISTINCT uniref50_seed FROM uniref LEFT JOIN PFAM ON PFAM.accession = uniref.accession LEFT JOIN annotations ON annotations.accession = uniref.accession WHERE PFAM.id = "PF07476" AND annotations.is_fragment = 0' | mysql -N -h $HOST -p $EFI_DB_NAME > work/uniref50_complete_ids.txt
+
