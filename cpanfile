@@ -11,7 +11,6 @@ requires 'DBD::mysql', '4.050';
 
 # GNT
 requires 'Array::Utils', '0.5';
-requires 'DBD::MariaDB', '1.23';
 
 # General
 requires 'Pod::Spell', '1.26';
