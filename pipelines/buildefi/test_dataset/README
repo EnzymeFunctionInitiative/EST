@@ -49,28 +49,49 @@ the following recipe to build one from an existing EFI MySQL database:
 
 ## Step 3: FASTA retrieval
 
-Assuming that the EFI BLAST sequence database is located at `$EFI_FULL_DB`
-and BLAST is installed on the system, the following recipe can be used:
+The master EFI BLAST sequence database is required for retrieving the sample
+dataset sequences.  The following steps assume that the location of this
+database is at `$EFI_FULL_DB`.  Additionally, legacy BLAST must be installed.
 
-    mkdir blastdb
-    fastacmd -d $EFI_FULL_DB -i accession_test.txt -o fasta_test.fasta
-    fastacmd -d $EFI_FULL_DB -i work/complete_ids.txt -o blastdb/combined_nr.fasta
-    fastacmd -d $EFI_FULL_DB -i work/uniref90_ids.txt -o blastdb/uniref90.fasta
-    fastacmd -d $EFI_FULL_DB -i work/uniref90_complete_ids.txt -o blastdb/uniref90_nr.fasta
-    fastacmd -d $EFI_FULL_DB -i work/uniref50_ids.txt -o blastdb/uniref50.fasta
-    fastacmd -d $EFI_FULL_DB -i work/uniref50_complete_ids.txt -o blastdb/uniref50_nr.fasta
+### BLAST installation
+
+Most systems contain recent versions of BLAST.  The EFI tools use the legacy
+version (2.2.26) of BLAST.  If legacy BLAST is installed on the system, then
+set the `$fasta_cmd` and `$formatdb_cmd` variables:
+
+    fastacmd_cmd="fastacmd"
+    formatdb_cmd="formatdb"
+
+If BLAST 2.2.26 is not available, then it must be installed using the
+following steps:
+
+    curl -o blast.tar.gz https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/blast-2.2.26-x64-linux.tar.gz
+    tar zxvf blast.tar.gz
+    fastacmd_cmd="$PWD/blast-2.2.26/bin/fastacmd"
+    formatdb_cmd="$PWD/blast-2.2.26/bin/formatdb"
+
+### BLAST database creation
+
+    mkdir -p blastdb
+    rm blastdb/*
+    $fastacmd_cmd -d $EFI_FULL_DB -i accession_test.txt -o fasta_test.fasta
+    $fastacmd_cmd -d $EFI_FULL_DB -i work/complete_ids.txt -o blastdb/combined_nr.fasta
+    $fastacmd_cmd -d $EFI_FULL_DB -i work/uniref90_ids.txt -o blastdb/uniref90.fasta
+    $fastacmd_cmd -d $EFI_FULL_DB -i work/uniref90_complete_ids.txt -o blastdb/uniref90_nr.fasta
+    $fastacmd_cmd -d $EFI_FULL_DB -i work/uniref50_ids.txt -o blastdb/uniref50.fasta
+    $fastacmd_cmd -d $EFI_FULL_DB -i work/uniref50_complete_ids.txt -o blastdb/uniref50_nr.fasta
     
     seq_id=$(head -1 accession_test.txt)
-    fastacmd -d $EFI_FULL_DB -o blast_query.fa -s $seq_id
+    $fastacmd_cmd -d $EFI_FULL_DB -o blast_query.fa -s $seq_id
     
     cp fasta_test.fasta blastdb/combined.fasta
     cd blastdb
-    formatdb -i combined.fasta -p T -o T
-    formatdb -i combined_nr.fasta -p T -o T
-    formatdb -i uniref90.fasta -p T -o T
-    formatdb -i uniref90_nr.fasta -p T -o T
-    formatdb -i uniref50.fasta -p T -o T
-    formatdb -i uniref50_nr.fasta -p T -o T
+    $formatdb_cmd -i combined.fasta -p T -o T
+    $formatdb_cmd -i combined_nr.fasta -p T -o T
+    $formatdb_cmd -i uniref90.fasta -p T -o T
+    $formatdb_cmd -i uniref90_nr.fasta -p T -o T
+    $formatdb_cmd -i uniref50.fasta -p T -o T
+    $formatdb_cmd -i uniref50_nr.fasta -p T -o T
     cd ..
 
 
