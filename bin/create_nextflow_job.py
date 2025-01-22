@@ -8,6 +8,7 @@ import create_est_nextflow_params
 import create_generatessn_nextflow_params
 import create_colorssn_nextflow_params
 import create_gnt_nextflow_params
+import create_gnd_nextflow_params
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -38,6 +39,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args = create_generatessn_nextflow_params.check_args(args)
     elif args.pipeline == "gnt":
         args = create_gnt_nextflow_params.check_args(args)
+    elif args.pipeline == "gnd":
+        args = create_gnd_nextflow_params.check_args(args)
     else:
         print(f"Job type '{args.pipeline}' not known")
         exit(1)
@@ -77,6 +80,11 @@ def create_parser() -> argparse.ArgumentParser:
     gnt_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GNT workflow file")
     create_gnt_nextflow_params.add_args(gnt_parser)
 
+    gnd_parser = subparsers.add_parser("gnd", help="Create a GND pipeline job script")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/gnd/gnd.nf")
+    gnd_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GND workflow file")
+    create_gnd_nextflow_params.add_args(gnd_parser)
+
     return parser
 
 
@@ -97,6 +105,8 @@ if __name__ == "__main__":
         params_output = create_generatessn_nextflow_params.render_params(**args_dict)
     elif args.pipeline == "gnt":
         params_output = create_gnt_nextflow_params.render_params(**args_dict)
+    elif args.pipeline == "gnd":
+        params_output = create_gnd_nextflow_params.render_params(**args_dict)
     else:
         print(f"Job type '{args.pipeline}' not known")
         exit(1)
