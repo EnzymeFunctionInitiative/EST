@@ -14,7 +14,7 @@ sub new {
     my $self = {};
     bless($self, $class);
     $self->{config} = $args{config} // die "Fatal error: unable to create filter: missing config param";
-    $self->{db} = $args{efi_db} // die "Fatal error: unable to create filter: missing efi_db param";
+    $self->{dbh} = $args{efi_dbh} // die "Fatal error: unable to create filter: missing efi_dbh param";
     $self->{logger} = $args{logger};
 
     return $self;
@@ -134,7 +134,6 @@ sub getDbValue {
 # Create connection to DB or return cached connection
 sub getDbHandle {
     my $self = shift;
-    $self->{dbh} = $self->{db}->getHandle() if not $self->{dbh};
     return $self->{dbh};
 }
 

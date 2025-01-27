@@ -19,6 +19,7 @@ use EFI::Options;
 my $opts = validateAndProcessOptions();
 
 my $db = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name});
+my $dbh = $db->getHandle();
 
 
 
@@ -39,7 +40,7 @@ if ($opts->{cluster_color_map}) {
 }
 
 # Retrieve metadata
-my $annoData = getAnnotationData($clusterToId, $db);
+my $annoData = getAnnotationData($clusterToId, $dbh);
 
 # Save mapping table
 saveMappingData($opts->{mapping_table}, $opts->{swissprot_table}, $clusterToId, $colorMap, $annoData);
@@ -119,7 +120,7 @@ sub saveMappingData {
 #
 # Parameters:
 #    $clusterToId - mapping cluster number to IDs in the cluster
-#    $db - EFI::Database object
+#    $dbh - database handle from EFI::Database
 #
 # Returns:
 #    hash ref mapping UniProt ID to {taxonomy_id, species, swissprot}; swissprot
@@ -127,11 +128,10 @@ sub saveMappingData {
 #
 sub getAnnotationData {
     my $clusterToId = shift;
-    my $db = shift;
+    my $dbh = shift;
 
     my $anno = new EFI::Annotations;
 
-    my $dbh = $db->getHandle();
     my $sql = "SELECT A.taxonomy_id, swissprot_status, metadata, T.species FROM annotations AS A LEFT JOIN taxonomy AS T ON A.taxonomy_id = T.taxonomy_id WHERE accession = ?";
     my $sth = $dbh->prepare($sql);
 

@@ -31,11 +31,11 @@ sub new {
 sub init {
     my $self = shift;
     my $config = shift || die "Fatal error: unable to create source: missing config arg";
-    my $efiDb = shift;
+    my $efiDbh = shift;
     my %args = @_;
 
     $self->{config} = $config;
-    $self->{efi_db} = $efiDb;
+    $self->{dbh} = $efiDbh;
     $self->{sunburst} = $args{sunburst};
     $self->{stats} = $args{stats};
 
@@ -131,10 +131,8 @@ sub retrieveUnirefIds {
     my @ids = keys %$idMetadata;
     my $unirefIds = {};
 
-    my $dbh = $self->{efi_db}->getHandle();
-
     my $sql = "SELECT * FROM uniref WHERE $unirefField = ?";
-    my $sth = $dbh->prepare($sql);
+    my $sth = $self->{dbh}->prepare($sql);
 
     foreach my $id (@ids) {
         $sth->execute($id);

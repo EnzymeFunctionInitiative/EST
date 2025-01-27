@@ -43,9 +43,10 @@ my $sunburst = new EFI::Import::Sunburst();
 my $stats = new EFI::Import::Statistics(config => $config);
 my $efiDbName = $config->getConfigValue("efi_db");
 my $efiDb = new EFI::Database(config => $config->getEfiDatabaseConfig(), db_name => $efiDbName);
+my $dbh = $efiDb->getHandle();
 
-my $sources = new EFI::Import::Sources(config => $config, efi_db => $efiDb, sunburst => $sunburst, stats => $stats);
-my $filter = new EFI::Import::Filter(config => $config, efi_db => $efiDb, logger => $logger);
+my $sources = new EFI::Import::Sources(config => $config, efi_dbh => $dbh, sunburst => $sunburst, stats => $stats);
+my $filter = new EFI::Import::Filter(config => $config, efi_dbh => $dbh, logger => $logger);
 my $writer = new EFI::Import::Writer(config => $config, sunburst => $sunburst, stats => $stats);
 
 my $source = $sources->createSource();

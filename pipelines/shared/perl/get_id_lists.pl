@@ -21,6 +21,7 @@ use EFI::Options;
 my $opts = validateAndProcessOptions();
 
 my $db = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name});
+my $dbh = $db->getHandle();
 
 
 
@@ -33,7 +34,7 @@ my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});
 my $unirefMap;
 
 if ($idType =~ m/uniref(\d+)/) {
-    $unirefMap = getUniRefMapping($clusterToId, $idType, $sourceIdMap, $db);
+    $unirefMap = getUniRefMapping($clusterToId, $idType, $sourceIdMap, $dbh);
 } elsif ($idType eq "repnode") {
     $clusterToId = resolve_mapping($clusterToId, "repnode", $sourceIdMap);
 }
@@ -141,7 +142,7 @@ sub saveSingletons {
 #    $idType - uniref50 or uniref90
 #    $sourceIdMap - hash ref that maps UniRef sequences IDs to an array
 #        ref of UniProt IDs
-#    $db - EFI::Database object
+#    $dbh - database handle from EFI::Database
 #
 # Returns:
 #    hash ref with one or two keys
@@ -152,9 +153,7 @@ sub getUniRefMapping {
     my $clusterToId = shift;
     my $idType = shift;
     my $sourceIdMap = shift;
-    my $db = shift;
-
-    my $dbh = $db->getHandle();
+    my $dbh = shift;
 
     my $uniref90Raw = {};
     my $uniref50Raw = {};

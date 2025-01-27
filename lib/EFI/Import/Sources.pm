@@ -31,7 +31,7 @@ sub new {
     my $self = {err => []};
     bless($self, $class);
     $self->{config} = $args{config} // die "Fatal error: unable to create source: missing config arg";
-    $self->{efi_db} = $args{efi_db} // die "Fatal error: unable to create source: missing efi_db argument";;
+    $self->{efi_dbh} = $args{efi_dbh} // die "Fatal error: unable to create source: missing efi_dbh argument";;
     $self->{sunburst} = $args{sunburst}; # Optional
     $self->{stats} = $args{stats}; # Optional
 
@@ -49,7 +49,7 @@ sub createSource {
     my $self = shift;
     my $name = $self->{config}->getMode() || die "Fatal error: unable to create source"; 
     my $obj = $types{$name};
-    if (not $obj->init($self->{config}, $self->{efi_db}, sunburst => $self->{sunburst}, stats => $self->{stats})) {
+    if (not $obj->init($self->{config}, $self->{efi_dbh}, sunburst => $self->{sunburst}, stats => $self->{stats})) {
         push @{$self->{err}}, $obj->getErrors();
         return undef;
     } else {
