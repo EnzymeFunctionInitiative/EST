@@ -46,10 +46,8 @@ sub removeFragments {
     my $self = shift;
     my $seqData = shift;
 
-    my $dbh = $self->getDbHandle();
-
     # Cache values for later use in filtering
-    $self->initDb($dbh);
+    $self->initDb();
 
     my $old = 0;
     my %removeIds;
@@ -99,13 +97,10 @@ sub applyFraction {
 # Cache database values for later filter use if we've already queried the set of IDs from the database.
 sub initDb {
     my $self = shift;
-    my $dbh = shift;
     $self->{cache} = {} if not $self->{cache};
-    if (not $self->{cache}->{_dbh}) {
+    if (not $self->{cache}->{_sth}) {
         my $sql = getSqlStatement();
-        my $dbh = $self->getDbHandle();
-        my $sth = $dbh->prepare($sql);
-        $self->{cache}->{_dbh} = $dbh;
+        my $sth = $self->{dbh}->prepare($sql);
         $self->{cache}->{_sth} = $sth;
     }
 }
@@ -128,13 +123,6 @@ sub getDbValue {
         $self->cacheRow($id, $row);
     }
     return $self->{cache}->{$type}->{$id};
-}
-
-
-# Create connection to DB or return cached connection
-sub getDbHandle {
-    my $self = shift;
-    return $self->{dbh};
 }
 
 
