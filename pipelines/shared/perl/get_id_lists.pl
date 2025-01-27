@@ -22,6 +22,9 @@ my $opts = validateAndProcessOptions();
 
 my $db = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name});
 my $dbh = $db->getHandle();
+if (not $dbh) {
+    die "Error connecting to database: " . $db->getError() . "\n";
+}
 
 
 

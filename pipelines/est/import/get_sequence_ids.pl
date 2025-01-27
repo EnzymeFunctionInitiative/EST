@@ -44,6 +44,10 @@ my $stats = new EFI::Import::Statistics(config => $config);
 my $efiDbName = $config->getConfigValue("efi_db");
 my $efiDb = new EFI::Database(config => $config->getEfiDatabaseConfig(), db_name => $efiDbName);
 my $dbh = $efiDb->getHandle();
+if (not $dbh) {
+    $logger->error("Error connecting to database: " . $efiDb->getError());
+    die "\n";
+}
 
 my $sources = new EFI::Import::Sources(config => $config, efi_dbh => $dbh, sunburst => $sunburst, stats => $stats);
 my $filter = new EFI::Import::Filter(config => $config, efi_dbh => $dbh, logger => $logger);

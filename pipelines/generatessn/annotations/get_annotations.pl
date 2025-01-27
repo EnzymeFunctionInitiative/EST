@@ -44,6 +44,12 @@ die "Missing --db-name argument" if not $dbName;
 
 my $anno = new EFI::Annotations;
 my $db = new EFI::Database(config => $configFile, db_name => $dbName);
+my $dbh = $db->getHandle();
+if (not $dbh) {
+    die "Error connecting to database: " . $db->getError() . "\n";
+}
+
+
 
 
 $unirefVersion = "" if not defined $unirefVersion or ($unirefVersion ne "90" and $unirefVersion ne "50");
