@@ -82,7 +82,6 @@ sub parseConfig {
     $self->{password} = $cfg->val("database", "password");
     $self->{host} = $cfg->val("database", "host", "localhost");
     $self->{port} = $cfg->val("database", "port", "3306");
-    $self->{ip_range} = $cfg->val("database", "ip_range", "");
 
     my $dbi = lc $cfg->val("database", "dbi", DBI_MYSQL);
     if ($dbi eq DBI_MYSQL_NAME) {
@@ -282,13 +281,15 @@ file and the optional C<db_name> argument.
 =item C<$configFile>
 
 Path to a configuration file that contains parameters such as username
-and password.  See L</"CONFIGURATION FILE FORMAT"> for information about
+and password.  See L</"configuration file format"> for information about
 the format.
 
 =item C<$dbName>
 
 Name of the database to use.  If the database type is SQLite then this
 should be the path to the C<.sqlite> file.
+
+=back
 
 =head4 Example Usage
 
@@ -376,6 +377,34 @@ the problem message.
 
 =head2 CONFIGURATION FILE FORMAT
 
+The configuration file (e.g. C<efi.config>) that is used throughout the
+pipelines contains information for accessing EFI databases.  The file uses
+the INI configuration format and the B<Config::IniFiles> Perl module is used
+to parse the file.
+
+The file contains a mandatory C<[database]> section with several options
+that may or may not be present depending on the database interface (DBI).
+Two DBIs are supported: SQLite and MySQL.  The configuration file for the
+SQLite DBI is always as follows:
+
+    [database]
+    dbi=sqlite
+
+When using MySQL to access EFI databases, the format contains additional
+options:
+
+    [database]
+    dbi=mysql
+    user=<USERNAME>
+    password=<PASSWORD>
+    host=<HOST>
+    port=<PORT>
+
+The C<port> option is optional and defaults to the standard MySQL port
+number C<3306>.
+
+Both DBIs may also include the C<name> parameter, which can alternatively 
+be specified when the object is instantiated (see C<new()>).
 
 =cut
 
