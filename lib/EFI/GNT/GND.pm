@@ -458,13 +458,15 @@ of the C<gene_key> field which maps to the query C<sort_key> field.  The schema
 is defined as follows:
 
     Table attributes {
-        // Primary key, unique to this table
+        // A number automatically assigned that provides a relationship to the
+        // neighbors table
         sort_key integer [primary key]
         // UniProt ID
         accession varchar(20)
         // ENA genome ID
         embl_id varchar(30)
-        // The number on the genome
+        // The sequential number on the genome, i.e. the Nth protein from the
+        // start of the genome
         num integer
         // Pfam family ID(s)
         family text
@@ -474,10 +476,10 @@ is defined as follows:
         start integer
         // End codon of the AA sequence on the genome
         stop integer
-        // Start codon, but relative to the start of this sequence; for values
+        // Start codon, but relative to the start of this sequence; for entries
         // in this table this will always be zero
         rel_start integer
-        // End codon, but relative to the start of this sequence; for values
+        // End codon, but relative to the start of this sequence; for entries
         // in this table this will always be the sequence length
         rel_stop integer
         // Direction of the sequence, either 'normal' or 'complement'
@@ -486,7 +488,7 @@ is defined as follows:
         type varchar(8)
         // Length of the sequence
         seq_len integer
-        // Taxonomy identifier as provided by NCBI
+        // Taxonomy identifier of the organism as provided by NCBI
         taxon_id integer
         // SwissProt status; 1 if the sequence is a SwissProt sequence, 0 if TrEMBL
         anno_status integer
@@ -506,8 +508,11 @@ is defined as follows:
         cluster_num integer
         // The organism that this sequence belongs to
         organism text
-        // This will be 1 if the neighbor exceeds the length of the genome in the
-        // case that the sequence type is circular
+        // This will be 1 if the window (e.g. number of neighbors to the left
+        // and right of the query sequence) is outside of the bounds of the
+        // genome; for example, if the window is 10, the query is at position
+        // 3 and the total number of sequences is 7, then this value will be
+        // 1, e.g. true
         is_bound integer
         // Reserved for future use
         evalue real
@@ -516,11 +521,12 @@ is defined as follows:
     }
     
     Table neighbors {
-        // Primary key, unique to this table
+        // A number automatically assigned unique to this table
         sort_key integer [primary key]
         // UniProt ID
         accession varchar(20)
-        // The number on the genome
+        // The sequential number on the genome, i.e. the Nth protein from the
+        // start of the genome
         num integer
         // Pfam family ID(s)
         family text
@@ -530,13 +536,14 @@ is defined as follows:
         start integer
         // End codon of the AA sequence on the genome
         stop integer
-        // Start codon, but relative to the start of the primary sequence
-        // that this is related to; if it is to the left of the primary
-        // sequence then it will be negative, if to the right, then positive
+        // Start codon, but relative to the start of the query sequence in the
+        // attributes table that this is related to; if it is to the left of
+        // the query sequence then it will be negative, if to the right, then
+        // positive
         rel_start integer
-        // End codon, but relative to the start of the primary sequence
-        // that this is related to; if it is to the left of the primary
-        // sequence then it will be negative, if to the right, then
+        // End codon, but relative to the start of the query sequence in the
+        // attributes table that this is related to; if it is to the left of
+        // the query sequence then it will be negative, if to the right, then
         // positive.  It is equal to rel_start + seq_len
         rel_stop integer
         // Direction of the sequence, either 'normal' or 'complement'
@@ -545,7 +552,7 @@ is defined as follows:
         type varchar(8)
         // Length of the sequence
         seq_len integer
-        // Taxonomy identifier as provided by NCBI
+        // Taxonomy identifier of the organism as provided by NCBI
         taxon_id integer
         // SwissProt status; 1 if the sequence is a SwissProt sequence, 0 if TrEMBL
         anno_status integer
@@ -557,8 +564,9 @@ is defined as follows:
         ipro_family_desc text
         // Sequence color, based on Pfam
         color varchar(255)
-        // Many-to-one: many neighbors can have the same gene_key, all pointing to one
-        // sort_key value in the attributes table.
+        // A neighbor has exactly one related entry in the attributes table;
+        // the relationship is determined by matching neighbors.gene_key with
+        // attributes.sort_key, and many neighbors can share the same gene_key
         gene_key integer
     }
 

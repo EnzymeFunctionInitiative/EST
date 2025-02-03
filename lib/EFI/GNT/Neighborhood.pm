@@ -307,7 +307,8 @@ sub getQueryIdPositionData {
     $pos->{high_window} = $pos->{query_num} + $neighborhoodSize; # upper boundary of neighborhood search in number of sequences
 
     # Determine if the query window exceeds the genome boundary (for example,
-    # if the query position is 3 and the window is 10, this is true)
+    # if the query position is 3, the geneome has 7 sequeunces, and the
+    # window is 10, then this is 1, e.g. true)
     my $isBound = ($pos->{low_window} < 1 ? 1 : 0);
     $isBound = $isBound | ($pos->{high_window} > $max ? 2 : 0);
     $pos->{is_bound} = $isBound;
