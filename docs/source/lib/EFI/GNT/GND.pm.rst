@@ -78,7 +78,7 @@ Parameters
    A reference to a **EFI::GNT::GNN** object; the GNN data in ``$gnn``
    should have already been retrieved.
 
-``$gndFile``
+``$dbFile``
    The path to a GND file to create.
 
 

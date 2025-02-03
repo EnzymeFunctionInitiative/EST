@@ -430,7 +430,7 @@ then the existing data is overwritten.
 A reference to a B<EFI::GNT::GNN> object; the GNN data in C<$gnn> should have
 already been retrieved.
 
-=item C<$gndFile>
+=item C<$dbFile>
 
 The path to a GND file to create.
 
