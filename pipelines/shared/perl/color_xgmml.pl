@@ -10,7 +10,7 @@ use EFI::Options;
 use EFI::SSN::XgmmlWriter;
 use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
 use EFI::Util::Colors;
-use EFI::SSN::Util::ID qw(get_cluster_num_cols);
+use EFI::SSN::Util::ID qw(get_cluster_num_cols parse_cluster_num_map);
 
 
 
@@ -97,21 +97,7 @@ sub saveClusterColorMap {
 sub parseClusterSizeFile {
     my $mapFile = shift;
 
-    open my $fh, "<", $mapFile or die "Unable to read cluster map file '$mapFile': $!";
-
-    my $headerLine = <$fh>;
-
-    my $seqSizes = {};
-    my $nodeSizes = {};
-
-    while (my $line = <$fh>) {
-        chomp $line;
-        my ($seqNum, $seqSize, $nodeNum, $nodeSize) = split(m/\t/, $line);
-        $seqSizes->{$seqNum} = $seqSize;
-        $nodeSizes->{$nodeNum} = $nodeSize;
-    }
-
-    close $fh;
+    my ($seqSizes, $nodeSizes) = parse_cluster_num_map($mapFile);
 
     return {seq => $seqSizes, node => $nodeSizes};
 }
