@@ -37,10 +37,10 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args = create_est_nextflow_params.check_args(args)
     elif args.pipeline == "generatessn":
         args = create_generatessn_nextflow_params.check_args(args)
-    elif args.pipeline == "gnt":
-        args = create_gnt_nextflow_params.check_args(args)
     elif args.pipeline == "gnd":
         args = create_gnd_nextflow_params.check_args(args)
+    elif args.pipeline == "gnt":
+        args = create_gnt_nextflow_params.check_args(args)
     else:
         print(f"Job type '{args.pipeline}' not known")
         exit(1)
@@ -75,15 +75,15 @@ def create_parser() -> argparse.ArgumentParser:
     generatessn_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the SSN nextflow workflow file")
     create_generatessn_nextflow_params.add_args(generatessn_parser)
 
-    gnt_parser = subparsers.add_parser("gnt", help="Create a GNT pipeline job script")
-    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/gnt/gnt.nf")
-    gnt_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GNT workflow file")
-    create_gnt_nextflow_params.add_args(gnt_parser)
-
     gnd_parser = subparsers.add_parser("gnd", help="Create a GND pipeline job script")
     nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/gnd/gnd.nf")
     gnd_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GND workflow file")
     create_gnd_nextflow_params.add_args(gnd_parser)
+
+    gnt_parser = subparsers.add_parser("gnt", help="Create a GNT pipeline job script")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/gnt/gnt.nf")
+    gnt_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GNT workflow file")
+    create_gnt_nextflow_params.add_args(gnt_parser)
 
     return parser
 

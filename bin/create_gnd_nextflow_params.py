@@ -7,7 +7,7 @@ import os
 
 def add_args(parser: argparse.ArgumentParser):
     """
-    add argumdents for GND pipeline to ``parser``
+    add arguments for GND pipeline to ``parser``
     """
     parser.add_argument("--output-dir", required=True, type=str, help="Location for results.  Must be empty, and will be created if it doesn't exist")
     parser.add_argument("--cluster-id-map", required=True, type=str, help="The mapping of cluster numbers to IDs in the cluster for the GNDs")
