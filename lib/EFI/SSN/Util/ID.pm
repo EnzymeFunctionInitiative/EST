@@ -7,7 +7,7 @@ use warnings;
 use Exporter qw(import);
 
 
-our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_file get_cluster_num_cols parse_cluster_num_map);
+our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_file parse_singletons_file get_cluster_num_cols parse_cluster_num_map);
 
 
 
@@ -25,11 +25,28 @@ our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_fi
 #
 sub get_cluster_num_cols {
     my $header = shift;
-    return () if not $header;
+
+    # Empty file
+    if (not $header) {
+        return;
+    }
+
+    # Singletons
     my @ph = split(m/\t/, $header);
-    my $seqNumCol = $ph[1] =~ /seq/ ? 1 : 2;
-    my $nodeNumCol = $ph[1] =~ /node/ ? 1 : 2;
-    return ($seqNumCol, $nodeNumCol);
+    if (@ph < 2) {
+        return;
+    }
+
+    # Sequence - Cluster number (from sequences)
+    if (@ph < 3) {
+        return (1, 1);
+    }
+
+    if ($ph[1] =~ m/seq/) {
+        return (1, 2);
+    } else {
+        return (2, 1);
+    }
 }
 
 
@@ -52,8 +69,9 @@ sub parse_cluster_map_file {
     open my $fh, "<", $file or die "Unable to open cluster map file '$file' for reading: $!";
 
     my $header = <$fh>;
-    return {} if not $header;
+    return if not $header;
     my ($seqNumCol, $nodeNumCol) = get_cluster_num_cols($header);
+    return if not $seqNumCol or not $nodeNumCol;
 
     # "node_label\tcluster_num_by_node\tcluster_num_by_seq
     my @header = split(m/\t/, $header);
@@ -73,6 +91,38 @@ sub parse_cluster_map_file {
 
     return ($seqClusterToId, $nodeClusterToId);
 }
+
+
+#
+# parse_singletons_file
+#
+# Parse the file that contains a list of singletons.  The file contains
+# a header.
+#
+# Parameters:
+#    $file - file containing a list of singletons.
+#
+# Returns:
+#    array ref of IDs
+#
+sub parse_singletons_file {
+    my $file = shift;
+
+    open my $fh, "<", $file or die "Unable to open cluster map file '$file' for reading: $!";
+
+    my $header = <$fh>;
+
+    my @ids;
+    while (my $line = <$fh>) {
+        chomp $line;
+        push @ids, $line;
+    }
+
+    close $fh;
+
+    return \@ids;
+}
+
 
 #
 # parse_metanode_map_file
@@ -226,6 +276,8 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
     # $clusterNumMapFile is typically output by compute_clusters.py
     my ($clusterSizesBySequences, $clusterSizesByNodes) = parse_cluster_num_map($clusterNumMapFile);
 
+    my $ids = parse_singletons_file($singletonsFile);
+
 
 =head2 DESCRIPTION
 
@@ -255,23 +307,15 @@ example:
     UNIPROT_ID2 1                  2
     UNIPROT_ID3 1                  1
 
-The function can also parse singleton files, with the format being a single column:
-
-    node_label
-    UNIPROT_ID
-    UNIPROT_ID2
-    UNIPROT_ID3
-
 =head4 Parameters
 
 =over
 
 =item C<$clusterMapFile>
 
-A tab-separated file that with one to three columns; the first column being the
+A tab-separated file that with two or three columns; the first column being the
 sequence ID, with the second and third columns being the cluster numbers (by sequence
-and by node).  If the cluster number columns don't exist (e.g. there is only one
-column, the ID), then the singleton cluster number ('0') is assigned.
+and by node).  If there are only two columns then the cluster numbers are identical.
 
 =back
 
@@ -312,6 +356,38 @@ C<cluster_num_node> column in the input file).  In the example given above
 =head4 Example Usage
 
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
+
+
+=head3 C<parse_singletons_file($singletonsFile)>
+
+Parse a list of singletons in a file, with the format being a single column
+file with a header:
+
+    node_label
+    UNIPROT_ID
+    UNIPROT_ID2
+    UNIPROT_ID3
+
+=head4 Parameters
+
+=over
+
+=item C<$singletonsFile>
+
+Path to a file containing IDs.
+
+=back
+
+=head4 Returns
+
+An array ref of IDs.
+
+=head4 Example Usage
+
+    my $ids = parse_singletons($singletonsFile);
+    foreach my $id (@$ids) {
+        print "Singleton: $id\n";
+    }
 
 
 =head3 C<parse_metanode_map_file($metanodeMapFile)>
