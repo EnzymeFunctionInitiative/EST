@@ -28,7 +28,11 @@ sub new {
     my $appName = $args{app_name} // $0;
     $appName =~ s%^.*/([^/]+)$%$1%; # only show the script, not path
 
-    my $self = { app => $appName, help_desc => $args{desc} // "" };
+    my $self = { app => $appName, help_desc => $args{desc} // "", max_line_len => 100 };
+    $self->{app} = $args{app_name} // $0;
+    $self->{help_desc} = $args{desc} // "";
+    $self->{ext_desc} = $args{ext_desc} // "";
+
     bless $self, $class;
 
     return $self;
@@ -136,7 +140,6 @@ sub processOptions {
 
 sub printHelp {
     my $self = shift;
-    my $helpOptions = shift || 0;
 
     my $text = "";
     my $maxArgLen = 0;
@@ -177,7 +180,6 @@ sub printHelp {
 
     push @cmdArgs, @cmdArgsOptional;
 
-    my $allowedLineLen = 100;
     my $scriptStr = "Usage: perl $self->{app}";
     my $len = length($scriptStr);
 
@@ -186,7 +188,7 @@ sub printHelp {
     # Output the usage options, wrapping as needed
     foreach my $cmd (@cmdArgs) {
         my $cmdLen = $cmd->[1] + 1;
-        if ($cmdLen + $len > $allowedLineLen) {
+        if ($cmdLen + $len > $self->{max_line_len}) {
             $text .= "\n   ";
             $len = 4;
         }
@@ -196,17 +198,11 @@ sub printHelp {
 
     $text .= "\n\n";
     $text .= "Description:\n   ";
+    $text .= $self->outputTextBlock($self->{help_desc});
 
-    # Output the help description, wrapping as needed
-    my @words = split(m/ +/, $self->{help_desc});
-    $len = 4;
-    foreach my $word (@words) {
-        if (length($word) + $len + 1 > $allowedLineLen) {
-            $text .= "\n   ";
-            $len = 4;
-        }
-        $len += length($word) + 1;
-        $text .= " $word";
+    if ($self->{ext_desc}) {
+        $text .= "\n\n   ";
+        $text .= $self->outputTextBlock($self->{ext_desc});
     }
 
     $text .= "\n\n";
@@ -228,6 +224,27 @@ sub printHelp {
 }
 
 
+sub outputTextBlock {
+    my $self = shift;
+    my $text = shift;
+    my $output = "";
+
+    # Output the help description, wrapping as needed
+    my @words = split(m/ +/, $text);
+    my $len = 4;
+    foreach my $word (@words) {
+        if (length($word) + $len + 1 > $self->{max_line_len}) {
+            $output .= "\n   ";
+            $len = 4;
+        }
+        $len += length($word) + 1;
+        $output .= " $word";
+    }
+
+    return $output;
+}
+
+
 1;
 __END__
 
@@ -241,7 +258,7 @@ EFI::Options - Perl module for parsing command line arguments
 
     use EFI::Options;
 
-    my $optParser = new EFI::Options(app_name => $0, desc => "application description");
+    my $optParser = new EFI::Options(app_name => $0, desc => "application description", ext_desc => "extended application description");
 
     $optParser->addOption("edgelist=s", 1, "path to a file with the edgelist", OPT_FILE);
     $optParser->addOption("file-type=s", 0, "type of the file (e.g. mapping, tab, xml)", OPT_VALUE); # Or, don't need to provide OPT_VALUE
@@ -271,10 +288,11 @@ EFI::Options is a utility module to get command line arguments.
 
 =head2 METHODS
 
-=head3 C<new(parse_options...)>
+=head3 C<new(app_name =E<gt> "app_name.pl", desc =E<gt> "description", ext_desc =E<gt> "extended description")>
 
 Create a new instance of this module.  The available parse options are C<app_name>, used
-to provide a custom name to the C<printHelp()> method, and C<desc>, also used in C<printHelp()>.
+to provide a custom name to the C<printHelp()> method, C<desc>, also used in C<printHelp()>,
+and C<ext_desc>, providing an extended description/help message.
 
 =head3 C<addOption($optSpec, $required, $help, $resultType)>
 
@@ -398,9 +416,11 @@ Return the usage, description, and option help text.
 =head4 Example Usage
 
     $optParser->parseOptions();
-    my $helpWithErrors = $optParser->printHelp(OPT_ERRORS);
+    # If script doesn't have --help arg, then automatically include validation errors in help message
+    my $helpWithErrors = $optParser->printHelp();
+    # If script has --help arg, then don't include validation errors in help message
     my $helpOnly = $optParser->printHelp();
-    
+
 
 =cut
 
