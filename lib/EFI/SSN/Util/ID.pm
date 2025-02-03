@@ -7,7 +7,7 @@ use warnings;
 use Exporter qw(import);
 
 
-our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_file get_cluster_num_cols);
+our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_file get_cluster_num_cols parse_cluster_num_map);
 
 
 
@@ -36,10 +36,12 @@ sub get_cluster_num_cols {
 #
 # parse_cluster_map_file
 #
-# Parse the file that maps cluster numbers to sequence IDs (or metanodes)
+# Parse the file that maps cluster numbers to sequence IDs (or metanodes).
+# Singletons (i.e. single column rows) are supported and are included in
+# cluster 0.
 #
 # Parameters:
-#    $file - file containing a map of cluster numbers to IDs (two-three columns, with header)
+#    $file - file containing a map of cluster numbers to IDs (one-three columns, with header)
 #
 # Returns:
 #    hash ref mapping cluster number to IDs in cluster
@@ -159,6 +161,44 @@ sub resolve_mapping {
     return $newMap;
 }
 
+
+#
+# parse_cluster_num_map
+#
+# Parse the cluster number mapping output by the clustering script
+#
+# Parameters:
+#    $file - path to file containing the table of sizes
+#
+# Returns:
+#    $sizeBySequences - a hash ref mapping cluster number to the number of
+#        sequences in the cluster (expanded metanodes)
+#    $sizeByNodes - a hash ref mapping cluster number to the number of
+#        nodes in the cluster (metanodes)
+#
+sub parse_cluster_num_map {
+    my $file = shift;
+
+    open my $fh, "<", $file or die "Unable to read cluster map file '$file': $!";
+
+    my $headerLine = <$fh>;
+
+    my $sizeBySequences = {};
+    my $sizeByNodes = {};
+
+    while (my $line = <$fh>) {
+        chomp $line;
+        my ($seqNum, $seqSize, $nodeNum, $nodeSize) = split(m/\t/, $line);
+        $sizeBySequences->{$seqNum} = $seqSize;
+        $sizeByNodes->{$nodeNum} = $nodeSize;
+    }
+
+    close $fh;
+
+    return $sizeBySequences, $sizeByNodes;
+}
+
+
 1;
 __END__
 
@@ -170,7 +210,7 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
 
 =head2 SYNOPSIS
 
-    use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file get_cluster_num_cols parse_metanode_map_file);
+    use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file get_cluster_num_cols parse_metanode_map_file parse_cluster_num_map);
 
     # $clusterMapFile comes from another utility, the Python `compute_clusters.py` script
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
@@ -182,6 +222,9 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
 
     # $header = "node_label      cluster_num_by_seq      cluster_num_by_node"
     my ($seqNumCol, $nodeNumCol) = get_cluster_num_cols($header);
+
+    # $clusterNumMapFile is typically output by compute_clusters.py
+    my ($clusterSizesBySequences, $clusterSizesByNodes) = parse_cluster_num_map($clusterNumMapFile);
 
 
 =head2 DESCRIPTION
@@ -203,7 +246,21 @@ and by-sequence and by-node numbering is identical.
 
 =head3 parse_cluster_map_file($clusterMapFile)
 
-Parses a file that contains a mapping of sequence IDs to cluster numbers.
+Parses a file that contains a mapping of sequence IDs to cluster numbers.  The file
+is a tab-separated file with one to three columns, and includes a header.  For
+example:
+
+    node_label  cluster_num_by_seq cluster_num_by_node
+    UNIPROT_ID  1                  1
+    UNIPROT_ID2 1                  2
+    UNIPROT_ID3 1                  1
+
+The function can also parse singleton files, with the format being a single column:
+
+    node_label
+    UNIPROT_ID
+    UNIPROT_ID2
+    UNIPROT_ID3
 
 =head4 Parameters
 
@@ -211,9 +268,10 @@ Parses a file that contains a mapping of sequence IDs to cluster numbers.
 
 =item C<$clusterMapFile>
 
-A file that contains three columns; the first column being the sequence ID, with the
-second and third columns being the cluster numbers (by sequence and by node).  If the
-cluster number columns don't exist then the singleton number ('0') is assigned.
+A tab-separated file that with one to three columns; the first column being the
+sequence ID, with the second and third columns being the cluster numbers (by sequence
+and by node).  If the cluster number columns don't exist (e.g. there is only one
+column, the ID), then the singleton cluster number ('0') is assigned.
 
 =back
 
@@ -404,6 +462,68 @@ The column index of the clusters numbered by nodes.
     chomp(my $row = getLine());
     my @p = split(m/\t/, $row);
     my $clusterNum = $p[$seqNumCol];
+
+
+
+
+=head3 C<parse_cluster_num_map($file)>
+
+Parse the cluster number mapping file that is output by B<compute_clusters.py>
+as part of the color SSN workflow.  The file a tab-separated file with a header
+giving the value in the columns, typically looking as follows:
+
+    cluster_num_by_seq cluster_size_by_seq cluster_num_by_node cluster_size_by_node
+    1                  19                  1                   12
+    2                  12                  3                   7
+    3                  7                   2                   11
+
+For inputs that are UniProt the values will always be the same.
+
+=head4 Parameters
+
+=over
+
+=item C<$file>
+
+Path to the cluster num mapping file.
+
+=back
+
+=head4 Returns
+
+Two hash refs mapping the cluster numbers to sizes:
+
+=over
+
+=item C<$clusterSizesBySequences>
+
+The number of sequences in each cluster (including any sequences in the metanodes).
+
+=item C<$clusterSizesByNodes>
+
+The number of sequences in each cluster (metanodes only).
+
+=back
+
+=head4 Example Usage
+
+    # $clusterNumMapFile contains the data specified above
+    my ($clusterSizesBySequences, $clusterSizesByNodes) = parse_cluster_num_map($clusterNumMapFile);
+
+    # $clusterSizesBySequences contains: 
+    #     {
+    #         1 => 19,
+    #         2 => 12,
+    #         3 => 7
+    #     }
+
+    # $clusterSizesByNodes contains:
+    #     {
+    #         1 => 12,
+    #         2 => 11,
+    #         3 => 7
+    #     }
+
 
 =cut
 
