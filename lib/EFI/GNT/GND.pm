@@ -430,7 +430,7 @@ then the existing data is overwritten.
 A reference to a B<EFI::GNT::GNN> object; the GNN data in C<$gnn> should have
 already been retrieved.
 
-=item C<$gndFile>
+=item C<$dbFile>
 
 The path to a GND file to create.
 
@@ -454,7 +454,122 @@ as position on the genome, taxonomic identifier, family data, plus more.  The
 structure is serialized into two tables, the C<attribute> table with one row for
 every ID in the cluster and the C<neighbors> table for the neighbors of each
 query.  The C<neighbors> table is linked to the C<query> table through the use
-of the C<query_sort_key> field which maps to the query C<sort_key> field.
+of the C<gene_key> field which maps to the query C<sort_key> field.  The schema
+is defined as follows:
+
+    Table attributes {
+        // A number automatically assigned that provides a relationship to the
+        // neighbors table
+        sort_key integer [primary key]
+        // UniProt ID
+        accession varchar(20)
+        // ENA genome ID
+        embl_id varchar(30)
+        // The sequential number on the genome, i.e. the Nth protein from the
+        // start of the genome
+        num integer
+        // Pfam family ID(s)
+        family text
+        // InterPro family ID(s)
+        ipro_family text
+        // Start codon of the AA sequence on the genome
+        start integer
+        // End codon of the AA sequence on the genome
+        stop integer
+        // Start codon, but relative to the start of this sequence; for entries
+        // in this table this will always be zero
+        rel_start integer
+        // End codon, but relative to the start of this sequence; for entries
+        // in this table this will always be the sequence length
+        rel_stop integer
+        // Direction of the sequence, either 'normal' or 'complement'
+        direction varchar(10)
+        // Type of the sequence, either 'linear' or 'circular'
+        type varchar(8)
+        // Length of the sequence
+        seq_len integer
+        // Taxonomy identifier of the organism as provided by NCBI
+        taxon_id integer
+        // SwissProt status; 1 if the sequence is a SwissProt sequence, 0 if TrEMBL
+        anno_status integer
+        // Sequence description if SwissProt
+        desc text
+        // Pfam family description(s)
+        family_desc text
+        // InterPro family description(s)
+        ipro_family_desc text
+        // Sequence color, based on Pfam
+        color varchar(255)
+        // Sorting order in the display
+        sort_order integer
+        // Organism strain
+        strain text
+        // The number in the cluster; 0 if there is no cluster associated
+        cluster_num integer
+        // The organism that this sequence belongs to
+        organism text
+        // This will be 1 if the window (e.g. number of neighbors to the left
+        // and right of the query sequence) is outside of the bounds of the
+        // genome; for example, if the window is 10, the query is at position
+        // 3 and the total number of sequences is 7, then this value will be
+        // 1, e.g. true
+        is_bound integer
+        // Reserved for future use
+        evalue real
+        // Reserved for future use
+        cluster_index integer
+    }
+    
+    Table neighbors {
+        // A number automatically assigned unique to this table
+        sort_key integer [primary key]
+        // UniProt ID
+        accession varchar(20)
+        // The sequential number on the genome, i.e. the Nth protein from the
+        // start of the genome
+        num integer
+        // Pfam family ID(s)
+        family text
+        // InterPro family ID(s)
+        ipro_family text
+        // Start codon of the AA sequence on the genome
+        start integer
+        // End codon of the AA sequence on the genome
+        stop integer
+        // Start codon, but relative to the start of the query sequence in the
+        // attributes table that this is related to; if it is to the left of
+        // the query sequence then it will be negative, if to the right, then
+        // positive
+        rel_start integer
+        // End codon, but relative to the start of the query sequence in the
+        // attributes table that this is related to; if it is to the left of
+        // the query sequence then it will be negative, if to the right, then
+        // positive.  It is equal to rel_start + seq_len
+        rel_stop integer
+        // Direction of the sequence, either 'normal' or 'complement'
+        direction varchar(10)
+        // Type of the sequence, either 'linear' or 'circular'
+        type varchar(8)
+        // Length of the sequence
+        seq_len integer
+        // Taxonomy identifier of the organism as provided by NCBI
+        taxon_id integer
+        // SwissProt status; 1 if the sequence is a SwissProt sequence, 0 if TrEMBL
+        anno_status integer
+        // Sequence description if SwissProt
+        desc text
+        // Pfam family description(s)
+        family_desc text
+        // InterPro family description(s)
+        ipro_family_desc text
+        // Sequence color, based on Pfam
+        color varchar(255)
+        // A neighbor has exactly one related entry in the attributes table;
+        // the relationship is determined by matching neighbors.gene_key with
+        // attributes.sort_key, and many neighbors can share the same gene_key
+        gene_key integer
+    }
+
 
 =cut
 
