@@ -22,7 +22,8 @@ process create_gnns {
 
     """
     id_map_file="merged_ids.txt"
-    cat $cluster_id_map $singletons > \$id_map_file
+    cat ${cluster_id_map} > \$id_map_file
+    awk '{if(NR>1)print}' ${singletons} >> \$id_map_file
     perl $projectDir/create_gnns.pl \
         --config ${params.efi_config} --db-name ${params.efi_db} --cluster-map \$id_map_file \
         --cluster-gnn cluster_gnn.xgmml --pfam-gnn pfam_gnn.xgmml \
