@@ -1,3 +1,6 @@
+
+include { get_sequences; split_sequence_ids; multiplex } from "../shared/nextflow/sequence.nf"
+
 process get_sequence_ids {
     publishDir params.final_output_dir, mode: 'copy'
     output:
@@ -36,31 +39,6 @@ process get_sequence_ids {
     }
 }
 
-process split_sequence_ids {
-    input:
-        path accessions_file
-    output:
-        path "accession_ids.txt.part*"
-    """
-    split -d -e -n r/${params.num_accession_shards} $accessions_file accession_ids.txt.part
-    """
-}
-
-process get_sequences {
-    input:
-        path accession_ids
-    output:
-        path "${accession_ids}.fasta"
-    stub:
-    """
-    cp $existing_fasta_file all_sequences.fasta
-    """
-    script:
-    """
-    perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file $accession_ids --output-sequence-file ${accession_ids}.fasta
-    """
-}
-
 process cat_fasta_files {
     publishDir params.final_output_dir, mode: 'copy'
     input:
@@ -94,18 +72,6 @@ process import_fasta {
     # produces a mapping.txt file
     perl $projectDir/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file} --sequence-version ${params.sequence_version}
     perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
-    """
-}
-
-process multiplex {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path fasta_file
-    output:
-        path 'sequences.fasta', emit: 'fasta_file'
-        path 'sequences.fasta.clstr', emit: 'clusters'
-    """
-    cd-hit -d 0  -c 1 -s 1 -i $fasta_file -o sequences.fasta -M 10000
     """
 }
 
@@ -233,8 +199,9 @@ workflow {
 
         // split up the sequence ID list into separate files to enable parallel sequence
         // retrieval from the BLAST sequence database
-        accession_shards = split_sequence_ids(sequence_id_files.accession_ids)
-        fasta_file = cat_fasta_files(get_sequences(accession_shards.flatten()).collect())
+        accession_shards = split_sequence_ids(sequence_id_files.accession_ids, params.num_accession_shards)
+        fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db)
+        fasta_file = cat_fasta_files(fasta_files.collect())
     }
 
     // step 2: multiplex
@@ -263,3 +230,4 @@ workflow {
     // step 5: visualize
     plots = visualize(stats.boxplot_stats)
 }
+
