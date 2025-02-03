@@ -7,7 +7,7 @@ use FindBin;
 
 use lib "$FindBin::Bin/../../../lib";
 
-use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file);
+use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file parse_singletons_file);
 use EFI::Options;
 
 
@@ -27,7 +27,7 @@ my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});
 
 my $fullClusterToId = resolve_mapping($clusterToId, $idType, $sourceIdMap);
 
-my $singletons = parse_cluster_map_file($opts->{singletons});
+my $singletons = parse_singletons_file($opts->{singletons});
 
 my $stats = computeStats($opts->{stats}, $clusterToId, $fullClusterToId, $idType, $singletons);
 
