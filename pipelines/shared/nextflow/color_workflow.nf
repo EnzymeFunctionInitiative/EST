@@ -1,4 +1,6 @@
 
+include { unzip_ssn } from "./unzip.nf"
+
 cluster_data_dir = "cluster-data"
 
 process get_id_list {
@@ -58,19 +60,10 @@ process get_ssn_id_info {
         path "index_seqid_map.txt", emit: "index_seqid_map"
         path "id_index_map.txt", emit: "id_index_map"
         path "seqid_source_map.txt", emit: "seqid_source_map"
+        path "ssn_sequences.fasta", emit: "ssn_sequences"
     """
     perl $projectDir/../shared/perl/ssn_to_id_list.pl --ssn $ssn_file --edgelist edgelist.txt --index-seqid index_seqid_map.txt \
-        --id-index id_index_map.txt --seqid-source-map seqid_source_map.txt
-    """
-}
-
-process unzip_input {
-    input:
-        path ssn_zipped
-    output:
-        path "ssn____local.xgmml"
-    """
-    perl $projectDir/../shared/perl/unzip_xgmml_file.pl --in $ssn_zipped --out ssn____local.xgmml
+        --id-index id_index_map.txt --seqid-source-map seqid_source_map.txt --ssn-sequences ssn_sequences.fasta
     """
 }
 
@@ -137,7 +130,7 @@ process compute_clusters {
 workflow color_and_retrieve {
     main:
         if (params.ssn_input =~ /\.zip$/) {
-            ssn_file = unzip_input(params.ssn_input)
+            ssn_file = unzip_ssn(params.ssn_input)
         } else {
             ssn_file = params.ssn_input
         }
