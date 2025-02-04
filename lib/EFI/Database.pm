@@ -256,8 +256,19 @@ B<EFI::Database> - Perl module for creating connections to databases
 
 =head2 SYNOPSIS
 
-    # Perform $gnn computations and save data
-    my $gnn = new EFI::GNT::GNN(...);
+    # SQLite
+    my $dbFile = "efi_db.sqlite";
+    my $db = new EFI::Database(config => $configFile, db_name => $dbFile);
+    my $dbh = $db->getHandle();
+
+    # MySQL
+    my $dbName = "efi_202412";
+    my $db = new EFI::Database(config => $configFile, db_name => $dbName);
+    my $dbh = $db->getHandle();
+
+    # Example Usage
+    use EFI::IdMapping;
+    my $mapper = new EFI::IdMapping(efi_dbh => $dbh);
 
 
 =head2 DESCRIPTION
@@ -272,7 +283,8 @@ connection parameters.
 =head3 C<new(config =E<gt> $configFile, db_name =E<gt> $dbName)>
 
 Creates a new B<EFI::Database> instance using the parameters in the config
-file and the optional C<db_name> argument.
+file and the optional C<db_name> argument.  If C<db_name> is used, that
+value overrides any C<name> field in the configuration file.
 
 =head4 Parameters
 
@@ -281,7 +293,7 @@ file and the optional C<db_name> argument.
 =item C<$configFile>
 
 Path to a configuration file that contains parameters such as username
-and password.  See L</"configuration file format"> for information about
+and password.  See B<EFI Configuartion File Format> for information about
 the format.
 
 =item C<$dbName>
@@ -360,11 +372,11 @@ A B<DBI> connection if successful, undef otherwise.
 
 =head3 C<getError()>
 
-Returns an errors that were detected during connection.
+Returns any errors that were detected during connection.
 
 =head4 Returns
 
-An empty string of there were no errors, otherwise a non-empty string with
+An empty string if there were no errors, otherwise a non-empty string with
 the problem message.
 
 =head4 Example Usage
@@ -374,38 +386,5 @@ the problem message.
         print "Error connecting to database: " . $db->getError() . "\n";
     }
 
-
-=head2 CONFIGURATION FILE FORMAT
-
-The configuration file (e.g. C<efi.config>) that is used throughout the
-pipelines contains information for accessing EFI databases.  The file uses
-the INI configuration format and the B<Config::IniFiles> Perl module is used
-to parse the file.
-
-The file contains a mandatory C<[database]> section with several options
-that may or may not be present depending on the database interface (DBI).
-Two DBIs are supported: SQLite and MySQL.  The configuration file for the
-SQLite DBI is always as follows:
-
-    [database]
-    dbi=sqlite
-
-When using MySQL to access EFI databases, the format contains additional
-options:
-
-    [database]
-    dbi=mysql
-    user=<USERNAME>
-    password=<PASSWORD>
-    host=<HOST>
-    port=<PORT>
-
-The C<port> option is optional and defaults to the standard MySQL port
-number C<3306>.
-
-Both DBIs may also include the C<name> parameter, which can alternatively 
-be specified when the object is instantiated (see C<new()>).
-
 =cut
-
 

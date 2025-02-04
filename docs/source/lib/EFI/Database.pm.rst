@@ -22,8 +22,19 @@ SYNOPSIS
 
 ::
 
-   # Perform $gnn computations and save data
-   my $gnn = new EFI::GNT::GNN(...);
+   # SQLite
+   my $dbFile = "efi_db.sqlite";
+   my $db = new EFI::Database(config => $configFile, db_name => $dbFile);
+   my $dbh = $db->getHandle();
+
+   # MySQL
+   my $dbName = "efi_202412";
+   my $db = new EFI::Database(config => $configFile, db_name => $dbName);
+   my $dbh = $db->getHandle();
+
+   # Example Usage
+   use EFI::IdMapping;
+   my $mapper = new EFI::IdMapping(efi_dbh => $dbh);
 
 
 
@@ -45,7 +56,8 @@ METHODS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creates a new **EFI::Database** instance using the parameters in the
-config file and the optional ``db_name`` argument.
+config file and the optional ``db_name`` argument. If ``db_name`` is
+used, that value overrides any ``name`` field in the configuration file.
 
 
 
@@ -54,9 +66,9 @@ Parameters
 
 ``$configFile``
    Path to a configuration file that contains parameters such as
-   username and password. See `"configuration file
-   format" <#configuration-file-format>`__ for information about the
-   format.
+   username and password. See `EFI Configuartion File
+   Format <file://../../../reference/efi_config_file.html>`__ for
+   information about the format.
 
 ``$dbName``
    Name of the database to use. If the database type is SQLite then this
@@ -158,14 +170,14 @@ Example Usage
 ``getError()``
 ~~~~~~~~~~~~~~
 
-Returns an errors that were detected during connection.
+Returns any errors that were detected during connection.
 
 
 
 Returns
 ^^^^^^^
 
-An empty string of there were no errors, otherwise a non-empty string
+An empty string if there were no errors, otherwise a non-empty string
 with the problem message.
 
 
