@@ -66,8 +66,7 @@ Parameters
 
 ``$configFile``
    Path to a configuration file that contains parameters such as
-   username and password. See `EFI Configuartion File
-   Format <file://../../../reference/efi_config_file.html>`__ for
+   username and password. See **EFI Configuartion File Format** for
    information about the format.
 
 ``$dbName``
@@ -191,42 +190,3 @@ Example Usage
    if (not $dbh) {
        print "Error connecting to database: " . $db->getError() . "\n";
    }
-
-
-
-CONFIGURATION FILE FORMAT
--------------------------
-
-The configuration file (e.g. ``efi.config``) that is used throughout the
-pipelines contains information for accessing EFI databases. The file
-uses the INI configuration format and the **Config::IniFiles** Perl
-module is used to parse the file.
-
-The file contains a mandatory ``[database]`` section with several
-options that may or may not be present depending on the database
-interface (DBI). Two DBIs are supported: SQLite and MySQL. The
-configuration file for the SQLite DBI is always as follows:
-
-::
-
-   [database]
-   dbi=sqlite
-
-When using MySQL to access EFI databases, the format contains additional
-options:
-
-::
-
-   [database]
-   dbi=mysql
-   user=<USERNAME>
-   password=<PASSWORD>
-   host=<HOST>
-   port=<PORT>
-
-The ``port`` option is optional and defaults to the standard MySQL port
-number ``3306``.
-
-Both DBIs may also include the ``name`` parameter, which can
-alternatively be specified when the object is instantiated (see
-``new()``).
