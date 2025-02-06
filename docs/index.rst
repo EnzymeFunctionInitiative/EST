@@ -9,4 +9,6 @@ are available to help you use the tools.
     source/guides/index
     source/pipelines/index
     source/pyEFI/index
+    source/developer/index
     :maxdepth: 2
+
