@@ -41,10 +41,13 @@ provided to the command then the default directory structure is used (e.g.
 
 To use an alternate dataset location, an additional parameter must be used,
 ``--data-dir``, to specify the alternate dataset. For example, if the test
-dataset is downloaded to ``/scratch/est_test/test_data/sqlite``, then the
+dataset is downloaded to ``/scratch/est_test/test_data/``, then the
 environment setup command must be replaced with: ::
 
-    source tests/test_env.sh --data-dir /scratch/est_test/test_data/sqlite
+    source tests/test_env.sh --data-dir /scratch/est_test/test_data
+
+Note, this path should exactly match the path used in the 
+``tests/download_example.sh`` script.
 
 Additional parameters can be used to control the test environment:
 
@@ -55,6 +58,8 @@ By adding the ``--db-type`` option with the ``sqlite`` or ``mysql`` value
 a user can control the database interface used by the scripts: ::
 
     source tests/test_env.sh --db-type sqlite
+
+If left undefined, the tests will be run assuming a ``sqlite`` database file.
 
 ``--results-dir``
 ~~~~~~~~~~~~~~~~~
