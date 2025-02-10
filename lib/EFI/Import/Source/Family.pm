@@ -38,8 +38,8 @@ sub new {
 sub init {
     my $self = shift;
     my $config = shift;
-    my $efiDb = shift;
-    $self->SUPER::init($config, $efiDb, @_);
+    my $efiDbh = shift;
+    $self->SUPER::init($config, $efiDbh, @_);
 
     my $fams = $config->getConfigValue("family");
     $self->{fams} = $fams;
@@ -184,8 +184,6 @@ sub executeQueries {
     my $self = shift;
     my $queryData = shift;
 
-    my $dbh = $self->{efi_db}->getHandle();
-
     my $ids = {};
     my $unirefMapping = {};
     my $numUniprotIds = 0;
@@ -194,7 +192,7 @@ sub executeQueries {
     # Look at every family in the input set; one query corresponds to one family
     foreach my $query (@{ $queryData->{queries} }) {
         my $sql = $self->makeSqlStatement($query);
-        my $sth = $dbh->prepare($sql);
+        my $sth = $self->{dbh}->prepare($sql);
         if (not $sth) {
             $self->addError("Unable to prepare query for Family source");
             return undef;

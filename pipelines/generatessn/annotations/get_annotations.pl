@@ -11,7 +11,7 @@ use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin/../../../lib";
 
-use EFI::Database;
+use EFI::Database qw(:dbi);
 use EFI::IdMapping::Util;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
@@ -44,6 +44,12 @@ die "Missing --db-name argument" if not $dbName;
 
 my $anno = new EFI::Annotations;
 my $db = new EFI::Database(config => $configFile, db_name => $dbName);
+my $dbh = $db->getHandle();
+if (not $dbh) {
+    die "Error connecting to database: " . $db->getError() . "\n";
+}
+
+
 
 
 $unirefVersion = "" if not defined $unirefVersion or ($unirefVersion ne "90" and $unirefVersion ne "50");
@@ -78,8 +84,10 @@ my $annoSpec = readAnnoSpec($annoSpecFile);
 
 
 
-my $dbh = $db->getHandle();
-$dbh->do('SET @@group_concat_max_len = 3000') if ($db->{db}->{dbi} and $db->{db}->{dbi} eq "mysql" and $db->{db}->{name} !~ m/\.sqlite/ and (not $ENV{EFI_DB} or $ENV{EFI_DB} =~ m/\.sqlite/)); # Increase the amount of elements that can be concat together (to avoid truncation)
+if ($db->getDbiType() == DBI_MYSQL) {
+    # Increase the amount of elements that can be concat together (to avoid truncation)
+    $dbh->do('SET @@group_concat_max_len = 3000');
+}
 
 
 my $ssnAnno = {};

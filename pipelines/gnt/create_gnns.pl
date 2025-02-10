@@ -30,7 +30,12 @@ my $opts = validateAndProcessOptions(DEFAULT_NEIGHBORHOOD_SIZE, DEFAULT_COOCCURR
 
 my $db = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name});
 my $dbh = $db->getHandle();
-die "Invalid database $opts->{db_name}" if not $dbh;
+if (not $dbh) {
+    die "Error connecting to database: " . $db->getError() . "\n";
+}
+
+
+
 
 my $idMap = parse_cluster_map_file($opts->{cluster_map});
 

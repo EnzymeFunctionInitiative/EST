@@ -38,8 +38,8 @@ sub new {
 sub init {
     my $self = shift;
     my $config = shift;
-    my $efiDb = shift;
-    $self->SUPER::init($config, $efiDb, @_);
+    my $efiDbh = shift;
+    $self->SUPER::init($config, $efiDbh, @_);
 
     $self->{blast_query} = $config->getConfigValue("blast_query");
     if (not $self->{blast_query}) {
