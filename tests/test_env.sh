@@ -55,7 +55,8 @@ do
                         connect tests to external databases
         --help          prints this message
 "
-		exit
+		return
+		#exit
 	# check if this argument matches a parameter string
 	elif [[ ${!index} == "--db-type" ]]; then
 		# grab the value of the next argument and save it in a var
@@ -117,7 +118,8 @@ fi
 # data must be downloaded and unpacked first
 if [[ ! -d "$DATA_DIR" ]]; then
     echo "Test data directory $DATA_DIR does not exist; download a sample dataset before running this script"
-    exit 1
+    #exit 1
+    return
 fi
 
 # set the default configuration file if one was not provided by the user
