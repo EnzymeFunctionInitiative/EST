@@ -2,7 +2,7 @@ Getting started
 ===============
 
 The Enzyme Function Initiative (EFI) offers several different tools to help in
-in the identification of isofunctional protein families. This guide will walk
+the identification of isofunctional protein families. This guide will walk
 the user through the initial setup of the tools.
 
 Obtain the Code
@@ -34,7 +34,7 @@ Nextflow to execute the tools. A guide for an alternative manual installation
 in integrated HPC environments is also included below.
 
 Requirements can either be installed on a system level (not recommended) or
-in a directory that is adminstrated by the user. For the purposes of this
+in a directory that is administered by the user. For the purposes of this
 guide it is assumed that the user has created a directory ``$EFIDEPS`` and
 added ``$EFIDEPS/bin`` to the path, and that all installations of requirements
 will be performed into subdirectories of ``$EFIDEPS``. Alternatively,
@@ -46,9 +46,9 @@ Nextflow Installation
 ~~~~~~~~~~~~~~~~~~~~~
 
 After downloading the EFI source code, Nextflow version 24.04.4 must be
-installed. It is important to note that version 24.04 is required. If this
-version is not available on the system, then a standard user can install
-Nextflow by following these steps:
+installed. It is important to note that version 24.04 is specifically
+required. If this version is not available on the system, then a standard Linux
+user can install Nextflow by following these steps:
 
 1. Download the all-in-one Nextflow program at
    https://github.com/nextflow-io/nextflow/releases/download/v24.04.4/nextflow-24.04.4-all.
@@ -73,7 +73,7 @@ Manual Installation
 
 Most installations of the tools do not require a manual installation since
 all of the required dependencies are included inside of a Docker container
-that can be run via Nextflow. However, in some cases it is desirable to
+which can be run via Nextflow. However, in some cases it is desirable to
 integrate the tools with an existing environment such as a HPC cluster. In
 this case the manual installation directions below should be followed:
 
