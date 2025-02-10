@@ -56,7 +56,6 @@ do
         --help          prints this message
 "
 		return
-		#exit
 	# check if this argument matches a parameter string
 	elif [[ ${!index} == "--db-type" ]]; then
 		# grab the value of the next argument and save it in a var
@@ -72,18 +71,18 @@ do
 		# grab the value of the next argument and save it in a var
 		results_dir="${!idx}"
 		echo "Testing results will be written in $results_dir"
-    # manually specify the EFI database name/path
-    elif [[ ${!index} == "--db-name" ]]; then
-        db_name="${!idx}"
-        echo "Using $db_name for the EFI database"
-    # manually specify the FASTA database path
-    elif [[ ${!index} == "--fasta-db" ]]; then
-        fasta_db="${!idx}"
-        echo "Using $fasta_db as the FASTA database path"
-    # manually specify the configuration file
-    elif [[ ${!index} == "--config-file" ]]; then
-        config_file="${!idx}"
-        echo "Using $config_file as the config file for database connections"
+	# manually specify the EFI database name/path
+	elif [[ ${!index} == "--db-name" ]]; then
+		db_name="${!idx}"
+		echo "Using $db_name for the EFI database"
+	# manually specify the FASTA database path
+	elif [[ ${!index} == "--fasta-db" ]]; then
+		fasta_db="${!idx}"
+		echo "Using $fasta_db as the FASTA database path"
+	# manually specify the configuration file
+	elif [[ ${!index} == "--config-file" ]]; then
+		config_file="${!idx}"
+		echo "Using $config_file as the config file for database connections"
 	fi
 done
 
@@ -118,7 +117,6 @@ fi
 # data must be downloaded and unpacked first
 if [[ ! -d "$DATA_DIR" ]]; then
     echo "Test data directory $DATA_DIR does not exist; download a sample dataset before running this script"
-    #exit 1
     return
 fi
 
