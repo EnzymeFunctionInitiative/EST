@@ -146,7 +146,23 @@ the actual modules will be stored (e.g. ``PERL5INSTALL=$EFIDEPS/perl5``). ::
 4. Then install the Perl modules: ::
 
     cd /path/to/EST/repo
-    cpan --installdeps .
+    cpanm --installdeps .
+
+Troubleshooting Perl Installation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A common error encountered when performing a manual setup is the installation
+of the Perl **XML::LibXML** module. This error occurs when the system **libxml2**
+library development headers are not installed. Unless the development headers
+package is not installed on a system-wide level (e.g. using `yum` or `apt`)
+then the installation of **XML::LibXML** must be forced. After the intial
+attempt at installation using `cpanm --installdeps .`, if there is an error
+installing **XML::LibXML** then run `cpanm --force --installdeps .`. It is
+essential to verify that the installation completed successfully by running
+`perl -MXML::LibXML` after the `cpanm` command completes. The former command
+should output nothing to the terminal, and wait for user input. If this is the
+case then the installation was successful and control can be returned to the
+terminal by pressing Ctrl+C on the keyboard.
 
 Testing and Execution
 ---------------------
