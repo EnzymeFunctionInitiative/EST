@@ -17,7 +17,7 @@ sub new {
     my $self = {};
     bless($self, $class);
 
-    $self->{efi_db} = $args{efi_db} // die "Require efi db argument for EFI::IdMapping";
+    $self->{dbh} = $args{efi_dbh} // die "Require efi_dbh database handle argument for EFI::IdMapping";
 
     return $self;
 }
@@ -27,8 +27,6 @@ sub new {
 
 sub reverseLookup {
     my ($self, $typeHint, @ids) = @_;
-
-    $self->{dbh} = $self->{efi_db}->getHandle() if not $self->{dbh};
 
     if ($typeHint eq UNIPROT) {
         return (\@ids, \[]);
@@ -86,7 +84,7 @@ EFI::IdMapping - Perl module for mapping non-UniProt protein sequence IDs to Uni
     use EFI::IdMapping;
     use EFI::IdMapping::Util qw(AUTO);
 
-    my $mapper = new EFI::IdMapping(efi_db => $efiDbRef); # $efiDbRef is required and is an EFI::Database object
+    my $mapper = new EFI::IdMapping(efi_dbh => $efiDbh); # $efiDbh is required and is a database handle from EFI::Database
     
     # Automatically detect ID type based on format
     my $typeHint = AUTO;
@@ -103,7 +101,7 @@ The most frequent non-UniProt ID type that is used is B<NCBI>, but other types a
 
 =head2 METHODS
 
-=head3 new(efi_db => $efiDbObject)
+=head3 new(efi_dbh => $efiDbh)
 
 Create an instance of EFI::IdMapping object.
 
@@ -111,9 +109,9 @@ Create an instance of EFI::IdMapping object.
 
 =over
 
-=item C<efi_db>
+=item C<efi_dbh>
 
-An instantiated C<EFI::Database> object.
+A database connection handle created by the B<EFI::Database> object.
 
 =back
 

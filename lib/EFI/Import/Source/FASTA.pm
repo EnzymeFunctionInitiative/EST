@@ -42,12 +42,12 @@ sub new {
 sub init {
     my $self = shift;
     my $config = shift;
-    my $efiDb = shift;
-    $self->SUPER::init($config, $efiDb, @_);
+    my $efiDbh = shift;
+    $self->SUPER::init($config, $efiDbh, @_);
 
     my $file = $config->getConfigValue("fasta");
     $self->{fasta} = $file;
-    $self->{efi_db} = $efiDb // die "Require efi db argument";
+    $self->{dbh} = $efiDbh // die "Require efi dbh argument";
 
     if (not $self->{fasta}) {
         $self->addError("Require --fasta arg");
@@ -150,7 +150,7 @@ sub saveSeqMapping {
 sub parseFasta {
     my $self = shift;
 
-    my $parser = new EFI::Util::FASTA::Headers(efi_db => $self->{efi_db});
+    my $parser = new EFI::Util::FASTA::Headers(efi_dbh => $self->{dbh});
 
     my $seq = {};           # sequence data
     my $seqMeta = {};       # Metadata for all sequences, UniProt and unidentified

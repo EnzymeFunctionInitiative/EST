@@ -24,8 +24,8 @@ sub new {
     my $self = {};
     bless $self, $class;
 
-    $self->{db} = $args{efi_db} // die "Require db argument for EFI::Util::FASTA::Headers";
-    $self->{id_mapper} = new EFI::IdMapping(efi_db => $args{efi_db});
+    $self->{dbh} = $args{efi_dbh} // die "Require efi_dbh argument for EFI::Util::FASTA::Headers";
+    $self->{id_mapper} = new EFI::IdMapping(efi_dbh => $args{efi_dbh});
 
     return $self;
 }
@@ -77,8 +77,6 @@ sub get_fasta_header_ids {
 
 sub parseLineForHeaders {
     my ($self, $line) = @_;
-
-    $self->{dbh} = $self->{db}->getHandle() if not $self->{dbh};
 
     $line =~ s/[\r\n]+$//;
     if ($line !~ m/^>/ or $line =~ m/^\s*$/) {
@@ -148,7 +146,7 @@ EFI::Util::FASTA::Headers - Perl module for parsing ID information from FASTA he
 
     use EFI::Util::FASTA::Headers;
 
-    my $parser = new EFI::Util::FASTA::Headers(efi_db => $efiDbRef); # $efiDbRef is required and is an EFI::Database object
+    my $parser = new EFI::Util::FASTA::Headers(efi_dbh => $efiDbh); # $efiDbh is required and is a database handle from EFI::Database
 
     open my $fh, "<", "fasta_file.fasta";
 
@@ -170,7 +168,7 @@ Information about the ID is included in the header return value that can be used
 
 =head2 METHODS
 
-=head3 new(efi_db => $efiDbObject)
+=head3 new(efi_dbh => $efiDbh)
 
 Create an instance of EFI::IdMapping object.
 
@@ -178,9 +176,9 @@ Create an instance of EFI::IdMapping object.
 
 =over
 
-=item C<efi_db>
+=item C<efi_dbh>
 
-An instantiated C<EFI::Database> object.
+A database connection handle created by the B<EFI::Database> object.
 
 =back
 

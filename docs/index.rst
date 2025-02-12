@@ -10,5 +10,5 @@ are available to help you use the tools.
     source/pipelines/index
     source/pyEFI/index
     source/developer/index
+    reference/index
     :maxdepth: 2
-

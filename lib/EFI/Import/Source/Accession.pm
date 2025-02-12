@@ -40,12 +40,12 @@ sub new {
 sub init {
     my $self = shift;
     my $config = shift;
-    my $efiDb = shift;
-    $self->SUPER::init($config, $efiDb, @_);
+    my $efiDbh = shift;
+    $self->SUPER::init($config, $efiDbh, @_);
 
     my $file = $config->getConfigValue("accessions");
     $self->{acc_file} = $file;
-    $self->{efi_db} = $efiDb // die "Require efi db argument";
+    $self->{dbh} = $efiDbh // die "Require efh dbh argument";
 
     if (not $self->{acc_file}) {
         $self->addError("Require --accessions arg");
@@ -141,7 +141,7 @@ sub identifyAccessionIds {
     my $self = shift;
     my $rawIds = shift;
 
-    my $idMapper = new EFI::IdMapping(efi_db => $self->{efi_db});
+    my $idMapper = new EFI::IdMapping(efi_dbh => $self->{dbh});
 
     my @ids = keys %$rawIds;
     my ($upIds, $noMatches, $reverseMap) = $idMapper->reverseLookup(EFI::IdMapping::Util::AUTO, @ids);
