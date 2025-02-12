@@ -146,7 +146,7 @@ the actual modules will be stored (e.g. ``PERL5INSTALL=$EFIDEPS/perl5``). ::
 4. Then install the Perl modules: ::
 
     cd /path/to/EST/repo
-    cpamn --installdeps .
+    cpan --installdeps .
 
 Testing and Execution
 ---------------------
