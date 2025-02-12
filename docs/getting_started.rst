@@ -112,6 +112,7 @@ be used to create a venv and install the required libraries:
 
    and install the required libraries: ::
 
+        cd /path/to/EST/repo
         pip install -r requirements.txt
 
    if this fails to install ``pyEFI``, that package can be manually installed: ::
@@ -144,6 +145,7 @@ the actual modules will be stored (e.g. ``PERL5INSTALL=$EFIDEPS/perl5``). ::
 
 4. Then install the Perl modules: ::
 
+    cd /path/to/EST/repo
     cpamn --installdeps .
 
 Testing and Execution
