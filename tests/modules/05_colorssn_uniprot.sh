@@ -17,7 +17,6 @@ if [[ ! -e "$ssn_file" ]]; then
     exit 1
 fi
 
-./bin/create_colorssn_nextflow_params.py --output-dir $OUTPUT_DIR --ssn-input $ssn_file --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME --fasta-db $EFI_FASTA_DB
-
-nextflow -log $OUTPUT_DIR/colorssn_nextflow.log -C $NXF_COLORSSN_CONFIG_FILE run pipelines/colorssn/colorssn.nf -params-file $OUTPUT_DIR/params.yml -w $OUTPUT_DIR/colorssn_work
+./bin/create_colorssn_nextflow_params.py --output-dir $OUTPUT_DIR --ssn-input $ssn_file --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME --fasta-db $EFI_FASTA_DB --nextflow-config $NXF_COLORSSN_CONFIG_FILE
+bash $OUTPUT_DIR/run_nextflow.sh
 

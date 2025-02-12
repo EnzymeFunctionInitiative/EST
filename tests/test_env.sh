@@ -87,7 +87,7 @@ else
     export EFI_TEST_ENV="sqlite"
 fi
 
-export EFI_TEST_DATA_DIR=$DATA_DIR
+export EFI_DATA_DIR=$data_dir
 export EFI_CONFIG_FILE="$DATA_DIR/efi.config"
 export EFI_FASTA_DB="$DATA_DIR/blastdb/combined.fasta"
 export EFI_TEST_ACC_FILE="$DATA_DIR/accession_test.txt"

@@ -3,13 +3,12 @@ set -e
 
 TEST_RESULTS_DIR=$1
 CONFIG_FILE=$2
-NXF_GNT_CONFIG_FILE="conf/gnd/$CONFIG_FILE"
+NXF_GND_CONFIG_FILE="conf/gnd/$CONFIG_FILE"
 
 OUTPUT_DIR="$TEST_RESULTS_DIR/test_results_gnd"
 
 rm -rf $OUTPUT_DIR
 
-./bin/create_gnd_nextflow_params.py --output-dir $OUTPUT_DIR --cluster-id-map $EFI_TEST_ID_LIST_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME
-
-nextflow -C $NXF_GNT_CONFIG_FILE run pipelines/gnd/gnd.nf -params-file $OUTPUT_DIR/params.yml
+./bin/create_gnd_nextflow_params.py --output-dir $OUTPUT_DIR --cluster-id-map $EFI_TEST_ID_LIST_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME --nextflow-config $NXF_GND_CONFIG_FILE
+bash $OUTPUT_DIR/run_nextflow.sh
 
