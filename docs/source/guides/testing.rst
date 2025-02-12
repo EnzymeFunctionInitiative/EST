@@ -15,11 +15,11 @@ Docker, run the following commands from the EST repository's root directory: ::
 
     chmod +x ./tests/runtests.sh ./tests/test_env.sh
     source ./tests/test_env.sh
-    ./tests/runtests.sh test.docker.config
+    ./tests/runtests.sh docker.config
 
 To instead run tests using Singularity, replace the last line from above with: ::
 
-    ./tests/runtests.sh test.singularity.config
+    ./tests/runtests.sh singularity.config
 
 Test Environment Setup
 ----------------------
@@ -77,14 +77,14 @@ directory: ::
 
     # from the EST root directory
     source ./tests/test_env.sh --results-dir ~/efi_testing/run1/
-    ./tests/runtests.sh test.docker.config
+    ./tests/runtests.sh docker.config
 
 Or, if the sample data has already been untar'd in a EST-external directory 
 (e.g. ``~/efi_testing/sample_data/``): ::
 
     # from the EST root directory
     source ./tests/test_env.sh --data-dir ~/efi_testing/sample_data/ --results-dir ~/efi_testing/run2/
-    ./tests/runtests.sh test.docker.config
+    ./tests/runtests.sh docker.config
 
 These examples both assume that the EFI-EST docker container is used. See below
 if a different container system or job submission method is used.
@@ -99,10 +99,6 @@ pipelines on PBS-Torque- or Slurm-based clusters as well as using Docker or
 Singularity containers. Configuration files can be found in ``conf/<workflow>`` 
 where ``workflow`` corresponds to one of the pipelines in ``pipelines/``.
 
-Configuration files beginning with ``test.`` are designed to be used for running
-the provided tests. Other configuration files are provided as well to be used 
-for non-standard testing or production runs.
-
 Individual Tests
 ----------------
 
@@ -116,5 +112,5 @@ script, individual tests can be run with the following command: ::
 where ``script`` is one of the ``##_module_name.sh`` files in the
 ``./tests/modules/`` directory. An example might be: ::
 
-    ./tests/modules/01_est_sequence_blast.sh $EFI_TEST_RESULTS_DIR test.singularity.config
+    ./tests/modules/01_est_sequence_blast.sh $EFI_TEST_RESULTS_DIR singularity.config
 
