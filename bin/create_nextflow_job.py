@@ -16,12 +16,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     paths absolute. Will call ``exit(1)`` if files do not exist.
     """
     fail = False
+
     if not os.path.exists(args.workflow_def):
         print(f"Workflow definition '{args.workflow_def}' does not exist")
-        fail = True
-
-    if not os.path.exists(args.config_path):
-        print(f"Nextflow configuration file '{args.config_path}' does not exist")
         fail = True
 
     if fail:
@@ -29,7 +26,6 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         exit(1)
     else:
         args.workflow_def = os.path.abspath(args.workflow_def)
-        args.config_path = os.path.abspath(args.config_path)
 
     if args.pipeline == "colorssn":
         args = create_colorssn_nextflow_params.check_args(args)
@@ -56,32 +52,31 @@ def create_parser() -> argparse.ArgumentParser:
     # batch args
     default_template_path = os.path.join(os.path.dirname(__file__), "templates")
     parser.add_argument("--templates-dir", type=str, default=default_template_path, help="Directory where job script templates are stored")
-    parser.add_argument("--config-path", type=str, required=True, help="Path to nextflow config file for pipeline")
     subparsers = parser.add_subparsers(dest="pipeline", required=True,)
 
     # add pipelines as subcommands
     colorssn_parser = subparsers.add_parser("colorssn", help="Create a Color SSN pipeline job script")
-    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/colorssn/colorssn.nf")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../", create_colorssn_nextflow_params.NXF_SCRIPT)
     colorssn_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the Color SSN nextflow workflow file")
     create_colorssn_nextflow_params.add_args(colorssn_parser)
 
     est_parser = subparsers.add_parser("est", help="Create an EST pipeline job script")
-    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/est/est.nf")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../", create_est_nextflow_params.NXF_SCRIPT)
     est_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the EST nextflow workflow file")
     create_est_nextflow_params.add_args(est_parser)
 
     generatessn_parser = subparsers.add_parser("generatessn", help="Create a generate-SSN pipeline job script")
-    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/generatessn/generatessn.nf")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../", create_generatessn_nextflow_params.NXF_SCRIPT)
     generatessn_parser.add_argument("--workflow-def", type=str, default=nxf_script_path, help="Location of the SSN nextflow workflow file")
     create_generatessn_nextflow_params.add_args(generatessn_parser)
 
     gnd_parser = subparsers.add_parser("gnd", help="Create a GND pipeline job script")
-    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/gnd/gnd.nf")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../", create_gnd_nextflow_params.NXF_SCRIPT)
     gnd_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GND workflow file")
     create_gnd_nextflow_params.add_args(gnd_parser)
 
     gnt_parser = subparsers.add_parser("gnt", help="Create a GNT pipeline job script")
-    nxf_script_path = os.path.join(os.path.dirname(__file__), "../pipelines/gnt/gnt.nf")
+    nxf_script_path = os.path.join(os.path.dirname(__file__), "../", create_gnt_nextflow_params.NXF_SCRIPT)
     gnt_parser.add_argument("--workflow-def", default=nxf_script_path, help="Location of the GNT workflow file")
     create_gnt_nextflow_params.add_args(gnt_parser)
 
@@ -96,7 +91,6 @@ if __name__ == "__main__":
     del args_dict["pipeline"]
     del args_dict["workflow_def"]
     del args_dict["templates_dir"]
-    del args_dict["config_path"]
     if args.pipeline == "colorssn":
         params_output = create_colorssn_nextflow_params.render_params(**args_dict)
     elif args.pipeline == "est":
@@ -123,7 +117,7 @@ if __name__ == "__main__":
                                            output_dir=args.output_dir,
                                            jobtype=args.pipeline,
                                            job_id=args.job_id,
-                                           config_path=args.config_path,
+                                           config_path=args.nextflow_config,
                                            efi_home=efi_home,
                                            load_modules=True)
     submission_script_output = os.path.join(args.output_dir, "run_nextflow.sh")

@@ -5,16 +5,17 @@ import glob
 import json
 import os
 
+import shared_args
+
+NXF_SCRIPT = "pipelines/gnd/gnd.nf"
+
 def add_args(parser: argparse.ArgumentParser):
     """
-    add arguments for GND pipeline to ``parser``
+    Add arguments for GND pipeline to ``parser``
     """
-    parser.add_argument("--output-dir", required=True, type=str, help="Location for results.  Must be empty, and will be created if it doesn't exist")
     parser.add_argument("--cluster-id-map", required=True, type=str, help="The mapping of cluster numbers to IDs in the cluster for the GNDs")
-    parser.add_argument("--efi-config", required=True, type=str, help="Location of the EFI config file")
-    parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
-
+    shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -22,35 +23,22 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
     fail = False
 
+    # check for shared args validity
+    validated_args = shared_args.check_args(args)
+    if validated_args is None:
+        fail = True
+    else:
+        args = validated_args
+
     if not os.path.exists(args.cluster_id_map):
         print(f"SSN Input file '{args.cluster_id_map}' does not exist")
         fail = True
     
-    if not os.path.exists(args.efi_config):
-        print(f"EFI config file '{args.efi_config}' does not exist")
-        fail = True
-    
-    if os.path.exists(args.output_dir):
-        if len(os.listdir(args.output_dir)) > 0:
-            print(f"Output directory '{args.output_dir}' is not empty, refusing to create params.yml")
-            fail = True
-    else:
-        try:
-            os.makedirs(args.output_dir)
-        except Exception as e:
-            print(f"Could not create output directory '{args.output_dir}': {e}")
-            fail = True
-
-
     if fail:
         print("Failed to render params template")
         exit(1)
     else:
-        args.output_dir = os.path.abspath(args.output_dir)
         args.cluster_id_map = os.path.abspath(args.cluster_id_map)
-        args.efi_config = os.path.abspath(args.efi_config)
-        if os.path.exists(args.efi_db):
-            args.efi_db = os.path.abspath(args.efi_db)
         return args
     
 def create_parser():
@@ -58,14 +46,14 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(cluster_id_map, efi_config, efi_db, output_dir, job_id):
+def render_params(cluster_id_map, efi_config, efi_db, output_dir, job_id, nextflow_config=None):
     params = {
         "final_output_dir": output_dir,
         "cluster_id_map": cluster_id_map,
         "efi_config": efi_config,
         "efi_db": efi_db
     }
-    params_file = os.path.join(output_dir, "params.yml")
+    params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)
     print(f"Wrote params to '{params_file}'")
@@ -74,4 +62,5 @@ def render_params(cluster_id_map, efi_config, efi_db, output_dir, job_id):
 if __name__ == "__main__":
     args = check_args(create_parser().parse_args())
     render_params(**vars(args))
+    shared_args.save_run_script(args, NXF_SCRIPT)
 
