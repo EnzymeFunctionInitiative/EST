@@ -6,11 +6,12 @@ import os
 SCRIPT_NAME = "run_nextflow.sh"
 PARAMS_NAME = "params.yml"
 
-def add_args(parser: argparse.ArgumentParser):
+def add_args(parser: argparse.ArgumentParser, use_output_dir: bool = True):
     """
     Add arguments common to all pipeline parameters
     """
-    parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
+    if use_output_dir == True:
+        parser.add_argument("--output-dir", required=True, type=str, help="Location for results. Will be created if it does not exist")
     parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
     parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     parser.add_argument("--nextflow-config", required=True, type=str, help="Path to the Nextflow configuration file to use (e.g. conf/est/docker.config)")

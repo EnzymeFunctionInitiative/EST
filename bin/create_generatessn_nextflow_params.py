@@ -28,7 +28,7 @@ def add_args(parser):
     # automatically pull parameters from EST results and params file
     autoparam_parser = subparsers.add_parser("auto", help="Autopopulate SSN parameters from EST directory", parents=[ssn_args_parser]).add_argument_group("EST-related parameters")
     autoparam_parser.add_argument("--est-output-dir", type=str, required=True, help="The EST output directory to use for parameter autopopulation")
-    autoparam_parser.add_argument("--nextflow-config", required=True, type=str, help="Path to the Nextflow configuration file to use (e.g. conf/est/docker.config)")
+    shared_args.add_args(autoparam_parser, use_output_dir=False)
 
     # if not in auto mode, manually specify the location of the results files
     manual_parser = subparsers.add_parser("manual", help="Manually specify parameters related to EST output", parents=[ssn_args_parser]).add_argument_group("EST-related parameters")
@@ -36,7 +36,7 @@ def add_args(parser):
     manual_parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
     manual_parser.add_argument("--seq-meta-file", required=True, type=str, help="EST sequence metadata file to get basic metadata from")
     manual_parser.add_argument("--uniref-version", default="", choices=["", "90", "50"], help="Which database to use for annotations")
-    manual_parser.add_argument("--db-version", default=100, help="The temporal version of UniProt to use")
+    manual_parser.add_argument("--db-version", default=100, help="Indicates the version of the EFI database that was used to generate the network")
     shared_args.add_args(manual_parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -58,10 +58,10 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         try:
             with open(parameter_file) as f:
                 params = json.load(f)
-                # args.uniref_version = params[""]
                 args.efi_config = params["efi_config"]
-                args.db_version = 1
                 args.efi_db = params["efi_db"]
+                #TODO: figure out how to get this from the EST run
+                args.db_version = 1
                 args.uniref_version = 1
                 args.job_id = params["job_id"]
         except (FileNotFoundError, PermissionError) as e:
