@@ -1,5 +1,22 @@
 create_gnd
 ==========
+Usage
+-----
+
+::
+
+	Usage: perl create_gnd.pl --cluster-map <FILE> --gnd <FILE> --config <FILE> --db-name <VALUE>
+	    [--nb-size <VALUE>]
+	
+	Description:
+	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline
+	
+	Options:
+	    --cluster-map    path to a file mapping sequence ID to cluster number
+	    --gnd            path to the output GND file
+	    --nb-size        neighborhood size (number of sequences to retrieve on either side of query
+	    --config         path to the config file for database connection
+	    --db-name        name of the EFI database to connect to for retrieving UniRef sequences
 
 Reference
 ---------

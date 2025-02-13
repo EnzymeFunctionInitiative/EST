@@ -1,5 +1,24 @@
 color_xgmml
 ===========
+Usage
+-----
+
+::
+
+	Usage: perl color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE>
+	    --cluster-num-map <FILE> [--cluster-color-map <FILE>]
+	
+	Description:
+	    Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes
+	    based on cluster. This is done without creating a DOM since elements are written one by one to
+	    the file as they are built.
+	
+	Options:
+	    --ssn                  path to input XGMML (XML) SSN file
+	    --color-ssn            path to output colored SSN (XGMML) file
+	    --cluster-map          path to output file mapping node index (col 1) to cluster numbers (num by seq, num by nodes)
+	    --cluster-num-map      path to input file containing the mapping of cluster number to cluster sizes
+	    --cluster-color-map    path to output file mapping cluster number (sequence count) to a color
 
 Reference
 ---------
@@ -26,7 +45,7 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-``color_xgmml.pl`` reads a SSN in the format of XGMML (XML) and writes
+**color_xgmml.pl** reads a SSN in the format of XGMML (XML) and writes
 it to a new file after adding cluster number and color attributes. The
 document is read and written in a stream-like fashion rather than
 creating and building a DOM for optimal memory usage.
@@ -56,4 +75,4 @@ Arguments
 
 ``--color-file``
    Path to a file containing the master color list. If not present then
-   the color map in ``EFI::Util::Colors`` is used.
+   the color map in **EFI::Util::Colors** is used.

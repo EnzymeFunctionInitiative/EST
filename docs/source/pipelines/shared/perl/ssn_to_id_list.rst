@@ -1,5 +1,22 @@
 ssn_to_id_list
 ==============
+Usage
+-----
+
+::
+
+	Usage: perl ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE> --index-seqid <FILE> --id-index <FILE>
+	    --seqid-source-map <FILE>
+	
+	Description:
+	    Parses an XGMML file to retrieve an edgelist and mapping info
+	
+	Options:
+	    --ssn                 path to XGMML (XML) SSN file
+	    --edgelist            path to an output edgelist file (two column space-separated file)
+	    --index-seqid         path to an output file mapping node index to XGMML nodeseqid (and optionally node size for UniRef/repnodes)
+	    --id-index            path to an output file mapping XGMML node ID to node index
+	    --seqid-source-map    path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty
 
 Reference
 ---------

@@ -5,18 +5,16 @@ Usage
 
 ::
 
-	Usage: perl pipelines/est/import/append_blast_query.pl --blast-query-file path_to_file
-	    [--output-sequence-file <path/to/output/sequences/file.fasta>]
-	    [--output-dir <path/to/output/dir>]
+	Usage: perl append_blast_query.pl --blast-query-file <FILE> [--output-sequence-file <FILE>]
+	    [--output-dir <FILE>]
 	
 	Description:
-	    Append the input BLAST query to the sequence import file
+	    Append the input BLAST query to the sequence import file.
 	
 	Options:
-	    --blast-query-file      file that contains the BLAST query sequence
-	    --output-sequence-file  file that contains the sequences already retrieved by the pipeline
-	    --output-dir            directory that contains the files for the job
-	
+	    --blast-query-file        path to file containing the BLAST query sequence
+	    --output-sequence-file    path to output sequence file that the input sequence gets appended to
+	    --output-dir              path to directory containing input files for the EST job
 
 Reference
 ---------

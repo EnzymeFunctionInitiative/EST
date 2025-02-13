@@ -1,5 +1,31 @@
 create_gnns
 ===========
+Usage
+-----
+
+::
+
+	Usage: perl create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
+	    --config <FILE> --db-name <VALUE> [--gnd <FILE>] [--cooc-table <FILE>] [--hub-count <FILE>]
+	    [--nb-pfam-list-dir <DIR_PATH>] [--no-context <FILE>] [--nb-size <VALUE>]
+	    [--cooc-threshold <VALUE>]
+	
+	Description:
+	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline
+	
+	Options:
+	    --cluster-map         path to a file mapping sequence ID to cluster number
+	    --cluster-gnn         path to the output cluster hub-spoke GNN XGMML file
+	    --pfam-gnn            path to the output Pfam hub-spoke GNN XGMML file
+	    --gnd                 path to the output GND file
+	    --cooc-table          path to the output Pfam co-occurence table file
+	    --hub-count           path to the output hub count table file
+	    --nb-pfam-list-dir    path to an output directory containing files for each Pfam hub
+	    --no-context          path to an output file to save a list of input IDs that didn't have an ENA entry or didn't have neighbors
+	    --nb-size             neighborhood size (number of sequences to retrieve on either side of query
+	    --cooc-threshold      Cooccurrence threshold (>= 0.0 and <= 1.0)
+	    --config              path to the config file for database connection
+	    --db-name             name of the EFI database to connect to for retrieving UniRef sequences
 
 Reference
 ---------
