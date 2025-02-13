@@ -15,7 +15,6 @@ def add_args(parser: argparse.ArgumentParser):
     """
     parser.add_argument("--ssn-input", required=True, type=str, help="The SSN file to color, XGMML or zipped XGMML")
     parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -47,7 +46,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.fasta_db = os.path.abspath(args.fasta_db)
         return args
     
-def create_parser():
+def create_parser() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render params.yml for Color SSN nextflow pipeline")
     add_args(parser)
     return parser

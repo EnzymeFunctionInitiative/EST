@@ -37,7 +37,6 @@ def add_args(parser):
     manual_parser.add_argument("--seq-meta-file", required=True, type=str, help="EST sequence metadata file to get basic metadata from")
     manual_parser.add_argument("--uniref-version", default="", choices=["", "90", "50"], help="Which database to use for annotations")
     manual_parser.add_argument("--db-version", default=100, help="The temporal version of UniProt to use")
-    manual_parser.add_argument("--job-id", default=131, help="Job ID")
     shared_args.add_args(manual_parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:

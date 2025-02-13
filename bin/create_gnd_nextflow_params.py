@@ -14,7 +14,6 @@ def add_args(parser: argparse.ArgumentParser):
     Add arguments for GND pipeline to ``parser``
     """
     parser.add_argument("--cluster-id-map", required=True, type=str, help="The mapping of cluster numbers to IDs in the cluster for the GNDs")
-    parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:

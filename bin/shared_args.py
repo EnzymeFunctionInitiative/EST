@@ -14,6 +14,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
     parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     parser.add_argument("--nextflow-config", required=True, type=str, help="Path to the Nextflow configuration file to use (e.g. conf/est/docker.config)")
+    parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
