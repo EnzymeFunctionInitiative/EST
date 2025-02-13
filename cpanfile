@@ -7,7 +7,7 @@ requires 'JSON', '4.10';
 requires 'XML::Writer', '0.900';
 requires 'XML::LibXML', '2.0210';
 requires 'DBD::SQLite', '1.74';
-requires 'DBD::mysql', '4.050';
+requires 'DBD::mysql', '4.046';
 
 # GNT
 requires 'Array::Utils', '0.5';

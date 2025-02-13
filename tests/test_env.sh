@@ -1,17 +1,12 @@
 #!/bin/bash
-# usage: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
-# Optional inputs:
-#	--db-type, accepted values are mysql or sqlite
-#	--data-dir, a local or global path where the sample data will be 
-#		    untarred into
-#	--results-dir, a local or global path where the results from the test 
-#		       suite will be written
-#	--help, prints usage information
 
 # starting fresh
 db_type=
 data_dir=
 results_dir=
+db_name=
+fasta_db=
+config_file=
 EFI_DB_NAME=
 EFI_TEST_ENV=
 EFI_TEST_DATA_DIR=
@@ -34,17 +29,33 @@ do
 	idx=$((index+1))
 	# check if this argument matches a parameter string
 	if [[ ${!index} == '--help' ]]; then
-		echo "Usage information for test_env.sh:
-Must be in the EST root directory. 
-To run: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
-Optional inputs:
-	--db-type, accepted values are mysql or sqlite, default: sqlite
-	--data-dir, a global path where the sample data will be untarred into, 
-		    default: tests/test_data
-	--results-dir, a global path where the results from the test suite will 
-		       be written, default: tests/test_results
-	--help, prints this usage information"
-		exit
+		echo "Usage: source tests/test_env.sh [--db-type mysql|sqlite --data-dir /path --results-dir /path]
+    [--db-name database_name_or_path --fasta-db blast_db --config-file /path/file]
+
+    Description:
+        Sets the environment variables necessary for running tests on the EFI
+        tools. This script must be run from the EST root directory.
+
+    Options:
+        --db-type       database interface to use, mysql or sqlite
+        --data-dir      path to the test dataset
+        --results-dir   path to an output directory to store results into
+        --db-name       name of the EFI database to use (path to .sqlite file
+                        in the case that the db-type is sqlite); test datasets
+                        contain a default database, and this option can be used
+                        to connect tests to external, large EFI databases
+        --fasta-db      path to a BLAST database that is used to retrieve
+                        sequences for computations; test datasets contain a
+                        default database, and this option can be used to
+                        connect tests to external, large BLAST databases used
+                        in the full EFI toolset
+        --config-file   path to a configuration file used by the EFI tools to
+                        connect to a database; test datasets contain a default
+                        configuration file, and this option can be used to
+                        connect tests to external databases
+        --help          prints this message
+"
+		return
 	# check if this argument matches a parameter string
 	elif [[ ${!index} == "--db-type" ]]; then
 		# grab the value of the next argument and save it in a var
@@ -54,12 +65,24 @@ Optional inputs:
 	elif [[ ${!index} == "--data-dir" ]]; then
 		# grab the value of the next argument and save it in a var
 		data_dir="${!idx}"
-		echo "Testing input data will be untarred in $data_dir"
+		echo "Using test input data from $data_dir"
 	# check if this argument matches a parameter string
 	elif [[ ${!index} == "--results-dir" ]]; then
 		# grab the value of the next argument and save it in a var
 		results_dir="${!idx}"
 		echo "Testing results will be written in $results_dir"
+	# manually specify the EFI database name/path
+	elif [[ ${!index} == "--db-name" ]]; then
+		db_name="${!idx}"
+		echo "Using $db_name for the EFI database"
+	# manually specify the FASTA database path
+	elif [[ ${!index} == "--fasta-db" ]]; then
+		fasta_db="${!idx}"
+		echo "Using $fasta_db as the FASTA database path"
+	# manually specify the configuration file
+	elif [[ ${!index} == "--config-file" ]]; then
+		config_file="${!idx}"
+		echo "Using $config_file as the config file for database connections"
 	fi
 done
 
@@ -79,24 +102,47 @@ fi
 # creating the necessary environment variables
 if [[ $db_type == "mysql" ]]; then
     DATA_DIR="$data_dir/mysql"
-    export EFI_DB_NAME="efi_db"
+    if [[ -z "$db_name" ]]; then
+        db_name="efi_db"
+    fi
     export EFI_TEST_ENV="mysql"
 else
-    DATA_DIR="$data_dir/smalldata"
-    export EFI_DB_NAME="$DATA_DIR/efi_db.sqlite"
+    DATA_DIR="$data_dir/sqlite"
+    if [[ -z "$db_name" ]]; then
+        db_name="$DATA_DIR/efi_db.sqlite"
+    fi
     export EFI_TEST_ENV="sqlite"
 fi
 
+# data must be downloaded and unpacked first
+if [[ ! -d "$DATA_DIR" ]]; then
+    echo "Test data directory $DATA_DIR does not exist; download a sample dataset before running this script"
+    return
+fi
+
+# set the default configuration file if one was not provided by the user
+if [[ -z "$config_file" || ! -f "$config_file" ]]; then
+    config_file="$DATA_DIR/efi.config"
+fi
+
+# set the default FASTA/BLAST db if one was not provided by the user
+if [[ -z "$fasta_db" ]]; then
+    fasta_db="$DATA_DIR/blastdb/combined.fasta"
+fi
+
+
 export EFI_DATA_DIR=$data_dir
-export EFI_CONFIG_FILE="$DATA_DIR/efi.config"
-export EFI_FASTA_DB="$DATA_DIR/blastdb/combined.fasta"
+export EFI_CONFIG_FILE=$config_file
+export EFI_DB_NAME=$db_name
+export EFI_FASTA_DB=$fasta_db
 export EFI_TEST_ACC_FILE="$DATA_DIR/accession_test.txt"
 export EFI_TEST_FASTA_FILE="$DATA_DIR/fasta_test.fasta"
 export EFI_TEST_BLAST_SEQ="$DATA_DIR/blast_query.fa"
 export EFI_TEST_FAMILY_ID="$DATA_DIR/family_id.txt"
-export EFI_TEST_SSN_UNIPROT="$DATA_DIR/ssn.xgmml"
+export EFI_TEST_SSN_UNIPROT="$DATA_DIR/ssn.xgmml.zip"
 export EFI_TEST_SSN_UNIREF90="$DATA_DIR/ssn_uniref90.xgmml"
 export EFI_TEST_SSN_UNIREF50="$DATA_DIR/ssn_uniref50.xgmml"
 export EFI_TEST_SSN_REPNODE="$DATA_DIR/ssn_repnode70.xgmml"
+export EFI_TEST_ID_LIST_FILE="$DATA_DIR/gnd_id_list.txt"
 export EFI_TEST_RESULTS_DIR=$results_dir
 

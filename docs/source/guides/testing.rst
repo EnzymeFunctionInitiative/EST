@@ -6,94 +6,126 @@ completed EFI pipelines execute without errors. If the pipeline is an EST workfl
 also run using a parameter file generated on "auto" mode (see
 ``bin/create_generatessn_nextflow_params.py``).
 
-The tests use a simple dataset that includes all elements of data needed for
-the EFI tools with a fraction of the number of sequences in the full EFI
-databases. By default, this test data is downloaded into a directory inside
-of the repository. Similarly, results from the tests are written to a directory 
-inside the repository by default. To run tests using the simple dataset with 
-Docker, run the following commands from the EST repository's root directory: ::
+Test Datasets
+-------------
 
-    chmod +x ./tests/runtests.sh ./tests/test_env.sh
-    source ./tests/test_env.sh
-    ./tests/runtests.sh docker.config
+Before beginning testing, test datasets must be downloaded from an EFI server.
+A ready-to-use example for downloading a SQLite-based dataset is provided in
+``tests/download_example.sh``. All testing and download steps should be run from
+the main EST repository directory.
 
-To instead run tests using Singularity, replace the last line from above with: ::
+If the example script is executed without modification, a directory structure
+should be created in ``EST_repo_dir/tests/test_data/sqlite`` with a number of
+files, the most important of which are: ::
 
-    ./tests/runtests.sh singularity.config
+    blastdb
+    efi.config
+    efi_db.sqlite
+
+If the user wishes to use a location for the test dataset that is outside of
+the EST repository (for example, if a user storage quota limits the amount of
+data), then the download example script should be modified to place the
+test datasets in an alternate directory (i.e. modifying the ``$test_data_dir``
+environment variable in ``tests/download_example.sh``). The environment must
+then be configured with this alternate path in a later step.
 
 Test Environment Setup
 ----------------------
-The ``test_env.sh`` script defines certain environment variables that are used 
-within the ``runtests.sh`` and test module scripts. It has command line arguments
-that control the type of SQL database management system used to run the 
-analysis queries as well as paths to where test input and output files will be 
-saved. 
 
-The usage of the ``test_env.sh`` script is printed by running: ::
+Once the test dataset has been established, the test environment must be
+set up by sourcing the ``tests/test_env.sh`` script. If no parameters are
+provided to the command then the default directory structure is used (e.g.
+``EST_repo_dir/tests/test_data/sqlite``). This command looks like: ::
 
-    ./tests/test_env.sh --help
+    source tests/test_env.sh
 
-which returns: ::
+To use an alternate dataset location, an additional parameter must be used,
+``--data-dir``, to specify the alternate dataset. For example, if the test
+dataset is downloaded to ``/scratch/est_test/test_data/``, then the
+environment setup command must be replaced with: ::
 
-    Usage information for test_env.sh:
-    Must be in the EST root directory. 
-    To run: source tests/test_env.sh [[--db-type mysql|sqlite]] [[--data-dir /path]] [[--results-dir /path]] [[--help]]
-    Optional inputs:
-    	--db-type, accepted values are mysql or sqlite, default: sqlite
-    	--data-dir, a global path where the sample data will be untarred into, 
-    		    default: tests/test_data
-    	--results-dir, a global path where the results from the test suite will 
-    		       be written, default: tests/test_results
-    	--help, prints this usage information
-    
-All command line arguments for this script are optional. 
+    source tests/test_env.sh --data-dir /scratch/est_test/test_data
 
-``--db-type`` argument
-~~~~~~~~~~~~~~~~~~~~
-The ``--db-type`` argument currently accepts any value but, if given an 
-unexpected value, will fallback to being assigned the default value of "sqlite".
-The accepted values are ``sqlite`` or ``mysql``. Giving a value of "mysql"
- expects that the full EFI database files are stored locally.
+Note, this path should exactly match the path used in the 
+``tests/download_example.sh`` script.
 
-``--data-dir`` argument
-~~~~~~~~~~~~~~~~~~~~
-The ``--data-dir`` argument currently accepts any value but expects a global 
-path to a directory where the sample data will be written to. Alternatively, if
-this directory already exists, the downloading and untar'ing of the sample data 
-will be skipped.
+Additional parameters can be used to control the test environment:
 
-``--results-dir`` argument
-~~~~~~~~~~~~~~~~~~~~
-The ``--results-dir`` argument currently accepts any value but expects a global
-path to a directory where the testing results will be written to. If this 
-directory already exists, the results files will be overwritten upon running 
-the ``runtests.sh`` script. 
+``--db-type``
+~~~~~~~~~~~~~
 
-Examples:
-~~~~~~~~~
-If you would like to download the sample data in the default location 
-(``tests/test_data``) but want results to be written to a EST-external 
-directory: ::
+By adding the ``--db-type`` option with the ``sqlite`` or ``mysql`` value
+a user can control the database interface used by the scripts: ::
 
-    # from the EST root directory
-    source ./tests/test_env.sh --results-dir ~/efi_testing/run1/
-    ./tests/runtests.sh docker.config
+    source tests/test_env.sh --db-type sqlite
 
-Or, if the sample data has already been untar'd in a EST-external directory 
-(e.g. ``~/efi_testing/sample_data/``): ::
+If left undefined, the tests will be run assuming a ``sqlite`` database file.
 
-    # from the EST root directory
-    source ./tests/test_env.sh --data-dir ~/efi_testing/sample_data/ --results-dir ~/efi_testing/run2/
-    ./tests/runtests.sh docker.config
+``--results-dir``
+~~~~~~~~~~~~~~~~~
 
-These examples both assume that the EFI-EST docker container is used. See below
-if a different container system or job submission method is used.
+The ``--results-dir`` option allows the user to change where output files
+from tests, as well as intermediate files generated by Nextflow, are
+located: ::
+
+    source tests/test_env.sh --results-dir /scratch/est_test/test_results
+
+``--db-name``
+~~~~~~~~~~~~~
+
+The user can specify the default database to use, overriding the database
+provided in the test datasets. For a SQLite interface, this could look
+like: ::
+
+    source tests/test_env.sh --db-type sqlite --db-name /scratch/est_test/full_sqlite/full_db.sqlite
+
+If the user requires a MySQL database connection, then the following
+example can be used: ::
+
+    source tests/test_env.sh --db-type mysql --db-name efi_202408
+
+``--fasta-db``
+~~~~~~~~~~~~~~
+
+A FASTA database (formatted with BLAST v2.2.26) is used for sequence
+retrieval and is included in the test datasets. An alternative database
+can be specified in the case that the user wishes to test on a larger
+dataset: ::
+
+    source tests/test_env.sh --fasta-db /path/to/fasta_db_dir/fasta_db_name
+
+Note that the ``fasta_db_name`` shown in this example is the BLAST
+database name which is not directly pointing to an individual file.
+
+``--config-file``
+~~~~~~~~~~~~~~~~~
+
+A database configuration file is used throughout the EFI tools and is
+typically to commands using the ``--efi-config`` argument. This can
+be included in the test environment by adding the ``--config-file``
+option: ::
+
+    source tests/test_env.sh --efi-config /path/to/efi.config
+
+This is useful when using a MySQL database to provide database
+connection values through this config file.
+
+Test Execution
+--------------
+
+Once the environment has been set up, the tests can be run: ::
+
+    bash tests/runtests.sh docker.config
+
+A Singularity container interface can also be used: ::
+
+    bash tests/runtests.sh singularity.config
 
 Nextflow Configurations
 -----------------------
 
 Nextflow configuration files must be passed as positional arguments to the 
-``./tests/runtests.sh`` and module testing scripts (see below).
+``bash tests/runtests.sh`` command and module testing scripts (see below).
 These configurations exist for various environments such as running the 
 pipelines on PBS-Torque- or Slurm-based clusters as well as using Docker or 
 Singularity containers. Configuration files can be found in ``conf/<workflow>`` 
@@ -102,15 +134,15 @@ where ``workflow`` corresponds to one of the pipelines in ``pipelines/``.
 Individual Tests
 ----------------
 
-The commands above will run all of the ``*.sh`` files in the ``./tests/modules/``
+The commands above will run all of the ``*.sh`` files in the ``tests/modules/``
 directory. The scripts have a numeric prefix so that they are run in succession
-each time for reproducibility. After running the ``source ./tests/test_env.sh`` 
+each time for reproducibility. After running the ``source tests/test_env.sh`` 
 script, individual tests can be run with the following command: ::
 
-    ./tests/modules/<script> $EFI_TEST_RESULTS_DIR <nextflow_config>
+    bash tests/modules/<script> $EFI_TEST_RESULTS_DIR <nextflow_config>
 
 where ``script`` is one of the ``##_module_name.sh`` files in the
-``./tests/modules/`` directory. An example might be: ::
+``tests/modules/`` directory. An example might be: ::
 
-    ./tests/modules/01_est_sequence_blast.sh $EFI_TEST_RESULTS_DIR singularity.config
+    bash tests/modules/01_est_sequence_blast.sh $EFI_TEST_RESULTS_DIR singularity.config
 
