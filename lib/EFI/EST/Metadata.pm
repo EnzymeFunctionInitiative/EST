@@ -151,11 +151,11 @@ SSN metadata files are a superset of sequence metadata files and are created in 
 
 =head2 METHODS
 
-=head3 new()
+=head3 C<new()>
 
 Create an instance of EFI::Util::Metadata object.
 
-=head3 parseFile($file)
+=head3 C<parseFile($file)>
 
 Reads a metadata file and returns a hash with the data.
 A metadata file contains a header line and three columns.
@@ -193,7 +193,7 @@ The hash ref contains a structure of IDs and their associated node attributes:
         ...
     }
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $data = $parser->parseFile($metaFile);
 
@@ -203,7 +203,7 @@ The hash ref contains a structure of IDs and their associated node attributes:
         }
     }
 
-=head3 writeData($file, $data, $fields)
+=head3 C<writeData($file, $data, $fields)>
 
 Saves data to the specified file. The data is expected to be in the same format that C<parseFile> outputs.
 C<$fields> is an optional value, a hash ref which can be passed to restrict which fields are output.
@@ -227,7 +227,7 @@ If it is not provided, all values in the input data are written out.
 
 =back
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $data = {}; # some data in here
     

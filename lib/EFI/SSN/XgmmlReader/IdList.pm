@@ -189,7 +189,7 @@ parsing and obtaining network information
 
 =head2 METHODS
 
-=head3 getMetanodeType
+=head3 C<getMetanodeType()>
 
 Gets the type of the metanodes in the network.
 
@@ -204,7 +204,7 @@ One of C<uniprot>, C<uniref90>, C<uniref50>, C<repnode>
 
 
 
-=head3 getMetanodeSizes
+=head3 C<getMetanodeSizes()>
 
 Gets the sizes of the metanodes in the network.
 
@@ -219,7 +219,7 @@ the metanode.  If the network is a UniProt network then this hash is empty.
 
 
 
-=head3 getMetanodes
+=head3 C<getMetanodes()>
 
 Gets metanodes from the network.
 
@@ -238,7 +238,7 @@ network then this hash is empty.
 
 
 
-=head3 getMetadata
+=head3 C<getMetadata()>
 
 Gets the metadata (node attributes) that is saved during parsing (currently only SwissProt
 description).  This is primarily used in the case that the network is UniProt; in that

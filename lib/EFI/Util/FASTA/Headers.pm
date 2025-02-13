@@ -163,12 +163,13 @@ EFI::Util::FASTA::Headers - Perl module for parsing ID information from FASTA he
 
 =head2 DESCRIPTION
 
-EFI::Util::FASTA::Headers is a utility module that parses sequence IDs out of FASTA headers and maps them to UniProt IDs if they are not a UniProt ID.
-Information about the ID is included in the header return value that can be used for sequence metadata.
+B<EFI::Util::FASTA::Headers> is a utility module that parses sequence IDs out of FASTA headers and
+maps them to UniProt IDs if they are not a UniProt ID. Information about the ID is included in the
+header return value that can be used for sequence metadata.
 
 =head2 METHODS
 
-=head3 new(efi_dbh => $efiDbh)
+=head3 C<new(efi_dbh =E<gt> $efiDbh)>
 
 Create an instance of EFI::IdMapping object.
 
@@ -182,7 +183,7 @@ A database connection handle created by the B<EFI::Database> object.
 
 =back
 
-=head3 parseLineForHeaders($line)
+=head3 C<parseLineForHeaders($line)>
 
 Determine if a line is a FASTA header, extract ID information, and return the result.
 
@@ -264,7 +265,7 @@ characters of the header string for UniProt IDs or IDs that map to UniProt IDs.
             raw_header => "info XP_007754113.1 metadata and other information"
         }
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $header = $parser->parseLineForHeaders($line);
     if ($header->{uniprot_id}) {

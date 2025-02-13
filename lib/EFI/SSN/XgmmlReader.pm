@@ -212,9 +212,9 @@ C<id> attribute).
 
 =head2 METHODS
 
-=head3 new(xgmml_file => $ssnFile)
+=head3 C<new(xgmml_file =E<gt> $ssnFile)>
 
-Creates a new C<EFI::SSN::XgmmlReader> object.
+Creates a new B<EFI::SSN::XgmmlReader> object.
 
 =head4 Parameters
 
@@ -235,8 +235,7 @@ Returns an object.
     my $parser = EFI::SSN::XgmmlReader->new(xgmml_file => $ssnFile);
 
 
-
-=head3 parse
+=head3 C<parse()>
 
 Parses the XGMML file on a per-element basis. This method doesn't create a DOM;
 rather it obtains information from each XML element as the file is being parsed and
@@ -247,8 +246,7 @@ builds an internal representation of an SSN as a collection of arrays and hashes
     $parser->parse();
 
 
-
-=head3 getEdgeList
+=head3 C<getEdgeList()>
 
 Gets the edgelist, which is a list of edges where each edge is defined as
 a pair of node indices.
@@ -264,8 +262,7 @@ and target node indices.
     map { print join(" ", @$_), "\n"; } @$edgelist;
 
 
-
-=head3 getIndexSeqIdMap
+=head3 C<getIndexSeqIdMap()>
 
 Gets the structure that correlates node index to sequence ID.
 
@@ -279,8 +276,7 @@ A hash ref that maps node index to sequence ID (numeric -> string).
     map { print join("\t", $_, $indexSeqIdMap->{$_}), "\n"; } keys %$indexSeqIdMap;
 
 
-
-=head3 getIdIndexMap
+=head3 C<getIdIndexMap()>
 
 Gets a mapping of node IDs (the C<id> attribute in a SSN node) to node index.
 

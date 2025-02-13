@@ -76,12 +76,12 @@ EFI::IdMapping::Util - Perl module containing helper functions and constants to 
 
 =head2 DESCRIPTION
 
-EFI::IdMapping::Util provides helper functions and exports constants for sequence ID mapping from
+B<EFI::IdMapping::Util> provides helper functions and exports constants for sequence ID mapping from
 non-UniProt ID types to UniProt IDs.
 
 =head2 METHODS
 
-=head3 check_id_type($id)
+=head3 C<check_id_type($id)>
 
 Determine the type of the given ID based on the structure of the string. 
 
@@ -99,11 +99,12 @@ A string containing an ID type.
 
 One of the known ID type constants, C<UNIPROT>, C<NCBI>, C<GENBANK>, C<GI>, or C<PDB>.
 
-=head4 Example usage:
+=head4 Example Usage
 
     if (check_id_type("B0SS77") eq UNIPROT) {
         print "ID is UniProt\n";
     }
+
 
 =head2 ID TYPES
 
@@ -123,6 +124,7 @@ A homologue identifier can be tacked on the end, in the form of C<.#>.  For exam
 C<GENBANK>, C<PDB>, and C<GI> are also identified but are not used frequently.
 
 =back
+
 
 =head2 CONSTANTS
 

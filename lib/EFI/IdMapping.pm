@@ -95,13 +95,16 @@ EFI::IdMapping - Perl module for mapping non-UniProt protein sequence IDs to Uni
 
 =head2 DESCRIPTION
 
-EFI::IdMapping is a utility module that maps non-UniProt IDs (usually obtained from FASTA headers) to UniProt IDs.
-It does this by using the C<idmapping> table in an EFI database, which is in turn obtained from the UniProt ID mapping dataset.
-The most frequent non-UniProt ID type that is used is B<NCBI>, but other types are supported (as defined in the C<EFI::IdMapping::Util> module).
+B<EFI::IdMapping> is a utility module that maps non-UniProt IDs (usually obtained from FASTA
+headers) to UniProt IDs.  It does this by using the C<idmapping> table in an EFI database, which
+is in turn obtained from the UniProt ID mapping dataset.  The most frequent non-UniProt ID type
+that is used is B<NCBI>, but other types are supported (as defined in the B<EFI::IdMapping::Util>
+module).
+
 
 =head2 METHODS
 
-=head3 new(efi_dbh => $efiDbh)
+=head3 C<new(efi_dbh =E<gt> $efiDbh)>
 
 Create an instance of EFI::IdMapping object.
 
@@ -115,7 +118,8 @@ A database connection handle created by the B<EFI::Database> object.
 
 =back
 
-=head3 reverseLookup($typeHint, @searchIds)
+
+=head3 C<reverseLookup($typeHint, @searchIds)>
 
 Try to map IDs of unknown format to UniProt IDs.
 
@@ -125,7 +129,8 @@ Try to map IDs of unknown format to UniProt IDs.
 
 =item C<$typeHint>
 
-ID format guess, a constant from C<EFI::IdMapping::Util>. Usually C<AUTO>. See C<EFI::IdMapping::Util> for all options.
+ID format guess, a constant from B<EFI::IdMapping::Util>. Usually C<AUTO>. See
+B<EFI::IdMapping::Util> for all options.
 
 =item C<@searchIds>
 
@@ -151,7 +156,7 @@ A hash ref containing a mapping of UniProt IDs to a list of source IDs.
 
 =back
 
-=head4 Example usage:
+=head4 Example Usage
 
     my @searchIds = ("B0SS77", "WP_012388845.1");
     # Return a list of UniProt IDs that were found

@@ -186,7 +186,7 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
 
 =head2 DESCRIPTION
 
-EFI::SSN::Util::ID is a utility module that provides functions to parse and manipulate
+B<EFI::SSN::Util::ID> is a utility module that provides functions to parse and manipulate
 files and structures that contain sequence ID information such as cluster number to IDs
 and metanodes.  A metanode is a node in the network that represents one or more sequences.
 For example, networks generated using UniRef will contain nodes that correspond to
@@ -201,7 +201,7 @@ and by-sequence and by-node numbering is identical.
 
 =head2 METHODS
 
-=head3 parse_cluster_map_file($clusterMapFile)
+=head3 C<parse_cluster_map_file($clusterMapFile)>
 
 Parses a file that contains a mapping of sequence IDs to cluster numbers.
 
@@ -251,13 +251,12 @@ C<cluster_num_node> column in the input file).  In the example given above
 
 =back
     
-=head4 Example usage:
+=head4 Example Usage
 
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
 
 
-
-=head3 parse_metanode_map_file($metanodeMapFile)
+=head3 C<parse_metanode_map_file($metanodeMapFile)>
 
 Parses a file that contains a mapping of metanodes to nodes within the metanode.
 The result may be an empty hash ref in the case that the file is empty (which
@@ -289,15 +288,13 @@ A hash ref that maps metanode to a list of sequences. For example:
         ...
     }
 
-=head4 Example usage:
+=head4 Example Usage
 
     # $metanodeMapFile comes from another utility, ssn_to_id_list.pl
     my ($idType, $sourceIdMap) = parse_metanode_map_file($metanodeMapFile);
 
 
-
-
-=head3 resolve_mapping($clusterToId, $idType, $sourceIdMap)
+=head3 C<resolve_mapping($clusterToId, $idType, $sourceIdMap)>
 
 Expands any metanode IDs in the C<$clusterToId> data structure to the full set of sequences.
 For example, if cluster 1 contains 5 metanodes, with each one containing 3 sequences, the
@@ -357,7 +354,7 @@ the metanode).
         ...
     }
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $clusterToId = {}; # get the mapping somehow
     my $sourceIdMap = {}; # get the mapping somehow
@@ -370,9 +367,7 @@ the metanode).
     }
 
 
-
-
-=head3 get_cluster_num_cols($header)
+=head3 C<get_cluster_num_cols($header)>
 
 Returns the column index of the cluster number by sequence and by node in
 C<cluster_id_map> files. These are used when parsing rows in the file to
@@ -398,7 +393,7 @@ The column index of the clusters numbered by nodes.
 
 =back
 
-=head4 Example usage:
+=head4 Example Usage
 
     my ($seqNumCol, $nodeNumCol) = get_cluster_num_cols($header);
     chomp(my $row = getLine());

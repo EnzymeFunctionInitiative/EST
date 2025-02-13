@@ -76,24 +76,24 @@ for inserting attributes into an XGMML file from EFI::SSN::XgmmlWriter.
 
 =head2 DESCRIPTION
 
-C<EFI::SSN::XgmmlWriter::AttributeHandler> is a Perl module that provides an interface
+B<EFI::SSN::XgmmlWriter::AttributeHandler> is a Perl module that provides an interface
 that node handlers can inherit from.  Each subclass implements methods that are used
-by C<EFI::SSN::XgmmlWriter> to insert attributes into an XGMML file that is being written.
+by B<EFI::SSN::XgmmlWriter> to insert attributes into an XGMML file that is being written.
 
-=head4 Example usage:
+=head4 Example Usage
 
     # Inherits from EFI::SSN::XgmmlWriter
     my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(...);
     $xwriter->addAttributeHandler($colorHandler);
 
 
-=head3 onInit()
+=head3 C<onInit()>
 
 Called before the input file is read and output file is written.  This is used to
 initialize variables that are necessary inside the handlers.
 
 
-=head3 onNodeStart($seqId, $id)
+=head3 C<onNodeStart($seqId, $id)>
 
 Called when the start of a node is encountered (e.g. the C<node> tag).
 
@@ -112,12 +112,12 @@ The Cytoscape identifier (e.g. C<id> attribute).  This may be the same as C<labe
 =back
 
 
-=head3 onNodeEnd()
+=head3 C<onNodeEnd()>
 
 Called when the end tag of a node is encountered.
 
 
-=head3 getSkipFieldInfo
+=head3 C<getSkipFieldInfo()>
 
 Gets a list of fields to skip when writing.  This is used so that the writer can insert
 new fields into the output SSN.
@@ -126,7 +126,7 @@ new fields into the output SSN.
 
 Array ref of field names in SSN display format (e.g. not internal naming convention).
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $fields = $h->getSkipFieldInfo();
     foreach my $f (@$fields) {
@@ -134,7 +134,7 @@ Array ref of field names in SSN display format (e.g. not internal naming convent
     }
 
 
-=head3 getNewAttributes
+=head3 C<getNewAttributes()>
 
 Get new attributes that are to be inserted at the current location in a node.
 
@@ -161,7 +161,7 @@ For example:
 
 If the third element isn't provided then the type of the attribute is assumed to be a string.
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $newAttr = $h->getNewAttributes($attName);
     foreach my $attr (@$newAttr) {
