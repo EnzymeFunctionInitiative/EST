@@ -1,4 +1,3 @@
-
 use strict;
 use warnings;
 
@@ -180,16 +179,9 @@ sub validateAndProcessOptions {
     $optParser->addOption("cluster-num-map=s", 1, "path to input file containing the mapping of cluster number to cluster sizes", OPT_FILE);
     $optParser->addOption("cluster-color-map=s", 0, "path to output file mapping cluster number (sequence count) to a color", OPT_FILE);
 
-    if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
-        die "$text\n";
-        exit(1);
-    }
-
-    if ($optParser->wantHelp()) {
-        my $text = $optParser->printHelp();
-        print $text;
-        exit(0);
+    if (not $optParser->parseOptions() or $optParser->wantHelp()) {
+        print $optParser->printHelp();
+        exit(not $optParser->wantHelp());
     }
 
     return $optParser->getOptions();

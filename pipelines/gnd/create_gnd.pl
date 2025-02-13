@@ -50,16 +50,9 @@ sub validateAndProcessOptions {
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
 
-    if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
-        die "$text\n";
-        exit(1);
-    }
-
-    if ($optParser->wantHelp()) {
-        my $text = $optParser->printHelp();
-        print $text;
-        exit(0);
+    if (not $optParser->parseOptions() or $optParser->wantHelp()) {
+        print $optParser->printHelp();
+        exit(not $optParser->wantHelp());
     }
 
     return $optParser->getOptions();

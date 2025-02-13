@@ -131,16 +131,9 @@ sub validateAndProcessOptions {
     $optParser->addOption("singletons=s", 1, "path to a file containing a list of singletons", OPT_FILE);
     $optParser->addOption("stats=s", 1, "path to an output file to save statistics to", OPT_FILE);
 
-    if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
-        die "$text\n";
-        exit(1);
-    }
-
-    if ($optParser->wantHelp()) {
-        my $text = $optParser->printHelp();
-        print $text;
-        exit(0);
+    if (not $optParser->parseOptions() or $optParser->wantHelp()) {
+        print $optParser->printHelp();
+        exit(not $optParser->wantHelp());
     }
 
     return $optParser->getOptions();

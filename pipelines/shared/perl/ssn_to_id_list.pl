@@ -177,16 +177,9 @@ sub validateAndProcessOptions {
     $optParser->addOption("id-index=s", 1, "path to an output file mapping XGMML node ID to node index", OPT_FILE);
     $optParser->addOption("seqid-source-map=s", 1, "path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty", OPT_FILE);
 
-    if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
-        die "$text\n";
-        exit(1);
-    }
-
-    if ($optParser->wantHelp()) {
-        my $text = $optParser->printHelp();
-        print $text;
-        exit(0);
+    if (not $optParser->parseOptions() or $optParser->wantHelp()) {
+        print $optParser->printHelp();
+        exit(not $optParser->wantHelp());
     }
 
     return $optParser->getOptions();

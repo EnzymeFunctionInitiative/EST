@@ -11,25 +11,17 @@ use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Annotations::Fields qw(INPUT_SEQ_ID);
 use EFI::Import::Config::Defaults;
+use EFI::Options;
 
 
 
-my ($blastQueryFile, $outputSeqFile, $outputDir, $wantHelp);
-my $result = GetOptions(
-    "blast-query-file=s" => \$blastQueryFile,
-    "output-sequence-file=s" => \$outputSeqFile,
-    "output-dir=s" => \$outputDir,
-    "help" => \$wantHelp,
-);
 
-$outputDir = getcwd() if not $outputDir;
-
-checkArgs();
+# Exits if help is requested or errors are encountered
+my $opts = validateAndProcessOptions();
 
 
-
-open my $queryFh, "<", $blastQueryFile or die "Unable to read blast query file $blastQueryFile: $!";
-open my $outFh, ">>", $outputSeqFile or die "Unable to append to sequence file $outputSeqFile: $!";
+open my $queryFh, "<", $opts->{blast_query_file} or die "Unable to read blast query file $opts->{blast_query_file}: $!";
+open my $outFh, ">>", $opts->{output_sequence_file} or die "Unable to append to sequence file $opts->{output_sequence_file}: $!";
 
 $outFh->print(">" . &INPUT_SEQ_ID, "\n");
 while (my $line = <$queryFh>) {
@@ -42,50 +34,37 @@ close $queryFh;
 
 
 
-sub checkArgs {
-    printHelp() and exit(0) if $wantHelp;
 
-    my $fail = 0;
-    if (not $blastQueryFile or not -f $blastQueryFile) {
-        print "Require --blast-query-file containing the FASTA sequence to use for the BLAST\n";
-        $fail = 1;
+
+sub validateAndProcessOptions {
+
+    my $desc = "Append the input BLAST query to the sequence import file.";
+
+    my $optParser = new EFI::Options(app_name => $0, desc => $desc);
+
+    $optParser->addOption("blast-query-file=s", 1, "path to file containing the BLAST query sequence", OPT_FILE);
+    $optParser->addOption("output-sequence-file=s", 0, "path to output sequence file that the input sequence gets appended to", OPT_FILE);
+    $optParser->addOption("output-dir=s", 0, "path to directory containing input files for the EST job", OPT_FILE);
+
+    if (not $optParser->parseOptions() or $optParser->wantHelp()) {
+        print $optParser->printHelp();
+        exit(not $optParser->wantHelp());
     }
-    if (not $outputSeqFile) {
-        $outputSeqFile = get_default_path("all_sequences", $outputDir);
+
+    my $opts = $optParser->getOptions();
+
+    $opts->{output_dir} = getcwd() if not $opts->{output_dir};
+    if (not $opts->{output_sequence_file}) {
+        $opts->{output_sequence_file} = get_default_path("all_sequences", $opts->{output_dir});
     }
 
-    if ($fail) {
-        printHelp();
-        exit(1);
-    }
-}
-
-
-sub printHelp {
-    print <<HELP;
-Usage: perl $0 --blast-query-file path_to_file
-    [--output-sequence-file <path/to/output/sequences/file.fasta>]
-    [--output-dir <path/to/output/dir>]
-
-Description:
-    Append the input BLAST query to the sequence import file
-
-Options:
-    --blast-query-file      file that contains the BLAST query sequence
-    --output-sequence-file  file that contains the sequences already retrieved by the pipeline
-    --output-dir            directory that contains the files for the job
-
-HELP
-    exit(0);
+    return $opts;
 }
 
 
 
 
-
-
-
-
+1;
 __END__
 
 =head1 append_blast_query.pl
@@ -111,4 +90,7 @@ BLAST import option for EST generates import sequences that are used for the all
 pipeline.  By default the query sequence (the sequence the user provided for the BLAST option)
 is not included in the import sequences.  This script takes that query sequence and appends it to
 the import sequence file.
+
+
+=cut
 
