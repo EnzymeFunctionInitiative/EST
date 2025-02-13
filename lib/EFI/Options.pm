@@ -25,7 +25,10 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = { app => $args{app_name} // $0, help_desc => $args{desc} // "" };
+    my $appName = $args{app_name} // $0;
+    $appName =~ s%^.*/([^/]+)$%$1%; # only show the script, not path
+
+    my $self = { app => $appName, help_desc => $args{desc} // "" };
     bless $self, $class;
 
     return $self;
