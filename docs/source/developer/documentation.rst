@@ -68,7 +68,8 @@ Perl
 Perl's standard documentation format is `POD
 <https://perldoc.perl.org/perlpod>_` which is not supported natively by Sphinx.
 However, POD documentation can be converted to other formats using commandline
-tools. Sphinx does not assess the documentation coverage in Perl files.
+tools included in ``scripts/``. Sphinx does not assess the documentation
+coverage in Perl files.
 
 Usage
 ^^^^^
@@ -95,81 +96,131 @@ manual page style.
 Function
 ^^^^^^^^
 All of the POD in a Perl file will be included in the reST output. The POD
-should be present directly above the function definition and should follow the
-form: ::
+should be placed after all of the code in the file, which is signified by the
+file return value ``1`` and special keyword ``__END__``: ::
+
+    package ABC;
+    
+    sub add {
+        ...
+    }
+
+    1;
+    __END__
 
     =pod
 
-    =head3 add
+    =head1 ABC
 
-    =over 4
+    =head2 NAME
 
-    =item Summary
+    ABC - Perl module for doing things
 
-    Add two numbers and return the result
+    =head2 SYNOPSIS
 
-    =item Parameters
+        use ABC;
 
-    =over 4
+        my $sum = ABC::add(1, 2);
 
-    =item C<a> (I<int>)
+    =head2 DESCRIPTION
+
+    B<ABC> is a utility module used to do various things.
+
+    =head2 METHODS
+
+    =head3 C<add($a, $b)>
+
+    Add two numbers and return the result.
+
+    =head4 Parameters
+
+    =over
+
+    =item C<$a>
 
     the first number
 
-    =item C<b> (I<int>)
+    =item C<$b>
 
     the second number
 
     =back
 
-    =item Returns
+    =head4 Returns
 
-    The sum of C<a> and C<b>
+    The sum of C<$a> and C<$b>
 
-    =back
+    =head4 Example Usage
+
+        my $sum = add(1, 2);
+
     =cut
-    sub add {
-        ...
 
 This will produce a docstring with sections for a summary, parameters, and
 return value. Parameter names will have code style and type hints will be
-italicized. The newlines are required for proper formatting. The result will look like this:
+italicized. The newlines are required for proper formatting. The result will
+look like this: ::
 
 
-----------
+    ABC
+    ===
 
-add
-^^^
+    NAME
+    ----
 
-Summary
-   Add two numbers and return the result
+    ABC - Perl module for doing things
 
-Parameters
-   ``a`` (*int*)
-      the first number
+    SYNOPSIS
+    --------
 
-   ``b`` (*int*)
-      the second number
+        use ABC;
 
-Returns
-   The sum of ``a`` and ``b``
+        my $sum = ABC::add(1, 2);
 
-----------
+    DESCRIPTION
+    -----------
+
+    **ABC** is a utility module used to do various things.
+
+    METHODS
+    -------
+
+    ``add($a, $b)``
+    ~~~~~~~~~~~~~~~~~~~~~
+
+    Add two numbers and return the result.
+
+    Parameters
+    ^^^^^^^^^^
+
+    * ``$a`` the first number
+    * ``$b`` the second number
+
+    Returns
+    ^^^^^^^
+
+    The sum of ``$a`` and ``$b``.
+
+    Example Usage
+    ^^^^^^^^^^^^^
+
+        my $sum = add(1, 2);
 
 Generating Documentation
 ^^^^^^^^^^^^^^^^^^^^^^^^
 EFI uses ``pod2html`` to produce an HTML version of the documentation,
-then uses `Pandoc <https://pandoc.org/>`_ to convert the HTML into reStructured Text.
+then uses `Pandoc <https://pandoc.org/>`_ to convert the HTML into reStructured
+Text. ``pod2html`` must be installed on the system or installed in a path
+directory that can be accessed by the build script.
 
 The custom script ``scripts/pod2rst.sh`` manages the conversion from POD to
-reST. It try to produce both a "Usage" section and a "Functions" section but
-will not output sections which have no content.
+reST. It will try to produce both a "Usage" section and a "Functions" section
+but will not output sections which have no content.
 
 This script requires that the path to the Perl file is mirrored under
 ``docs/source/pipelines``. For example, to produce documentation for
-``src/est/split_fasta/split_fasta.pl``, the path
+``pipelines/est/split_fasta/split_fasta.pl``, the path
 ``docs/source/pipelines/est/split_fasta`` must have already been created.
-
 
 To generate documentation:
 
@@ -184,7 +235,16 @@ To generate documentation:
 
     make docs-perlpod
 
+3. To make documentation for Perl modules, the custom script can be run on the
+   module directly. To create documentation in ``docs/source/lib/Module``: ::
+
+    bash scripts/pod2rst.sh lib/Module/Path.pm
+
 Building Documentation
---------------------------
+----------------------
 To built the HTML version of the documentation, simply run ``make docs-html``.
 This will output files to ``build/html/``. 
+
+Spelling can be checked by running ``make docs-spelling``. The word list is
+located ``docs/spelling_wordlist.txt``.
+
