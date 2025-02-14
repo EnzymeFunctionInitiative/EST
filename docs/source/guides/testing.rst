@@ -115,11 +115,11 @@ Test Execution
 
 Once the environment has been set up, the tests can be run: ::
 
-    bash tests/runtests.sh test.docker.config
+    bash tests/runtests.sh docker.config
 
 A Singularity container interface can also be used: ::
 
-    bash tests/runtests.sh test.singularity.config
+    bash tests/runtests.sh singularity.config
 
 Nextflow Configurations
 -----------------------
@@ -130,10 +130,6 @@ These configurations exist for various environments such as running the
 pipelines on PBS-Torque- or Slurm-based clusters as well as using Docker or 
 Singularity containers. Configuration files can be found in ``conf/<workflow>`` 
 where ``workflow`` corresponds to one of the pipelines in ``pipelines/``.
-
-Configuration files beginning with ``test.`` are designed to be used for running
-the provided tests. Other configuration files are provided as well to be used 
-for non-standard testing or production runs.
 
 Individual Tests
 ----------------
@@ -148,5 +144,5 @@ script, individual tests can be run with the following command: ::
 where ``script`` is one of the ``##_module_name.sh`` files in the
 ``tests/modules/`` directory. An example might be: ::
 
-    bash tests/modules/01_est_sequence_blast.sh $EFI_TEST_RESULTS_DIR test.singularity.config
+    bash tests/modules/01_est_sequence_blast.sh $EFI_TEST_RESULTS_DIR singularity.config
 

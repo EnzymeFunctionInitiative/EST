@@ -131,7 +131,7 @@ if [[ -z "$fasta_db" ]]; then
 fi
 
 
-export EFI_TEST_DATA_DIR=$DATA_DIR
+export EFI_DATA_DIR=$data_dir
 export EFI_CONFIG_FILE=$config_file
 export EFI_DB_NAME=$db_name
 export EFI_FASTA_DB=$fasta_db
