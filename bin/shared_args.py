@@ -44,7 +44,6 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         fail = True
 
     if fail:
-        print("Failed to render params template")
         return None
     else:
         args.output_dir = os.path.abspath(args.output_dir)
@@ -54,10 +53,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             args.efi_db = os.path.abspath(args.efi_db)
         return args
 
-def create_parser():
-    return parser
-
-def save_run_script(args: argparse.ArgumentParser, nxf_script_path: str):
+def save_run_script(args: argparse.Namespace, nxf_script_path: str):
     """
     Save the nextflow execution command to a file for easier use by the user.
 

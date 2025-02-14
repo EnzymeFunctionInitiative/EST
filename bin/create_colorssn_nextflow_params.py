@@ -46,7 +46,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.fasta_db = os.path.abspath(args.fasta_db)
         return args
     
-def create_parser() -> argparse.Namespace:
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Render params.yml for Color SSN nextflow pipeline")
     add_args(parser)
     return parser
