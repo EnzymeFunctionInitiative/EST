@@ -43,7 +43,7 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-``get_sequences.pl`` retrieves sequences from a BLAST-formatted
+**get_sequences.pl** retrieves sequences from a BLAST-formatted
 database. The sequences that are retrieved are specified in an input
 file provided on the command line.
 
@@ -63,12 +63,12 @@ Arguments
 ``--sequence-ids-file`` (optional, defaults)
    The path to the input file containing a list of sequence IDs. If this
    is not specified, the file with the name corresponding to the
-   ``accession_ids`` value in the **``EFI::Import::Config::Defaults``**
+   ``accession_ids`` value in the **EFI::Import::Config::Defaults**
    module is used from the output directory.
 
 ``--output-sequence-file`` (optional, defaults)
    The path to the output file containing all of the FASTA sequences
    that were retrieved from the database. If this is not specified, the
    file with the name corresponding to the ``all_sequences`` value in
-   the **``EFI::Import::Config::Defaults``** module is used in the
-   output directory.
+   the **EFI::Import::Config::Defaults** module is used in the output
+   directory.

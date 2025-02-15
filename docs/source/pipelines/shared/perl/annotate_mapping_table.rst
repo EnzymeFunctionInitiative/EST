@@ -1,5 +1,26 @@
 annotate_mapping_table
 ======================
+Usage
+-----
+
+::
+
+	Usage: perl annotate_mapping_table.pl --cluster-map <FILE> --mapping-table <FILE> --config <FILE>
+	    --db-name <VALUE> [--seqid-source-map <FILE>] [--cluster-color-map <FILE>]
+	    [--swissprot-table <FILE>]
+	
+	Description:
+	    Outputs a mapping table with UniProt ID, cluster number, cluster color, taxonomy ID, and
+	    species corresponding to the UniProt ID
+	
+	Options:
+	    --cluster-map          path to a file mapping sequence ID to cluster number
+	    --seqid-source-map     path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)
+	    --mapping-table        path to an output file to store mapping in
+	    --cluster-color-map    path to a file mapping cluster number (sequence count) to color (optional)
+	    --swissprot-table      path to an output file to store SwissProt mappings in (optional)
+	    --config               path to the config file for database connection
+	    --db-name              name of the EFI database to connect to for retrieving annotations
 
 Reference
 ---------

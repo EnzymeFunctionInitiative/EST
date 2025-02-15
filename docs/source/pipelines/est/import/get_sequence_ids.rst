@@ -200,15 +200,6 @@ begin with the letters ``ZZ``.
 
 
 
-Example Usage
-^^^^^^^^^^^^^
-
-::
-
-   get_sequence_ids.pl --mode fasta --fasta <USER_FASTA_FILE>
-
-
-
 Parameters
 ^^^^^^^^^^
 
@@ -222,8 +213,17 @@ Parameters
    the **``import_fasta.pl``** script which reformats the user FASTA
    file into an acceptable format with proper header IDs. If this is not
    specified, the file is named according to the ``seq_mapping`` value
-   in the **``EFI::Import::Config::Defaults``** module and put in the
-   output directory.
+   in the **EFI::Import::Config::Defaults** module and put in the output
+   directory.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   get_sequence_ids.pl --mode fasta --fasta <USER_FASTA_FILE>
 
 
 
@@ -235,9 +235,8 @@ The import options share a number of arguments.
 ``--sequence-ids-file`` (optional, defaults)
    The output file that the IDs from the sequence ID retrieval are
    stored in. If this is not specified, the file is named according to
-   the ``accession_ids`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
-   directory.
+   the ``accession_ids`` value in the **EFI::Import::Config::Defaults**
+   module and put in the output directory.
 
 ``--mode`` (required)
    Specifies the mode; supported values are ``blast``, ``family``, and
@@ -265,23 +264,22 @@ The import options share a number of arguments.
    used.
 
 ``--output-metadata-file`` (optional, defaults)
-   The script also outputs a metadata file (see
-   **``EFI::EST::Metadata``** for the format of this file). If this is
-   not specified, the file is named according to the
-   ``sequence_metadata`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
+   The script also outputs a metadata file (see **EFI::EST::Metadata**
+   for the format of this file). If this is not specified, the file is
+   named according to the ``sequence_metadata`` value in the
+   **EFI::Import::Config::Defaults** module and put in the output
    directory.
 
 ``--output-sunburst-ids-file-`` (optional, defaults)
    The EST graphical tools support the display of taxonomy in the form
    of sunburst diagrams. If this is not specified, the file is named
    according to the ``sunburst_ids`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
+   **EFI::Import::Config::Defaults** module and put in the output
    directory.
 
 ``--output-stats-file`` (optional, defaults)
    Statistics are computed for the sequences that are retrieved (e.g.
    size of family, number of sequences). If this is not specified, the
    file is named according to the ``import_stats`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
+   **EFI::Import::Config::Defaults** module and put in the output
    directory.

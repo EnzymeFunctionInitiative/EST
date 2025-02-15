@@ -349,16 +349,16 @@ while inserting color and cluster number information
 
 =head2 DESCRIPTION
 
-EFI::SSN::XgmmlWriter is a Perl module for stream reading XGMML files and writing
+B<EFI::SSN::XgmmlWriter> is a Perl module for stream reading XGMML files and writing
 them to a new XGMML file while including metadata for nodes (e.g. things like colors,
-cluster numbers, etc.).  The C<EFI::SSN::XgmmlWriter::AttributeHandler> and
+cluster numbers, etc.).  The B<EFI::SSN::XgmmlWriter::AttributeHandler> and
 derived classes are used to provide metadata.
 
 =head2 METHODS
 
-=head3 new(ssn => $ssnFile, output_ssn => $outputSsn)
+=head3 C<new(ssn =E<gt> $ssnFile, output_ssn =E<gt> $outputSsn)>
 
-Creates a new C<EFI::SSN::XgmmlWriter> object.
+Creates a new B<EFI::SSN::XgmmlWriter> object.
 
 =head4 Parameters
 
@@ -370,24 +370,24 @@ Path to a SSN file in XGMML format (XML) that is to be parsed and rewritten.
 
 =back
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
 
 
-=head3 write()
+=head3 C<write()>
 
 Parses the XGMML file on a per-element basis and writes the element to the output
 SSN. This method doesn't create a DOM; rather it obtains information from each
 XML element that is relevant to the input handlers and copies the element
 to the output file.
 
-=head4 Example usage:
+=head4 Example Usage
 
     $parser->write();
 
 
-=head3 addAttributeHandler($handler)
+=head3 C<addAttributeHandler($handler)>
 
 Adds a handler to the list of handlers that are called for each node attribute.
 
@@ -397,7 +397,7 @@ Adds a handler to the list of handlers that are called for each node attribute.
 
 =item C<$handler>
 
-An object derived from C<EFI::SSN::XgmmlWriter::AttributeHandler>.
+An object derived from B<EFI::SSN::XgmmlWriter::AttributeHandler>.
 
 =back
 

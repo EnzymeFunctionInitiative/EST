@@ -165,18 +165,18 @@ based on cluster number into a SSN.
 
 =head2 DESCRIPTION
 
-C<EFI::SSN::XgmmlWriter::AttributeHandler::Color> is a Perl module that is a node handler
+B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> is a Perl module that is a node handler
 used by EFI::SSN::XgmmlWriter to insert attributes into an XGMML file that is being written.
 This handler saves new node attributes into each node that specifies colors based on
 the cluster number.  The node attributes are inserted into the node at a location that
-is determined by a method in the C<EFI::Annotations> class.
+is determined by a method in the B<EFI::Annotations> class.
 
 
 =head2 METHODS
 
-=head3 new(cluster_map => $clusterMap, colors => $colors, cluster_sizes => $sizes)
+=head3 C<new(cluster_map =E<gt> $clusterMap, colors =E<gt> $colors, cluster_sizes =E<gt> $sizes)>
 
-Creates a new C<EFI::SSN::XgmmlWriter::AttributeHandler::Color> object and uses the
+Creates a new B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> object and uses the
 given parameters to determine node colors.
 
 =head4 Parameters
@@ -191,7 +191,7 @@ in cluster and the second element is the cluster number based on nodes in cluste
 
 =item C<colors>
 
-A C<EFI::Util::Colors> object used for retrieving the color of a node based
+A B<EFI::Util::Colors> object used for retrieving the color of a node based
 on cluster number.
 
 =item C<cluster_sizes>
@@ -213,14 +213,14 @@ of nodes.  For example:
 
 =back
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap,
         colors => $colors, cluster_sizes => $sizes);
     $xwriter->addAttributeHandler($colorHandler);
 
 
-=head3 getClusterColors()
+=head3 C<getClusterColors()>
 
 Returns a mapping of cluster numbers (based on number of sequences) to color.
 

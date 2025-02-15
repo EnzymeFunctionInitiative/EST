@@ -141,10 +141,11 @@ use by a script later in the EST import pipeline
 
 =head2 DESCRIPTION
 
-This script retrieves sequence IDs from a database or file and saves them for use by a script later in the EST import pipeline.
-There are four EST import modes available: BLAST, Family, Accessions, and FASTA.  
-See C<import_fasta.pl> for extra functionality required to complete the FASTA import option.
-In addition to outputting a file containing sequence identifiers, a metadata file is output that contains basic information about the sequences (e.g. how they were obtained).
+This script retrieves sequence IDs from a database or file and saves them for use by a script
+later in the EST import pipeline. There are four EST import modes available: BLAST, Family,
+Accessions, and FASTA.  See C<import_fasta.pl> for extra functionality required to complete the
+FASTA import option.  In addition to outputting a file containing sequence identifiers, a metadata
+file is output that contains basic information about the sequences (e.g. how they were obtained).
 
 =head2 MODES
 
@@ -159,10 +160,11 @@ the BLAST step might look like this:
 
 C<QUERY_FILE> is the path to the file that contains the user-specified query.
 C<BLAST_IMPORT_DB> is the path to a BLAST-formatted database.
-C<BLAST_EVALUE> and <BLAST_NUM_MATCHES> are the e-value to use and the maximum number of matches to return from the BLAST, respectively.
-The process generates a C<blast_hits.tab> file.  Assuming the process completed successfully, the next step is
-to run this script.  An additional output from the script is the C<blast_hits.tab> file, which is used
-during SSN generation for the BLAST import option only.
+C<BLAST_EVALUE> and <BLAST_NUM_MATCHES> are the e-value to use and the maximum number of matches
+to return from the BLAST, respectively.  The process generates a C<blast_hits.tab> file.  Assuming
+the process completed successfully, the next step is to run this script.  An additional output from
+the script is the C<blast_hits.tab> file, which is used during SSN generation for the BLAST import
+option only.
 
 =head4 Example Usage
 
@@ -184,8 +186,8 @@ The file that contains the user FASTA query sequence.
 
 =head3 B<Family>
 
-The Family import option uses one or more protein families to retrieve a list of IDs. The families that
-are supported are Pfam, InterPro, Pfam clans, SSF, and GENE3D.
+The Family import option uses one or more protein families to retrieve a list of IDs.  The families
+that are supported are Pfam, InterPro, Pfam clans, SSF, and GENE3D.
 
 =head4 Example Usage
 
@@ -228,13 +230,10 @@ A path to a file containing sequence IDs.  Each identifier should be on a separa
 =head3 B<FASTA>
 
 The FASTA import option parses sequence IDs from FASTA headers in a user-specified FASTA file.
-The headers are parsed to identify UniProt sequence IDs, and if non-UniProt IDs are detected, attempts to map those back to UniProt IDs.
-The result is an accession ID list file with only UniProt IDs.
-Additionally, if sequences could not be identified as UniProt or mapped to UniProt, anonymous sequence IDs are assigned that begin with the letters C<ZZ>.
-
-=head4 Example Usage
-
-    get_sequence_ids.pl --mode fasta --fasta <USER_FASTA_FILE>
+The headers are parsed to identify UniProt sequence IDs, and if non-UniProt IDs are detected,
+attempts to map those back to UniProt IDs.  The result is an accession ID list file with only
+UniProt IDs.  Additionally, if sequences could not be identified as UniProt or mapped to UniProt,
+anonymous sequence IDs are assigned that begin with the letters C<ZZ>.
 
 =head4 Parameters
 
@@ -246,12 +245,17 @@ A path to a file containing FASTA sequences.  Identifiers are pulled from the se
 
 =item C<--seq-mapping-file> (optional, defaults)
 
-This file is necessary to map UniProt or anonymous identifiers to the proper header line in the input FASTA file.
-The file is provided to the B<C<import_fasta.pl>> script which reformats the user FASTA file into an acceptable format with proper header IDs.
-If this is not specified, the file is named according to the C<seq_mapping> value in the B<C<EFI::Import::Config::Defaults>> module and put in the output directory.
+This file is necessary to map UniProt or anonymous identifiers to the proper header line in the
+input FASTA file.  The file is provided to the B<C<import_fasta.pl>> script which reformats the
+user FASTA file into an acceptable format with proper header IDs.  If this is not specified, the
+file is named according to the C<seq_mapping> value in the B<EFI::Import::Config::Defaults> module
+and put in the output directory.
 
 =back
 
+=head4 Example Usage
+
+    get_sequence_ids.pl --mode fasta --fasta <USER_FASTA_FILE>
 
 
 =head3 Shared Arguments
@@ -264,7 +268,7 @@ The import options share a number of arguments.
 
 The output file that the IDs from the sequence ID retrieval are stored in.
 If this is not specified, the file is named according to the C<accession_ids> value
-in the B<C<EFI::Import::Config::Defaults>> module and put in the output directory.
+in the B<EFI::Import::Config::Defaults> module and put in the output directory.
 
 =item C<--mode> (required)
 
@@ -293,22 +297,22 @@ specified, the current working directory is used.
 
 =item C<--output-metadata-file> (optional, defaults)
 
-The script also outputs a metadata file (see B<C<EFI::EST::Metadata>> for the format of this file).
+The script also outputs a metadata file (see B<EFI::EST::Metadata> for the format of this file).
 If this is not specified, the file is named according to the C<sequence_metadata> value
-in the B<C<EFI::Import::Config::Defaults>> module and put in the output directory.
+in the B<EFI::Import::Config::Defaults> module and put in the output directory.
 
 =item C<--output-sunburst-ids-file-> (optional, defaults)
 
 The EST graphical tools support the display of taxonomy in the form of sunburst diagrams.
 If this is not specified, the file is named according to the C<sunburst_ids> value
-in the B<C<EFI::Import::Config::Defaults>> module and put in the output directory.
+in the B<EFI::Import::Config::Defaults> module and put in the output directory.
 
 =item C<--output-stats-file> (optional, defaults)
 
 Statistics are computed for the sequences that are retrieved (e.g. size of family,
 number of sequences).
 If this is not specified, the file is named according to the C<import_stats> value
-in the B<C<EFI::Import::Config::Defaults>> module and put in the output directory.
+in the B<EFI::Import::Config::Defaults> module and put in the output directory.
 
 =back
 

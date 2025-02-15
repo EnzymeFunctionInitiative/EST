@@ -101,7 +101,7 @@ import_fasta.pl - import user-specified FASTA sequences into a form usable by th
 
 =head2 DESCRIPTION
 
-For all import methods but FASTA, the C<get_sequences.pl> script is used.  This script is
+For all import methods but FASTA, the B<get_sequences.pl> script is used.  This script is
 a replacement for that and is designed to work with FASTA sequences that do not have a
 proper sequence ID.  It assigns anonymous sequence identifiers to the sequences and
 writes them to the standard C<all_sequences> file that is outputted from C<get_sequences.pl>.
@@ -124,7 +124,7 @@ current working directory if not specified.
 When C<get_sequence_ids.pl> is run in the FASTA mode, it outputs a file that maps
 lines in the original user-specified FASTA file to anonymous sequence identifiers.
 If this is not specified, the file with the name corresponding to the C<seq_mapping> value
-in the B<C<EFI::Import::Config::Defaults>> module is used in the output directory.
+in the B<EFI::Import::Config::Defaults> module is used in the output directory.
 
 This file is a two column format file with a header line, where the first column
 is the UniProt or anonymous ID and the second column is the line number where the
@@ -135,7 +135,7 @@ corresponding sequence header is located in the C<--user-uploaded-file> file.
 The path to the output file containing all of the FASTA sequences that are reformatted
 and renamed based on the C<--seq-mapping-file> file.
 If this is not specified, the file with the name corresponding to the C<all_sequences> value
-in the B<C<EFI::Import::Config::Defaults>> module is used in the output directory.
+in the B<EFI::Import::Config::Defaults> module is used in the output directory.
 
 =back
 

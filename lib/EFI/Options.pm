@@ -25,7 +25,10 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = { app => $args{app_name} // $0, help_desc => $args{desc} // "" };
+    my $appName = $args{app_name} // $0;
+    $appName =~ s%^.*/([^/]+)$%$1%; # only show the script, not path
+
+    my $self = { app => $appName, help_desc => $args{desc} // "" };
     bless $self, $class;
 
     return $self;
@@ -216,16 +219,12 @@ sub printHelp {
     }
 
     # Print any errors that were discovered during validation
-    if (@{ $self->{errors} }) {
+    if (@{ $self->{errors} } and not $self->wantHelp()) {
         $text .= "\nErrors:\n";
         map { $text .= "    Missing or invalid argument --$self->{options}->{$_}->{opt}\n"; } @{ $self->{errors} };
     }
 
-    if ($helpOptions & OPT_PRINT_HELP) {
-        print $text;
-    } else {
-        return $text;
-    }
+    return $text;
 }
 
 
@@ -272,12 +271,12 @@ EFI::Options is a utility module to get command line arguments.
 
 =head2 METHODS
 
-=head3 new(parse_options...)
+=head3 C<new(parse_options...)>
 
 Create a new instance of this module.  The available parse options are C<app_name>, used
 to provide a custom name to the C<printHelp()> method, and C<desc>, also used in C<printHelp()>.
 
-=head3 addOption($optSpec, $required, $help, $resultType)
+=head3 C<addOption($optSpec, $required, $help, $resultType)>
 
 Adds an option to the list of available options.
 
@@ -313,14 +312,14 @@ types are C<OPT_VALUE>, C<OPT_FILE>, and C<OPT_DIR_PATH>.
 
 C<1> if the addition was a success, C<0> if the option already exists.
 
-=head4 Example usage:
+=head4 Example Usage
 
     $optParser->addOption("edgelist=s", 1, "path to a file with the edgelist", OPT_FILE);
     $optParser->addOption("file-type=s", 0, "type of the file (e.g. mapping, tab, xml)", OPT_VALUE); # Or, don't need to provide OPT_VALUE
     $optParser->addOption("finalize", 0, "finalize the computation");
 
 
-=head3 parseOptions()
+=head3 C<parseOptions()>
 
 Parses the command line arguments and validates them against the specification provided
 by the user in C<addOption>.  Called after all C<addOption>s are called.
@@ -329,7 +328,7 @@ by the user in C<addOption>.  Called after all C<addOption>s are called.
 
 C<1> if the parsing was a success and all required arguments were present; C<0> otherwise.
 
-=head4 Example usage:
+=head4 Example Usage
 
     if (not $optParser->parseOptions()) {
         my $text = $optParser->printHelp(OPT_ERRORS);
@@ -338,7 +337,7 @@ C<1> if the parsing was a success and all required arguments were present; C<0> 
     }
 
 
-=head3 getOptions()
+=head3 C<getOptions()>
 
 Return information about the options that were added and parsed.
 
@@ -349,7 +348,7 @@ command line, it will not be present in this hash ref.  The option key is the
 option name provided in the specification to C<addOption> with the dash C<-> replaced
 with underscores C<_>.
 
-=head4 Example usage:
+=head4 Example Usage
 
     my $options = $optParser->getOptions();
 
@@ -358,7 +357,7 @@ with underscores C<_>.
     }
 
 
-=head3 wantHelp()
+=head3 C<wantHelp()>
 
 Determine if the user wants to display a help message.
 
@@ -366,7 +365,7 @@ Determine if the user wants to display a help message.
 
 C<1> if the user specified C<--help> on the command line, C<0> otherwise.
 
-=head4 Example usage:
+=head4 Example Usage
 
     $optParser->parseOptions();
 
@@ -377,7 +376,7 @@ C<1> if the user specified C<--help> on the command line, C<0> otherwise.
     }
 
 
-=head3 printHelp([$outputType])
+=head3 C<printHelp([$outputType])>
 
 Return or display help based on the input options added via C<addOption()>.
 
@@ -387,23 +386,20 @@ Return or display help based on the input options added via C<addOption()>.
 
 =item C<$outputType>
 
-Specifies the type of output and how to display it.  Multiple arguments are
-provided with the logical OR operator.  Available arguments are C<OPT_PRINT_HELP>
-and C<OPT_ERRORS>.  If C<OPT_ERRORS> is provided as an argument, then any
-errors encountered during parsing are displayed in addition to the help text.
+If the value is C<OPT_ERRORS>, then add the validation errors to the bottom of
+the help text.
 
 =back
 
 =head4 Returns
 
-If C<$outputType> includes C<OPT_PRINT_HELP> as an option, the help text is
-printed and the method returns nothing.  Otherwise the help text is returned.
+Return the usage, description, and option help text.
 
-=head4 Example usage:
+=head4 Example Usage
 
     $optParser->parseOptions();
-    my $text = $optParser->printHelp(OPT_ERRORS);
-    $optParser->printHelp(OPT_PRINT_HELP|OPT_ERRORS);
+    my $helpWithErrors = $optParser->printHelp(OPT_ERRORS);
+    my $helpOnly = $optParser->printHelp();
     
 
 =cut

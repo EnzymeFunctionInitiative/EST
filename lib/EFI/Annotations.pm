@@ -637,18 +637,19 @@ SQL return data from the C<annotations> table in the EFI database.
 
 =head2 DESCRIPTION
 
-EFI::Annotations is a utility module that provides helper functions for creating SQL statements
+B<EFI::Annotations> is a utility module that provides helper functions for creating SQL statements
 that can be used to query the EFI database C<annotations> table.  In addition, methods are provided
 for processing data rows returned from database query results.  Helper methods are provided
 for determining node attribute types.
 
 =head2 METHODS
 
-=head3 new()
+=head3 C<new()>
 
 Create an instance of EFI::Annotations.
 
-=head3 build_taxid_query_string($taxId)
+
+=head3 C<build_taxid_query_string($taxId)>
 
 Creates a SQL SELECT query statement based on a taxonomic identifier
 that can be provided to a SQL connection
@@ -673,7 +674,8 @@ SQL SELECT query statement.
     my $taxId = 1000;
     my $sqlSelect = $anno->build_taxid_query_string($taxId);
 
-=head3 build_query_string($accession, $extraWhere)
+
+=head3 C<build_query_string($accession, $extraWhere)>
 
 Creates a SQL SELECT query statement based on a sequence identifier
 that can be provided to a SQL connection
@@ -709,7 +711,8 @@ SQL SELECT query statement.
     my $extraWhere = "A." . FIELD_SEQ_LEN_KEY . " <= $maxLen";
     my $sqlSelect = $anno->build_query_string($accession, $extraWhere);
 
-=head3 build_id_mapping_query_string($accession)
+
+=head3 C<build_id_mapping_query_string($accession)>
 
 Creates a SQL SELECT query statement to retrieve IDs from the EFI database C<idmapping> table.
 This can be used to convert from UniProt IDs to non-UniProt IDs (e.g. RefSeq).
@@ -733,7 +736,8 @@ SQL SELECT query statement.
     my $accession = "B0SS77";
     my $sqlSelect = $anno->build_id_mapping_query_string($accession);
 
-=head3 build_annotations($dbRow, $ncbiIds, $annoSpec)
+
+=head3 C<build_annotations($dbRow, $ncbiIds, $annoSpec)>
 
 Creates a hash ref data structure from a database result row.
 The structure contains all of the node attributes that are in the results, formatted appropriately,
@@ -799,7 +803,8 @@ and a hash ref of values from the database row, mapping display field name to th
     #     "is_fragment" => "fragment",
     # }
 
-=head3 get_annotation_data()
+
+=head3 C<get_annotation_data()>
 
 Return metadata for all of the fields that are displayed in the SSN.
 
@@ -839,7 +844,8 @@ the order in which they appear, the display name, and the node type.
     #     ...
     # }
 
-=head3 get_ssn_annotation_fields()
+
+=head3 C<get_ssn_annotation_fields()>
 
 Returns a list of field names that are included by default in the SSN output.
 
@@ -857,7 +863,7 @@ A list of field names.
     #    ...
     # )
 
-=head3 decode_meta_struct($jsonString)
+=head3 C<decode_meta_struct($jsonString)>
 
 Decodes a JSON string from the C<annotations> table metadata column into a hash representing
 the values for that accession.  The metadata column uses short 1 or 2 character keys to
@@ -891,7 +897,8 @@ A hash ref containing the values from the JSON string.
     #     "ec_code" => "code"
     # }
 
-=head3 sort_annotations(@fields)
+
+=head3 C<sort_annotations(@fields)>
 
 Sorts the fields in the order in which they should appear in the SSN.
 
@@ -916,7 +923,8 @@ The input array, sorted by the internal C<order> field as specified in the modul
     @fieldNames = $anno->sort_annotations(@fieldNames);
     # @fieldNames will be ("organism", "NCBI_IDs", "ec_code").
 
-=head3 is_list_attribute($attrName)
+
+=head3 C<is_list_attribute($attrName)>
 
 Checks if the input attribute name is a SSN list attribute.
 
@@ -944,7 +952,7 @@ A SSN display attribute name (e.g. C<Organism>).
     my $isList = $anno->is_list_attribute($attrName);
     # $isList is 0
 
-=head3 get_attribute_type($attrName)
+=head3 C<get_attribute_type($attrName)>
 
 Returns the SSN node attribute data type for the attribute name.
 
@@ -972,7 +980,8 @@ The string "integer" if the type is numeric, "string" otherwise.
     my $theType = $anno->get_attribute_type($attrName);
     # $theType is "integer"
 
-=head3 is_expandable_attr($attrName)
+
+=head3 C<is_expandable_attr($attrName)>
 
 Checks if the input attribute name (or its display/SSN column name) can be expanded into a list of IDs.
 In other words, it checks if the input name is UniRef or repnode ID list attribute name.
@@ -1006,7 +1015,8 @@ A SSN display attribute name (e.g. C<UniRef90 IDs>).
     my $isExpandable = $anno->is_expandable_attr($attrName);
     # $isExpandable is 1
 
-=head3 get_expandable_attr()
+
+=head3 C<get_expandable_attr()>
 
 Gets a mapping of ID attribute display names (such as UniRef clusters or repnodes) that can be
 expanded into multiple IDs. See C<is_expandable_attr()> for a list of the currently available ones. 
@@ -1017,7 +1027,7 @@ expanded into multiple IDs. See C<is_expandable_attr()> for a list of the curren
 
 =item C<$fields>
 
-An array ref of fields from C<EFI::Annotations::Fields> relating to expandable attributes.
+An array ref of fields from B<EFI::Annotations::Fields> relating to expandable attributes.
 
 =item C<$display>
 
@@ -1035,7 +1045,7 @@ A hash ref mapping field name to field display for each element in C<$fields>.
     }
 
 
-=head3 get_attribute_info($attrName)
+=head3 C<get_attribute_info($attrName)>
 
 Gets information about the given attribute.
 
@@ -1073,7 +1083,7 @@ set and non-zero if they are XGMML list attribute types or numerical types, resp
     }
 
 
-=head3 get_cluster_info_insert_location()
+=head3 C<get_cluster_info_insert_location()>
 
 Returns the name of the SSN column where the cluster number and color columns should be inserted.
 This is designed so that the new columns will be inserted immediately following the returned column.
@@ -1090,7 +1100,8 @@ A string representing a SSN column heading (e.g. display name).
         # Append the color and cluster number column values
     }
 
-=head3 get_color_fields()
+
+=head3 C<get_color_fields()>
 
 Gets a list of color SSN attribute display names (such as cluster number and color).
 
@@ -1100,7 +1111,7 @@ Gets a list of color SSN attribute display names (such as cluster number and col
 
 =item C<$fields>
 
-An array ref of fields from C<EFI::Annotations::Fields> of the C<color> group.
+An array ref of fields from B<EFI::Annotations::Fields> of the C<color> group.
 
 =item C<$display>
 
