@@ -168,7 +168,7 @@ chronological order:
    run in parallel.  The result of this process is a multiset of edges between
    sequences.  In this stage, the BLAST tabular output is converted to
    `Parquet <https://parquet.apache.org/>`_ files for more efficient processing.
-   The conversion is referred to as "transcoding" in the code.  The is the most
+   The conversion is referred to as "transcoding" in the code.  This is the most
    computationally intensive stage of the pipeline.
 
 4. **BLASTreduce**.  All-by-all BLAST creates a multiset of directed edges, but a

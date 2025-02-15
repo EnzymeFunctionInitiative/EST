@@ -66,10 +66,11 @@ Running the Pipeline
 Generating a Parameter File
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The GNT pipeline starts with a SSN as input and uses sequences retrieved from
-a BLAST-formatted sequence database.  The parameter file that configures the
-GNT pipeline can be created using the ``bin/create_gnt_nextflow_params.py``
-script.  An example usage of the command: ::
+The GNT pipeline starts with a SSN and retrieves genome context for the
+sequences in the network from the EFI database to create GNNs.  A parameter
+file necessary to run the GNT pipeline can be created using the
+``bin/create_gnt_nextflow_params.py`` script.  An example usage of the
+command: ::
 
     python bin/create_gnt_nextflow_params.py --ssn-input ssn.xgmml --fasta-db blastdb/uniprot.fasta --output-dir results/ --efi-config efi.config --efi-db efi_db.sqlite --nextflow-config file.config
 
