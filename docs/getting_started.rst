@@ -46,9 +46,9 @@ Nextflow Installation
 ~~~~~~~~~~~~~~~~~~~~~
 
 After downloading the EFI source code, Nextflow version 24.04.4 must be
-installed. It is important to note that version 24.04 is specifically
-required. If this version is not available on the system, then a standard Linux
-user can install Nextflow by following these steps:
+installed. **Version 24.04 specifically is required.** If this version is not
+available on the system, then a standard Linux user can install Nextflow by
+following these steps:
 
 1. Download the all-in-one Nextflow program at
    https://github.com/nextflow-io/nextflow/releases/download/v24.04.4/nextflow-24.04.4-all.
@@ -72,10 +72,10 @@ Manual Installation
 -------------------
 
 Most installations of the tools do not require a manual installation since
-all of the required dependencies are included inside of a Docker container
-which can be run via Nextflow. However, in some cases it is desirable to
-integrate the tools with an existing environment such as a HPC cluster. In
-this case the manual installation directions below should be followed:
+all of the required dependencies are included inside of the Docker container
+that is run via Nextflow. However, in some cases it is desirable to integrate
+the tools with an existing environment such as a HPC cluster. In this case the
+manual installation directions below should be followed:
 
 1. Install `DuckDB <https://duckdb.org>`_ from
    https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip
@@ -92,7 +92,7 @@ this case the manual installation directions below should be followed:
    run ``make``, then ``mv $EFIDEPS/cd-hit-v4.8.1-2019-0228/cd-hit $EFIDEPS/bin``.
 
 The tools require a number of Perl and Python libraries that are not part
-of standard installations, which are specified in ``cpanfile`` and
+of standard installations, and these are specified in ``cpanfile`` and
 ``requirements.txt``, respectively.
 
 Python Libraries
@@ -104,6 +104,7 @@ be used to create a venv and install the required libraries:
 
 1. Create a Python virtual environment before installing libraries: ::
 
+        cd /path/to/EST/repo
         python -mvenv efi-env
 
 2. Once that command completes, activate the environment: ::
@@ -112,7 +113,6 @@ be used to create a venv and install the required libraries:
 
    and install the required libraries: ::
 
-        cd /path/to/EST/repo
         pip install -r requirements.txt
 
    if this fails to install ``pyEFI``, that package can be manually installed: ::
@@ -130,13 +130,15 @@ the actual modules will be stored (e.g. ``PERL5INSTALL=$EFIDEPS/perl5``). ::
     PERL5INSTALL=$EFIDEPS/perl5
     mkdir -p $PERL5INSTALL
 
-1. If ``local::lib`` and ``cpanminus`` are not installed, then execute: ::
+1. If ``local::lib`` and ``cpanminus`` are not installed in the system Perl
+   version, then execute: ::
 
     wget -O- http://cpanmin.us | perl - -l $PERL5INSTALL App::cpanminus local::lib
 
 2. To generate the environment variables required to use the custom Perl
    library location: ::
 
+    cd /path/to/EST/repo
     perl -I $PERL5INSTALL/lib/perl5 -Mlocal::lib=$PERL5INSTALL > perl_env.sh
 
 3. Set the Perl environment variables: ::
@@ -145,7 +147,6 @@ the actual modules will be stored (e.g. ``PERL5INSTALL=$EFIDEPS/perl5``). ::
 
 4. Then install the Perl modules: ::
 
-    cd /path/to/EST/repo
     cpanm --installdeps .
 
 Troubleshooting Perl Installation
@@ -159,7 +160,7 @@ then the installation of **XML::LibXML** must be forced. After the intial
 attempt at installation using `cpanm --installdeps .`, if there is an error
 installing **XML::LibXML** then run `cpanm --force --installdeps .`. It is
 essential to verify that the installation completed successfully by running
-`perl -MXML::LibXML` after the `cpanm` command completes. The former command
+`perl -MXML::LibXML` after the `cpanm` command completes. The Perl command
 should output nothing to the terminal, and wait for user input. If this is the
 case then the installation was successful and control can be returned to the
 terminal by pressing Ctrl+C on the keyboard.

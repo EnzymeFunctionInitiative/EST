@@ -6,4 +6,5 @@ Developer Guides
     :maxdepth: 1
 
     documentation.rst
+    ../pyEFI/index
 

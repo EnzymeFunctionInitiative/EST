@@ -6,7 +6,7 @@ from pyEFI.transcode import fasta_to_parquet
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--fasta", type=str, required=True, help="The FASTA file to transcode")
-    parser.add_argument("--output", type=str, required=True, help="Output filename for trancoded FASTA")
+    parser.add_argument("--output", type=str, required=True, help="Output filename for transcoded FASTA")
     return parser
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
