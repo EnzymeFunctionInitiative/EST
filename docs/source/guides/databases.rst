@@ -21,7 +21,7 @@ Metadata Database Installation
 Configuration File
 ~~~~~~~~~~~~~~~~~~
 
-See :doc:`/reference/efi_config_file` for details on the configuration
+See :doc:`../reference/efi_config_file` for details on the configuration
 file format.
 
 SQLite Database
@@ -46,7 +46,7 @@ MySQL Database
 ~~~~~~~~~~~~~~
 
 A comprehensive MySQL database installation guide is outside of the scope
-of this document since it is depedent on the computational infrastructure
+of this document since it is dependent on the computational infrastructure
 that is available to the end user and additionally requires coordination
 with an IT department. The steps can be summarized as follows:
 
