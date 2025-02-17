@@ -107,13 +107,14 @@ Additionally, it is assumed that results will be stored in ``/data/results``.
    file: ::
 
         results_dir="/data/results/family_test"
-        python bin/create_est_nextflow_params.py family --families PF07476 --output-dir $results_dir --efi-config /data/efi/efi.config --efi-db /data/efi/efi_202408.sqlite
+        python bin/create_est_nextflow_params.py family --families PF07476 --output-dir $results_dir --efi-config /data/efi/efi.config --efi-db /data/efi/efi_202408.sqlite --nextflow-config conf/est/docker.config
 
    then execute Nextflow with Singularity: ::
 
-        nextflow -C conf/est/singularity.config run pipelines/est/est.nf -params-file $results_dir/params.yml -work-dir $results_dir/work
+        bash $results_dir/run_nextflow.sh
 
-   (To use Docker, replace ``conf/est/singularity.config`` with ``conf/est/docker.config``.)
+   (To use Singularity, replace the ``--nextflow-config`` argument value
+   ``conf/est/docker.config`` with ``conf/est/singularity.config``.)
 
 Advanced Reference
 ==================
