@@ -59,7 +59,7 @@ class CdHitParser:
                     cluster_id = line[1:]
                     clusters[cluster_id] = []
                 else:
-                    m = re.search(r'^.+>(.+)\.\.\. (.*)$', line)
+                    m = re.search(r'^.+>(.+)\.\.\.$', line)
                     if m:
                         sequence_id = m.group(1)
                         #pct = m.group(2)
