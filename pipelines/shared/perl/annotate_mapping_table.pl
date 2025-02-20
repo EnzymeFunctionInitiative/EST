@@ -87,10 +87,14 @@ sub saveMappingData {
     my $colorMap = shift;
     my $annoData = shift;
 
-    open my $fh, ">", $mapFile or die "Unable to write to mapping table '$mapFile': $!";
+    # Conditionally write to map file
+    my $fh;
+    if ($mapFile) {
+        open $fh, ">", $mapFile or die "Unable to write to mapping table '$mapFile': $!";
+        $fh->print(join("\t", "UniProt ID", "Cluster Number", "Cluster Color", "Taxonomy ID", "Species"), "\n");
+    }
 
-    $fh->print(join("\t", "UniProt ID", "Cluster Number", "Cluster Color", "Taxonomy ID", "Species"), "\n");
-
+    # Conditionally write to swissprot table file
     my $spfh;
     if ($swissprotMapFile) {
         open $spfh, ">", $swissprotMapFile or die "Unable to write to swissprot table '$swissprotMapFile': $!";
@@ -103,16 +107,13 @@ sub saveMappingData {
         my @ids = sort { $a cmp $b } @{ $clusterToId->{$clusterNum} };
         foreach my $id (@ids) {
             my $data = $annoData->{$id} // {};
-            $fh->print(join("\t", $id, $clusterNum, $colorMap->{$clusterNum} // "", $data->{taxonomy_id} // "", $data->{species} // ""), "\n");
-            if ($data->{swissprot} and $spfh) {
-                $spfh->print(join("\t", $clusterNum, $id, $data->{swissprot}), "\n");
-            }
+            $fh->print(join("\t", $id, $clusterNum, $colorMap->{$clusterNum} // "", $data->{taxonomy_id} // "", $data->{species} // ""), "\n") if $fh;
+            $spfh->print(join("\t", $clusterNum, $id, $data->{swissprot}), "\n") if $spfh;
         }
     }
 
     close $spfh if $spfh;
-
-    close $fh;
+    close $fh if $fh;
 }
 
 
@@ -201,7 +202,7 @@ sub validateAndProcessOptions {
 
     $optParser->addOption("cluster-map=s", 1, "path to a file mapping sequence ID to cluster number", OPT_FILE);
     $optParser->addOption("seqid-source-map=s", 0, "path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)", OPT_FILE);
-    $optParser->addOption("mapping-table=s", 1, "path to an output file to store mapping in", OPT_FILE);
+    $optParser->addOption("mapping-table=s", 0, "path to an output file to store mapping in", OPT_FILE);
     $optParser->addOption("cluster-color-map=s", 0, "path to a file mapping cluster number (sequence count) to color (optional)", OPT_FILE);
     $optParser->addOption("swissprot-table=s", 0, "path to an output file to store SwissProt mappings in (optional)", OPT_FILE);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
@@ -226,13 +227,14 @@ C<annotate_mapping_table.pl> - create a table that has UniProt IDs with associat
 
 =head2 SYNOPSIS
 
-    annotate_mapping_table.pl --cluster-map <FILE> --seqid-source-map <FILE> --mapping-table <FILE>
+    annotate_mapping_table.pl --cluster-map <FILE> --seqid-source-map <FILE> [--mapping-table <FILE>]
         --config <FILE> --db-name <NAME> [--cluster-color-map <FILE> --swissprot-table <FILE>]
 
 =head2 DESCRIPTION
 
 C<annotate_mapping_table.pl> creates a table of UniProt IDs with cluster number,
-cluster color, taxonomy ID, and species as additional columns.
+cluster color, taxonomy ID, and species as additional columns, as well as a table
+listing SwissProt annotations.
 
 =head3 Arguments
 
@@ -240,7 +242,8 @@ cluster color, taxonomy ID, and species as additional columns.
 
 =item C<--cluster-map>
 
-Path to a file that maps UniProt sequence ID to a cluster number
+Path to a file that maps UniProt sequence ID to a cluster number.  Singletons are
+supported and treated as members of cluster 0
 
 =item C<--seqid-source-map>
 
@@ -249,7 +252,8 @@ to include all of these IDs, not just the metanodes)
 
 =item C<--mapping-table>
 
-Path to the output file to store the table in
+Optional path to the output file to store the table in; optional because sometimes only
+SwissProt outputs are required
 
 =item C<--cluster-color-map>
 

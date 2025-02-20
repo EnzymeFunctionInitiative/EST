@@ -152,6 +152,7 @@ class SsnNetworkGraph:
                 path to a file to output singleton list to
         """
         with open(singletons_file, "w") as fh:
+            fh.write("node_label\n")
             ids = list(self.singletons.values())
             ids.sort()
             for id in ids:

@@ -7,7 +7,7 @@ use FindBin;
 
 use lib "$FindBin::Bin/../../../lib";
 
-use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file);
+use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file parse_singletons_file);
 use EFI::Options;
 
 
@@ -27,7 +27,7 @@ my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});
 
 my $fullClusterToId = resolve_mapping($clusterToId, $idType, $sourceIdMap);
 
-my $singletons = loadSingletons($opts->{singletons});
+my $singletons = parse_singletons_file($opts->{singletons});
 
 my $stats = computeStats($opts->{stats}, $clusterToId, $fullClusterToId, $idType, $singletons);
 
@@ -95,33 +95,6 @@ sub computeStats {
 }
 
 
-#
-# loadSingletons
-#
-# Load the singletons in the SSN; the file includes a header line
-#
-# Parameters:
-#    $file - single column file to parse
-#
-sub loadSingletons {
-    my $file = shift;
-
-    open my $fh, "<", $file or die "Unable to open singletons file '$file' for reading: $!";
-
-    my @ids;
-
-    my $header = <$fh>;
-    while (my $line = <$fh>) {
-        chomp $line;
-        push @ids, $_;
-    }
-
-    close $fh;
-
-    return \@ids;
-}
-
-
 sub validateAndProcessOptions {
 
     my $optParser = new EFI::Options(app_name => $0, desc => "Outputs a file listing the convergence ratio for each cluster in the input cluster map");
@@ -138,6 +111,7 @@ sub validateAndProcessOptions {
 
     return $optParser->getOptions();
 }
+
 
 1;
 __END__

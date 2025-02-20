@@ -23,7 +23,6 @@ sub new {
     $self->{anno} = new EFI::Annotations;
     my ($attrNames, $attrDisplay) = $self->{anno}->get_expandable_attr();
     $self->{id_list_fields} = { map { $attrDisplay->{$_} => $_ } @$attrNames };
-    $self->{sp_field_name} = FIELD_SWISSPROT_DESC;
     $self->{metadata} = {}; # any node metadata that we are to store (e.g. swissprot)
     $self->{meta_map} = undef; # Metanode -> IDs in metanode mapping
     $self->{id_type} = "uniprot";
@@ -136,8 +135,10 @@ sub processNodeAttribute {
         # (in that case there will be duplicates because of the FIELD_REPNODE_IDS values)
         $self->{meta_map}->{$seqId}->{$value} = 1;
     # SwissProt
-    } elsif ($fieldName eq $self->{sp_field_name}) {
+    } elsif ($fieldName eq FIELD_SWISSPROT_DESC) {
         $self->{metadata}->{$seqId}->{swissprot} = $value if $value;
+    } elsif ($fieldName eq FIELD_SEQ_KEY) {
+        $self->{metadata}->{$seqId}->{sequence} = $value if $value;
     }
 }
 
@@ -249,11 +250,18 @@ used instead of the saved node attribute.
 =head4 Returns
 
 A hash ref with keys being the sequence ID (metanode ID), with each value being another
-hash ref with each saved node attribute.  Currently only the C<swissprot> hash ref key
-is supported.  Only sequence IDs with attribute values are in the hash ref.
+hash ref with each saved node attribute.  Currently the C<swissprot> and C<sequence> hash
+ref keys are supported.  Only sequence IDs with attribute values are in the hash ref.
+The C<sequence> key will only be present if a protein sequence was included; this is used
+when unidentified sequences are included in the analysis.
 
     {
         "UNIPROT_ID" => {
+            "swissprot" => "Description",
+            "sequence" => "ABC"
+        },
+        "UNIPROT_ID2" => {},
+        "UNIPROT_ID3" => {
             "swissprot" => "Description"
         }
     }
