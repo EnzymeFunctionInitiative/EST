@@ -16,7 +16,8 @@ use EFI::IdMapping::Util;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
 use EFI::IdMapping::Util qw(:ids);
-use EFI::EST::Metadata;
+use EFI::EST::Metadata::Reader;
+use EFI::EST::Metadata::Writer;
 
 
 my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
@@ -76,8 +77,11 @@ if ($unirefVersion) {
 }
 
 
-my $parser = new EFI::EST::Metadata;
-my ($idMeta, $fieldNames) = $parser->parseFile($metaFileIn, $idListFile);
+my $parser = new EFI::EST::Metadata::Reader(file => $metaFileIn, id_list_file => $idListFile);
+my $writer = new EFI::EST::Metadata::Writer();
+
+my $accessions = $parser->getIds();
+my $metaAttrs = $parser->getAttributeNames();
 
 my $unirefLenFiltWhere = getUnirefLenFiltWhere();
 my $annoSpec = readAnnoSpec($annoSpecFile);
@@ -90,11 +94,9 @@ if ($db->getDbiType() == DBI_MYSQL) {
 }
 
 
-my $ssnAnno = {};
-
 my %unirefIds;
 my %unirefClusterIdSeqLen;
-foreach my $accession (sort keys %$idMeta){
+foreach my $accession (sort @$accessions){
     next if $accession =~ /^Z/i;
 
     # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
@@ -112,13 +114,13 @@ foreach my $accession (sort keys %$idMeta){
 
     my @ncbiIds = getNcbiIds($accession);
     
-    my $data = formatAnnoData($accession, $idMeta->{$accession}, \@rows, \@ncbiIds, \%unirefIds, \%unirefClusterIdSeqLen);
+    my $data = formatAnnoData($accession, \@rows, \@ncbiIds, \%unirefIds, \%unirefClusterIdSeqLen);
 
-    $ssnAnno->{$accession} = $data;
+    $writer->addValues($accession, $data);
 }
 
 
-$parser->writeData($annoOut, $ssnAnno);
+$writer->saveMetadata($annoOut);
 
 
 $dbh->disconnect();
@@ -145,7 +147,6 @@ $dbh->disconnect();
 
 sub formatAnnoData {
     my $accession = shift;
-    my $seqMeta = shift;
     my $rows = shift;
     my $ncbiIds = shift;
     my $unirefIds = shift;
@@ -154,9 +155,11 @@ sub formatAnnoData {
     my @params = ($rows, $ncbiIds);
     push @params, $annoSpec ? $annoSpec : undef;
 
+    # Get the attributes in hash ref format for the given SQL results
     my $data = $anno->build_annotations(@params);
 
-    foreach my $field (keys %$seqMeta) {
+    # Add any existing metadata attributes in to the data for the ID
+    foreach my $field (@$metaAttrs) {
         if ($field eq $clusterField) {
             my @ids = map { $_->[0] } @{$unirefIds->{$accession}};
             $data->{$field} = join(",", $accession, @ids);
@@ -165,7 +168,7 @@ sub formatAnnoData {
             $data->{$field} = $size;
             $data->{&FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY} = $unirefClusterIdSeqLen->{$accession} if $unirefClusterIdSeqLen->{$accession};
         } elsif (not $data->{$field}) {
-            $data->{$field} = $seqMeta->{$field};
+            $data->{$field} = $parser->getValue($accession, $field);
         }
     }
 
@@ -240,15 +243,17 @@ sub queryDatabase {
 sub getUnirefQuerySql {
     my $accession = shift;
 
-    my @sql;
+    return () if (not $unirefVersion or not $clusterField);
 
-    if ($unirefVersion and $clusterField and exists $idMeta->{$accession}->{$clusterField}) {
-        my @allIds = split(m/,/, $idMeta->{$accession}->{$clusterField});
-        my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
-        while (my @chunk = splice(@idList, 0, 200)) {
-            my $sql = $anno->build_query_string(\@chunk, $unirefLenFiltWhere);
-            push @sql, $sql;
-        }
+    my $value = $parser->getValue($accession, $clusterField);
+    return () if not $value;
+
+    my @sql;
+    my @allIds = split(m/,/, );
+    my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
+    while (my @chunk = splice(@idList, 0, 200)) {
+        my $sql = $anno->build_query_string(\@chunk, $unirefLenFiltWhere);
+        push @sql, $sql;
     }
 
     return @sql;
