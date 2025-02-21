@@ -30,16 +30,15 @@ sub new {
 
 sub init {
     my $self = shift;
-    my $config = shift || die "Fatal error: unable to create source: missing config arg";
+    my $config = shift;
     my $efiDbh = shift;
     my %args = @_;
 
-    $self->{config} = $config;
-    $self->{dbh} = $efiDbh;
+    $self->{dbh} = $efiDbh // die "Require efh dbh argument";
     $self->{sunburst} = $args{sunburst};
     $self->{stats} = $args{stats};
 
-    my $seqVer = $config->getConfigValue("sequence_version");
+    my $seqVer = $config->{sequence_version};
     if ($seqVer =~ m/^uniref(50|90)$/) {
         $self->{uniref_version} = $seqVer;
     }

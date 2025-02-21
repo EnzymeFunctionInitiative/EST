@@ -47,8 +47,13 @@ sub getErrors {
 
 sub createSource {
     my $self = shift;
-    my $name = $self->{config}->getMode() || die "Fatal error: unable to create source"; 
-    my $obj = $types{$name};
+    my $sourceName = shift;
+
+    my $obj = $types{$sourceName};
+    if (not $obj) {
+        die "Fatal error: Unknown sequence ID source '$sourceName'";
+    }
+
     if (not $obj->init($self->{config}, $self->{efi_dbh}, sunburst => $self->{sunburst}, stats => $self->{stats})) {
         push @{$self->{err}}, $obj->getErrors();
         return undef;

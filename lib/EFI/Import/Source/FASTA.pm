@@ -45,16 +45,15 @@ sub init {
     my $efiDbh = shift;
     $self->SUPER::init($config, $efiDbh, @_);
 
-    my $file = $config->getConfigValue("fasta");
+    my $file = $config->{fasta};
     $self->{fasta} = $file;
-    $self->{dbh} = $efiDbh // die "Require efi dbh argument";
 
     if (not $self->{fasta}) {
         $self->addError("Require --fasta arg");
         return undef;
     }
 
-    $self->{map_file} = $config->getConfigValue("seq_mapping_file");
+    $self->{map_file} = $config->{seq_mapping_file};
 
     return 1;
 }

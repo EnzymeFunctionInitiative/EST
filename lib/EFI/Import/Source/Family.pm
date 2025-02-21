@@ -41,7 +41,7 @@ sub init {
     my $efiDbh = shift;
     $self->SUPER::init($config, $efiDbh, @_);
 
-    my $fams = $config->getConfigValue("family");
+    my $fams = $config->{family};
     $self->{fams} = $fams;
 
     if (not $fams) {

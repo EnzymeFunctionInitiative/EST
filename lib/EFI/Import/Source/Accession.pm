@@ -43,9 +43,8 @@ sub init {
     my $efiDbh = shift;
     $self->SUPER::init($config, $efiDbh, @_);
 
-    my $file = $config->getConfigValue("accessions");
+    my $file = $config->{accessions};
     $self->{acc_file} = $file;
-    $self->{dbh} = $efiDbh // die "Require efh dbh argument";
 
     if (not $self->{acc_file}) {
         $self->addError("Require --accessions arg");

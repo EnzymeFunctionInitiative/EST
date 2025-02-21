@@ -24,25 +24,23 @@ use EFI::Import::Logger;
 
 my $logger = new EFI::Import::Logger();
 
-my $config = new EFI::Import::Config::IdList();
-my ($err) = $config->validateAndProcessOptions();
+my $optionParser = new EFI::Import::Config::IdList();
+my ($status, $help) = $optionParser->validateOptions();
 
-if ($config->wantHelp()) {
-    $config->printHelp($0);
-    exit(0);
+if ($help) {
+    print "$help\n";
+    exit(not $status); # if error, status is 0, so exit non zero to indicate to shell that there was a problem
 }
 
-if (@$err) {
-    #$logger->error(@$err);
-    $config->printHelp($0, $err);
-    die "\n";
-}
+my $config = $optionParser->getOptions();
+
+
 
 
 my $sunburst = new EFI::Import::Sunburst();
-my $stats = new EFI::Import::Statistics(config => $config);
-my $efiDbName = $config->getConfigValue("efi_db");
-my $efiDb = new EFI::Database(config => $config->getEfiDatabaseConfig(), db_name => $efiDbName);
+my $stats = new EFI::Import::Statistics();
+my $efiDbName = $config->{efi_db};
+my $efiDb = new EFI::Database(config => $config->{efi_config}, db_name => $efiDbName);
 my $dbh = $efiDb->getHandle();
 if (not $dbh) {
     $logger->error("Error connecting to database: " . $efiDb->getError());
@@ -53,12 +51,15 @@ my $sources = new EFI::Import::Sources(config => $config, efi_dbh => $dbh, sunbu
 my $filter = new EFI::Import::Filter(config => $config, efi_dbh => $dbh, logger => $logger);
 my $writer = new EFI::Import::Writer(config => $config, sunburst => $sunburst, stats => $stats);
 
-my $source = $sources->createSource();
+
+# Create the primary source (e.g. FASTA, Accession, BLAST, Family)
+my $source = $sources->createSource($config->{mode});
 if (not $source) {
     $logger->error($sources->getErrors());
     die "\n";
 }
-$logger->message("Using " . $source->getType() . " as source");
+$logger->message("Using " . $source->getType() . " as primary source");
+
 
 # Retrieve only the IDs from the input sequence family or file
 $logger->message("Retrieving accession IDs from source $efiDbName");

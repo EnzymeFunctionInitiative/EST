@@ -1,10 +1,8 @@
 
 package EFI::Import::Config::Sequences;
 
-use warnings;
 use strict;
-
-use Data::Dumper;
+use warnings;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
@@ -12,68 +10,54 @@ use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Config);
 
 use EFI::Import::Config::Defaults;
+use EFI::Options;
 
 
 sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = $class->SUPER::new(%args);
-
-    $self->getOptions();
+    my $helpDesc = "Retrieve the FASTA sequences for each ID in a file with UniProt accession IDs";
+    my $self = $class->SUPER::new(%args, desc => $helpDesc);
 
     return $self;
 }
 
 
-sub getFastaDb {
+sub addImportOptions {
     my $self = shift;
-    return $self->getConfigValue("fasta_db");
+    $self->SUPER::addImportOptions();
+
+    $self->addOption("fasta-db=s", 1, "path to BLAST-formatted sequence database", OPT_FILE);
+    $self->addOption("sequence-ids-file=s", 1, "path to text file containing list of accession IDs", OPT_FILE);
+    $self->addOption("output-sequence-file=s", 0, "path to output file to put sequences in; defaults into --output-dir", OPT_FILE);
 }
 
 
-sub getOptions {
+sub validateOptions {
     my $self = shift;
 
-    my @spec = (
-        "fasta-db=s" => "",
-        "sequence-ids-file=s",
-        "output-sequence-file=s" => "",
-    );
-    my %defaults = (
-        fasta_db => "",
-        sequence_ids_file => "",
-        output_sequence_file => "",
-    );
-    
-    $self->SUPER::getOptions(\%defaults, \@spec);
-}
-
-
-sub validateAndProcessOptions {
-    my $self = shift;
-
-    my ($err) = $self->SUPER::validateAndProcessOptions();
-
-    my $h = $self->getAllOptions();
-
-    my $outputDir = $self->getOutputDir();
-    if (not $h->{output_sequence_file}) {
-        my $seqFile = get_default_path("all_sequences", $outputDir);
-        $self->setConfigValue("output_sequence_file", $seqFile);
+    my ($status, $help) = $self->SUPER::validateOptions();
+    if ($help) {
+        return ($status, $help);
     }
 
-    push @$err, "Require --fasta-db" if not $h->{fasta_db};
+    my $opts = $self->getOptions();
+    my $outputDir = $opts->{output_dir};
 
-    $h->{sequence_ids_file} = $h->{sequence_ids_file} || get_default_path("accession_ids", $outputDir);
+    my @dbFiles = glob("$opts->{fasta_db}.*");
+    my @errors;
+    push @errors, "Require --fasta-db" if (not -f $opts->{fasta_db} or not @dbFiles);
 
-    $self->addHelp("--fasta-db", "<BLAST_DB>", "Path to BLAST-formatted sequence database", 1);
-    $self->addHelp("--sequence-ids-file", "<ACCESSION_IDS_FILE>", "Path to text file containing list of accession IDs", 0);
-    $self->addHelp("--output-sequence-file", "<FASTA_FILE>", "Path to output file to put sequences in", 0);
+    $opts->{sequence_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{sequence_ids_file};
 
-    $self->addHelpDescription("Retrieve the FASTA sequences for each ID in a file with UniProt accession IDs");
+    if (@errors) {
+        my $help = $self->printHelp();
+        map { $help .= "    $_\n"; } @errors;
+        return (0, $help);
+    }
 
-    return ($err);
+    return 1;
 }
 
 

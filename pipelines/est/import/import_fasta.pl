@@ -17,24 +17,22 @@ use EFI::Import::Logger;
 
 my $logger = new EFI::Import::Logger();
 
-my $config = new EFI::Import::Config::FastaImport();
-my ($err) = $config->validateAndProcessOptions();
+my $optionParser = new EFI::Import::Config::FastaImport();
+my ($status, $help) = $optionParser->validateOptions();
 
-if ($config->wantHelp()) {
-    $config->printHelp($0);
-    exit(0);
+if ($help) {
+    print "$help\n";
+    exit(not $status); # if error, status is 0, so exit non zero to indicate to shell that there was a problem
 }
 
-if (@$err) {
-    #$logger->error(@$err);
-    $config->printHelp($0, $err);
-    die "\n";
-}
+my $config = $optionParser->getOptions();
 
 
-my $mappingFile = $config->getConfigValue("seq_mapping_file");
-my $fastaFile = $config->getConfigValue("uploaded_fasta");
-my $outputFile = $config->getConfigValue("output_sequence_file");
+
+
+my $mappingFile = $config->{seq_mapping_file};
+my $fastaFile = $config->{uploaded_fasta};
+my $outputFile = $config->{output_sequence_file};
 
 
 my $lineMapping = loadMappingFile($mappingFile);

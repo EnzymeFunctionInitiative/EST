@@ -41,13 +41,13 @@ sub init {
     my $efiDbh = shift;
     $self->SUPER::init($config, $efiDbh, @_);
 
-    $self->{blast_query} = $config->getConfigValue("blast_query");
+    $self->{blast_query} = $config->{blast_query};
     if (not $self->{blast_query}) {
         $self->addError("Require --blast-query arg");
         return undef;
     }
 
-    $self->{blast_output} = $config->getConfigValue("blast_output");
+    $self->{blast_output} = $config->{blast_output};
     if (not $self->{blast_output}) {
         $self->addError("Require --blast-output arg");
         return undef;

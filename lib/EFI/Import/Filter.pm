@@ -11,11 +11,12 @@ sub new {
     my $class = shift;
     my %args = @_;
 
+    die "Unable to create filter: missing efi_dbh param" if not $args{efi_dbh};
+
     my $self = {};
+    $self->{dbh} = $args{efi_dbh};
+
     bless($self, $class);
-    $self->{config} = $args{config} // die "Fatal error: unable to create filter: missing config param";
-    $self->{dbh} = $args{efi_dbh} // die "Fatal error: unable to create filter: missing efi_dbh param";
-    $self->{logger} = $args{logger};
 
     return $self;
 }
