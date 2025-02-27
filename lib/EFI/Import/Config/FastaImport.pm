@@ -9,7 +9,7 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Config);
 
-use EFI::Import::Config::Defaults;
+use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Options;
 
 
@@ -43,7 +43,7 @@ sub validateOptions {
     }
 
     my $opts = $self->getOptions();
-    my $outputDir = $opts->{output_dir};
+    my $outputDir = $self->getOutputDir();
 
     $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
     $opts->{output_sequence_file} = get_default_path("all_sequences", $outputDir) if not $opts->{output_sequence_file};

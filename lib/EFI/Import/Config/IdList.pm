@@ -10,7 +10,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Config);
 
 use EFI::Import::Sources;
-use EFI::Import::Config::Defaults;
+use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Options;
 
 
@@ -27,28 +27,20 @@ sub new {
 
 sub addImportOptions {
     my $self = shift;
-    $self->SUPER::addImportOptions();
+    $self->SUPER::addImportOptions(include_config => 1);
 
     $self->addOption("mode=s", 1, "the sequence retrieval mode (one of blast, family, accession, or fasta)");
-    $self->addOption("efi-config-file=s", 1, "path to EFI database configuration file", OPT_FILE);
-    $self->addOption("efi-db=s", 1, "EFI database name, or path to EFI SQLite database file");
-    $self->addOption("output-metadata-file=s", 0, "output file to put metadata into (defaults into --output-dir)");
-    $self->addOption("output-sunburst-ids-file=s", 0, "output file to put sunburst data into (defaults into --output-dir)", OPT_FILE);
     $self->addOption("output-stats-file=s", 0, "Output file to put sequence ID statistics into (defaults into --output-dir)", OPT_FILE);
     $self->addOption("sequence-ids-file=s", 0, "Output file to put sequence IDs into (defaults into --output-dir)", OPT_FILE);
     $self->addOption("sequence-version=s", 0, "sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot");
-    #$self->addOption("include-family", 0, "", "");
-    #$self->addOption("restrict-family=s", 0, "", "");
-    #$self->addOption("restrict-domain=s", 0, "", "");
     $self->addOption("family=s", 0, "one or more protein families (PF#####, IPR######); required for --mode family");
     $self->addOption("fasta=s", 0, "user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta", OPT_FILE);
     $self->addOption("seq-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal)", OPT_FILE);
     $self->addOption("accessions=s", 0, "user-specified file containing list of accession IDs to use for all-by-all; required for --mode accession", OPT_FILE);
     $self->addOption("blast-query=s", 0, "path to file containing sequence for initial BLAST; required for --mode blast", OPT_FILE);
     $self->addOption("blast-output=s", 0, "output file to put BLAST results into; required for --mode blast", OPT_FILE);
+    #TODO:
     #$self->addOption("domain-region=s", 0, "", "");
-    #$self->addOption("exclude-fragments", 0, "", "");
-    #$self->addOption("fraction=i", 0, "", "");
 }
 
 

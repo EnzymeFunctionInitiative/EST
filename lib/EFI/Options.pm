@@ -362,9 +362,9 @@ Return information about the options that were added and parsed.
 =head4 Returns
 
 A hash ref mapping option key to option value.  If an option was not provided on the
-command line, it will not be present in this hash ref.  The option key is the
-option name provided in the specification to C<addOption> with the dash C<-> replaced
-with underscores C<_>.
+command line, even though it was added to the specification using C<addOption()>, it will
+not be present in this hash ref.  The option key is the option name provided in the
+specification to C<addOption> with the dash C<-> replaced with underscores C<_>.
 
 =head4 Example Usage
 

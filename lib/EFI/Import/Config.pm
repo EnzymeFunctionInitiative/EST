@@ -4,7 +4,7 @@ package EFI::Import::Config;
 use strict;
 use warnings;
 
-use Cwd qw(abs_path);
+use Cwd qw(abs_path getcwd);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 use parent qw(EFI::Options);
@@ -19,9 +19,17 @@ sub new {
 
     my $self = $class->SUPER::new(%args);
 
+    $self->{output_dir} = getcwd();
+
     $self->addImportOptions();
 
     return $self;
+}
+
+
+sub getOutputDir {
+    my $self = shift;
+    return $self->{output_dir};
 }
 
 
@@ -32,7 +40,13 @@ sub new {
 #
 sub addImportOptions {
     my $self = shift;
+    my %args = @_;
     $self->addOption("output-dir=s", 0, "path to directory to store output in; if not specified, defaults to current working directory", OPT_DIR_PATH);
+    #TODO: document this
+    if ($args{include_config}) {
+        $self->addOption("efi-config-file=s", 1, "path to EFI database configuration file", OPT_FILE);
+        $self->addOption("efi-db=s", 1, "EFI database name, or path to EFI SQLite database file");
+    }
 }
 
 
@@ -49,10 +63,29 @@ sub validateOptions {
     my $self = shift;
 
     if (not $self->parseOptions() or $self->wantHelp()) {
-        return ($self->wantHelp(), $self->printHelp());
-    } else {
-        return 1;
+        my $status = $self->wantHelp() ? 1 : $self->getErrorStatusCode();
+        return ($status, $self->printHelp());
     }
+
+    my $opts = $self->getOptions();
+
+    if ($opts->{output_dir}) {
+        if (not -d $opts->{output_dir}) {
+            my $help = $self->printHelp();
+            $help .= "    Require --output-dir to exist\n";
+            return ($self->getErrorStatusCode(), $help);
+        } else {
+            $self->{output_dir} = $opts->{output_dir};
+        }
+    }
+
+    return 1;
+}
+
+
+sub getErrorStatusCode {
+    my $self = shift;
+    return 0;
 }
 
 
@@ -83,6 +116,10 @@ EFI::Import::Config - Perl module for parsing command line arguments for the EST
     foreach my $opt (keys %$options) {
         print "$opt: $options->{$opt}\n";
     }
+
+    # To get --output-dir, always use getOutputDir()
+    my $outputDir = $optParser->getOutputDir();
+    $options->{output_dir} = $outputDir; # if so desired
 
 
 =head2 DESCRIPTION
@@ -127,6 +164,29 @@ information for the script.
     if ($help) {
         print "$help\n";
         exit(not $status); # if error, status is 0, so exit non zero to indicate to shell that there was a problem
+    }
+
+
+=head3 C<getOutputDir()>
+
+Get the output dir.  If the user specifies C<--output-dir> on the command line and it is valid,
+then that value is returned.  If the user doesn't specify C<--output-dir> then the current working
+directory is used.  If the user specifies C<--output-dir> but it doesn't exist, then validation
+will fail.
+
+=head4 Returns
+
+Path to the output directory to store results in.
+
+=head4 Example Usage
+
+    my $opts = $optParser->getOptions();
+    my $hasArg = exists $opts->{output_dir};
+    my $outputDir = $optParser->getOutputDir();
+    if ($hasArg) {
+        print "Output dir comes from command line --output-dir\n";
+    } else {
+        print "Output dir comes from current working directory\n";
     }
 
 
