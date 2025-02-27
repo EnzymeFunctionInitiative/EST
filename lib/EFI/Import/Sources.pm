@@ -32,8 +32,6 @@ sub new {
     bless($self, $class);
     $self->{config} = $args{config} // die "Fatal error: unable to create source: missing config arg";
     $self->{efi_dbh} = $args{efi_dbh} // die "Fatal error: unable to create source: missing efi_dbh argument";;
-    $self->{sunburst} = $args{sunburst}; # Optional
-    $self->{stats} = $args{stats}; # Optional
 
     return $self;
 }
@@ -54,7 +52,7 @@ sub createSource {
         die "Fatal error: Unknown sequence ID source '$sourceName'";
     }
 
-    if (not $obj->init($self->{config}, $self->{efi_dbh}, sunburst => $self->{sunburst}, stats => $self->{stats})) {
+    if (not $obj->init($self->{config}, $self->{efi_dbh})) {
         push @{$self->{err}}, $obj->getErrors();
         return undef;
     } else {

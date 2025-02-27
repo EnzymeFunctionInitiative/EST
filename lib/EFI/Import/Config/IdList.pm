@@ -55,25 +55,24 @@ sub validateOptions {
     my @errors;
 
     my $opts = $self->getOptions();
-    my $outputDir = $opts->{output_dir};
+    my $outputDir = $self->getOutputDir();
 
     push @errors, "Invalid --mode" if not EFI::Import::Sources::validateSource($opts->{mode});
 
-    $opts->{sequence_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{sequence_ids_file};
+    $opts->{sequence_ids_file} = get_default_path("source_ids", $outputDir) if not $opts->{sequence_ids_file};
     $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
 
     $opts->{sequence_version} = $opts->{sequence_version} =~ m/^uni(ref50|ref90|prot)$/i ? lc $opts->{sequence_version} : "uniprot";
 
     $opts->{fraction} = $opts->{fraction} || 1;
 
-    $opts->{output_metadata_file} = get_default_path("sequence_metadata", $outputDir) if not $opts->{output_metadata_file};
     $opts->{output_sunburst_ids_file} = get_default_path("sunburst_ids", $outputDir) if not $opts->{output_sunburst_ids_file};
     $opts->{output_stats_file} = get_default_path("import_stats", $outputDir) if not $opts->{output_stats_file};
 
     if (@errors) {
         my $help = $self->printHelp();
         map { $help .= "    $_\n"; } @errors;
-        return (0, $help);
+        return ($self->getErrorStatusCode(), $help);
     }
 
     return 1;

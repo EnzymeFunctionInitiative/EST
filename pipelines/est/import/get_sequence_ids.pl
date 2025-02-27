@@ -1,24 +1,20 @@
-#!/bin/env perl
 
 use strict;
 use warnings;
 
-use Data::Dumper;
-use Getopt::Long;
 use FindBin;
 use Time::HiRes qw(time);
 
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
+use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Import::Config::IdList;
-use EFI::Import::Sources;
-use EFI::Import::Filter;
-use EFI::Import::Writer;
-use EFI::Import::Sunburst;
-use EFI::Import::Statistics;
 use EFI::Import::Logger;
-
+use EFI::Import::Source::Family qw(FAMILY_SOURCE_NAME);
+use EFI::Import::Sources;
+use EFI::Import::Statistics;
+use EFI::Sequence::Collection;
 
 
 
@@ -32,28 +28,24 @@ if ($help) {
     exit(not $status); # if error, status is 0, so exit non zero to indicate to shell that there was a problem
 }
 
-my $config = $optionParser->getOptions();
+my $opts = $optionParser->getOptions();
 
 
-
-
-my $sunburst = new EFI::Import::Sunburst();
-my $stats = new EFI::Import::Statistics();
-my $efiDbName = $config->{efi_db};
-my $efiDb = new EFI::Database(config => $config->{efi_config}, db_name => $efiDbName);
+my $efiDbName = $opts->{efi_db};
+my $efiDb = new EFI::Database(config => $opts->{efi_config}, db_name => $efiDbName);
 my $dbh = $efiDb->getHandle();
 if (not $dbh) {
     $logger->error("Error connecting to database: " . $efiDb->getError());
     die "\n";
 }
 
-my $sources = new EFI::Import::Sources(config => $config, efi_dbh => $dbh, sunburst => $sunburst, stats => $stats);
-my $filter = new EFI::Import::Filter(config => $config, efi_dbh => $dbh, logger => $logger);
-my $writer = new EFI::Import::Writer(config => $config, sunburst => $sunburst, stats => $stats);
+
+my $sources = new EFI::Import::Sources(config => $opts, efi_dbh => $dbh);
 
 
-# Create the primary source (e.g. FASTA, Accession, BLAST, Family)
-my $source = $sources->createSource($config->{mode});
+# Access the primary source type (e.g. FASTA, Accession, BLAST, Family)
+#TODO: move the config parameter creation to this file (i.e. don't bury it in the Sources::XX modules)
+my $source = $sources->createSource($opts->{mode});
 if (not $source) {
     $logger->error($sources->getErrors());
     die "\n";
@@ -63,52 +55,75 @@ $logger->message("Using " . $source->getType() . " as primary source");
 
 # Retrieve only the IDs from the input sequence family or file
 $logger->message("Retrieving accession IDs from source $efiDbName");
-my $_start = time();
 
-my $seqData = $source->getSequenceIds();
-if (not $seqData) {
+# Create an empty collection that will be populated
+my $seqData = new EFI::Sequence::Collection();
+
+my $_start = time();
+my $numIds = 0;
+
+# Populate the sequence collection from the source
+my $numLoaded = $source->loadFromSource($seqData);
+if (not $numLoaded) {
     $logger->error($source->getErrors());
     die "\n";
 }
-my $numIds = $stats->getValue("num_blast_retr");
+
+
+my $stats = new EFI::Import::Statistics();
+
+$source->addStats($stats);
+
+
+# If the family argument is present and the primary source is not family, then we add the families
+# to the data set
+if ($opts->{family} and $opts->{mode} ne FAMILY_SOURCE_NAME) {
+    my $familySource = $sources->createSource(FAMILY_SOURCE_NAME);
+    my $numFamLoaded = $familySource->loadFromSource($seqData);
+    $familySource->addStats($stats);
+    $numIds += $numFamLoaded;
+}
+
+
+# If BLAST, FASTA, or Accession are used, and UniRef is selected, then the input/given IDs are UniRef
+# IDs and we need to retrieve all of UniProt IDs in the clusters.
+# If Family is used, and UniRef is selected, then 
+#TODO: add UniRef IDs to source ids file
+#my $unirefMapping = $self->retrieveUnirefIds($ids);
+#if ($self->{uniref_version}) {
+#    $unirefMapping = $self->{uniref_version} eq "uniref50" ? $unirefMapping->{50} : $unirefMapping->{90};
+#}
+
 
 my $_elapsed = int((time() - $_start) * 1000);
 $logger->message("Found $numIds UniProt sequence IDs in $_elapsed ms");
 
-# Input is a hashref in the structure below; the method updates the structure rather than creating a new one
-$logger->message("Applying filters");
-my $numRemoved = $filter->filterIds($seqData);
-$logger->message("Applied filters and removed a total of $numRemoved IDs");
 
-# Saves to metadata file
-$logger->message("Saving sequence IDs and metadata to the files");
-$writer->saveSequenceIdData($seqData);
+$seqData->save($opts->{sequence_ids_file});
+#TODO: save all IDs + UniRef to $opts->{accession_ids_file}
+
+$stats->save($opts->{output_stats_file});
 
 
 
 
 
 
-#
-# SEQUENCE RETRIEVAL
-# 1. BLAST: after BLAST runs, extract sequences from file and retrieve from the selected database
-# 2. Family: select from family ID-sequence ID table
-#    a. If UniRef option is set join with UniRef mapping table
-# 3. FASTA: parse IDs to look up metadata, and use sequences provided
-# 4. Accession: look up metadata for IDs
-#
-#
-# FRAGMENT FILTERING
-# 1. BLAST: sequences are already filtered by using the appropriate database
-# 2. Family: after IDs are retrieved, query DB metadata table to exclude fragment sequences
-# 3. FASTA: after IDs are parsed, query DB metadata table to exclude fragment sequences
-# 4. Accession: after IDs are parsed, query DB metadata table to exclude fragment sequences
-#
-#
-# TAXONOMY FILTERING
-#
-#
-#; if no-fragments option is used exclude by join on attributes table
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
