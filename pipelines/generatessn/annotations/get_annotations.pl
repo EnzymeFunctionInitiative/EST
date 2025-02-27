@@ -16,8 +16,7 @@ use EFI::IdMapping::Util;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
 use EFI::IdMapping::Util qw(:ids);
-use EFI::EST::Metadata::Reader;
-use EFI::EST::Metadata::Writer;
+use EFI::Sequence::Collection;
 
 
 my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
@@ -77,11 +76,12 @@ if ($unirefVersion) {
 }
 
 
-my $parser = new EFI::EST::Metadata::Reader(file => $metaFileIn, id_list_file => $idListFile);
-my $writer = new EFI::EST::Metadata::Writer();
+my $inputIds = new EFI::Sequence::Collection();
+my $outputIds = new EFI::Sequence::Collection();
 
-my $accessions = $parser->getIds();
-my $metaAttrs = $parser->getAttributeNames();
+$inputIds->load($metaFileIn);
+my $accessions = $inputIds->getSequenceIds();
+my $metaAttrs = $inputIds->getFields();
 
 my $unirefLenFiltWhere = getUnirefLenFiltWhere();
 my $annoSpec = readAnnoSpec($annoSpecFile);
@@ -116,11 +116,11 @@ foreach my $accession (sort @$accessions){
     
     my $data = formatAnnoData($accession, \@rows, \@ncbiIds, \%unirefIds, \%unirefClusterIdSeqLen);
 
-    $writer->addValues($accession, $data);
+    $outputIds->addSequence($accession, $data);
 }
 
 
-$writer->saveMetadata($annoOut);
+$outputIds->save($annoOut);
 
 
 $dbh->disconnect();
@@ -168,7 +168,8 @@ sub formatAnnoData {
             $data->{$field} = $size;
             $data->{&FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY} = $unirefClusterIdSeqLen->{$accession} if $unirefClusterIdSeqLen->{$accession};
         } elsif (not $data->{$field}) {
-            $data->{$field} = $parser->getValue($accession, $field);
+            my $value = $inputIds->getSequence($accession)->getAttribute($field);
+            $data->{$field} = $value;
         }
     }
 
@@ -245,7 +246,7 @@ sub getUnirefQuerySql {
 
     return () if (not $unirefVersion or not $clusterField);
 
-    my $value = $parser->getValue($accession, $clusterField);
+    my $value = $inputIds->getSequence($accession)->getAttribute($clusterField);
     return () if not $value;
 
     my @sql;

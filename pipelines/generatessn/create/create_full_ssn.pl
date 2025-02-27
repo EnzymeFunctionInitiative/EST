@@ -19,8 +19,8 @@ use lib "$FindBin::Bin/../../../lib";
 use EFI::Config;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:source);
-use EFI::EST::Metadata::Reader;
 use EFI::EST::AlignmentScore;
+use EFI::Sequence::Collection;
 
 
 my ($inputBlast, $inputFasta, $annoFile, $outputSsn, $title, $maxNumEdges, $dbver, $includeSeqs, $includeAllSeqs, $useMinEdgeAttr, $ncMapFile, $isDomainJob);
@@ -68,7 +68,6 @@ flock($outputFh, LOCK_EX);
 my $Writer = new XML::Writer(DATA_MODE => 'true', DATA_INDENT => 2, OUTPUT => $outputFh);
 
 my $Anno = new EFI::Annotations;
-my $parser = new EFI::EST::Metadata::Reader(file => $annoFile);
 
 my $Connectivity = getConnectivity($ncMapFile);
 
@@ -82,8 +81,10 @@ my @UniprotIds;
 my $includeSequences = 0;
 
 
-my $accessions = $parser->getIds();
-my @fieldNames = @{ $parser->getAttributeNames() };
+my $inputIds = new EFI::Sequence::Collection();
+$inputIds->load($annoFile);
+my $accessions = $inputIds->getSequenceIds();
+my @fieldNames = @{ $inputIds->getFields() };
 
 # Convert values from the metadata structure into a form we can use for creating the SSN XML
 foreach my $id (@$accessions) {
@@ -94,7 +95,7 @@ foreach my $id (@$accessions) {
             $isList = 1;
         }
 
-        my $value = $parser->getValue($id, $field);
+        my $value = $inputIds->getSequence($id)->getAttribute($field);
         $value = "None" if not $value;
 
         my ($forceList, $data) = loadDataForNode($isList, $id, $value);
