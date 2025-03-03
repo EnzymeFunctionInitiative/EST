@@ -40,7 +40,7 @@ if (not $dbh) {
 my $idMap = parse_cluster_map_file($opts->{cluster_map});
 
 my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
-my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno);
+my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno, neighborhood_size => $opts->{nb_size});
 $gnn->retrieveClusterData();
 
 # Compute the family hub data that is used to generate the Pfam and cluster
@@ -83,8 +83,8 @@ sub validateAndProcessOptions {
     $optParser->addOption("hub-count=s", 0, "path to the output hub count table file", OPT_FILE);
     $optParser->addOption("nb-pfam-list-dir=s", 0, "path to an output directory containing files for each Pfam hub", OPT_DIR_PATH);
     $optParser->addOption("no-context=s", 0, "path to an output file to save a list of input IDs that didn't have an ENA entry or didn't have neighbors", OPT_FILE);
-    $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences to retrieve on either side of query)", OPT_VALUE, $defaultNbSize);
-    $optParser->addOption("cooc-threshold=f", 0, "Cooccurrence threshold (>= 0.0 and <= 1.0)", OPT_VALUE, $defaultCoocThreshold);
+    $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences) to retrieve on either side of query (> 0 and <= 20)", OPT_VALUE, $defaultNbSize);
+    $optParser->addOption("cooc-threshold=f", 0, "cooccurrence threshold (>= 0.0 and <= 1.0)", OPT_VALUE, $defaultCoocThreshold);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
 
