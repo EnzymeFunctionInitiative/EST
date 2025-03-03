@@ -25,10 +25,18 @@ process create_gnns {
     cat ${cluster_id_map} > \$id_map_file
     awk '{if(NR>1)print}' ${singletons} >> \$id_map_file
     perl $projectDir/create_gnns.pl \
-        --config ${params.efi_config} --db-name ${params.efi_db} --cluster-map \$id_map_file \
-        --cluster-gnn cluster_gnn.xgmml --pfam-gnn pfam_gnn.xgmml \
-        --hub-count hub_count.txt --cooc-table cooc_table.txt --no-context nomatches_noneighbors.txt \
-        --nb-pfam-list-dir nb_pfam --gnd gnd.sqlite
+        --cluster-map \$id_map_file \
+        --cluster-gnn cluster_gnn.xgmml \
+        --pfam-gnn pfam_gnn.xgmml \
+        --gnd gnd.sqlite \
+        --cooc-table cooc_table.txt \
+        --hub-count hub_count.txt \
+        --nb-pfam-list-dir nb_pfam \
+        --no-context nomatches_noneighbors.txt \
+        --nb-size ${params.nb_size} \
+        --cooc-threshold ${params.cooc_threshold} \
+        --config ${params.efi_config} \
+        --db-name ${params.efi_db}
     """
 }
 
