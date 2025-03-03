@@ -29,7 +29,7 @@ sub applyFilter {
 
     #TODO: keep SwissProts
     for (my $i = 0; $i < @ids; $i++) {
-        $seqs->removeSequence($ids[$i]) if not ($i % $self->{fraction});
+        $seqs->removeSequence($ids[$i]) if ($i % $self->{fraction});
     }
 }
 

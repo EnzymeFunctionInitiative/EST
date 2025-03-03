@@ -49,30 +49,34 @@ sub applyFilter {
 
     my %matched;
 
-    while (@ids) {
-        my @batch = split(@ids, 0, $self->{num_sql_aggregate});
+    my @spliceIds = @ids;
+    while (@spliceIds) {
+        my @batch = splice(@spliceIds, 0, $self->{num_sql_aggregate});
         my $batch = join(",", map { "'$_'" } @batch);
         my $sql = "SELECT accession FROM annotations LEFT JOIN taxonomy ON annotations.taxonomy_id = taxonomy.taxonomy_id WHERE accession IN ($batch) AND ($self->{filter_clause})";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute();
-        my @batchMatched = @{ $sth->fetchall_arrayref() }[0];
+        my $allData = $sth->fetchall_arrayref();
+        my @batchMatched = map { $_->[0] } @{ $allData };
         @matched{@batchMatched} = ();
     }
 
     foreach my $id (@ids) {
-        $seqs->removeSequence($id) if not $matched{$id};
+        $seqs->removeSequence($id) if not exists $matched{$id};
     }
 }
 
 
 sub parseFilter {
     my $self = shift;
-    my $filterString = shift;
+    my $filterFile = shift;
+
+    my $filterString = $self->readFile($filterFile);
 
     my $json = decode_json($filterString);
-    die "Invalid JSON filter string" if not $json;
+    die "Invalid JSON filter string" if not $json or not $json->[0];
 
-    my $whereClause = $self->parseFilterJson($json);
+    my $whereClause = $self->parseFilterJson($json->[0]);
 
     return $whereClause;
 }
@@ -82,13 +86,7 @@ sub loadPredefinedFilters {
     my $self = shift;
     my $file = shift;
 
-    my $fileContents = "";
-
-    open my $fh, "<", $file or die "Unable to read predefined taxonomy filter file '$file': $!";
-    while (my $line = <$fh>) {
-        $fileContents .= $line;
-    }
-    close $fh;
+    my $fileContents = $self->readFile($file);
 
     my $json = decode_json($fileContents);
     die "Invalid JSON predefined filter string" if not $json;
@@ -97,6 +95,21 @@ sub loadPredefinedFilters {
         my $whereClause = $self->parseFilterJson($filter);
         $self->{filter_sql}->{$filter->{name}} = $whereClause;
     }
+}
+
+
+sub readFile {
+    my $self = shift;
+    my $file = shift;
+
+    my $fileContents = "";
+    open my $fh, "<", $file or die "Unable to read predefined taxonomy filter file '$file': $!";
+    while (my $line = <$fh>) {
+        $fileContents .= $line;
+    }
+    close $fh;
+
+    return $fileContents;
 }
 
 

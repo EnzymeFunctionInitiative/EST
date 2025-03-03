@@ -7,11 +7,12 @@ use warnings;
 
 sub new {
     my $class = shift;
+    my $id = shift;
     my %args = @_;
 
-    die "Require id argument" if not $args{id};
+    die "Require id argument" if not $id;
 
-    my $self = { id => $args{id}, attr => {}, seq => "" };
+    my $self = { id => $id, attr => {}, seq => "" };
     bless($self, $class);
 
     if ($args{attr}) {

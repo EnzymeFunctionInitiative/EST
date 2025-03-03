@@ -30,18 +30,20 @@ sub applyFilter {
 
     my %matched;
 
-    while (@ids) {
-        my @batch = split(@ids, 0, $self->{num_sql_aggregate});
+    my @spliceIds = @ids;
+    while (@spliceIds) {
+        my @batch = splice(@spliceIds, 0, $self->{num_sql_aggregate});
         my $batch = join(",", map { "'$_'" } @batch);
         my $sql = "SELECT accession, is_fragment FROM annotations WHERE accession IN ($batch) AND is_fragment = 0";
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute();
-        my @batchMatched = @{ $sth->fetchall_arrayref() }[0];
+        my $allData = $sth->fetchall_arrayref();
+        my @batchMatched = map { $_->[0] } @{ $allData };
         @matched{@batchMatched} = ();
     }
 
     foreach my $id (@ids) {
-        $seqs->removeSequence($id) if not $matched{$id};
+        $seqs->removeSequence($id) if not exists $matched{$id};
     }
 }
 
