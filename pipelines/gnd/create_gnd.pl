@@ -36,7 +36,7 @@ if (not $dbh) {
 my $idMap = parse_cluster_map_file($opts->{cluster_map});
 
 my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
-my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno);
+my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno, neighborhood_size => $opts->{nb_size});
 $gnn->retrieveClusterData();
 
 my $gnd = new EFI::GNT::GND();
@@ -52,7 +52,7 @@ sub validateAndProcessOptions {
 
     $optParser->addOption("cluster-map=s", 1, "path to a file mapping sequence ID to cluster number", OPT_FILE);
     $optParser->addOption("gnd=s", 1, "path to the output GND file", OPT_FILE);
-    $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences to retrieve on either side of query", OPT_VALUE, $defaultNbSize);
+    $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences) to retrieve on either side of query (> 0 and <= 20)", OPT_VALUE, $defaultNbSize);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
 
