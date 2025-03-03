@@ -178,7 +178,7 @@ ENA data or without neighbors.
 =item C<--nb-size>
 
 Optional number of neighbors on the left and right of the input IDs to
-include in the analysis, an integer > 0.
+include in the analysis, an integer > 0 and <= 20.
 
 =item C<--cooc-threshold>
 
