@@ -13,8 +13,9 @@ use EFI::Import::Filter;
 use EFI::Import::Filter::Fraction;
 use EFI::Import::Filter::Fragment;
 use EFI::Import::Filter::Taxonomy;
-use EFI::Sequence::Collection;
 use EFI::Options;
+use EFI::Sequence::Collection;
+use EFI::Sequence::Type;
 
 
 my $defaultPredefTaxFiltFileName = "assets/predefined_taxonomy_filters.yml";
@@ -30,19 +31,32 @@ if ($help) {
 my $opts = $optionParser->getOptions();
 
 
-my $efiDb = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name});
+my $efiDb = new EFI::Database(config => $opts->{efi_config_file}, db_name => $opts->{efi_db});
 my $dbh = $efiDb->getHandle();
-
-
-# Special case when no filters are to be applied, we copy the input to the output file
-if (not $opts->{remove_fragments} and not $opts->{user_filter_file} and not $opts->{predef_filter}) {
-    copy($opts->{source_file}, $opts->{filtered_file});
-    exit(0);
+if (not $dbh) {
+    die("Error connecting to database: " . $efiDb->getError());
 }
 
 
+# Special case when no filters are to be applied, we copy the input to the output file
+my $useAnyFilter = ($opts->{remove_fragments} or $opts->{user_filter_file} or $opts->{predef_filter} or $opts->{fraction});
+if (not $useAnyFilter) {
+    copy($opts->{source_meta_file}, $opts->{sequence_meta_file});
+    copy($opts->{source_ids_file}, $opts->{accession_ids_file});
+    exit(0);
+}
+
 my $seqData = new EFI::Sequence::Collection();
-$seqData->load($opts->{source_file});
+$seqData->load($opts->{source_meta_file}, $opts->{source_ids_file}, sequence_version => $opts->{sequence_version});
+
+
+
+
+# Only retain a fraction of the sequences
+if ($opts->{fraction} > 1) {
+    my $fracFilter = new EFI::Import::Filter::Fraction(dbh => $dbh, fraction => $opts->{fraction});
+    $fracFilter->applyFilter($seqData);
+}
 
 
 # Remove fragments
@@ -65,33 +79,16 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
     $taxFilter->applyFilter($seqData);
 }
 
-
-# Only retain a fraction of the sequences
-if ($opts->{fraction} > 1) {
-    my $fracFilter = new EFI::Import::Filter::Fraction(dbh => $dbh, fraction => $opts->{fraction});
-    $fracFilter->applyFilter($seqData);
-}
-
-
 # Restrict to specified families
 #TODO
 
 
-# Save the data to the output file
-$seqData->save($opts->{filtered_file});
-
-saveAccessionIds($seqData);
+# Save the filtered metadata and accession IDs to the output files
+$seqData->save($opts->{sequence_meta_file}, $opts->{accession_ids_file});
 
 
 
 
-sub saveAccessionIds {
-    my $seqData = shift;
-
-    open my $fh, ">", $opts->{accession_ids_file} or die "Unable to write to accession IDs file '$opts->{accession_ids_file}': $!";
-    map { $fh->print("$_\n"); } $seqData->getIds();
-    close $fh;
-}
 
 
 

@@ -11,12 +11,13 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
 use EFI::Annotations::Fields ':source';
-
-our $TYPE_NAME = "family";
+use EFI::Sequence::Type;
 
 use Exporter qw(import);
-use constant FAMILY_SOURCE_NAME => $TYPE_NAME;
+use constant FAMILY_SOURCE_NAME => "family";
 our @EXPORT_OK = qw(FAMILY_SOURCE_NAME);
+
+our $TYPE_NAME = FAMILY_SOURCE_NAME;
 
 
 sub new {
@@ -44,8 +45,9 @@ sub init {
 
     $self->addError("Require one or more --family args") and return undef if not $config->{family};
 
-    $self->{fams} = $config->{family};
+    $self->{fams} = [ split(m/,/, $config->{family}) ];
     $self->{use_domain} = $config->{domain} // 0;
+    $self->{sequence_version} = $config->{sequence_version} ? get_sequence_version($config->{sequence_version}) : SEQ_UNIPROT;
 
     return 1;
 }
@@ -62,12 +64,12 @@ sub loadFromSource {
 
     my $queryData = $self->prepareQueries();
 
-    my ($ids, $numIds) = $self->executeQueries($queryData);
+    my ($ids, $numIds, $numFullFamily) = $self->executeQueries($queryData);
 
     $self->makeMetadata($ids, $destSeqData);
 
     $self->addStatsValue("num_ids", $numIds);
-    #TODO: $self->addStatsValue("num_full_family", $numUniprot) if $self->{uniref_version};
+    $self->addStatsValue("num_full_family", $numFullFamily) if $self->{sequence_version} ne SEQ_UNIPROT;
 
     return $numIds;
 }
@@ -95,13 +97,13 @@ sub prepareQueries {
     foreach my $tableName (keys %$tables) {
         foreach my $fam (@{ $tables->{$tableName} }) {
             # Columns
-            my @c = ("start", "end");
+            my @c = ("start", "end", "uniref50_seed", "uniref90_seed");
             # Conditions (in WHERE clause, joined by AND)
             my @w = ();
             # Paramerized values (first one is the family ID)
             my @p = ($fam);
             # Joins, array of {table => "targetTable", joinCol => "primaryCol", targetCol => "targetCol"}
-            my @j = ();
+            my @j = ({table => "uniref", joinCol => "$tableName.accession", targetCol => "uniref.accession"});
             push @all, {table => $tableName, joins => \@j, cols => \@c, cond => \@w, params => \@p};
         }
     }
@@ -167,7 +169,7 @@ sub executeQueries {
     my $queryData = shift;
 
     my $ids = {};
-    my $numUniprotIds = 0;
+    my $numIds = 0;
 
     # Look at every family in the input set; one query corresponds to one family
     foreach my $query (@{ $queryData->{queries} }) {
@@ -186,10 +188,10 @@ sub executeQueries {
 
         # Returns the number of UniProt or UniRef sequences
         my $numUp = $self->processQuery($sth, $ids);
-        $numUniprotIds += $numUp;
+        $numIds += $numUp;
     }
 
-    return ($ids, $numUniprotIds);
+    return ($ids, $numIds);
 }
 
 
@@ -244,20 +246,34 @@ sub processQuery {
     my $sth = shift;
     my $ids = shift;
 
-    my $numUniprotIds = 0;
+    my $numIds = 0;
 
-    # The retrieval process gets all IDs even if we're using UniRef
-
-    while (my $row = $sth->fetchrow_hashref()) {
-        (my $uniprotId = $row->{accession}) =~ s/\-\d+$//; #remove homologues
-
-        my $domain = [ $row->{start}, $row->{end} ];
-        push @{ $ids->{$uniprotId} }, $domain;
-
-        $numUniprotIds++;
+    my $uniprotCol = "accession";
+    my $seqCol = $uniprotCol;
+    my $isUniref = 0;
+    if ($self->{sequence_version} eq SEQ_UNIREF90 or $self->{sequence_version} eq SEQ_UNIREF50) {
+        $seqCol = "$self->{sequence_version}_seed";
+        $isUniref = 1;
     }
 
-    return $numUniprotIds;
+    # The retrieval process gets all IDs even if we're using UniRef so that we can get easily get
+    # the domain.
+
+    while (my $row = $sth->fetchrow_hashref()) {
+        # Remove isoforms
+        my $seqId = $row->{$seqCol} =~ s/\-\d+$//r;
+        my $uniprotId = $isUniref ? $row->{accession} =~ s/\-\d+$//r : $seqId;
+
+        # If we're using UniRef, skip non-UniRef sequences
+        next if ($isUniref and $uniprotId ne $seqId);
+
+        my $domain = [ $row->{start}, $row->{end} ];
+        push @{ $ids->{$seqId} }, $domain;
+
+        $numIds++;
+    }
+
+    return $numIds;
 }
 
 

@@ -8,19 +8,20 @@ use Time::HiRes qw(time);
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
-use EFI::Import::Config::Defaults qw(get_default_path);
-use EFI::Import::Config::IdList;
+use EFI::Import::Config::Source;
 use EFI::Import::Logger;
 use EFI::Import::Source::Family qw(FAMILY_SOURCE_NAME);
 use EFI::Import::Sources;
 use EFI::Import::Statistics;
 use EFI::Sequence::Collection;
+use EFI::Sequence::Type;
 
+use constant NUM_AGG_ID_SELECT => 1000;
 
 
 my $logger = new EFI::Import::Logger();
 
-my $optionParser = new EFI::Import::Config::IdList();
+my $optionParser = new EFI::Import::Config::Source();
 my ($status, $help) = $optionParser->validateOptions();
 
 if ($help) {
@@ -32,7 +33,7 @@ my $opts = $optionParser->getOptions();
 
 
 my $efiDbName = $opts->{efi_db};
-my $efiDb = new EFI::Database(config => $opts->{efi_config}, db_name => $efiDbName);
+my $efiDb = new EFI::Database(config => $opts->{efi_config_file}, db_name => $efiDbName);
 my $dbh = $efiDb->getHandle();
 if (not $dbh) {
     $logger->error("Error connecting to database: " . $efiDb->getError());
@@ -87,20 +88,16 @@ if ($opts->{family} and $opts->{mode} ne FAMILY_SOURCE_NAME) {
 
 # If BLAST, FASTA, or Accession are used, and UniRef is selected, then the input/given IDs are UniRef
 # IDs and we need to retrieve all of UniProt IDs in the clusters.
-# If Family is used, and UniRef is selected, then 
-#TODO: add UniRef IDs to source ids file
-#my $unirefMapping = $self->retrieveUnirefIds($ids);
-#if ($self->{uniref_version}) {
-#    $unirefMapping = $self->{uniref_version} eq "uniref50" ? $unirefMapping->{50} : $unirefMapping->{90};
-#}
+# If Family is used, and UniRef is selected, then the IDs in the collection are UniRef.
+# Retrieve all UniProt IDs and related UniRef IDs and save them to a mapping file.
+saveUnirefMapping($seqData, $opts->{sequence_version});
 
 
 my $_elapsed = int((time() - $_start) * 1000);
 $logger->message("Found $numIds UniProt sequence IDs in $_elapsed ms");
 
 
-$seqData->save($opts->{sequence_ids_file});
-#TODO: save all IDs + UniRef to $opts->{accession_ids_file}
+$seqData->save($opts->{source_meta_file}, $opts->{source_ids_file});
 
 $stats->save($opts->{output_stats_file});
 
@@ -112,6 +109,51 @@ $stats->save($opts->{output_stats_file});
 
 
 
+
+
+
+
+
+
+
+
+
+#
+# saveUnirefMapping
+#
+# Adds UniRef sequences to the sequence collection mapping, so that we can use UniRef sequences
+# later in the pipelines (e.g. in sunbursts).
+#
+# Parameters:
+#    $seqData - EFI::Sequence::Collection object
+#    $seqVersion - sequence version, one of SEQ_UNIPROT, SEQ_UNIREF90, or SEQ_UNIREF50
+# 
+sub saveUnirefMapping {
+    my $seqData = shift;
+    my $seqVersion = shift;
+
+    my @ids = $seqData->getSequenceIds();
+
+    my $tableKey = "accession";
+    if ($seqVersion eq SEQ_UNIREF90) {
+        $tableKey = "uniref90_seed";
+    } elsif ($seqVersion eq SEQ_UNIREF50) {
+        $tableKey = "uniref50_seed";
+    }
+
+    my %idTable;
+    while (@ids) {
+        my @batch = splice(@ids, 0, NUM_AGG_ID_SELECT);
+        my $ids = join(",", map { "'$_'" } @batch);
+        my $sql = "SELECT * FROM uniref WHERE $tableKey IN ($ids)";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute();
+    
+        while (my $row = $sth->fetchrow_hashref()) {
+            $seqData->addUniref($row->{accession}, $row->{uniref90_seed}, $row->{uniref50_seed});
+        }
+    }
+}
 
 
 

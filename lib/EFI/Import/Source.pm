@@ -12,6 +12,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../";
 use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
 
 use EFI::Annotations::Fields ':all';
+use EFI::Sequence::Type;
 
 
 our $TYPE_NAME = "";
@@ -36,8 +37,8 @@ sub init {
 
     $self->{dbh} = $efiDbh // die "Require efh dbh argument";
 
-    my $seqVer = $config->{sequence_version};
-    if ($seqVer =~ m/^uniref(50|90)$/) {
+    my $seqVer = get_sequence_version($config->{sequence_version});
+    if ($seqVer ne SEQ_UNIPROT) {
         $self->{uniref_version} = $seqVer;
     }
 
@@ -69,65 +70,6 @@ sub loadFromSource {
 }
 
 
-
-
-#
-# retrieveUnirefIds - internal method
-#
-# Given an input list of UniProt IDs, returns a structure of UniRef50 and UniRef90 ID
-# mapping to clusters of UniProt IDs.
-# 
-# Parameters:
-#     $idMetadata - hash ref where the keys are UniProt IDs; the values are not used;
-#         for example:
-#             {
-#                 "UniProtID" => undef,
-#                 "UniProtID" => undef,
-#                 ...
-#             }
-#
-# Returns:
-#     mapping of UniRef IDs to UniProt IDs
-#
-# Example return value:
-#
-#     {
-#         50 => {
-#             "UNIREFID" => ["UniProt", "UniProt", ...],
-#             ...
-#         },
-#         90 => {
-#             "UNIREFID" => ["UniProt", "UniProt", ...],
-#             ...
-#         }
-#     }
-#
-sub retrieveUnirefIds {
-    my $self = shift;
-    my $idMetadata = shift;
-
-    my $unirefField = $self->{uniref_version} ? "$self->{uniref_version}_seed" : "accession";
-
-    my @ids = keys %$idMetadata;
-    my $unirefIds = {};
-
-    my $sql = "SELECT * FROM uniref WHERE $unirefField = ?";
-    my $sth = $self->{dbh}->prepare($sql);
-
-    foreach my $id (@ids) {
-        $sth->execute($id);
-        while (my $row = $sth->fetchrow_hashref) {
-            push @{ $unirefIds->{50}->{$row->{uniref50_seed}} }, $row->{accession};
-            push @{ $unirefIds->{90}->{$row->{uniref90_seed}} }, $row->{accession};
-        }
-    }
-
-    return $unirefIds;
-}
-
-
-
-
 # protected
 sub addStatsValue {
     my $self = shift;
@@ -135,8 +77,6 @@ sub addStatsValue {
     my $value = shift;
     $self->{stats}->{$name} = $value;
 }
-
-
 
 
 # public

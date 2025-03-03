@@ -9,13 +9,14 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 
 use EFI::Sequence;
+use EFI::Sequence::Type;
 
 
 sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = { seq => {}, fields => [] };
+    my $self = { seq => {}, fields => [], uniref => {}, seq_ver_map => {} };
     bless($self, $class);
 
     return $self;
@@ -42,10 +43,21 @@ sub addSequence {
 }
 
 
+sub addUniref {
+    my $self = shift;
+    my $uniprot = shift;
+    my $uniref90 = shift;
+    my $uniref50 = shift;
+
+    $self->{uniref}->{$uniprot} = [$uniref90, $uniref50];
+}
+
+
 sub removeSequence {
     my $self = shift;
     my $id = shift;
     delete $self->{seq}->{$id} if $self->{seq}->{$id};
+    delete $self->{seq_ver_map}->{$id} if $self->{seq_ver_map}->{$id};
 }
 
 
@@ -60,6 +72,53 @@ sub getSequenceIds {
 }
 
 
+sub getAllSequenceIds {
+    my $self = shift;
+    my @ids = keys %{ $self->{uniref} };
+    @ids = $self->getSequenceIds() if not @ids;
+    if (wantarray) {
+        return @ids;
+    } else {
+        return \@ids;
+    }
+}
+
+
+# Careful, for sunbursts only
+sub getRawUnirefMapping {
+    my $self = shift;
+    return $self->{uniref};
+}
+
+
+sub getUniref90 {
+    my $self = shift;
+    my $id = shift;
+    return $self->getUniref($id, 0);
+}
+
+
+sub getUniref50 {
+    my $self = shift;
+    my $id = shift;
+    return $self->getUniref($id, 1);
+}
+
+
+sub getUniref {
+    my $self = shift;
+    my $id = shift;
+    my $idx = shift;
+    if ($self->{seq_ver_map}->{$id}) {
+        return $self->{seq_ver_map}->{$id}->[$idx];
+    } elsif ($self->{uniref}->{$id}) {
+        return $self->{uniref}->{$id}->[$idx];
+    } else {
+        return "";
+    }
+}
+
+
 sub getSequence {
     my $self = shift;
     my $id = shift;
@@ -69,9 +128,27 @@ sub getSequence {
 
 sub load {
     my $self = shift;
-    my $file = shift;
+    my $metadataFile = shift;
+    my $idFile = shift;
+    my %opts = @_;
 
-    open my $fh, "<", $file or die "Unable to read ID list file '$file': $!";
+    my $retval = $self->loadMetadataFile($metadataFile);
+    return 0 if not $retval;
+
+    if ($idFile and -f $idFile) {
+        $retval = $self->loadIdFile($idFile, %opts);
+        return 0 if not $retval;
+    }
+
+    return 1;
+}
+
+
+sub loadMetadataFile {
+    my $self = shift;
+    my $inputFile = shift;
+
+    open my $fh, "<", $inputFile or die "Unable to read ID list file '$inputFile': $!";
 
     my @warnings;
     my %data;
@@ -107,11 +184,49 @@ sub load {
 }
 
 
+sub loadIdFile {
+    my $self = shift;
+    my $inputFile = shift;
+    my %opts = @_;
+
+    open my $fh, "<", $inputFile or die "Unable to read from accession IDs file '$inputFile': $!";
+
+    my $headerLine = <$fh>;
+
+    while (my $line = <$fh>) {
+        chomp $line;
+        my ($uniprot, $uniref90, $uniref50) = split(m/\t/, $line);
+        $self->{uniref}->{$uniprot} = [$uniref90, $uniref50];
+    }
+
+    $fh->close();
+
+    # If the source IDs are UniRef, get a reverse mapping of UniRef sequence ID (in metadata file)
+    # to list of UniProts in the UniRef cluster
+    if ($opts{sequence_version} and ($opts{sequence_version} eq SEQ_UNIREF90 or $opts{sequence_version} eq SEQ_UNIREF50)) {
+        my $colIdx = $opts{sequence_version} eq SEQ_UNIREF90 ? 0 : 1;
+        foreach my $uniprot (keys %{ $self->{uniref} }) {
+            push @{ $self->{seq_ver_map}->{$self->{uniref}->{$uniprot}}->[$colIdx] }, $uniprot;
+        }
+    }
+}
+
+
 sub save {
     my $self = shift;
-    my $file = shift;
+    my $metadataFile = shift;
+    my $idFile = shift;
 
-    open my $fh, ">", $file or die "Unable to write to metadata file '$file': $!";
+    $self->saveMetadataFile($metadataFile);
+    $self->saveIdFile($idFile);
+}
+
+
+sub saveMetadataFile {
+    my $self = shift;
+    my $outputFile = shift;
+
+    open my $fh, ">", $outputFile or die "Unable to write to metadata file '$outputFile': $!";
 
     $fh->print(join("\t", "UniProt_ID", "Attribute", "Value"), "\n");
 
@@ -127,6 +242,22 @@ sub save {
     }
 
     close $fh;
+}
+
+
+sub saveIdFile {
+    my $self = shift;
+    my $outputFile = shift;
+
+    open my $fh, ">", $outputFile or die "Unable to write to accession IDs file '$outputFile': $!";
+    
+    $fh->print(join("\t", "uniprot_id", "uniref90_id", "uniref50_id"), "\n");
+    
+    foreach my $id (sort keys %{ $self->{uniref} }) {
+        $fh->print(join("\t", $id, @{ $self->{uniref}->{$id} }), "\n");
+    }
+    
+    $fh->close();
 }
 
 
@@ -146,7 +277,7 @@ sub formatAttributeValue {
         return join("^", @vals);
     }
 
-    return "";
+    return $value;
 }
 
 
