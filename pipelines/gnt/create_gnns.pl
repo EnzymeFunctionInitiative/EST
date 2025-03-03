@@ -83,7 +83,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("hub-count=s", 0, "path to the output hub count table file", OPT_FILE);
     $optParser->addOption("nb-pfam-list-dir=s", 0, "path to an output directory containing files for each Pfam hub", OPT_DIR_PATH);
     $optParser->addOption("no-context=s", 0, "path to an output file to save a list of input IDs that didn't have an ENA entry or didn't have neighbors", OPT_FILE);
-    $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences to retrieve on either side of query", OPT_VALUE, $defaultNbSize);
+    $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences to retrieve on either side of query)", OPT_VALUE, $defaultNbSize);
     $optParser->addOption("cooc-threshold=f", 0, "Cooccurrence threshold (>= 0.0 and <= 1.0)", OPT_VALUE, $defaultCoocThreshold);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
