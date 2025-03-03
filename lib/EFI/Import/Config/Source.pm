@@ -1,5 +1,5 @@
 
-package EFI::Import::Config::IdList;
+package EFI::Import::Config::Source;
 
 use strict;
 use warnings;
@@ -12,6 +12,7 @@ use parent qw(EFI::Import::Config);
 use EFI::Import::Sources;
 use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Options;
+use EFI::Sequence::Type;
 
 
 sub new {
@@ -30,9 +31,10 @@ sub addImportOptions {
     $self->SUPER::addImportOptions(include_config => 1);
 
     $self->addOption("mode=s", 1, "the sequence retrieval mode (one of blast, family, accession, or fasta)");
-    $self->addOption("output-stats-file=s", 0, "Output file to put sequence ID statistics into (defaults into --output-dir)", OPT_FILE);
-    $self->addOption("sequence-ids-file=s", 0, "Output file to put sequence IDs into (defaults into --output-dir)", OPT_FILE);
-    $self->addOption("sequence-version=s", 0, "sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot");
+    $self->addOption("output-stats-file=s", 0, "output file to put sequence ID statistics into (defaults into --output-dir)", OPT_FILE);
+    $self->addOption("source-meta-file=s", 0, "output file to put sequence ID and source data into (defaults into --output-dir)", OPT_FILE);
+    $self->addOption("source-ids-file=s", 0, "path to the output file to save list of UniRef and UniProt accession IDs to (defaults into --output-dir)", OPT_FILE);
+    $self->addOption("sequence-version=s", 0, "sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
     $self->addOption("family=s", 0, "one or more protein families (PF#####, IPR######); required for --mode family");
     $self->addOption("fasta=s", 0, "user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta", OPT_FILE);
     $self->addOption("seq-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal)", OPT_FILE);
@@ -59,19 +61,17 @@ sub validateOptions {
 
     push @errors, "Invalid --mode" if not EFI::Import::Sources::validateSource($opts->{mode});
 
-    $opts->{sequence_ids_file} = get_default_path("source_ids", $outputDir) if not $opts->{sequence_ids_file};
+    $opts->{source_meta_file} = get_default_path("source_meta", $outputDir) if not $opts->{source_meta_file};
+    $opts->{source_ids_file} = get_default_path("source_ids", $outputDir) if not $opts->{source_ids_file};
     $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
 
-    $opts->{sequence_version} = $opts->{sequence_version} =~ m/^uni(ref50|ref90|prot)$/i ? lc $opts->{sequence_version} : "uniprot";
-
-    $opts->{fraction} = $opts->{fraction} || 1;
+    $opts->{sequence_version} = get_sequence_version($opts->{sequence_version});
 
     $opts->{output_sunburst_ids_file} = get_default_path("sunburst_ids", $outputDir) if not $opts->{output_sunburst_ids_file};
     $opts->{output_stats_file} = get_default_path("import_stats", $outputDir) if not $opts->{output_stats_file};
 
     if (@errors) {
-        my $help = $self->printHelp();
-        map { $help .= "    $_\n"; } @errors;
+        my $help = $self->printHelp(\@errors);
         return ($self->getErrorStatusCode(), $help);
     }
 

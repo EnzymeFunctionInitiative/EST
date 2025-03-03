@@ -52,8 +52,7 @@ sub validateOptions {
     $opts->{sequence_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{sequence_ids_file};
 
     if (@errors) {
-        my $help = $self->printHelp();
-        map { $help .= "    $_\n"; } @errors;
+        my $help = $self->printHelp(\@errors);
         return (0, $help);
     }
 

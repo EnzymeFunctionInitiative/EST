@@ -19,8 +19,6 @@ sub new {
 
     my $self = $class->SUPER::new(%args);
 
-    $self->{output_dir} = getcwd();
-
     $self->addImportOptions();
 
     return $self;
@@ -29,7 +27,7 @@ sub new {
 
 sub getOutputDir {
     my $self = shift;
-    return $self->{output_dir};
+    return $self->{opts}->{output_dir};
 }
 
 
@@ -71,15 +69,23 @@ sub validateOptions {
 
     if ($opts->{output_dir}) {
         if (not -d $opts->{output_dir}) {
-            my $help = $self->printHelp();
-            $help .= "    Require --output-dir to exist\n";
+            my $help = $self->printHelp(["Require --output-dir to exist"]);
             return ($self->getErrorStatusCode(), $help);
-        } else {
-            $self->{output_dir} = $opts->{output_dir};
         }
+    } else {
+        $opts->{output_dir} = getcwd();
     }
 
+    $self->{opts} = $opts;
+
     return 1;
+}
+
+
+sub getOptions {
+    my $self = shift;
+    return $self->{opts} if $self->{opts};
+    $self->{opts} = $self->SUPER::getOptions();
 }
 
 
@@ -125,7 +131,7 @@ EFI::Import::Config - Perl module for parsing command line arguments for the EST
 =head2 DESCRIPTION
 
 B<EFI::Import::Config> is a utility module to get command line arguments for the EST import
-scripts.  The B<EFI::Import::Config::FastaImport>, B<EFI::Import::Config::IdList>, and
+scripts.  The B<EFI::Import::Config::FastaImport>, B<EFI::Import::Config::Source>, and
 B<EFI::Import::Config::Sequences> modules derive from this and provide app-specific
 option parsing.  They should be used instead of directly using this module.
 

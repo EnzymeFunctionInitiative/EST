@@ -140,6 +140,7 @@ sub processOptions {
 
 sub printHelp {
     my $self = shift;
+    my $extraErrors = shift || [];
 
     my $text = "";
     my $maxArgLen = 0;
@@ -214,10 +215,14 @@ sub printHelp {
         $text .= sprintf("    %-${maxArgLen}s    %s\n", @$desc);
     }
 
+    my @extraErrors = @$extraErrors;
     # Print any errors that were discovered during validation
-    if (@{ $self->{errors} } and not $self->wantHelp()) {
+    if ((@{ $self->{errors} } or @extraErrors) and not $self->wantHelp()) {
         $text .= "\nErrors:\n";
         map { $text .= "    Missing or invalid argument --$self->{options}->{$_}->{opt}\n"; } @{ $self->{errors} };
+        if (@extraErrors) {
+            map { $text .= "    $_\n"; } @extraErrors;
+        }
     }
 
     return $text;

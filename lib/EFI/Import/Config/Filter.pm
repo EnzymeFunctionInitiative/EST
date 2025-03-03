@@ -11,6 +11,7 @@ use parent qw(EFI::Import::Config);
 
 use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Options;
+use EFI::Sequence::Type;
 
 
 
@@ -37,10 +38,12 @@ sub addImportOptions {
     $self->addOption("predef-filter=s", 0, "name of a predefined taxonomy filter");
     $self->addOption("user-filter-file=s", 0, "path to a yml file containing a user-specified taxonomy filter");
     $self->addOption("remove-fragments", 0, "path to the output GND file", OPT_FILE);
-    $self->addOption("fraction=i", 0, "only include the specified fraction of sequences");
+    $self->addOption("fraction=i", 0, "only include the specified fraction of sequences", OPT_VALUE, 1);
     $self->addOption("source-meta-file=s", 0, "path to the input file containing the source data to filter", OPT_FILE);
-    $self->addOption("filtered-sequence-meta-file=s", 0, "path to the output file to save filtered sequences to", OPT_FILE);
-    $self->addOption("accession-ids-file=s", 0, "path to the output file to save simple list of accession IDs to", OPT_FILE);
+    $self->addOption("source-ids-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
+    $self->addOption("sequence-version=s", 0, "source sequence type (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
+    $self->addOption("sequence-meta-file=s", 0, "path to the output file to save filtered sequences to", OPT_FILE);
+    $self->addOption("accession-ids-file=s", 0, "path to the output file to save filtered UniRef and UniProt accession IDs to", OPT_FILE);
     #TODO:
     #$self->addOption("include-family", 0, "", "");
     #$self->addOption("restrict-family=s", 0, "", "");
@@ -61,11 +64,20 @@ sub validateOptions {
     my $opts = $self->getOptions();
     my $outputDir = $self->getOutputDir();
 
-    $opts->{source_meta_file} = get_default_path("sequence_ids_file", $outputDir) if not $opts->{source_meta_file};
-    push @errors, "Error: invalid --source-file path" if not -f $opts->{source_meta_file};
+    # Input
+    $opts->{source_meta_file} = get_default_path("source_meta", $outputDir) if not $opts->{source_meta_file};
+    push @errors, "Error: invalid --source-meta-file path" if not -f $opts->{source_meta_file};
+    $opts->{source_ids_file} = get_default_path("source_ids", $outputDir) if not $opts->{source_ids_file};
+    push @errors, "Error: invalid --source-ids-file path" if not -f $opts->{source_ids_file};
 
-    $opts->{accession_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{accession_ids};
-    $opts->{filtered_file} = get_default_path("filtered_ids", $outputDir) if not $opts->{filtered_file};
+    $opts->{sequence_version} = get_sequence_version($opts->{sequence_version});
+
+    # >= 1, integer
+    $opts->{fraction} = ($opts->{fraction} and $opts->{fraction} =~ m/^\d+$/) ? $opts->{fraction} : 1;
+
+    # Output
+    $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
+    $opts->{accession_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{accession_ids_file};
 
     push @errors, "Error: invalid path to --user-filter-file" if $opts->{user_filter_file} and not -f $opts->{user_filter_file};
 
@@ -80,8 +92,7 @@ sub validateOptions {
     }
 
     if (@errors) {
-        my $help = $self->printHelp();
-        map { $help .= "    $_\n"; } @errors;
+        my $help = $self->printHelp(\@errors);
         return ($self->getErrorStatusCode(), $help);
     }
 
