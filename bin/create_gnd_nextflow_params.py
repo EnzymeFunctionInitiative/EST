@@ -50,12 +50,13 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(cluster_id_map, efi_config, efi_db, output_dir, job_id, nextflow_config=None):
+def render_params(cluster_id_map, efi_config, efi_db, nb_size, output_dir, job_id, nextflow_config=None):
     params = {
         "final_output_dir": output_dir,
         "cluster_id_map": cluster_id_map,
         "efi_config": efi_config,
-        "efi_db": efi_db
+        "efi_db": efi_db,
+        "nb_size": nb_size
     }
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:

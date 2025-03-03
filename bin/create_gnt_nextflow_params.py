@@ -61,7 +61,7 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_threhsold, output_dir, job_id, nextflow_config=None):
+def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_threshold, output_dir, job_id, nextflow_config=None):
     params = {
         "final_output_dir": output_dir,
         "ssn_input": ssn_input,
