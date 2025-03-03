@@ -44,7 +44,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"Neighborhood size (--nb-size) was given a bad value ({args.nb_size}).")
         fail = True
 
-    if args.nb_size < 0 or args.nb_size > 1:
+    if args.cooc_threshold < 0 or args.cooc_threshold > 1:
         print(f"Co-occurrence threshold (--cooc-thresold) was given a bad value ({args.cooc_threshold}).")
         fail = True
 
