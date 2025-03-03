@@ -14,6 +14,7 @@ def add_args(parser: argparse.ArgumentParser):
     Add arguments for GND pipeline to ``parser``
     """
     parser.add_argument("--cluster-id-map", required=True, type=str, help="The mapping of cluster numbers to IDs in the cluster for the GNDs")
+    parser.add_argument("--nb-size", type=int, required=False, default=20, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0.")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -33,6 +34,10 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"SSN Input file '{args.cluster_id_map}' does not exist")
         fail = True
     
+    if args.nb_size < 0 or args.nb_size > 20:
+        print(f"Neighborhood size (--nb-size) was given a bad value ({args.nb_size}).")
+        fail = True
+
     if fail:
         print("Failed to render params template")
         exit(1)
