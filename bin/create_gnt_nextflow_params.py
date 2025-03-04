@@ -40,12 +40,12 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"FASTA database '{args.fasta_db}' not found")
         fail = True
 
-    if args.nb_size < 0 or args.nb_size > 20:
-        print(f"Neighborhood size (--nb-size) was given a bad value ({args.nb_size}).")
+    if args.nb_size < 1 or args.nb_size > 20:
+        print(f"Invalid value for --nb-size ({args.nb_size}).")
         fail = True
 
     if args.cooc_threshold < 0 or args.cooc_threshold > 1:
-        print(f"Co-occurrence threshold (--cooc-thresold) was given a bad value ({args.cooc_threshold}).")
+        print(f"Invalid value for --cooc-threshold ({args.cooc_threshold}).")
         fail = True
 
     if fail:

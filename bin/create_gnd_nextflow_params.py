@@ -34,8 +34,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"SSN Input file '{args.cluster_id_map}' does not exist")
         fail = True
     
-    if args.nb_size < 0 or args.nb_size > 20:
-        print(f"Neighborhood size (--nb-size) was given a bad value ({args.nb_size}).")
+    if args.nb_size < 1 or args.nb_size > 20:
+        print(f"Invalid value for --nb-size ({args.nb_size}).")
         fail = True
 
     if fail:
