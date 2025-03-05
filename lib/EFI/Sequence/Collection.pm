@@ -57,16 +57,45 @@ sub addUniref {
     my $uniprot = shift;
     my $uniref90 = shift;
     my $uniref50 = shift;
-
-    $self->{uniref}->{$uniprot} = [$uniref90, $uniref50];
+    $self->{uniprot}->{$uniprot} = [$uniref90, $uniref50];
+    $self->{uniref90}->{$uniref90}->{$uniprot} = 1;
+    $self->{uniref50}->{$uniref50}->{$uniprot} = 1;
 }
 
 
 sub removeSequence {
     my $self = shift;
-    my $id = shift;
-    delete $self->{seq}->{$id} if $self->{seq}->{$id};
-    delete $self->{seq_ver_map}->{$id} if $self->{seq_ver_map}->{$id};
+    my $sequenceId = shift;
+
+    # Already removed because it was a UniRef cluster
+    return if not $self->{uniprot}->{$sequenceId};
+
+    my %remove = ($sequenceId => 1);
+    my ($uniref90, $uniref50) = @{ $self->{uniprot}->{$sequenceId} };
+
+    delete $self->{uniref90}->{$uniref90}->{$sequenceId};
+    delete $self->{uniref50}->{$uniref50}->{$sequenceId};
+
+    if ($uniref90 eq $sequenceId) {
+        foreach my $id (keys %{ $self->{uniref90}->{$uniref90} }) {
+            delete $self->{uniref90}->{$uniref90}->{$id};
+            $remove{$id} = 1;
+        }
+        delete $self->{uniref90}->{$uniref90};
+    }
+
+    if ($uniref50 eq $sequenceId) {
+        foreach my $id (keys %{ $self->{uniref50}->{$uniref50} }) {
+            delete $self->{uniref50}->{$uniref50}->{$id};
+            $remove{$id} = 1;
+        }
+        delete $self->{uniref50}->{$uniref50};
+    }
+
+    foreach my $id (keys %remove) {
+        delete $self->{uniprot}->{$id};
+        delete $self->{seq}->{$id} if $self->{seq}->{$id};
+    }
 }
 
 
