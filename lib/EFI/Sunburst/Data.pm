@@ -39,7 +39,7 @@ sub getSunburstTaxonomy {
 
         my $hasData = 0;
         while (my $row = $sth->fetchrow_hashref) {
-            $self->addTaxData($taxData, $row, $id, $seqData->getUniref90($id), $seqData->getUniref50($id));
+            $self->addTaxData($taxData, $row, $id, $seqData->getUniref90Id($id), $seqData->getUniref50Id($id));
             $hasData = 1;
         }
 

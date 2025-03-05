@@ -16,7 +16,16 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = { seq => {}, fields => [], uniref => {}, seq_ver_map => {} };
+    # seq is a hash ref containing a mapping of sequence ID to EFI::Sequence object (the sequence
+    #     IDs are either UniProt or UniRef depending on the input
+    # fields is an array ref containing a list of the attributes in the metadata file
+    # uniprot maps UniProt IDs to their corresponding UniRef IDs
+    # uniref90 (in the case that the input IDs are UniRef) maps UniRef90 IDs to their UniProt IDs
+    #     based on the input accession ids file loaded in load()
+    # uniref50 (in the case that the input IDs are UniRef) maps UniRef50 IDs to their UniProt IDs
+    #     based on the input accession ids file loaded in load()
+    # sequence_version is the sequence version (set by load())
+    my $self = { seq => {}, fields => [], uniprot => {}, uniref90 => {}, uniref50 => {}, sequence_version => SEQ_UNIPROT };
     bless($self, $class);
 
     return $self;
@@ -74,7 +83,7 @@ sub getSequenceIds {
 
 sub getAllSequenceIds {
     my $self = shift;
-    my @ids = keys %{ $self->{uniref} };
+    my @ids = keys %{ $self->{uniprot} };
     @ids = $self->getSequenceIds() if not @ids;
     if (wantarray) {
         return @ids;
@@ -84,35 +93,26 @@ sub getAllSequenceIds {
 }
 
 
-# Careful, for sunbursts only
-sub getRawUnirefMapping {
-    my $self = shift;
-    return $self->{uniref};
-}
-
-
-sub getUniref90 {
+sub getUniref90Id {
     my $self = shift;
     my $id = shift;
-    return $self->getUniref($id, 0);
+    return $self->getUnirefId($id, 0);
 }
 
 
-sub getUniref50 {
+sub getUniref50Id {
     my $self = shift;
     my $id = shift;
-    return $self->getUniref($id, 1);
+    return $self->getUnirefId($id, 1);
 }
 
 
-sub getUniref {
+sub getUnirefId {
     my $self = shift;
     my $id = shift;
     my $idx = shift;
-    if ($self->{seq_ver_map}->{$id}) {
-        return $self->{seq_ver_map}->{$id}->[$idx];
-    } elsif ($self->{uniref}->{$id}) {
-        return $self->{uniref}->{$id}->[$idx];
+    if ($self->{uniprot}->{$id}) {
+        return $self->{uniprot}->{$id}->[$idx];
     } else {
         return "";
     }
@@ -131,6 +131,8 @@ sub load {
     my $metadataFile = shift;
     my $idFile = shift;
     my %opts = @_;
+
+    $self->{sequence_version} = $opts{sequence_version} // SEQ_UNIPROT;
 
     my $retval = $self->loadMetadataFile($metadataFile);
     return 0 if not $retval;
@@ -196,19 +198,10 @@ sub loadIdFile {
     while (my $line = <$fh>) {
         chomp $line;
         my ($uniprot, $uniref90, $uniref50) = split(m/\t/, $line);
-        $self->{uniref}->{$uniprot} = [$uniref90, $uniref50];
+        $self->addUniref($uniprot, $uniref90, $uniref50);
     }
 
     $fh->close();
-
-    # If the source IDs are UniRef, get a reverse mapping of UniRef sequence ID (in metadata file)
-    # to list of UniProts in the UniRef cluster
-    if ($opts{sequence_version} and ($opts{sequence_version} eq SEQ_UNIREF90 or $opts{sequence_version} eq SEQ_UNIREF50)) {
-        my $colIdx = $opts{sequence_version} eq SEQ_UNIREF90 ? 0 : 1;
-        foreach my $uniprot (keys %{ $self->{uniref} }) {
-            push @{ $self->{seq_ver_map}->{$self->{uniref}->{$uniprot}}->[$colIdx] }, $uniprot;
-        }
-    }
 }
 
 
