@@ -30,5 +30,29 @@ sub applyFilter {
 }
 
 
+# return hash ref of sequences that matched a specific SQL query
+sub getMatchedSequences {
+    my $self = shift;
+    my $ids = shift;
+    my $sqlPattern = shift;
+
+    my %matched;
+
+    my @spliceIds = @$ids;
+    while (@spliceIds) {
+        my @batch = splice(@spliceIds, 0, $self->{num_sql_aggregate});
+        my $batch = join(",", map { "'$_'" } @batch);
+        my $sql = $sqlPattern =~ s/<IDS>/$batch/gr;
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute();
+        my $allData = $sth->fetchall_arrayref();
+        my @batchMatched = map { $_->[0] } @{ $allData };
+        @matched{@batchMatched} = ();
+    }
+
+    return \%matched;
+}
+
+
 1;
 

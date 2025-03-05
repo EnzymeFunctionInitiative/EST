@@ -43,26 +43,12 @@ sub applyFilter {
     my $self = shift;
     my $seqs = shift;
 
-    my @ids = $seqs->getSequenceIds();
-
-    #TODO: apply to uniref
-
-    my %matched;
-
-    my @spliceIds = @ids;
-    while (@spliceIds) {
-        my @batch = splice(@spliceIds, 0, $self->{num_sql_aggregate});
-        my $batch = join(",", map { "'$_'" } @batch);
-        my $sql = "SELECT accession FROM annotations LEFT JOIN taxonomy ON annotations.taxonomy_id = taxonomy.taxonomy_id WHERE accession IN ($batch) AND ($self->{filter_clause})";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute();
-        my $allData = $sth->fetchall_arrayref();
-        my @batchMatched = map { $_->[0] } @{ $allData };
-        @matched{@batchMatched} = ();
-    }
+    my @ids = $seqs->getAllSequenceIds();
+    my $sql = "SELECT accession FROM annotations LEFT JOIN taxonomy ON annotations.taxonomy_id = taxonomy.taxonomy_id WHERE accession IN (<IDS>) AND ($self->{filter_clause})";
+    my $matched = $self->getMatchedSequences(\@ids, $sql);
 
     foreach my $id (@ids) {
-        $seqs->removeSequence($id) if not exists $matched{$id};
+        $seqs->removeSequence($id) if not exists $matched->{$id};
     }
 }
 
