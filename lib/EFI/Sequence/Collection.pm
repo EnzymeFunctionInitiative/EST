@@ -229,7 +229,7 @@ sub saveMetadataFile {
         my $seq = $self->getSequence($id);
         my @attr = $seq->getAttributeNames();
         foreach my $attr (@attr) {
-            my $value = $self->formatAttributeValue($seq->getAttribute($attr));
+            my $value = $seq->packAttributeValue($seq->getAttribute($attr));
             $fh->print(join("\t", $id, $attr, $value), "\n");
         }
     }
@@ -246,31 +246,11 @@ sub saveIdFile {
     
     $fh->print(join("\t", "uniprot_id", "uniref90_id", "uniref50_id"), "\n");
     
-    foreach my $id (sort keys %{ $self->{uniref} }) {
-        $fh->print(join("\t", $id, @{ $self->{uniref}->{$id} }), "\n");
+    foreach my $id (sort keys %{ $self->{uniprot} }) {
+        $fh->print(join("\t", $id, @{ $self->{uniprot}->{$id} }), "\n");
     }
     
     $fh->close();
-}
-
-
-sub formatAttributeValue {
-    my $self = shift;
-    my $value = shift;
-
-    if (ref $value eq "ARRAY") {
-        my @vals;
-        foreach my $part (@$value) {
-            if (ref $part eq "ARRAY") {
-                push @vals, join(",", @$part);
-            } else {
-                push @vals, $part;
-            }
-        }
-        return join("^", @vals);
-    }
-
-    return $value;
 }
 
 

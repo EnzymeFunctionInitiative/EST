@@ -32,18 +32,11 @@ sub getId {
 }
 
 
-sub addAttribute {
-    my $self = shift;
-    my $attr = shift || die "Require attribute name";
-    my $value = shift || "";
-    $self->{attr}->{$attr} = $value;
-}
-
-
 sub getAttribute {
     my $self = shift;
     my $attr = shift || die "Require attribute name";
-    return $self->{attr}->{$attr};
+    my $val = $self->{attr}->{$attr};
+    return $val;
 }
 
 
@@ -68,6 +61,42 @@ sub setSequence {
 sub getSequence {
     my $self = shift;
     return $self->{seq};
+}
+
+
+sub packAttributeValue {
+    my $self = shift;
+    my $value = shift;
+
+    if (ref $value eq "ARRAY") {
+        my @vals;
+        foreach my $part (@$value) {
+            if (ref $part eq "ARRAY") {
+                push @vals, join(",", @$part);
+            } else {
+                push @vals, $part;
+            }
+        }
+        return join("^", @vals);
+    }
+
+    return $value;
+}
+
+
+sub unpackAttributeValue {
+    my $self = shift;
+    my $value = shift;
+    my @parts = split("^", $value);
+    if (@parts > 1) {
+        if (wantarray) {
+            return @parts;
+        } else {
+            return \@parts;
+        }
+    } else {
+        return $value;
+    }
 }
 
 
