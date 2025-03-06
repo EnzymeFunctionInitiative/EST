@@ -8,7 +8,10 @@ process create_gnd {
 
     """
     perl $projectDir/create_gnd.pl \
-        --config ${params.efi_config} --db-name ${params.efi_db} --cluster-map $cluster_id_map \
+        --config ${params.efi_config} \
+        --db-name ${params.efi_db} \
+        --cluster-map $cluster_id_map \
+        --nb-size ${params.nb_size} \
         --gnd gnd.sqlite
     """
 }
