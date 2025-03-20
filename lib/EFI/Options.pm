@@ -50,8 +50,8 @@ sub addOption {
     # $optSpec == --test-arg=s
     my $getoptName = $optSpec =~ s/^\-+//r;
     # $getoptName == test-arg=s
-    my $baseName = $getoptName =~ s/^(.+)=(.+?)$/$1/r;
-    my $optValType = $2;
+    my $baseName = $getoptName =~ s/^(.+)(=|:)(.+?)$/$1/r;
+    my $optValType = $3;
     # $baseName == test-arg
     my $keyName = $baseName =~ s/-/_/gr;
     # $keyName = test_arg
