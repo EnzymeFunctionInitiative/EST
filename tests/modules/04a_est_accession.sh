@@ -6,7 +6,8 @@ CONFIG_FILE=$2
 NXF_EST_CONFIG_FILE="conf/est/$CONFIG_FILE"
 NXF_SSN_CONFIG_FILE="conf/generatessn/$CONFIG_FILE"
 
-OUTPUT_DIR="$TEST_RESULTS_DIR/test_results_accession"
+self=$(basename "$0" .sh)
+OUTPUT_DIR="$TEST_RESULTS_DIR/$self"
 
 rm -rf $OUTPUT_DIR
 

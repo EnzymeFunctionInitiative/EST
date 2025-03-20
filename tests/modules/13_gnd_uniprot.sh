@@ -5,7 +5,8 @@ TEST_RESULTS_DIR=$1
 CONFIG_FILE=$2
 NXF_GND_CONFIG_FILE="conf/gnd/$CONFIG_FILE"
 
-OUTPUT_DIR="$TEST_RESULTS_DIR/test_results_gnd"
+self=$(basename "$0" .sh)
+OUTPUT_DIR="$TEST_RESULTS_DIR/$self"
 
 rm -rf $OUTPUT_DIR
 
