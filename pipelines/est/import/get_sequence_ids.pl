@@ -76,6 +76,11 @@ my $stats = new EFI::Import::Statistics();
 $source->addStats($stats);
 
 
+if ($source->hasUnmatchedIds()) {
+    $source->saveUnmatchedIds($opts->{unmatched_ids});
+}
+
+
 # If the family argument is present and the primary source is not family, then we add the families
 # to the data set
 if ($opts->{family} and $opts->{mode} ne FAMILY_SOURCE_NAME) {

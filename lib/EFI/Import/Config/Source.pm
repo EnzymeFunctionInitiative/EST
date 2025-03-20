@@ -40,6 +40,7 @@ sub addImportOptions {
     $self->addOption("fasta=s", 0, "user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta", OPT_FILE);
     $self->addOption("seq-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal)", OPT_FILE);
     $self->addOption("accessions=s", 0, "user-specified file containing list of accession IDs to use for all-by-all; required for --mode accession", OPT_FILE);
+    $self->addOption("unmatched-ids=s", 0, "file containing IDs in FASTA or accession ID files that were not matched in the EFI database", OPT_FILE);
     $self->addOption("blast-query=s", 0, "path to file containing sequence for initial BLAST; required for --mode blast", OPT_FILE);
     $self->addOption("blast-output=s", 0, "output file to put BLAST results into; required for --mode blast", OPT_FILE);
     #TODO:
@@ -65,6 +66,7 @@ sub validateOptions {
     $opts->{source_meta_file} = get_default_path("source_meta", $outputDir) if not $opts->{source_meta_file};
     $opts->{source_ids_file} = get_default_path("source_ids", $outputDir) if not $opts->{source_ids_file};
     $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
+    $opts->{unmatched_ids} = get_default_path("unmatched_ids", $outputDir) if not $opts->{unmatched_ids};
 
     $opts->{sequence_version} = get_sequence_version($opts->{sequence_version});
     $opts->{family_sequence_version} = get_sequence_version($opts->{family_sequence_version}) if $opts->{family_sequence_version};

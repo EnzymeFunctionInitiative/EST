@@ -27,6 +27,7 @@ sub new {
     my $self = $class->SUPER::new(%args);
     $self->{_type} = $TYPE_NAME;
     $self->{use_headers} = 1;
+    $self->{unmatched_ids} = [];
 
     return $self;
 }
@@ -76,6 +77,23 @@ sub loadFromSource {
 
 
 
+sub hasUnmatchedIds {
+    my $self = shift;
+    return @{ $self->{unmatched_ids} };
+}
+
+
+sub saveUnmatchedIds {
+    my $self = shift;
+    my $file = shift;
+    open my $fh, ">", $file or die "Unable to write to unmatched ID list file '$file': $!";
+    map { $fh->print("$_\n"); } @{ $self->{unmatched_ids} };
+    close $fh;
+}
+
+
+
+
 #
 # parseAccessions - internal method
 #
@@ -89,7 +107,7 @@ sub loadFromSource {
 sub parseAccessions {
     my $self = shift;
 
-    print("Parsing accession file $self->{acc_file}\n");
+    ###print("Parsing accession file $self->{acc_file}\n");
 
     open my $afh, "<", $self->{acc_file} or die "Unable to open user accession file $self->{acc_file}: $!";
 
@@ -140,8 +158,7 @@ sub identifyAccessionIds {
 
     my $numUniprotIds = scalar @uniprotIds;
     my $numNoMatches = scalar @$noMatches;
-
-    print("There were $numUniprotIds IDs that had UniProt matches and $numNoMatches IDs that could not be identified\n");
+    $self->{unmatched_ids} = $noMatches;
 
     my $numForeign = 0;
     foreach my $id (@uniprotIds) {

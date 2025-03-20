@@ -66,7 +66,7 @@ sub loadFromSource {
     my $self = shift;
     my $destSeqData = shift; # populate this
 
-    my $ids = $self->parseBlastResults();
+    my ($ids, $unmatched) = $self->parseBlastResults();
 
     my $querySeq = $self->loadQuerySequence();
 
@@ -130,16 +130,18 @@ sub makeMetadata {
 #
 # Returns:
 #     array ref of IDs
+#     array ref of IDs in BLAST results that were not in metadata database (this will occur if
+#         the BLAST database was not generated using the same database as the EFI metadata
+#         database; e.g. the BLAST sequence database is older than the metadata database)
 #
 sub parseBlastResults {
     my $self = shift;
 
-    open my $fh, "<", $self->{blast_output};
+    open my $fh, "<", $self->{blast_output} or die "Unable to read blast output file '$self->{blast_output}': $!";
 
     #cat init.blast | grep -v '#' | cut -f 1,2,3,4,12 | sort -k5,5nr > init_blast.tab
 
-    my $count = 0;
-    my %ids;
+    my %blastIds;
     my $firstHit = "";
 
     while (my $line = <$fh>) {
@@ -151,22 +153,33 @@ sub parseBlastResults {
         my $id = $parts[1] // next;
         $id =~ s/^.*\|(\w+)\|.*$/$1/;
 
-        $firstHit = $id if $count == 0;
-
-        if (not exists $ids{$id}) {
-            $ids{$id} = ();
-            $count++;
-        }
+        $firstHit = $id if $firstHit;
+        $blastIds{$id} = ();
     }
 
     close $fh;
 
+    my @blastIds = keys %blastIds;
+    my $sql = "SELECT accession FROM annotations WHERE accession IN (<IDS>)";
+    my $matched = $self->{util}->batchRetrieveIds(\@blastIds, $sql, "accession"); # $self->{util} comes from parent module
+
+    my @ids;
+    my @unmatched;
+    foreach my $id (@blastIds) {
+        if ($matched->{$id}) {
+            push @ids, $id;
+        } else {
+            push @unmatched, $id;
+        }
+    }
+
+    my $count = @ids;
     $self->addStatsValue("num_blast_retr", $count);
+    my $unmatched = @unmatched;
+    $self->addStatsValue("num_blast_unmatched", $unmatched);
 
-    return [ keys %ids ];
+    return \@ids, \@unmatched;
 }
-
-
 
 
 #

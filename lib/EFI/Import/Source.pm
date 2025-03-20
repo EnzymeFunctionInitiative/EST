@@ -68,6 +68,18 @@ sub loadFromSource {
 }
 
 
+sub hasUnmatchedIds {
+    my $self = shift;
+    return 0;
+}
+
+
+sub saveUnmatchedIds {
+    my $self = shift;
+    my $file = shift;
+}
+
+
 # protected
 sub addStatsValue {
     my $self = shift;
