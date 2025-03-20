@@ -4,7 +4,11 @@ package EFI::Import::Filter;
 use strict;
 use warnings;
 
-use constant DEFAULT_NUM_SQL_AGGREGATE => 1000;
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../"; # Import libs
+
+use EFI::Import::Util;
 
 
 sub new {
@@ -15,7 +19,7 @@ sub new {
 
     my $self = {};
     $self->{dbh} = $args{dbh};
-    $self->{num_sql_aggregate} = $args{num_sql_aggregate} // DEFAULT_NUM_SQL_AGGREGATE;
+    $self->{util} = new EFI::Import::Util(dbh => $self->{dbh});
 
     bless($self, $class);
 
@@ -36,21 +40,9 @@ sub getMatchedSequences {
     my $ids = shift;
     my $sqlPattern = shift;
 
-    my %matched;
+    my $matched = $self->{util}->batchRetrieveIds($ids, $sqlPattern, "accession");
 
-    my @spliceIds = @$ids;
-    while (@spliceIds) {
-        my @batch = splice(@spliceIds, 0, $self->{num_sql_aggregate});
-        my $batch = join(",", map { "'$_'" } @batch);
-        my $sql = $sqlPattern =~ s/<IDS>/$batch/gr;
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute();
-        my $allData = $sth->fetchall_arrayref();
-        my @batchMatched = map { $_->[0] } @{ $allData };
-        @matched{@batchMatched} = ();
-    }
-
-    return \%matched;
+    return $matched;
 }
 
 
