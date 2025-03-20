@@ -47,7 +47,11 @@ sub init {
 
     $self->{fams} = [ split(m/,/, $config->{family}) ];
     $self->{use_domain} = $config->{domain} // 0;
-    $self->{sequence_version} = $config->{sequence_version} ? get_sequence_version($config->{sequence_version}) : SEQ_UNIPROT;
+
+    # If the user uses the --family-sequence-version flag, that means that this Family source is
+    # adding to another primary source, and we use that sequence version.  Otherwise we use the
+    # user-provided or default --sequence-version value.
+    $self->{sequence_version} = $config->{family_sequence_version} if $config->{family_sequence_version}; # $self->{sequence_version} is already set in the super method
 
     return 1;
 }
@@ -64,9 +68,13 @@ sub loadFromSource {
 
     my $queryData = $self->prepareQueries();
 
-    my ($ids, $numIds, $numFullFamily) = $self->executeQueries($queryData);
+    my ($ids, $numIds, $uniprotUniref) = $self->executeQueries($queryData);
+
+    my $numFullFamily = keys %$uniprotUniref;
 
     $self->makeMetadata($ids, $destSeqData);
+
+    $self->addUnirefIds($destSeqData, $self->{sequence_version}, $uniprotUniref);
 
     $self->addStatsValue("num_ids", $numIds);
     $self->addStatsValue("num_full_family", $numFullFamily) if $self->{sequence_version} ne SEQ_UNIPROT;
@@ -97,14 +105,20 @@ sub prepareQueries {
     foreach my $tableName (keys %$tables) {
         foreach my $fam (@{ $tables->{$tableName} }) {
             # Columns
-            my @c = ("start", "end", "uniref50_seed", "uniref90_seed");
-            # Conditions (in WHERE clause, joined by AND)
+            my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end",
+                "IF ($tableName.id = f2.id, uniref.uniref50_seed, NULL) AS uniref50_seed",
+                "IF ($tableName.id = f3.id, uniref.uniref90_seed, NULL) AS uniref90_seed");
+            # Conditions (in WHERE clause, joined by AND); one for family ID is already included
             my @w = ();
             # Paramerized values (first one is the family ID)
             my @p = ($fam);
             # Joins, array of {table => "targetTable", joinCol => "primaryCol", targetCol => "targetCol"}
-            my @j = ({table => "uniref", joinCol => "$tableName.accession", targetCol => "uniref.accession"});
-            push @all, {table => $tableName, joins => \@j, cols => \@c, cond => \@w, params => \@p};
+            my @j = ();
+            push @j, {table => "uniref", joinCol => "$tableName.accession", targetCol => "uniref.accession"};
+            push @j, {table => "PFAM AS f2", joinCol => "f2.accession", targetCol => "uniref.uniref50_seed"};
+            push @j, {table => "PFAM AS f3", joinCol => "f3.accession", targetCol => "uniref.uniref90_seed"};
+            my $g = "$tableName.accession";
+            push @all, {table => $tableName, joins => \@j, cols => \@c, cond => \@w, params => \@p, group_by => $g};
         }
     }
 
@@ -163,6 +177,7 @@ sub getFamilyNames {
 # Returns:
 #     hash ref of IDs mapping to family domain
 #     total number of IDs found
+#     hash ref of mapping of UniProt to corresponding UniRef90 and UniRef50 IDs
 #
 sub executeQueries {
     my $self = shift;
@@ -170,6 +185,7 @@ sub executeQueries {
 
     my $ids = {};
     my $numIds = 0;
+    my $uniprotUniref = {};
 
     # Look at every family in the input set; one query corresponds to one family
     foreach my $query (@{ $queryData->{queries} }) {
@@ -187,11 +203,11 @@ sub executeQueries {
         }
 
         # Returns the number of UniProt or UniRef sequences
-        my $numUp = $self->processQuery($sth, $ids);
+        my $numUp = $self->processQuery($sth, $ids, $uniprotUniref);
         $numIds += $numUp;
     }
 
-    return ($ids, $numIds);
+    return ($ids, $numIds, $uniprotUniref);
 }
 
 
@@ -222,7 +238,9 @@ sub makeSqlStatement {
 
     my $joins = join(" ", map { "LEFT JOIN $_->{table} ON $_->{joinCol} = $_->{targetCol}" } @{ $query->{joins} });
 
-    my $sql = "SELECT $acCol AS accession $cols FROM $query->{table} $joins WHERE $query->{table}.id = ? $cond";
+    my $groupBy = $query->{group_by} ? "GROUP BY $query->{group_by}" : "";
+
+    my $sql = "SELECT $acCol AS accession $cols FROM $query->{table} $joins WHERE $query->{table}.id = ? $cond $groupBy";
     return $sql;
 }
 
@@ -237,6 +255,7 @@ sub makeSqlStatement {
 # Parameters:
 #     $sth - DBI statement handle, used for retrieving results
 #     $ids - hash ref, output data structure; hash ref to store domain regions
+#     $uniprotUniref - hash ref, mapping UniProt ID to corresponding UniRef90 and UniRef50 IDs
 #
 # Returns:
 #     number of UniProt IDs in the query
@@ -245,6 +264,7 @@ sub processQuery {
     my $self = shift;
     my $sth = shift;
     my $ids = shift;
+    my $uniprotUniref = shift;
 
     my $numIds = 0;
 
@@ -261,14 +281,20 @@ sub processQuery {
 
     while (my $row = $sth->fetchrow_hashref()) {
         # Remove isoforms
-        my $seqId = $row->{$seqCol} =~ s/\-\d+$//r;
-        my $uniprotId = $isUniref ? $row->{accession} =~ s/\-\d+$//r : $seqId;
+        my $uniprotId = $row->{accession} =~ s/\-\d+$//r;
+        my $seqId = $isUniref ? ($row->{$seqCol} || "") =~ s/\-\d+$//r : $uniprotId;
 
-        # If we're using UniRef, skip non-UniRef sequences
-        next if ($isUniref and $uniprotId ne $seqId);
+        if ($isUniref) {
+            if ($uniprotId eq $seqId) {
+                my $domain = [ $row->{start}, $row->{end} ];
+                push @{ $ids->{$seqId} }, $domain;
+            }
+        } else {
+            my $domain = [ $row->{start}, $row->{end} ];
+            push @{ $ids->{$seqId} }, $domain;
+        }
 
-        my $domain = [ $row->{start}, $row->{end} ];
-        push @{ $ids->{$seqId} }, $domain;
+        $uniprotUniref->{$uniprotId} = [$row->{uniref90_seed} || "", $row->{uniref50_seed} || ""];
 
         $numIds++;
     }

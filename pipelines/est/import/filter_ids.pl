@@ -84,6 +84,7 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
 
 
 # Save the filtered metadata and accession IDs to the output files
+$seqData->updateUnirefMetadata();
 $seqData->save($opts->{sequence_meta_file}, $opts->{accession_ids_file});
 
 

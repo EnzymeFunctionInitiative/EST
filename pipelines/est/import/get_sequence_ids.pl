@@ -86,13 +86,6 @@ if ($opts->{family} and $opts->{mode} ne FAMILY_SOURCE_NAME) {
 }
 
 
-# If BLAST, FASTA, or Accession are used, and UniRef is selected, then the input/given IDs are UniRef
-# IDs and we need to retrieve all of UniProt IDs in the clusters.
-# If Family is used, and UniRef is selected, then the IDs in the collection are UniRef.
-# Retrieve all UniProt IDs and related UniRef IDs and save them to a mapping file.
-saveUnirefMapping($seqData, $opts->{sequence_version});
-
-
 my $_elapsed = int((time() - $_start) * 1000);
 $logger->message("Found $numIds UniProt sequence IDs in $_elapsed ms");
 
@@ -100,62 +93,6 @@ $logger->message("Found $numIds UniProt sequence IDs in $_elapsed ms");
 $seqData->save($opts->{source_meta_file}, $opts->{source_ids_file});
 
 $stats->save($opts->{output_stats_file});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#
-# saveUnirefMapping
-#
-# Adds UniRef sequences to the sequence collection mapping, so that we can use UniRef sequences
-# later in the pipelines (e.g. in sunbursts).
-#
-# Parameters:
-#    $seqData - EFI::Sequence::Collection object
-#    $seqVersion - sequence version, one of SEQ_UNIPROT, SEQ_UNIREF90, or SEQ_UNIREF50
-# 
-sub saveUnirefMapping {
-    my $seqData = shift;
-    my $seqVersion = shift;
-
-    my @ids = $seqData->getSequenceIds();
-
-    my $tableKey = "accession";
-    if ($seqVersion eq SEQ_UNIREF90) {
-        $tableKey = "uniref90_seed";
-    } elsif ($seqVersion eq SEQ_UNIREF50) {
-        $tableKey = "uniref50_seed";
-    }
-
-    my %idTable;
-    while (@ids) {
-        my @batch = splice(@ids, 0, NUM_AGG_ID_SELECT);
-        my $ids = join(",", map { "'$_'" } @batch);
-        my $sql = "SELECT * FROM uniref WHERE $tableKey IN ($ids)";
-        my $sth = $dbh->prepare($sql);
-        $sth->execute();
-    
-        while (my $row = $sth->fetchrow_hashref()) {
-            $seqData->addUniref($row->{accession}, $row->{uniref90_seed}, $row->{uniref50_seed});
-        }
-    }
-}
-
-
 
 
 

@@ -24,6 +24,8 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
+    common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
+    common_parser.add_argument("--family-sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"], help="Sequence version to use when adding families to other modes; only use when mode is not family and the desired sequence version from the families is not uniprot")
     shared_args.add_args(common_parser)
 
     # add a subparser for each import mode
@@ -35,9 +37,8 @@ def add_args(parser: argparse.ArgumentParser):
     blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90")
 
     # option B: Family
-    family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group('Family Options')
-    family_parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
-    family_parser.add_argument("--families", type=str, required=True, help="Comma-separated list of families to add")
+    family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group("Family Options")
+    # Can add families to every job type
 
     # option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
@@ -95,6 +96,12 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         else:
             args.accessions_file = os.path.abspath(args.accessions_file)
 
+    # Can't validate in the argparse library because --family can be used in modes other family
+    # and in that case it is optional; when mode is family then it is required so we validate here
+    if args.import_mode == "family" and not args.families:
+        print(f"Family mode requires --family argument")
+        fail = True
+
     if fail:
         print("Failed to render params template")
         exit(1)
@@ -111,7 +118,8 @@ def create_parser() -> argparse.ArgumentParser:
 def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id,
                   efi_config, fasta_db, efi_db, multiplex, blast_evalue,
                   import_mode, sequence_version,
-                  families=None, exclude_fragments=None,
+                  families=None, family_sequence_version=None,
+                  sequence_filter=None,
                   fasta_file=None,
                   accessions_file=None,
                   blast_query_file=None,
@@ -142,10 +150,6 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         }
         if sequence_version != "uniprot":
             params["import_blast_fasta_db"] = args.import_blast_fasta_db
-    elif import_mode == "family":
-        params |= {
-            "families": families
-        }
     elif import_mode == "fasta":
         params |= {
             "uploaded_fasta_file": fasta_file
@@ -154,7 +158,14 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         params |= {
             "accessions_file": accessions_file
         }
-    
+
+    if families is not None:
+        params |= {
+            "families": families
+        }
+        if import_mode != "family":
+            params["family_sequence_version"] = args.family_sequence_version
+
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)

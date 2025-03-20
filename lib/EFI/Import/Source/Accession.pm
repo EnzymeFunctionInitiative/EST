@@ -68,6 +68,8 @@ sub loadFromSource {
 
     my $numIds = $self->identifyAccessionIds($rawIds, $destSeqData);
 
+    $self->addUnirefIds($destSeqData);
+
     return $numIds;
 }
 

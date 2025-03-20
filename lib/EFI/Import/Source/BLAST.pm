@@ -72,6 +72,8 @@ sub loadFromSource {
 
     my $numIds = $self->makeMetadata($ids, $querySeq, $destSeqData);
 
+    $self->addUnirefIds($destSeqData);
+
     return $numIds;
 }
 

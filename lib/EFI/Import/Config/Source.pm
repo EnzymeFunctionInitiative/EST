@@ -36,6 +36,7 @@ sub addImportOptions {
     $self->addOption("source-ids-file=s", 0, "path to the output file to save list of UniRef and UniProt accession IDs to (defaults into --output-dir)", OPT_FILE);
     $self->addOption("sequence-version=s", 0, "sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
     $self->addOption("family=s", 0, "one or more protein families (PF#####, IPR######); required for --mode family");
+    $self->addOption("family-sequence-version=s", 0, "sequence type to retrieve when adding family import to another mode (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
     $self->addOption("fasta=s", 0, "user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta", OPT_FILE);
     $self->addOption("seq-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal)", OPT_FILE);
     $self->addOption("accessions=s", 0, "user-specified file containing list of accession IDs to use for all-by-all; required for --mode accession", OPT_FILE);
@@ -66,6 +67,7 @@ sub validateOptions {
     $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
 
     $opts->{sequence_version} = get_sequence_version($opts->{sequence_version});
+    $opts->{family_sequence_version} = get_sequence_version($opts->{family_sequence_version}) if $opts->{family_sequence_version};
 
     $opts->{output_sunburst_ids_file} = get_default_path("sunburst_ids", $outputDir) if not $opts->{output_sunburst_ids_file};
     $opts->{output_stats_file} = get_default_path("import_stats", $outputDir) if not $opts->{output_stats_file};
