@@ -4,39 +4,83 @@ include { get_sequences; split_sequence_ids; multiplex } from "../shared/nextflo
 process get_sequence_ids {
     publishDir params.final_output_dir, mode: 'copy'
     output:
-        path 'accession_ids.txt', emit: 'accession_ids'
+        path 'source_ids.tab', emit: 'source_ids'
+        path 'source_seq.tab', emit: 'source_meta'
         path 'import_stats.json', emit: 'import_stats'
-        path 'sequence_metadata.tab', emit: 'sequence_metadata'
-        path 'sunburst_ids.tab', emit: 'sunburst_ids'
         path 'blast_hits.tab', emit: 'blast_hits', optional: true
-    stub:
-    """
-    cp $existing_fasta_file allsequences.fa
-    """
+        path 'seq_mapping.tab', emit: 'seq_mapping', optional: true
+        path 'unmatched_id.tab', emit: 'unmatched_ids', optional: true
     script:
+
     common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode} --sequence-version ${params.sequence_version}"
+
+    family_args = ""
+    if (params.families) {
+        family_args = "--family " + params.families
+        if (params.family_sequence_version) {
+            family_args = family_args + " --family-sequence-version " + params.family_sequence_version
+        }
+    }
+
     if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
         """
         blastall -p blastp -i ${params.blast_query_file} -d ${params.import_blast_fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init_blast.out
         if [[ -s init_blast.out ]]; then
             awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
-            perl $projectDir/import/get_sequence_ids.pl $common_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
         else
             echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
+            exit 1
         fi
-        """
-    } else if (params.import_mode == "family") {
-        """
-        perl $projectDir/import/get_sequence_ids.pl $common_args --family ${params.families}
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
         """
     } else if (params.import_mode == "accessions") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args --accessions ${params.accessions_file}
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --accessions ${params.accessions_file}
+        """
+    } else if (params.import_mode == "fasta") {
+        """
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --fasta ${params.uploaded_fasta_file} --seq-mapping-file seq_mapping.tab
+        """
+    } else if (params.import_mode == "family") {
+        """
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args
         """
     } else {
         error "Mode '${params.import_mode}' not yet implemented"
     }
+}
+
+process filter_ids {
+    publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path source_ids
+        path source_meta
+    output:
+        path 'accession_ids.tab', emit: 'accession_ids'
+        path 'sequence_metadata.tab', emit: 'sequence_metadata'
+    script:
+    filter_args = ""
+    if (params.filter) {
+        filter_args = params.filter.join(" --filter ")
+        filter_args = "--filter ${filter_args}"
+    }
+    """
+    perl $projectDir/import/filter_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --sequence-version ${params.sequence_version} $filter_args
+    """
+}
+
+process get_sunburst_data {
+    publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path accession_ids
+        path sequence_metadata
+    output:
+        path 'sunburst_tax.json', emit: 'sunburst_tax'
+    script:
+    """
+    perl $projectDir/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db}
+    """
 }
 
 process cat_fasta_files {
@@ -60,18 +104,13 @@ process cat_fasta_files {
 
 process import_fasta {
     publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path seq_mapping
     output:
-        path "all_sequences.fasta", emit: "fasta_file"
-        path 'accession_ids.txt', emit: 'accession_ids'
-        path 'import_stats.json', emit: 'import_stats'
-        path 'sequence_metadata.tab', emit: 'sequence_metadata'
-        path 'sunburst_ids.tab', emit: 'sunburst_ids'
-        path 'seq_mapping.tab', emit: 'mapping_file'
+        path "imported.fasta", emit: "fasta_file"
 
     """
-    # produces a mapping.txt file
-    perl $projectDir/import/get_sequence_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --fasta ${params.uploaded_fasta_file} --sequence-version ${params.sequence_version}
-    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file}
+    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file} --seq-mapping-file ${seq_mapping}
     """
 }
 
@@ -190,19 +229,22 @@ process visualize {
 workflow {
     // step 1: import sequence ids using params
 
-    if (params.import_mode == "fasta") {
-        fasta_import_files = import_fasta()
-        fasta_file = fasta_import_files.fasta_file
-        sequence_id_files = fasta_import_files
-    } else {
-        sequence_id_files = get_sequence_ids()
+    source_data = get_sequence_ids()
 
-        // split up the sequence ID list into separate files to enable parallel sequence
-        // retrieval from the BLAST sequence database
-        accession_shards = split_sequence_ids(sequence_id_files.accession_ids, params.num_accession_shards)
-        fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db)
-        fasta_file = cat_fasta_files(fasta_files.collect())
+    sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta)
+
+    get_sunburst_data(sequence_id_files.accession_ids, sequence_id_files.sequence_metadata)
+
+    // split up the sequence ID list into separate files to enable parallel sequence
+    // retrieval from the BLAST sequence database
+    accession_shards = split_sequence_ids(sequence_id_files.accession_ids, params.num_accession_shards)
+    fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db).collect()
+    if (params.import_mode == "fasta") {
+        fasta_import_files = import_fasta(source_data.seq_mapping)
+        fasta_file = fasta_import_files.fasta_file
+        fasta_files = fasta_files.concat(fasta_file)
     }
+    fasta_file = cat_fasta_files(fasta_files)
 
     // step 2: multiplex
     if (params.multiplex) {
@@ -230,4 +272,3 @@ workflow {
     // step 5: visualize
     plots = visualize(stats.boxplot_stats)
 }
-

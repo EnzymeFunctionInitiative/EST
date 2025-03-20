@@ -34,18 +34,18 @@ sub addImportOptions {
     my $self = shift;
     $self->SUPER::addImportOptions(include_config => 1);
 
-    $self->addOption("predef-filter-file=s", 0, "path to yml file containing predefined taxonomy filters", OPT_FILE);
-    $self->addOption("predef-filter=s", 0, "name of a predefined taxonomy filter");
-    $self->addOption("user-filter-file=s", 0, "path to a yml file containing a user-specified taxonomy filter");
-    $self->addOption("remove-fragments", 0, "path to the output GND file", OPT_FILE);
-    $self->addOption("fraction=i", 0, "only include the specified fraction of sequences", OPT_VALUE, 1);
+    $self->addOption("filter:s%", 0, "filters to apply (predef-name, predef-file, user-file, fragments, fraction)");
+    #$self->addOption("predef-filter-file=s", 0, "path to yml file containing predefined taxonomy filters", OPT_FILE);
+    #$self->addOption("predef-filter=s", 0, "name of a predefined taxonomy filter");
+    #$self->addOption("user-filter-file=s", 0, "path to a yml file containing a user-specified taxonomy filter");
+    #$self->addOption("remove-fragments", 0, "path to the output GND file", OPT_FILE);
+    #$self->addOption("fraction=i", 0, "only include the specified fraction of sequences", OPT_VALUE, 1);
     $self->addOption("source-meta-file=s", 0, "path to the input file containing the source data to filter", OPT_FILE);
     $self->addOption("source-ids-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
     $self->addOption("sequence-version=s", 0, "source sequence type (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
     $self->addOption("sequence-meta-file=s", 0, "path to the output file to save filtered sequences to", OPT_FILE);
     $self->addOption("accession-ids-file=s", 0, "path to the output file to save filtered UniRef and UniProt accession IDs to", OPT_FILE);
-    #TODO:
-    #$self->addOption("include-family", 0, "", "");
+    #TODO: added in a future issue
     #$self->addOption("restrict-family=s", 0, "", "");
     #$self->addOption("restrict-domain=s", 0, "", "");
 }
@@ -72,24 +72,16 @@ sub validateOptions {
 
     $opts->{sequence_version} = get_sequence_version($opts->{sequence_version});
 
-    # >= 1, integer
-    $opts->{fraction} = ($opts->{fraction} and $opts->{fraction} =~ m/^\d+$/) ? $opts->{fraction} : 1;
+    # Parse the filter options provided on the command line
+    my $filter = $opts->{filter} || {};
+    $opts->{fraction} = ($filter->{fraction} and $filter->{fraction} =~ m/^\d+$/) ? $filter->{fraction} : 1;
+    $opts->{remove_fragments} = exists $filter->{fragments} ? 1 : 0;
+    my @taxFilterErrors = $self->parseTaxonomyFilterOptions($filter, $opts);
+    push @errors, @taxFilterErrors;
 
     # Output
     $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
     $opts->{accession_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{accession_ids_file};
-
-    push @errors, "Error: invalid path to --user-filter-file" if $opts->{user_filter_file} and not -f $opts->{user_filter_file};
-
-    if ($opts->{predef_filter_file} and not -f $opts->{predef_filter_file}) {
-        push @errors, "Error: invalid path to --predef-filter-file";
-    } elsif ($opts->{predef_filter}) {
-        if (not $opts->{predef_filter_file} and not $self->{predef_filter_file}) {
-            push @errors, "Error: require predefined taxonomy filter file";
-        } elsif (not $opts->{predef_filter_file}) {
-            $opts->{predef_filter_file} = $self->{predef_filter_file};
-        }
-    }
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);
@@ -97,6 +89,47 @@ sub validateOptions {
     }
 
     return 1;
+}
+
+
+sub parseTaxonomyFilterOptions {
+    my $self = shift;
+    my $filter = shift;
+    my $opts = shift;
+
+    my @errors;
+
+    # If a user-defined filter file is provided, then try to use it
+    if ($filter->{"user-filter"}) {
+        if (-f $filter->{"user-filter"}) {
+            $opts->{user_filter_file} = $filter->{"user-filter"};
+        } else {
+            push @errors, "Error: invalid path to --filter user-filter=PATH";
+        }
+
+    # The user has specified a predefined filter file and it doesn't exist
+    } elsif ($filter->{"predef-file"} and not -f $filter->{"predef-file"}) {
+        push @errors, "Error: invalid path to --filter predef-file=PATH";
+
+    # Try to use the predefined filter specified by the user
+    } elsif ($filter->{"predef-filter"}) {
+        # The user hasn't specified a predefined filter file, and there was no default file detected
+        if (not $filter->{"predef-file"} and not $self->{predef_filter_file}) {
+            push @errors, "Error: require predefined taxonomy filter file";
+
+        # Use the default file detected in the installation
+        } elsif (not $filter->{"predef-file"}) {
+            $opts->{predef_filter} = $filter->{"predef-filter"};
+            $opts->{predef_filter_file} = $self->{predef_filter_file};
+
+        # Otherwise, the one defined on the command line is valid
+        } else {
+            $opts->{predef_filter} = $filter->{"predef-filter"};
+            $opts->{predef_filter_file} = $filter->{"predef-file"};
+        }
+    }
+
+    return @errors;
 }
 
 

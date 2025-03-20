@@ -24,6 +24,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
+    common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
     common_parser.add_argument("--family-sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"], help="Sequence version to use when adding families to other modes; only use when mode is not family and the desired sequence version from the families is not uniprot")
     shared_args.add_args(common_parser)
@@ -102,6 +103,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"Family mode requires --family argument")
         fail = True
 
+    args.sequence_filter = args.filter
+    del args.filter
+
     if fail:
         print("Failed to render params template")
         exit(1)
@@ -138,7 +142,7 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "fasta_db": fasta_db,
         "efi_db": efi_db,
         "import_mode": import_mode,
-        "exclude_fragments": exclude_fragments,
+        "filter": sequence_filter,
         "multiplex": multiplex,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version

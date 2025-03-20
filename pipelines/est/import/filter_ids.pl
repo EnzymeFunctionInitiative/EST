@@ -38,30 +38,22 @@ if (not $dbh) {
 }
 
 
-# Special case when no filters are to be applied, we copy the input to the output file
-my $useAnyFilter = ($opts->{remove_fragments} or $opts->{user_filter_file} or $opts->{predef_filter} or $opts->{fraction});
-if (not $useAnyFilter) {
-    copy($opts->{source_meta_file}, $opts->{sequence_meta_file});
-    copy($opts->{source_ids_file}, $opts->{accession_ids_file});
-    exit(0);
-}
-
 my $seqData = new EFI::Sequence::Collection();
 $seqData->load($opts->{source_meta_file}, $opts->{source_ids_file}, sequence_version => $opts->{sequence_version});
 
 
-
+my %defaultFilterArgs = (dbh => $dbh);
 
 # Only retain a fraction of the sequences
 if ($opts->{fraction} > 1) {
-    my $fracFilter = new EFI::Import::Filter::Fraction(dbh => $dbh, fraction => $opts->{fraction});
+    my $fracFilter = new EFI::Import::Filter::Fraction(%defaultFilterArgs, fraction => $opts->{fraction});
     $fracFilter->applyFilter($seqData);
 }
 
 
 # Remove fragments
 if ($opts->{remove_fragments}) {
-    my $fragFilter = new EFI::Import::Filter::Fragment(dbh => $dbh);
+    my $fragFilter = new EFI::Import::Filter::Fragment(%defaultFilterArgs);
     $fragFilter->applyFilter($seqData);
 }
 
@@ -75,7 +67,7 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
         $args{predef_filter} = $opts->{predef_filter};
         $args{predef_filter_file} = $opts->{predef_filter_file};
     }
-    my $taxFilter = new EFI::Import::Filter::Taxonomy(dbh => $dbh, %args);
+    my $taxFilter = new EFI::Import::Filter::Taxonomy(%defaultFilterArgs, %args);
     $taxFilter->applyFilter($seqData);
 }
 
@@ -86,7 +78,6 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
 # Save the filtered metadata and accession IDs to the output files
 $seqData->updateUnirefMetadata();
 $seqData->save($opts->{sequence_meta_file}, $opts->{accession_ids_file});
-
 
 
 
