@@ -15,6 +15,7 @@ my %files = (
     seq_mapping => "seq_mapping.tab",
     blastout => "blastout.tab",
     import_stats => "import_stats.json",
+    unmatched_ids => "unmatched_ids.tab",
 
     # output from filter_ids.pl
     sequence_meta => "sequence_metadata.tab",

@@ -16,8 +16,6 @@ use EFI::Import::Statistics;
 use EFI::Sequence::Collection;
 use EFI::Sequence::Type;
 
-use constant NUM_AGG_ID_SELECT => 1000;
-
 
 my $logger = new EFI::Import::Logger();
 

@@ -4,8 +4,6 @@ package EFI::Import::Sources;
 use strict;
 use warnings;
 
-use Data::Dumper;
-
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
@@ -31,7 +29,7 @@ sub new {
     my $self = {err => []};
     bless($self, $class);
     $self->{config} = $args{config} // die "Fatal error: unable to create source: missing config arg";
-    $self->{efi_dbh} = $args{efi_dbh} // die "Fatal error: unable to create source: missing efi_dbh argument";;
+    $self->{efi_dbh} = $args{efi_dbh} // die "Fatal error: unable to create source: missing efi_dbh argument";
 
     return $self;
 }
