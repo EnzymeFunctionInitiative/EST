@@ -11,6 +11,8 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
 use parent qw(EFI::Import::Filter);
 
+use EFI::Sequence::Type qw(is_unknown_sequence);
+
 
 sub new {
     my $class = shift;
@@ -44,6 +46,7 @@ sub applyFilter {
     my $seqs = shift;
 
     my @ids = $seqs->getAllSequenceIds();
+    @ids = grep { not is_unknown_sequence($_) } @ids;
     my $sql = "SELECT accession FROM annotations LEFT JOIN taxonomy ON annotations.taxonomy_id = taxonomy.taxonomy_id WHERE accession IN (<IDS>) AND ($self->{filter_clause})";
     my $matched = $self->getMatchedSequences(\@ids, $sql);
 

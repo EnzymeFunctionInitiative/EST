@@ -13,6 +13,7 @@ use constant SEQ_UNIREF90 => "uniref90";
 
 
 our @EXPORT = qw(SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 get_sequence_version);
+our @EXPORT_OK = qw(is_unknown_sequence);
 
 
 sub get_sequence_version {
@@ -21,6 +22,12 @@ sub get_sequence_version {
         return SEQ_UNIPROT;
     }
     return $param;
+}
+
+
+sub is_unknown_sequence {
+    my $seq = shift;
+    return $seq =~ m/^Z/i;
 }
 
 

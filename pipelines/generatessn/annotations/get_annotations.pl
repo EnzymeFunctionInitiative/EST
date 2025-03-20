@@ -11,12 +11,14 @@ use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin/../../../lib";
 
-use EFI::Database qw(:dbi);
+use EFI::Database;
+use EFI::Database::Schema qw(:dbi);
 use EFI::IdMapping::Util;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
 use EFI::IdMapping::Util qw(:ids);
 use EFI::Sequence::Collection;
+use EFI::Sequence::Type qw(is_unknown_sequence);
 
 
 my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
@@ -97,7 +99,7 @@ if ($db->getDbiType() == DBI_MYSQL) {
 my %unirefIds;
 my %unirefClusterIdSeqLen;
 foreach my $accession (sort @$accessions){
-    next if $accession =~ /^Z/i;
+    next if is_unknown_sequence($accession);
 
     # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
     # sequence cluster.  This code does that.

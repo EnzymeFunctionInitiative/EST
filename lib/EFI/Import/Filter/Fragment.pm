@@ -10,7 +10,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
 use parent qw(EFI::Import::Filter);
 
 use EFI::Annotations::Fields qw(:annotations);
-use EFI::Sequence::Type;
+use EFI::Sequence::Type qw(is_unknown_sequence);
 
 
 sub new {
@@ -28,6 +28,7 @@ sub applyFilter {
     my $seqs = shift;
 
     my @ids = $seqs->getAllSequenceIds();
+    @ids = grep { not is_unknown_sequence($_) } @ids;
     my $sql = "SELECT accession, is_fragment FROM annotations WHERE accession IN (<IDS>) AND is_fragment = 0";
     my $matched = $self->getMatchedSequences(\@ids, $sql);
 
