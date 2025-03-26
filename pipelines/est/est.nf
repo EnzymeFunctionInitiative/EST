@@ -1,7 +1,7 @@
 
 include { get_sequences; split_sequence_ids; multiplex } from "../shared/nextflow/sequence.nf"
 
-process get_sequence_ids {
+process get_source_ids {
     publishDir params.final_output_dir, mode: 'copy'
     output:
         path 'source_ids.tab', emit: 'source_ids'
@@ -54,11 +54,12 @@ process get_sequence_ids {
 process filter_ids {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path source_ids
-        path source_meta
+        path source_ids     // table of all sequence IDs, including UniRef IDs
+        path source_meta    // sequence metdata
     output:
-        path 'accession_ids.tab', emit: 'accession_ids'
-        path 'sequence_metadata.tab', emit: 'sequence_metadata'
+        path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
+        path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
+        path 'sequence_ids.tab', emit: 'sequence_ids'           // list of primary sequence IDs in the metadata file
     script:
     filter_args = ""
     if (params.filter) {
@@ -73,7 +74,7 @@ process filter_ids {
 process get_sunburst_data {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path accession_ids
+        path accession_table
         path sequence_metadata
     output:
         path 'sunburst_tax.json', emit: 'sunburst_tax'
@@ -86,12 +87,11 @@ process get_sunburst_data {
 process cat_fasta_files {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path fasta_files
+        path '*.fasta'
     output:
         path 'all_sequences.fasta'
     script:
-    input = fasta_files.toSorted().join(" ")
-    cat_cmd = "cat $input > all_sequences.fasta"
+    cat_cmd = "cat *.fasta > all_sequences.fasta"
     if (params.import_mode == "blast") {
         """
         $cat_cmd
@@ -105,12 +105,14 @@ process cat_fasta_files {
 process import_fasta {
     publishDir params.final_output_dir, mode: 'copy'
     input:
+        path accession_table
+        path sequence_metadata
         path seq_mapping
     output:
-        path "imported.fasta", emit: "fasta_file"
-
+        path "imported_sequences.fasta", emit: "fasta_file"
+        path "sequence_ids.tab", emit: "sequence_ids"
     """
-    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file} --seq-mapping-file ${seq_mapping}
+    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file} --seq-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
     """
 }
 
@@ -227,48 +229,67 @@ process visualize {
 }
 
 workflow {
-    // step 1: import sequence ids using params
 
-    source_data = get_sequence_ids()
+    // Step 1: import sequence ids using params
 
+    // We get sequence IDs and basic metadata from the input source, including those in FASTA files
+    source_data = get_source_ids()
+
+    // Filter on all sequence IDs including UniRef, and including IDs in FASTA files
     sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta)
 
-    get_sunburst_data(sequence_id_files.accession_ids, sequence_id_files.sequence_metadata)
+    // Get sunburst data for all sequence IDs, after filtering
+    get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)
 
-    // split up the sequence ID list into separate files to enable parallel sequence
-    // retrieval from the BLAST sequence database
-    accession_shards = split_sequence_ids(sequence_id_files.accession_ids, params.num_accession_shards)
-    fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db).collect()
+    // If importing FASTA file, reformat the FASTA file and create the file that will be added to
+    // the dataset for all-by-all BLAST
+    import_fasta_file = ""
     if (params.import_mode == "fasta") {
-        fasta_import_files = import_fasta(source_data.seq_mapping)
-        fasta_file = fasta_import_files.fasta_file
-        fasta_files = fasta_files.concat(fasta_file)
+        fasta_import_files = import_fasta(sequence_id_files.accession_table, sequence_id_files.sequence_metadata, source_data.seq_mapping)
+        import_fasta_file = fasta_import_files.fasta_file
+        // In a later step, only retrieve sequences for IDs not in the FASTA file (e.g. added
+        // from families
+        sequence_ids = fasta_import_files.sequence_ids
+    } else {
+        sequence_ids = sequence_id_files.sequence_ids
     }
-    fasta_file = cat_fasta_files(fasta_files)
 
-    // step 2: multiplex
+    // Split up the sequence ID list into separate files to enable parallel sequence retrieval
+    // from the BLAST sequence database.  If the import mode is FASTA, then these IDs are only
+    // ones that come from adding a family to the job
+    accession_shards = split_sequence_ids(sequence_ids, params.num_accession_shards)
+    fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db)
+    if (params.import_mode == "fasta") {
+        fasta_files = fasta_files.concat(import_fasta_file)
+    }
+
+    // Add the imported FASTA file if the import mode is fasta
+    fasta_file = cat_fasta_files(fasta_files.collect())
+
+    // Step 2: multiplex
     if (params.multiplex) {
         multiplex_files = multiplex(fasta_file)
         fasta_file = multiplex_files.fasta_file
     }
 
-    // step 2: create blastdb and frac seq file 
+    // Step 3: create blastdb and frac seq file 
     blastdb = create_blast_db(fasta_file)
+    blastdb.database_files | view
     fasta_lengths_parquet = blastreduce_transcode_fasta(fasta_file)
 
-    // step 3: all-by-all blast and blast reduce
+    // Step 4: all-by-all blast and blast reduce
     fasta_shards = split_fasta(fasta_file)
     blast_fractions = all_by_all_blast(blastdb.database_files, blastdb.database_name, fasta_shards.flatten()) | collect
     reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
 
-    // demultiplex
+    // Demultiplex
     if (params.multiplex) {
         reduced_blast_parquet = demultiplex(reduced_blast_parquet, multiplex_files.clusters)
     }
 
-    // step 4: compute convergence ratio and boxplot stats
+    // Step 5: compute convergence ratio and boxplot stats
     stats = compute_stats(reduced_blast_parquet, fasta_lengths_parquet)
 
-    // step 5: visualize
+    // Step 6: visualize
     plots = visualize(stats.boxplot_stats)
 }

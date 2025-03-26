@@ -28,7 +28,7 @@ my $dbh = $efiDb->getHandle();
 
 
 my $seqData = new EFI::Sequence::Collection();
-$seqData->load($opts->{sequence_meta_file}, $opts->{accession_ids_file});
+$seqData->load($opts->{sequence_meta_file}, $opts->{accession_table_file});
 
 
 my $creator = new EFI::Sunburst::Data(dbh => $dbh);

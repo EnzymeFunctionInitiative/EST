@@ -49,7 +49,7 @@ sub validateOptions {
     my @errors;
     push @errors, "Require --fasta-db" if (not -f $opts->{fasta_db} or not @dbFiles);
 
-    $opts->{sequence_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{sequence_ids_file};
+    $opts->{sequence_ids_file} = get_default_path("accession_table", $outputDir) if not $opts->{sequence_ids_file};
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);

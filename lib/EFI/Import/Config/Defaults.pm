@@ -19,7 +19,8 @@ my %files = (
 
     # output from filter_ids.pl
     sequence_meta => "sequence_metadata.tab",
-    accession_ids => "accession_ids.tab",
+    accession_table => "accession_table.tab",
+    sequence_ids => "sequence_ids.tab",
 
     # output from get_sunburst_data.pl
     sunburst_ids => "sunburst_ids.tab",

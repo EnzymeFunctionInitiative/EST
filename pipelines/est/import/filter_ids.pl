@@ -77,7 +77,13 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
 
 # Save the filtered metadata and accession IDs to the output files
 $seqData->updateUnirefMetadata();
-$seqData->save($opts->{sequence_meta_file}, $opts->{accession_ids_file});
+$seqData->save($opts->{sequence_meta_file}, $opts->{accession_table_file});
+
+
+my @sequenceIds = $seqData->getSequenceIds();
+open my $fh, ">", $opts->{sequence_ids_file} or die "Unable to write to sequence IDs file '$opts->{sequence_ids_file}': $!";
+map { $fh->print("$_\n"); } @sequenceIds;
+close $fh;
 
 
 

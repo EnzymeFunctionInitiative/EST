@@ -231,7 +231,7 @@ sub makeMetadata {
 
     foreach my $id (keys %$seq) {
         my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FASTA };
-        foreach my $metaKey (%{ $seqMeta->{$id} }) {
+        foreach my $metaKey (keys %{ $seqMeta->{$id} }) {
             $attr->{$metaKey} = $seqMeta->{$id}->{$metaKey};
         }
         $destSeqData->addSequence($id, $attr, $seq->{$id});

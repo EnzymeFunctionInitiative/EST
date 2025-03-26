@@ -35,16 +35,12 @@ sub addImportOptions {
     $self->SUPER::addImportOptions(include_config => 1);
 
     $self->addOption("filter:s%", 0, "filters to apply (predef-name, predef-file, user-file, fragments, fraction)");
-    #$self->addOption("predef-filter-file=s", 0, "path to yml file containing predefined taxonomy filters", OPT_FILE);
-    #$self->addOption("predef-filter=s", 0, "name of a predefined taxonomy filter");
-    #$self->addOption("user-filter-file=s", 0, "path to a yml file containing a user-specified taxonomy filter");
-    #$self->addOption("remove-fragments", 0, "path to the output GND file", OPT_FILE);
-    #$self->addOption("fraction=i", 0, "only include the specified fraction of sequences", OPT_VALUE, 1);
     $self->addOption("source-meta-file=s", 0, "path to the input file containing the source data to filter", OPT_FILE);
     $self->addOption("source-ids-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
     $self->addOption("sequence-version=s", 0, "source sequence type (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
     $self->addOption("sequence-meta-file=s", 0, "path to the output file to save filtered sequences to", OPT_FILE);
-    $self->addOption("accession-ids-file=s", 0, "path to the output file to save filtered UniRef and UniProt accession IDs to", OPT_FILE);
+    $self->addOption("accession-table-file=s", 0, "path to the output file to save the filtered UniRef and UniProt accession ID table to (for sunburst)", OPT_FILE);
+    $self->addOption("sequence-ids-file=s", 0, "path to the output file to save filtered sequence IDs to (for sequence retrieval)", OPT_FILE);
     #TODO: added in a future issue
     #$self->addOption("restrict-family=s", 0, "", "");
     #$self->addOption("restrict-domain=s", 0, "", "");
@@ -81,7 +77,8 @@ sub validateOptions {
 
     # Output
     $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
-    $opts->{accession_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{accession_ids_file};
+    $opts->{accession_table_file} = get_default_path("accession_table", $outputDir) if not $opts->{accession_table_file};
+    $opts->{sequence_ids_file} = get_default_path("sequence_ids", $outputDir) if not $opts->{sequence_ids_file};
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);

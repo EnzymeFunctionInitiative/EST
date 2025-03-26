@@ -9,8 +9,10 @@ use FindBin;
 
 use lib "$FindBin::Bin/../../../lib";
 
+use EFI::Annotations::Fields qw(:source);
 use EFI::Import::Config::FastaImport;
 use EFI::Import::Logger;
+use EFI::Sequence::Collection;
 
 
 
@@ -30,25 +32,51 @@ my $config = $optionParser->getOptions();
 
 
 
-my $mappingFile = $config->{seq_mapping_file};
-my $fastaFile = $config->{uploaded_fasta};
-my $outputFile = $config->{output_sequence_file};
+my $lineMapping = loadMappingFile($config->{seq_mapping_file});
+
+my $seqCollection = new EFI::Sequence::Collection();
+$seqCollection->load($config->{sequence_meta_file});
+
+my @seqIds = $seqCollection->getSequenceIds();
+
+# filteredSeqIds is used to exclude any IDs/sequences in the FASTA file that were excluded due to
+# filtering in a prior step.  fastaSource is used to determine if an ID in the input ID list
+# (sequence metadata file) comes from the FASTA file; this is used to save IDs that originate only
+# from a family that was added to a fasta import job.
+my %filteredSeqIds;
+my %fastaSource;
+foreach my $id (@seqIds) {
+    $filteredSeqIds{$id} = 1;
+    my $source = $seqCollection->getSequence($id)->getAttribute(FIELD_SEQ_SRC_KEY) // "";
+    $fastaSource{$id} = ($source eq FIELD_SEQ_SRC_VALUE_BOTH or $source eq FIELD_SEQ_SRC_VALUE_FASTA);
+}
 
 
-my $lineMapping = loadMappingFile($mappingFile);
-
-open my $in, "<", $fastaFile or die "Unable to read input fasta file $fastaFile: $!";
-open my $out, ">", $outputFile or die "Unable to write to output fasta file $outputFile: $!";
+open my $in, "<", $config->{uploaded_fasta} or die "Unable to read input fasta file $config->{uploaded_fasta}: $!";
+open my $out, ">", $config->{output_sequence_file} or die "Unable to write to output fasta file $config->{output_sequence_file}: $!";
 
 my $lineNum = 0;
 my $isValidSeq = 0;
 while (my $line = <$in>) {
-    if ($line =~ m/^>/ and $lineMapping->{$lineNum}) {
-        $out->print(">$lineMapping->{$lineNum}\n");
-        $isValidSeq = 1;
+    if ($line =~ m/^>/) {
+        # Check if the user-provided sequence header has a valid sequence that was parsed by the
+        # pipeline, and if the mapped ID is included in the sequence metadata file (which is
+        # created by the filter pipeline process to remove user-specified filters)
+        my $mappedId = $lineMapping->{$lineNum};
+        if ($mappedId) {
+            # If true, then the ID passed the filtering in a prior step
+            if ($filteredSeqIds{$mappedId}) {
+                $out->print(">$lineMapping->{$lineNum}\n");
+                $isValidSeq = 1;
+            } else {
+                #TODO: remove this debug
+                print "REMOVED $mappedId FROM import fasta\n";
+            }
+        }
     } elsif ($line =~ m/^>/) {
         $isValidSeq = 0;
     } elsif ($isValidSeq) {
+        # Print the current line from user-specified FASTA file
         $out->print($line);
     }
     $lineNum++;
@@ -56,6 +84,11 @@ while (my $line = <$in>) {
 
 close $out;
 close $in;
+
+
+open my $fh, ">", $config->{sequence_ids_file} or die "Unable to write to output sequence IDs file '$config->{sequence_ids_file}': $!";
+map { $fh->print("$_\n") if not $fastaSource{$_}; } @seqIds;
+close $fh;
 
 
 

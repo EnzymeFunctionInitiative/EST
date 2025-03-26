@@ -26,12 +26,14 @@ sub new {
 }
 
 
+# public
 sub getId {
     my $self = shift;
     return $self->{id};
 }
 
 
+# public
 sub getAttribute {
     my $self = shift;
     my $attr = shift || die "Require attribute name";
@@ -40,6 +42,7 @@ sub getAttribute {
 }
 
 
+# public
 sub getAttributeNames {
     my $self = shift;
     my @attrs = sort keys %{ $self->{attr} };
@@ -51,6 +54,7 @@ sub getAttributeNames {
 }
 
 
+# public
 sub setAttribute {
     my $self = shift;
     my $attr = shift;
@@ -71,19 +75,7 @@ sub setAttribute {
 }
 
 
-sub setSequence {
-    my $self = shift;
-    my $seq = shift;
-    $self->{seq} = $seq;
-}
-
-
-sub getSequence {
-    my $self = shift;
-    return $self->{seq};
-}
-
-
+# public
 sub packAttributeValue {
     my $self = shift;
     my $value = shift;
@@ -104,6 +96,7 @@ sub packAttributeValue {
 }
 
 
+# public
 sub unpackAttributeValue {
     my $self = shift;
     my $value = shift;
@@ -145,6 +138,22 @@ B<EFI::Sequence> - Perl module that represents a sequence
 
     my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq);
 
+    my $seqId = $seq->getId();
+    print "Sequence ID $seqId\n";
+
+    my $attrVal = $seq->getAttribute(FIELD_SEQ_SRC_KEY);
+    print "Attribute " . FIELD_SEQ_SRC_KEY . " = $attrVal\n";
+
+    my @names = $seq->getAttributeNames();
+    print "Available attributes: " . join(", ", @names) . "\n";
+
+    $seq->setAttribute("custom", "value");
+    $seq->setAttribute("list1", ["item 1", "item 2", "item 3"]);
+    $seq->setAttribute("list2", "item 1", "item 2", "item 3");
+
+    my $valueAsString = $seq->packAttributeValue("value");
+    my $list1AsString = $seq->packAttributeValue(["item 1", "item 2", "item 3"]);
+
 
 =head2 DESCRIPTION
 
@@ -169,11 +178,11 @@ UniProt sequence identifier.
 
 =item C<attr>
 
-Attributes, as a hash ref.
+Optional attributes, as a hash ref.
 
 =item C<seq>
 
-Protein sequence as a string.
+Optional protein sequence as a string.
 
 =back
 
@@ -181,6 +190,122 @@ Protein sequence as a string.
 
     my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq);
 
+
+=head3 C<getId()>
+
+Get the sequence identifier.
+
+=head4 Returns
+
+Sequence identifier as a string.
+
+=head4 Example Usage
+
+    my $id = $seq->getId();
+
+
+=head3 C<getAttribute($name)>
+
+Gets the value of the attribute with the given name.
+
+=head4 Parameters
+
+=over
+
+=item C<$name>
+
+Attribute name; typically one from the available options in B<EFI::Annotations::Fields>.
+
+=back
+
+=head4 Returns
+
+The attribute value as a string (packed if the value is a list).
+
+=head4 Example Usage
+
+    $seq->setAttribute("list1", ["item 1", "item 2", "item 3"]);
+    my $val = $seq->getAttribute("list1");
+    # $val is: "item 1^item 2^item 3"
+
+
+=head3 C<getAttributeNames()>
+
+Gets the list of available attribute names for the sequence.
+
+=head4 Returns
+
+Returns an array of attribute names in array context.
+Returns an array ref of attribute names in scalar context.
+
+=head4 Example Usage
+
+    my @names = $seq->getAttributeNames();
+    print "Available attributes: " . join(", ", @names) . "\n";
+
+    my $names = $seq->getAttributeNames();
+    print "Available attributes: " . join(", ", @$names) . "\n";
+
+
+=head3 C<setAttribute($name, $value)>
+
+Sets the attribute value for the given attribute name.
+
+=head4 Parameters
+
+=over
+
+=item C<$name>
+
+Attribute name; typically one from the available options in B<EFI::Annotations::Fields>,
+although can be anything.
+
+=item C<$value>
+
+Scalar, array, or array ref.
+
+=back
+
+=head4 Example Usage
+
+    $seq->setAttribute("custom", "value");
+    $val = $seq->getAttribute("custom");
+    # $val is "value"
+
+    $seq->setAttribute("list1", ["item 1", "item 2", "item 3"]);
+    $val = $seq->getAttribute("list1");
+    # $val is: "item 1^item 2^item 3"
+
+    $seq->setAttribute("list2", "item 1", "item 2", "item 3");
+    $val = $seq->getAttribute("list1");
+    # $val is: "item 1^item 2^item 3"
+
+
+=head3 C<packAttributeValue($value)>
+
+Packs the attribute value into a string that can be serialized and deserialized.
+Elements in packed arrays are separated by the caret character (C<^>).
+
+=head4 Parameters
+
+=over
+
+=item C<$value>
+
+Value to pack, either a scalar or an array ref.
+
+=back
+
+=head4 Returns
+
+Returns C<$value> if scalar.  Returns packed array if C<$value> is an array ref.
+
+=head4 Example Usage
+
+    $val = $seq->packAttributeValue("value");
+    # $val is "value"
+    $val = $seq->packAttributeValue(["item 1", "item 2", "item 3"]);
+    # $val is: "item 1^item 2^item 3"
 
 =cut
 

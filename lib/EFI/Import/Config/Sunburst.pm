@@ -30,7 +30,7 @@ sub addImportOptions {
     $self->SUPER::addImportOptions(include_config => 1);
 
     $self->addOption("sequence-meta-file=s", 0, "path to the input file that contains sequence metadata", OPT_FILE);
-    $self->addOption("accession-ids-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
+    $self->addOption("accession-table-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
     $self->addOption("sunburst-data-file=s", 0, "output file to put sunburst data into (defaults into --output-dir)", OPT_FILE);
     $self->addOption("pretty-print", 0, "pretty-print JSON");
 }
@@ -52,8 +52,8 @@ sub validateOptions {
     $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
     push @errors, "Error: invalid --sequence-meta-file path" if not -f $opts->{sequence_meta_file};
 
-    $opts->{accession_ids_file} = get_default_path("accession_ids", $outputDir) if not $opts->{accession_ids_file};
-    push @errors, "Error: invalid --accession-ids-file path" if not -f $opts->{accession_ids_file};
+    $opts->{accession_table_file} = get_default_path("accession_table", $outputDir) if not $opts->{accession_table_file};
+    push @errors, "Error: invalid --accession-table-file path" if not -f $opts->{accession_table_file};
 
     $opts->{sunburst_data_file} = get_default_path("sunburst_data", $outputDir) if not $opts->{sunburst_data_file};
 

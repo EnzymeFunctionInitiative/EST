@@ -30,7 +30,9 @@ sub addImportOptions {
 
     $self->addOption("uploaded-fasta=s", 1, "user-specified FASTA file containing sequences to use for all-by-all", OPT_FILE);
     $self->addOption("seq-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir", OPT_FILE);
-    $self->addOption("output-sequence-file=s", 0, "path to output file to put sequences in; defaults into --output-dir", OPT_FILE);
+    $self->addOption("sequence-meta-file=s", 0, "file containing sequence metadata (post filtering)", OPT_FILE);
+    $self->addOption("output-sequence-file=s", 0, "path to output file to save sequences in; defaults into --output-dir", OPT_FILE);
+    $self->addOption("sequence-ids-file=s", 0, "path to output file to save sequences IDs in; defaults into --output-dir", OPT_FILE);
 }
 
 
@@ -47,6 +49,8 @@ sub validateOptions {
 
     $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
     $opts->{output_sequence_file} = get_default_path("all_sequences", $outputDir) if not $opts->{output_sequence_file};
+    $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
+    $opts->{sequence_ids_file} = get_default_path("sequence_ids", $outputDir) if not $opts->{sequence_ids_file};
 
     return 1;
 }

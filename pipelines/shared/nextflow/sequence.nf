@@ -6,7 +6,11 @@ process split_sequence_ids {
     output:
         path "accession_ids.txt.part*"
     """
-    split -d -e -n r/$num_accession_shards ${accessions_file} accession_ids.txt.part
+    if [[ -s "${accessions_file}" ]]; then
+        split -d -e -n r/$num_accession_shards ${accessions_file} accession_ids.txt.part
+    else
+        touch accession_ids.txt.part
+    fi
     """
 }
 
@@ -17,7 +21,11 @@ process get_sequences {
     output:
         path "${accession_ids}.fasta"
     """
-    perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${fasta_db} --sequence-ids-file ${accession_ids} --output-sequence-file ${accession_ids}.fasta
+    if [[ -s "${accession_ids}" ]]; then
+        perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${fasta_db} --sequence-ids-file ${accession_ids} --output-sequence-file ${accession_ids}.fasta
+    else
+        touch ${accession_ids}.fasta
+    fi
     """
 }
 
