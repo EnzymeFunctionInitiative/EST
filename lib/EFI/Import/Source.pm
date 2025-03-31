@@ -101,10 +101,6 @@ sub addStatsValue {
 #    $unirefIds - optional hash ref of manually-specified UniRef IDs (i.e. from the Family source);
 #        if this is specified, then no database lookup is made and the IDs are added from this hash
 #
-# Returns:
-#    an array ref containing a list of all the input IDs in the $seqData collection that were not
-#        identified in the database
-#
 sub addUnirefIds {
     my $self = shift;
     my $seqData = shift;
@@ -116,29 +112,16 @@ sub addUnirefIds {
         return;
     }
 
+    # UniProt IDs
     my @ids = $seqData->getSequenceIds();
 
-    # If the IDs from the collection are already UniRef IDs, we need to retrieve the IDs from
-    # the uniref table that match those IDs.
-    my $tableKey = "accession";
-    if ($seqVersion eq SEQ_UNIREF90) {
-        $tableKey = "uniref90_seed";
-    } elsif ($seqVersion eq SEQ_UNIREF50) {
-        $tableKey = "uniref50_seed";
-    }
-
-    my $sql = "SELECT * FROM uniref WHERE $tableKey IN (<IDS>)";
+    my $sql = "SELECT * FROM uniref WHERE accession IN (<IDS>)";
     my $matched = $self->{util}->batchRetrieveIds(\@ids, $sql, "accession");
-    my @unmatched;
     foreach my $id (@ids) {
         if ($matched->{$id}) {
             $seqData->addUniref($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
-        } else {
-            push @unmatched, $id;
         }
     }
-
-    return \@unmatched;
 }
 
 

@@ -67,12 +67,21 @@ sub loadFromSource {
 
     my $numFullFamily = keys %$uniprotUniref;
 
-    $self->makeMetadata($ids, $destSeqData);
+    my $numSharedSeq = $self->makeMetadata($ids, $destSeqData);
 
+    # Get the UniRef IDs that are in the input family(s)
+    my ($numUniref90Matched, $numUniref50Matched) = $self->getUnirefIds($uniprotUniref);
+
+    # Add the UniRef IDs to the metadata file
     $self->addUnirefIds($destSeqData, $self->{sequence_version}, $uniprotUniref);
 
     $self->addStatsValue("num_ids", $numIds);
-    $self->addStatsValue("num_full_family", $numFullFamily) if $self->{sequence_version} ne SEQ_UNIPROT;
+    if ($self->{sequence_version} ne SEQ_UNIPROT) {
+        $self->addStatsValue("num_full_family", $numFullFamily);
+        $self->addStatsValue("num_uniref90_in_family", $numUniref90Matched);
+        $self->addStatsValue("num_uniref50_in_family", $numUniref50Matched);
+    }
+    $self->addStatsValue("num_shared_ids", $numSharedSeq) if $numSharedSeq; # overlap between primary import source and family
 
     return $numIds;
 }
@@ -100,9 +109,11 @@ sub prepareQueries {
     foreach my $tableName (keys %$tables) {
         foreach my $fam (@{ $tables->{$tableName} }) {
             # Columns
-            my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end",
-                "IF ($tableName.id = f2.id, uniref.uniref50_seed, NULL) AS uniref50_seed",
-                "IF ($tableName.id = f3.id, uniref.uniref90_seed, NULL) AS uniref90_seed");
+            my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end");
+            push @c, "uniref.uniref90_seed", "uniref.uniref50_seed";
+            #my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end",
+            #    "IF ($tableName.id = f3.id, uniref.uniref90_seed, NULL) AS uniref90_seed",
+            #    "IF ($tableName.id = f2.id, uniref.uniref50_seed, NULL) AS uniref50_seed");
             # Conditions (in WHERE clause, joined by AND); one for family ID is already included
             my @w = ();
             # Paramerized values (first one is the family ID)
@@ -110,9 +121,10 @@ sub prepareQueries {
             # Joins, array of {table => "targetTable", joinCol => "primaryCol", targetCol => "targetCol"}
             my @j = ();
             push @j, {table => "uniref", joinCol => "$tableName.accession", targetCol => "uniref.accession"};
-            push @j, {table => "PFAM AS f2", joinCol => "f2.accession", targetCol => "uniref.uniref50_seed"};
-            push @j, {table => "PFAM AS f3", joinCol => "f3.accession", targetCol => "uniref.uniref90_seed"};
-            my $g = "$tableName.accession";
+            #push @j, {table => "PFAM AS f2", joinCol => "f2.accession", targetCol => "uniref.uniref50_seed"};
+            #push @j, {table => "PFAM AS f3", joinCol => "f3.accession", targetCol => "uniref.uniref90_seed"};
+            my $g = "";
+            #my $g = "$tableName.accession";
             push @all, {table => $tableName, joins => \@j, cols => \@c, cond => \@w, params => \@p, group_by => $g};
         }
     }
@@ -289,12 +301,53 @@ sub processQuery {
             push @{ $ids->{$seqId} }, $domain;
         }
 
-        $uniprotUniref->{$uniprotId} = [$row->{uniref90_seed} || "", $row->{uniref50_seed} || ""];
+        #$uniprotUniref->{$uniprotId} = [$row->{uniref90_seed} || "", $row->{uniref50_seed} || ""];
+        $uniprotUniref->{$uniprotId} = ["", ""];
 
         $numIds++;
     }
 
     return $numIds;
+}
+
+
+
+
+#
+# getUnirefIds - private method
+#
+# Gets all of the UniRef IDs that are in the family.  Since a UniProt sequence in a given family
+# can be in a UniRef sequence that is not also part of the family, those should be excluded.
+#
+# Parameters:
+#    $ids - hash ref mapping uniprot to an array ref of [uniref90_seed, uniref50_seed]
+#
+# Returns:
+#    number of UniRef90 IDs that were in the family
+#    number of UniRef50 IDs that were in the family
+#
+sub getUnirefIds {
+    my $self = shift;
+    my $ids = shift;
+
+    my @ids = keys %$ids;
+
+    my $getIds = sub {
+        my $field = shift;
+        my $idx = shift;
+        my $sql = "SELECT * FROM uniref WHERE $field IN (<IDS>)";
+        my $matched = $self->{util}->batchRetrieveIds(\@ids, $sql, "accession");
+        my $numMatched = 0;
+        foreach my $id (@ids) {
+            $ids->{$id}->[$idx] = $matched->{$id}->{$field} and $numMatched++ if $matched->{$id};
+        }
+        return $numMatched;
+    };
+
+    my $numUniref90Matched = $getIds->("uniref90_seed", 0);
+    my $numUniref50Matched = $getIds->("uniref50_seed", 1);
+
+    return ($numUniref90Matched, $numUniref50Matched);
 }
 
 
@@ -341,16 +394,40 @@ sub retrieveFamiliesForClans {
 #     $ids - hash ref with the keys being the IDs identified from the families
 #     $destSeqData - reference to EFI::Sequence::Collection; add sequences into this
 #
+# Returns:
+#     if the family is being added to another import source, the number of sequences that are
+#         shared between the primary import source and the family(s)
+#
 sub makeMetadata {
     my $self = shift;
     my $ids = shift;
     my $destSeqData = shift;
 
+    my $numShared = 0;
+
     foreach my $id (keys %$ids) {
         my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FAMILY };
+        # Set the domain region (e.g. start,end)
         $attr->{&FIELD_SEQ_DOMAIN} = $ids->{$id} if $self->{use_domain};
-        $destSeqData->addSequence($id, $attr);
+        # This returns false if the sequence already exists from another source (i.e. we're adding
+        # a family in to another import option)
+        if (not $destSeqData->addSequence($id, $attr)) {
+            my $seq = $destSeqData->getSequence($id);
+            my $source = $seq->getAttribute(FIELD_SEQ_SRC_KEY);
+            if (not $source) {
+                $source = FIELD_SEQ_SRC_VALUE_FAMILY;
+            } elsif ($source eq FIELD_SEQ_SRC_VALUE_FASTA) {
+                $source = FIELD_SEQ_SRC_VALUE_BOTH;
+                $numShared++;
+            } elsif ($source eq FIELD_SEQ_SRC_VALUE_BLASTHIT) {
+                $source = FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY;
+                $numShared++;
+            }
+            $seq->setAttribute(FIELD_SEQ_SRC_KEY, $source);
+        }
     }
+
+    return $numShared;
 }
 
 
