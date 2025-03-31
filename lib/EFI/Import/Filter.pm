@@ -19,6 +19,7 @@ sub new {
 
     my $self = {};
     $self->{dbh} = $args{dbh};
+    $self->{stats} = $args{stats} || DummyStats->new;
     $self->{util} = new EFI::Import::Util(dbh => $self->{dbh});
 
     bless($self, $class);
@@ -43,6 +44,22 @@ sub getMatchedSequences {
     my $matched = $self->{util}->batchRetrieveIds($ids, $sqlPattern, "accession");
 
     return $matched;
+}
+
+
+package DummyStats;
+
+
+sub new {
+    my $class = shift;
+    my $self = {};
+    bless($self, $class);
+    return $self;
+}
+
+
+sub addValue {
+    my $self = shift;
 }
 
 

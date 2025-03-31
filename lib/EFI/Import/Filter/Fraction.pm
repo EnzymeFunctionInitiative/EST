@@ -28,9 +28,12 @@ sub applyFilter {
     my @ids = $seqs->getSequenceIds();
 
     #TODO: keep SwissProts
+    my $numRemoved = 0;
     for (my $i = 0; $i < @ids; $i++) {
-        $seqs->removeSequence($ids[$i]) if ($i % $self->{fraction});
+        $seqs->removeSequence($ids[$i]) and $numRemoved++ if ($i % $self->{fraction});
     }
+
+    $self->{stats}->addValue("num_filter_fraction", $numRemoved);
 }
 
 

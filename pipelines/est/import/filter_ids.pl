@@ -13,6 +13,7 @@ use EFI::Import::Filter;
 use EFI::Import::Filter::Fraction;
 use EFI::Import::Filter::Fragment;
 use EFI::Import::Filter::Taxonomy;
+use EFI::Import::Statistics;
 use EFI::Options;
 use EFI::Sequence::Collection;
 use EFI::Sequence::Type;
@@ -43,6 +44,12 @@ $seqData->load($opts->{source_meta_file}, $opts->{source_ids_file}, sequence_ver
 
 
 my %defaultFilterArgs = (dbh => $dbh);
+
+
+my $stats = new EFI::Import::Statistics();
+$stats->load($opts->{source_stats_file});
+$defaultFilterArgs{stats} = $stats;
+
 
 # Only retain a fraction of the sequences
 if ($opts->{fraction} > 1) {
@@ -86,7 +93,7 @@ map { $fh->print("$_\n"); } @sequenceIds;
 close $fh;
 
 
-
+$stats->save($opts->{stats_file});
 
 
 

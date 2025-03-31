@@ -14,13 +14,14 @@ my %files = (
     source_meta => "source_seq.tab",
     seq_mapping => "seq_mapping.tab",
     blastout => "blastout.tab",
-    import_stats => "import_stats.json",
+    source_stats => "source_stats.json",
     unmatched_ids => "unmatched_ids.tab",
 
     # output from filter_ids.pl
     sequence_meta => "sequence_metadata.tab",
     accession_table => "accession_table.tab",
     sequence_ids => "sequence_ids.tab",
+    import_stats => "import_stats.json",
 
     # output from get_sunburst_data.pl
     sunburst_ids => "sunburst_ids.tab",

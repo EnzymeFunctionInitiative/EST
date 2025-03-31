@@ -32,9 +32,12 @@ sub applyFilter {
     my $sql = "SELECT accession, is_fragment FROM annotations WHERE accession IN (<IDS>) AND is_fragment = 0";
     my $matched = $self->getMatchedSequences(\@ids, $sql);
 
+    my $numRemoved = 0;
     foreach my $id (@ids) {
-        $seqs->removeSequence($id) if not exists $matched->{$id};
+        $seqs->removeSequence($id) and $numRemoved++ if not exists $matched->{$id};
     }
+
+    $self->{stats}->addValue("num_filter_fragment", $numRemoved);
 }
 
 

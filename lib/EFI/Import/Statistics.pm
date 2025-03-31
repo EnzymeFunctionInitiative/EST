@@ -14,8 +14,6 @@ sub new {
     my $self = {stats => {}};
     bless($self, $class);
 
-    $self->{mapping} = getMapping();
-
     return $self;
 }
 
@@ -24,7 +22,6 @@ sub addValue {
     my $self = shift;
     my $key = shift;
     my $val = shift;
-    $key = $self->{mapping}->{$key} // $key;
     $self->{stats}->{$key} = $val;
 }
 
@@ -32,7 +29,6 @@ sub addValue {
 sub getValue {
     my $self = shift;
     my $key = shift;
-    $key = $self->{mapping}->{$key} // $key;
     return $self->{stats}->{$key} // 0;
 }
 
@@ -48,6 +44,29 @@ sub save {
     open my $fh, ">", $outputFile or die "Unable to write to $outputFile: $!";
     $fh->print($json);
     close $fh;
+}
+
+
+sub load {
+    my $self = shift;
+    my $inputFile = shift;
+
+    if (not -f $inputFile) {
+        $self->{stats} = {};
+        return;
+    }
+
+    my $inputData = "";
+    open my $fh, "<", $inputFile or die "Unable to read statistics file '$inputFile': $!";
+    while (my $line = <$fh>) {
+        chomp $line;
+        $inputData .= $line;
+    }
+    close $fh;
+
+    my $data = JSON->new->decode($inputData);
+
+    $self->{stats} = $data;
 }
 
 

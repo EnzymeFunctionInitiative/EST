@@ -41,6 +41,8 @@ sub addImportOptions {
     $self->addOption("sequence-meta-file=s", 0, "path to the output file to save filtered sequences to", OPT_FILE);
     $self->addOption("accession-table-file=s", 0, "path to the output file to save the filtered UniRef and UniProt accession ID table to (for sunburst)", OPT_FILE);
     $self->addOption("sequence-ids-file=s", 0, "path to the output file to save filtered sequence IDs to (for sequence retrieval)", OPT_FILE);
+    $self->addOption("source-stats-file=s", 0, "path to the file containing source import stats", OPT_FILE);
+    $self->addOption("stats-file=s", 0, "path to the file to save filter statistics to (appends to source stats)", OPT_FILE);
     #TODO: added in a future issue
     #$self->addOption("restrict-family=s", 0, "", "");
     #$self->addOption("restrict-domain=s", 0, "", "");
@@ -79,6 +81,8 @@ sub validateOptions {
     $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
     $opts->{accession_table_file} = get_default_path("accession_table", $outputDir) if not $opts->{accession_table_file};
     $opts->{sequence_ids_file} = get_default_path("sequence_ids", $outputDir) if not $opts->{sequence_ids_file};
+    $opts->{source_stats_file} = get_default_path("source_stats", $outputDir) if not $opts->{source_stats_file};
+    $opts->{stats_file} = get_default_path("import_stats", $outputDir) if not $opts->{stats_file};
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);

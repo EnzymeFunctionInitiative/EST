@@ -59,7 +59,6 @@ $logger->message("Retrieving accession IDs from source $efiDbName");
 my $seqData = new EFI::Sequence::Collection();
 
 my $_start = time();
-my $numIds = 0;
 
 # Populate the sequence collection from the source
 my $numLoaded = $source->loadFromSource($seqData);
@@ -67,6 +66,7 @@ if (not $numLoaded) {
     $logger->error($source->getErrors());
     die "\n";
 }
+my $numIds = $numLoaded;
 
 
 my $stats = new EFI::Import::Statistics();

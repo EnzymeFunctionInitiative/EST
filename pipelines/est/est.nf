@@ -6,7 +6,7 @@ process get_source_ids {
     output:
         path 'source_ids.tab', emit: 'source_ids'
         path 'source_seq.tab', emit: 'source_meta'
-        path 'import_stats.json', emit: 'import_stats'
+        path 'source_stats.json', emit: 'source_stats'
         path 'blast_hits.tab', emit: 'blast_hits', optional: true
         path 'seq_mapping.tab', emit: 'seq_mapping', optional: true
         path 'unmatched_id.tab', emit: 'unmatched_ids', optional: true
@@ -56,10 +56,12 @@ process filter_ids {
     input:
         path source_ids     // table of all sequence IDs, including UniRef IDs
         path source_meta    // sequence metdata
+        path source_stats   // statistics of source import process
     output:
         path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
         path 'sequence_ids.tab', emit: 'sequence_ids'           // list of primary sequence IDs in the metadata file
+        path 'import_stats.json', emit: 'import_stats'          // statistics of source and filter import processes
     script:
     filter_args = ""
     if (params.filter) {
@@ -236,7 +238,7 @@ workflow {
     source_data = get_source_ids()
 
     // Filter on all sequence IDs including UniRef, and including IDs in FASTA files
-    sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta)
+    sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats)
 
     // Get sunburst data for all sequence IDs, after filtering
     get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)

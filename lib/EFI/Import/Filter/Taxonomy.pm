@@ -50,9 +50,12 @@ sub applyFilter {
     my $sql = "SELECT accession FROM annotations LEFT JOIN taxonomy ON annotations.taxonomy_id = taxonomy.taxonomy_id WHERE accession IN (<IDS>) AND ($self->{filter_clause})";
     my $matched = $self->getMatchedSequences(\@ids, $sql);
 
+    my $numRemoved = 0;
     foreach my $id (@ids) {
-        $seqs->removeSequence($id) if not exists $matched->{$id};
+        $seqs->removeSequence($id) and $numRemoved++ if not exists $matched->{$id};
     }
+
+    $self->{stats}->addValue("num_filter_taxonomy", $numRemoved);
 }
 
 
