@@ -73,13 +73,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             fail = True
         else:
             args.blast_query_file = os.path.abspath(args.blast_query_file)
-        if args.sequence_version != "uniprot":
-            if args.import_blast_fasta_db is None:
-                print("--import-blast-fasta-db is required when sequence version is not uniprot")
-                fail = True
-            else:
-                # Use the UniRef database for the BLAST
-                args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
+        if args.import_blast_fasta_db is not None:
+            # Use the UniRef database for the BLAST
+            args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
         else:
             # Use the main database for the BLAST
             args.import_blast_fasta_db = os.path.abspath(args.fasta_db)
@@ -149,10 +145,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
     if import_mode == "blast":
         params |= {
             "blast_query_file": blast_query_file,
-            "import_blast_fasta_db": fasta_db
+            "import_blast_fasta_db": import_blast_fasta_db
         }
-        if sequence_version != "uniprot":
-            params["import_blast_fasta_db"] = args.import_blast_fasta_db
     elif import_mode == "fasta":
         params |= {
             "uploaded_fasta_file": fasta_file
