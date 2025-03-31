@@ -26,7 +26,6 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
-    common_parser.add_argument("--family-sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"], help="Sequence version to use when adding families to other modes; only use when mode is not family and the desired sequence version from the families is not uniprot")
     shared_args.add_args(common_parser)
 
     # add a subparser for each import mode
@@ -122,7 +121,7 @@ def create_parser() -> argparse.ArgumentParser:
 def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id,
                   efi_config, fasta_db, efi_db, multiplex, blast_evalue,
                   import_mode, sequence_version,
-                  families=None, family_sequence_version=None,
+                  families=None,
                   sequence_filter=None,
                   fasta_file=None,
                   accessions_file=None,
@@ -167,8 +166,6 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         params |= {
             "families": families
         }
-        if import_mode != "family":
-            params["family_sequence_version"] = args.family_sequence_version
 
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:

@@ -48,11 +48,6 @@ sub init {
     $self->{fams} = [ split(m/,/, $config->{family}) ];
     $self->{use_domain} = $config->{domain} // 0;
 
-    # If the user uses the --family-sequence-version flag, that means that this Family source is
-    # adding to another primary source, and we use that sequence version.  Otherwise we use the
-    # user-provided or default --sequence-version value.
-    $self->{sequence_version} = $config->{family_sequence_version} if $config->{family_sequence_version}; # $self->{sequence_version} is already set in the super method
-
     return 1;
 }
 
