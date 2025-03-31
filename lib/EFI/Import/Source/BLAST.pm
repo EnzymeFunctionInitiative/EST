@@ -163,6 +163,8 @@ sub parseBlastResults {
     my $sql = "SELECT accession FROM annotations WHERE accession IN (<IDS>)";
     my $matched = $self->{util}->batchRetrieveIds(\@blastIds, $sql, "accession"); # $self->{util} comes from parent module
 
+    # @unmatched contains the IDs that BLAST found (e.g. in the blastdb) but were not in the
+    # metadata (due to version mismatch)
     my @ids;
     my @unmatched;
     foreach my $id (@blastIds) {

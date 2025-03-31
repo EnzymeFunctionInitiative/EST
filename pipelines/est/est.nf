@@ -17,9 +17,6 @@ process get_source_ids {
     family_args = ""
     if (params.families) {
         family_args = "--family " + params.families
-        if (params.family_sequence_version) {
-            family_args = family_args + " --family-sequence-version " + params.family_sequence_version
-        }
     }
 
     if (params.import_mode == "blast") {
@@ -276,7 +273,6 @@ workflow {
 
     // Step 3: create blastdb and frac seq file 
     blastdb = create_blast_db(fasta_file)
-    blastdb.database_files | view
     fasta_lengths_parquet = blastreduce_transcode_fasta(fasta_file)
 
     // Step 4: all-by-all blast and blast reduce
