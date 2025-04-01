@@ -1,4 +1,3 @@
-
 package EFI::Sunburst::Data;
 
 use strict;
@@ -14,7 +13,7 @@ sub new {
     my $self = {};
     bless ($self, $class);
 
-    $self->{dbh} = $args{dbh};
+    $self->{util} = new EFI::Import::Util(dbh => $args{dbh});
 
     return bless($self, $class);
 }
@@ -25,25 +24,17 @@ sub getSunburstTaxonomy {
     my $self = shift;
     my $seqData = shift;
 
-    my $dbh = $self->{dbh};
-    my $sql = "SELECT T.* FROM taxonomy AS T LEFT JOIN annotations AS A ON T.taxonomy_id = A.taxonomy_id WHERE A.accession = ?";
-    my $sth = $dbh->prepare($sql);
+    my $sqlPattern = "SELECT A.accession, T.* FROM taxonomy AS T LEFT JOIN annotations AS A ON T.taxonomy_id = A.taxonomy_id WHERE A.accession IN (<IDS>)";
+    my @ids = $seqData->getAllSequenceIds();
+    my $matched = $self->{util}->batchRetrieveIds(\@ids, $sqlPattern, "accession");
 
     my $taxData = {unique_test => {}, data => {}};
 
-    my @ids = $seqData->getAllSequenceIds();
-
     my @notFound;
     foreach my $id (@ids) {
-        $sth->execute($id);
-
-        my $hasData = 0;
-        while (my $row = $sth->fetchrow_hashref) {
-            $self->addTaxData($taxData, $row, $id, $seqData->getUniref90Id($id), $seqData->getUniref50Id($id));
-            $hasData = 1;
-        }
-
-        if (not $hasData) {
+        if ($matched->{$id}) {
+            $self->addTaxData($taxData, $matched->{$id}, $id, $seqData->getUniref90Id($id), $seqData->getUniref50Id($id));
+        } else {
             push @notFound, $id;
         }
     }
