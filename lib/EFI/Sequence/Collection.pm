@@ -76,7 +76,7 @@ sub removeSequence {
         delete $self->{seq}->{$sequenceId};
     }
 
-    if ($self->{uniref50}->{$sequenceId}) {
+    if ($self->{sequence_version} eq SEQ_UNIREF50 and $self->{uniref50}->{$sequenceId}) {
         foreach my $ur90 (keys %{ $self->{uniref50}->{$sequenceId} }) {
             if ($self->{uniref90}->{$ur90}) {
                 foreach my $up (keys %{ $self->{uniref90}->{$ur90} }) {
@@ -90,7 +90,7 @@ sub removeSequence {
         delete $self->{uniref50}->{$sequenceId};
     }
     
-    if ($self->{uniref90}->{$sequenceId}) {
+    if ($self->{sequence_version} eq SEQ_UNIREF90 and $self->{uniref90}->{$sequenceId}) {
         foreach my $up (keys %{ $self->{uniref90}->{$sequenceId} }) {
             delete $self->{uniprot}->{$up};
         }

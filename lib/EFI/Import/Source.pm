@@ -112,15 +112,22 @@ sub addUnirefIds {
         return;
     }
 
-    # UniProt IDs
+    # If the IDs from the collection are already UniRef IDs, we need to retrieve the IDs from
+    # the uniref table that match those IDs.
+    my $tableKey = "accession";
+    if ($seqVersion eq SEQ_UNIREF90) {
+        $tableKey = "uniref90_seed";
+    } elsif ($seqVersion eq SEQ_UNIREF50) {
+        $tableKey = "uniref50_seed";
+    }
+
+    my $sql = "SELECT * FROM uniref WHERE $tableKey IN (<IDS>)";
+
     my @ids = $seqData->getSequenceIds();
 
-    my $sql = "SELECT * FROM uniref WHERE accession IN (<IDS>)";
     my $matched = $self->{util}->batchRetrieveIds(\@ids, $sql, "accession");
-    foreach my $id (@ids) {
-        if ($matched->{$id}) {
-            $seqData->addUniref($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
-        }
+    foreach my $id (sort keys %$matched) {
+        $seqData->addUniref($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
     }
 }
 
