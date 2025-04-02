@@ -32,9 +32,14 @@ sub getOutputDir {
 
 
 #
-# add default, shared options
+# addImportOptions - protected method
 #
-# call in sub classes
+# Add default shared options to the available command line parsing list; call in sub classes
+#
+# Parameters:
+#    include_config - if specified as an optional value, then include the command line options
+#        that are required by the import scripts (i.e. path to database config file and path or
+#        name of database) 
 #
 sub addImportOptions {
     my $self = shift;

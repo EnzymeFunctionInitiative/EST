@@ -37,8 +37,6 @@ sub save {
     my $self = shift;
     my $outputFile = shift;
 
-    $self->computeStats();
-
     my $json = JSON->new->allow_nonref->pretty->encode($self->{stats});
 
     open my $fh, ">", $outputFile or die "Unable to write to $outputFile: $!";
@@ -70,12 +68,6 @@ sub load {
 }
 
 
-sub computeStats {
-    my $self = shift;
-    #TODO: implement this
-}
-
-
 sub getMapping {
     return {
         total => "Total",
@@ -90,5 +82,7 @@ sub getMapping {
         num_blast_retr => "BlastRetrieved",
     };
 }
+
+
 1;
 
