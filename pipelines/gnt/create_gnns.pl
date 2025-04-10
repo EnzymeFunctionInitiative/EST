@@ -63,7 +63,18 @@ $tables->saveIdsWithNoContext($opts->{no_context}) if $opts->{no_context};
 
 if ($opts->{gnd}) {
     my $gnd = new EFI::GNT::GND();
-    $gnd->save($gnn, $opts->{gnd});
+
+    my $metadata = {
+        neighborhood_size => $opts->{nb_size},
+        coccurrence => $opts->{cooc_threshold},
+        title => $opts->{title} // "",
+        type => "gnn",
+    };
+
+    my $networkType = ""; #TODO
+    my $clusterNames = {}; #TODO
+    my %args = (network_type => $networkType, cluster_names => $clusterNames, sort_sequence_ids => 1);
+    $gnd->save($opts->{gnd}, $gnn, $metadata, %args);
 }
 
 
@@ -87,6 +98,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("cooc-threshold=f", 0, "cooccurrence threshold (>= 0.0 and <= 1.0)", OPT_VALUE, $defaultCoocThreshold);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
+    $optParser->addOption("title=s", 0, "title of the GNN and GND for display purposes");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();

@@ -39,8 +39,22 @@ my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno, neighborhood_size => $opts->{nb_size});
 $gnn->retrieveClusterData();
 
+
 my $gnd = new EFI::GNT::GND();
-$gnd->save($gnn, $opts->{gnd});
+
+my $networkType = ""; #TODO
+my $clusterNames = {}; #TODO
+my $matchedIds = {}; #TODO
+my $unmatchedIds = []; #TODO
+my $metadata = {
+    neighborhood_size => $opts->{nb_size},
+    title => $opts->{title} // "",
+    type => $opts->{source_type} // "",
+    sequence => $opts->{source_sequence} // "",
+};
+
+my %args = (network_type => $networkType, cluster_names => $clusterNames, matched_ids => $matchedIds, unmatched_ids => $unmatchedIds);
+$gnd->save($opts->{gnd}, $gnn, $metadata, %args);
 
 
 
@@ -55,13 +69,27 @@ sub validateAndProcessOptions {
     $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences) to retrieve on either side of query (> 0 and <= 20)", OPT_VALUE, $defaultNbSize);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
+    $optParser->addOption("title=s", 0, "title of the GND, metadata");
+    $optParser->addOption("source-type=s", 0, "the source of the data provided, e.g. BLAST, FASTA, ID list");
+    $optParser->addOption("source-sequence-file=s", 0, "path to a file containing the sequence used to generate the results, only valid for BLAST sources");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
         exit(not $optParser->wantHelp());
     }
 
-    return $optParser->getOptions();
+    my $opts = $optParser->getOptions();
+
+    if ($opts->{source_sequence_file} and -f $opts->{source_sequence_file}) {
+        my $sequence = "";
+        open my $fh, "<", $opts->{source_sequence_file} or die "Unable to open source sequence file '$opts->{source_sequence_file}': $!";
+        while (my $line = <$fh>) {
+            chomp $line;
+            $sequence .= $line;
+        }
+        close $fh;
+        $opts->{source_sequence} = $sequence;
+    }
 }
 
 1;

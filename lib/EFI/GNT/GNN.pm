@@ -113,16 +113,16 @@ sub insertAnnotationData {
     $data->{attributes}->{taxon_id} = $anno->{taxonomy_id};
     $data->{attributes}->{anno_status} = $anno->{status};
     $data->{attributes}->{desc} = $anno->{desc};
-    $data->{attributes}->{family_desc} = $anno->{pfam_desc};
-    $data->{attributes}->{ipro_family_desc} = $anno->{interpro_desc};
+    $data->{attributes}->{pfam_desc} = $anno->{pfam_desc};
+    $data->{attributes}->{interpro_desc} = $anno->{interpro_desc};
 
     foreach my $nbObj (@{ $data->{neighbors} }) {
         my $nbAnno = $self->{gnt_anno}->getGnnIdAnnotations($nbObj);
         $nbObj->{taxon_id} = $nbAnno->{taxonomy_id};
         $nbObj->{anno_status} = $nbAnno->{status};
         $nbObj->{desc} = $nbAnno->{desc};
-        $nbObj->{family_desc} = $nbAnno->{pfam_desc};
-        $nbObj->{ipro_family_desc} = $nbAnno->{interpro_desc};
+        $nbObj->{pfam_desc} = $nbAnno->{pfam_desc};
+        $nbObj->{interpro_desc} = $nbAnno->{interpro_desc};
     }
 }
 
