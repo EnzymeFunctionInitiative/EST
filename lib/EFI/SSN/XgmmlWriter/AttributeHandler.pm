@@ -125,14 +125,38 @@ The Cytoscape identifier (e.g. C<id> attribute).  This may be the same as C<labe
 Called when the end tag of a node is encountered.
 
 
-=head3 C<getSkipFieldInfo()>
+=head3 C<onGraphAttr($attrName, $attrValue)>
 
-Gets a list of fields to skip when writing.  This is used so that the writer can insert
-new fields into the output SSN.
+Called as each attribute of a graph element is processed.  The return value replaces the
+existing value in the network attribute.
+
+=head4 Parameters
+
+=over C<$attrName>
+
+The attribute name (e.g. C<label>).
+
+=item C<$attrValue>
+
+The existing attribute value (e.g. C<"TDS_UP Full Network">).
+
+=back
 
 =head4 Returns
 
-Array ref of field names in SSN display format (e.g. not internal naming convention).
+A replacement value for the attribute.  For example, C<"TDS_UP Full Network colorized">.
+
+
+=head3 C<getSkipFieldInfo()>
+
+Gets a list of fields to skip when writing.  This is used so that the writer can insert
+new fields into the output SSN, and if those fields already exist then they are skipped
+by the writer and instead the new values are inserted.
+
+=head4 Returns
+
+Array ref of field names in SSN display format (e.g. e.g. external, user-facting naming
+convention).
 
 =head4 Example Usage
 

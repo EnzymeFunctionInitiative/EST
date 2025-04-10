@@ -122,7 +122,7 @@ C<create_gnns.pl> - read a SSN XGMML file and write it to a new file after addin
     create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
         --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
         [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
-        [--nb-size <INTEGER> --cooc-threshold <NUMBER>]
+        [--nb-size <INTEGER> --cooc-threshold <NUMBER> --title "<TITLE>"]
 
 
 =head2 DESCRIPTION
@@ -204,6 +204,10 @@ Path to the C<efi.config> file used for database connection options.
 =item C<--db-name>
 
 Name of the database to use (path to file for SQLite).
+
+=item C<--title>
+
+Optional title to use for display purposes in the GND viewer.
 
 =back
 

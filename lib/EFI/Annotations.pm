@@ -1138,9 +1138,32 @@ A string representing a SSN column heading (e.g. display name).
     }
 
 
+=head3 C<get_gnt_info_insert_location()>
+
+Returns the name of the SSN column where the GNT information columns (e.g. ENA status, ID,
+neighbor families) should be inserted.  This is designed so that the new columns will be
+inserted immediately following the returned column.
+
+=head4 Returns
+
+A string representing a SSN column heading (e.g. display name).
+
+=head4 Example Usage
+
+    my $name = $anno->get_gnt_info_insert_location();
+    if ($currentSsnColName eq $name) {
+        # Insert a copy of the current SSN column
+        # Append the GNT columns
+    }
+
+
 =head3 C<get_color_fields()>
 
 Gets a list of color SSN attribute display names (such as cluster number and color).
+These are (from B<EFI::Annotations::Fields):
+C<FIELD_COLOR_SEQ_NUM>, C<FIELD_COLOR_NODE_NUM>, C<FIELD_COLOR_SINGLETON>,
+C<FIELD_COLOR_SEQ_NUM_COLOR>, C<FIELD_COLOR_NODE_NUM_COLOR>, C<FIELD_COLOR_SEQ_COUNT>, and
+C<FIELD_COLOR_NODE_COUNT>
 
 =head4 Returns
 
@@ -1152,7 +1175,8 @@ An array ref of fields from B<EFI::Annotations::Fields> of the C<color> group.
 
 =item C<$display>
 
-A hash ref of field name to field display (e.g. FIELD_COLOR_SEQ_NUM => "Sequence Count Cluster Number").
+A hash ref mapping field name to field display.  The key is a constant from
+B<EFI::Annotations::Fields> and the value is from B<EFI::Annotations>.
 
 =back
 
@@ -1164,6 +1188,41 @@ A hash ref of field name to field display (e.g. FIELD_COLOR_SEQ_NUM => "Sequence
     if (exists $attr->{$ssnField}) {
         print "The SSN field $ssnField is one of the color fields\n";
     }
+
+
+=head3 C<get_gnt_fields()>
+
+Gets a list of GNT SSN attribute display names.  These are (from B<EFI::Annotations::Fields>):
+C<FIELD_GNT_PRESENT_ENA_DB>, C<FIELD_GNT_NB_ENA_DB>, C<FIELD_GNT_ENA_ID>, C<FIELD_GNT_NB_PFAM>,
+and C<FIELD_GNT_NB_INTERPRO>.
+
+
+=head4 Returns
+
+=over
+
+=item C<$fields>
+
+An array ref of fields from B<EFI::Annotations::Fields> of the C<gnt> group.
+
+=item C<$display>
+
+A hash ref mapping field name to field display.  These are (from B<EFI::Annotations::Fields):
+A hash ref of field name to field display (e.g. FIELD_AAAA => "").
+
+=back
+
+=head4 Example Usage
+
+    my $ssnField = "Sequence Count Cluster Number";
+    my ($attrFields, $attrDisplay) = $anno->get_gnt_fields();
+    my %attr = map { $attrDisplay->{$_} => $_ } @$attrFields;
+    if (exists $attr->{$ssnField}) {
+        print "The SSN field $ssnField is one of the GNT fields\n";
+    }
+
+
+=cut
 
 
 =cut

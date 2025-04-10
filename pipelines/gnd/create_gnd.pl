@@ -104,7 +104,7 @@ C<create_gnd.pl> - read a SSN XGMML file and write it to a new file after adding
 =head2 SYNOPSIS
 
     create_gnd.pl --cluster-map <FILE> --gnd <FILE> --config <FILE> --db-name <NAME>
-        [--nb-size <INTEGER>]
+        [--nb-size <INTEGER> --title "<TITLE>" --source-type "<TYPE>" --source-sequence-file <FILE>]
 
 
 =head2 DESCRIPTION
@@ -140,6 +140,20 @@ Path to the C<efi.config> file used for database connection options.
 =item C<--db-name>
 
 Name of the database to use (path to file for SQLite).
+
+=item C<--title>
+
+Optional title to use for display purposes in the GND viewer.
+
+=item C<--source-type>
+
+Optional type of the data that was used to generate the input (e.g. BLAST, FASTA,
+ID_LOOKUP, or unzip).
+
+=item C<--source-sequence-file>
+
+Optional path to a file containing the sequence used to generate the input IDs if the
+source data came from a BLAST.
 
 =back
 

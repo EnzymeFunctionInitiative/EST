@@ -151,7 +151,7 @@ __END__
 
 =head2 NAME
 
-EFI::SSN::XgmmlWriter::AttributeHandler::Color - Perl module for saving color attributes
+B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> - Perl module for saving color attributes
 based on cluster number into a SSN.
 
 =head2 SYNOPSIS
@@ -161,7 +161,7 @@ based on cluster number into a SSN.
 
     my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
 
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap,
+    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color->new(cluster_map => $clusterMap,
         colors => $colors, cluster_sizes => $sizes);
     $xwriter->addAttributeHandler($colorHandler);
 
@@ -223,7 +223,7 @@ of nodes.  For example:
 
 =head4 Example Usage
 
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap,
+    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color->new(cluster_map => $clusterMap,
         colors => $colors, cluster_sizes => $sizes);
     $xwriter->addAttributeHandler($colorHandler);
 

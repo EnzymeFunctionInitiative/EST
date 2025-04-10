@@ -373,7 +373,7 @@ __END__
 
 =head2 NAME
 
-EFI::SSN::XgmmlWriter - Perl module for rewriting a XGMML file from a source to a target
+B<EFI::SSN::XgmmlWriter> - Perl module for rewriting a XGMML file from a source to a target
 while inserting color and cluster number information
 
 =head2 SYNOPSIS
@@ -381,9 +381,9 @@ while inserting color and cluster number information
     use EFI::SSN::XgmmlWriter;
     use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
 
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap, colors => $colors);
+    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color->new(cluster_map => $clusterMap, colors => $colors);
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn, append_new_attr => 1);
     $xwriter->addAttributeHandler($colorHandler);
     $xwriter->write();
 
@@ -397,7 +397,7 @@ derived classes are used to provide metadata.
 
 =head2 METHODS
 
-=head3 C<new(ssn =E<gt> $ssnFile, output_ssn =E<gt> $outputSsn)>
+=head3 C<new(ssn =E<gt> $ssnFile, output_ssn =E<gt> $outputSsn, append_new_attr =E<gt> 1)>
 
 Creates a new B<EFI::SSN::XgmmlWriter> object.
 
@@ -407,13 +407,27 @@ Creates a new B<EFI::SSN::XgmmlWriter> object.
 
 =item C<ssn>
 
-Path to a SSN file in XGMML format (XML) that is to be parsed and rewritten.
+Path to a SSN file in XGMML format (XML) that is to be parsed.
+
+=item C<output_ssn>
+
+Path to the SSN file to write.
+
+=item C<append_new_attr>
+
+If true (non-zero), then new attributes are appended after the node attribute location
+specified by B<EFI::Annotations> (e.g. C<get_cluster_info_insert_location> and
+C<get_gnt_info_insert_location>).  Otherwise the new node attributes will be prepended
+to the location.  I<Defaults to true (e.g. appending).>
 
 =back
 
 =head4 Example Usage
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn,
+        append_new_attr => 0);
+    # If the location is the node attribute "Organism", then fields will be inserted
+    # before the "Organism" attribute and then "Organism" will be added.
 
 
 =head3 C<write()>
