@@ -6,8 +6,11 @@ use warnings;
 
 use DBI;
 
-use constant SORT_KEY => "sort_key";
-use constant QUERY_GENE_KEY => "gene_key"; # links the neighbors to corresponding query sequences
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../..";
+
+use EFI::GNT::GND::Schema qw(:schema);
 
 
 sub new {
@@ -88,12 +91,12 @@ sub insertNeighbors {
     my $sortKey = 0;
 
     if (not $self->{insert_neighbor_sth}) {
-        my @cols = map { $_->{db_name} // $_->{name} } grep { not $_->{primary_key} } @{ $self->{neighbor_cols} };
+        my @cols = map { $_->{db_name} // $_->{name} } grep { not $_->{primary_key} } @{ $self->{schema}->getNeighborCols() };
         my @vals = map { "?" } @cols;
 
         my $colNames = join(", ", @cols);
         my $vals = join(", ", @vals);
-        my $sql = "INSERT INTO neighbors ($colNames) VALUES ($vals)";
+        my $sql = "INSERT INTO " . NEIGHBOR_TABLE . " ($colNames) VALUES ($vals)";
 
         my $sth = $self->{dbh}->prepare($sql);
         if (not $sth) {
@@ -105,9 +108,9 @@ sub insertNeighbors {
     my %families;
     foreach my $neighbor (@$neighbors) {
         my @row;
-        foreach my $col (@{ $self->{neighbor_cols} }) {
-            next if $col->{primary_key}; # don't insert sort_key, since it's auto increment
-            if ($col->{name} eq QUERY_GENE_KEY) {
+        foreach my $col (@{ $self->{schema}->getNeighborCols() }) {
+            next if $col->{primary_key}; # don't insert sort_key for neighbors, since it's auto increment
+            if ($col->{name} eq QUERY_KEY or $col->{name} eq LEGACY_QUERY_KEY) {
                 push @row, $querySortKey;
             } else {
                 push @row, $neighbor->{$col->{name}} // "";
@@ -138,17 +141,17 @@ sub insertQueryId {
     my $queryData = shift;
 
     my @row;
-    foreach my $col (@{ $self->{query_id_cols} }) {
+    foreach my $col (@{ $self->{schema}->getQueryIdCols() }) {
         push @row, $queryData->{$col->{name}} // "";
     }
 
     if (not $self->{insert_query_sth}) {
-        my @cols = map { $_->{db_name} // $_->{name} } @{ $self->{query_id_cols} };
+        my @cols = map { $_->{db_name} // $_->{name} } @{ $self->{schema}->getQueryIdCols() };
         my @vals = map { "?" } @cols;
 
         my $colNames = join(", ", @cols);
         my $vals = join(", ", @vals);
-        my $sql = "INSERT INTO attributes ($colNames) VALUES ($vals)";
+        my $sql = "INSERT INTO " . QUERY_TABLE . " ($colNames) VALUES ($vals)";
 
         my $sth = $self->{dbh}->prepare($sql);
         if (not $sth) {
@@ -190,187 +193,6 @@ sub insert {
         $self->{dbh}->commit();
     }
     $sth->execute(@$row);
-}
-
-
-#
-# initializeDatabase - private method
-#
-# Creates the tables and indexes necessary to store data for a GNN.  If
-# none or not all of the expected tables exist then any existing data is
-# overwritten.
-#
-# Parameters:
-#    $gndFile - path to an output GND file
-#
-# Returns:
-#    1 if the database already exists, 0 otherwise
-#
-sub initializeDatabase {
-    my $self = shift;
-    my $gndFile = shift;
-
-    if (-e $gndFile) {
-        return 0;
-    }
-
-    $self->{dbh} = DBI->connect("DBI:SQLite:dbname=$gndFile", "", "");
-    # Turn on transactions (e.g. don't automatically commit after every insert)
-    $self->{dbh}->{AutoCommit} = 0;
-
-    my @queryIndexCols = $self->initializeTable("attributes", $self->{query_id_cols});
-    my @neighborIndexCols = $self->initializeTable("neighbors", $self->{neighbor_cols});
-
-    my @indexCols;
-    push @indexCols, ["attributes", \@queryIndexCols];
-    push @indexCols, ["neighbors", \@neighborIndexCols];
-
-    # Create indexes
-    foreach my $colGroup (@indexCols) {
-        my $tableName = $colGroup->[0];
-        foreach my $col (@{ $colGroup->[1] }) {
-            my $indexName = "${tableName}_$col";
-            my $sql = "CREATE INDEX $indexName ON $tableName ($col)";
-            $self->{dbh}->do($sql);
-            $self->{dbh}->commit();
-        }
-    }
-
-    return 1;
-}
-
-
-#
-# initializeTable - private method
-#
-# Creates a table. The input is a table name and column specification.
-# Each value in a column spec contains the name of the column, the
-# database type of the column, and optional additional parameters
-# 'not_null' (1 if the column is NOT NULL), 'create_index' (1 if an
-# index must be created for the column), and 'primary_key' (1 if the
-# column is a primary key; multiple columns can be primary keys).
-#
-# Parameters:
-#    $tableName - name of the table to create
-#    $tableCols - column specification; array ref, each element
-#        is a hash ref (from getQuerySchema() or getNeighorSchema())
-#
-# Returns:
-#    list of column names that must be indexed
-#
-sub initializeTable {
-    my $self = shift;
-    my $tableName = shift;
-    my $tableCols = shift;
-
-    my @cols;
-    my @pk;
-    my @indexCols;
-    foreach my $col (@$tableCols) {
-        my $colName = $col->{db_name} // $col->{name};
-        my $spec = "$colName $col->{type}";
-        $spec .= " NOT NULL" if $col->{not_null};
-        push @pk, $colName if $col->{primary_key};
-        push @indexCols, $colName if $col->{create_index};
-        push @cols, $spec;
-    }
-
-    # Drop the table if the database is partially initialized or is out of date
-    $self->{dbh}->do("DROP TABLE IF EXISTS $tableName");
-    $self->{dbh}->commit();
-
-    my $cols = join(", ", @cols);
-    my $pk = join(", ", @pk);
-    $cols .= ", PRIMARY KEY ($pk)" if $pk;
-    my $sql = "CREATE TABLE $tableName ($cols)";
-
-    $self->{dbh}->do($sql);
-    $self->{dbh}->commit();
-
-    return @indexCols;
-}
-
-
-#
-# getSharedSchema - private static function
-#
-# Return schema that is shared between the attribute (query) and neighbors tables.
-# The 'name' field is both the input data structure and database field names, but
-# if the 'db_name' field is present then that value is used for the database name
-# column.  For example, the 'embl_id' field is in the input data structure, and
-# the 'db_name' field in the schema indicates that those values should be stored
-# in a column in the database named 'id'.
-#
-# Returns:
-#    array ref where each element corresponds to a column specification
-#
-sub getSharedSchema {
-    return [
-        {name => SORT_KEY, type => "INTEGER", primary_key => 1, create_index => 1},
-        {name => "id", db_name => "accession", type => "VARCHAR(20)", create_index => 1},
-        {name => "embl_id", db_name => "id", type => "VARCHAR(30)"},
-        {name => "num", type => "INTEGER"},
-        {name => "family", type => "TEXT"}, # can be more than one family, separated by dash
-        {name => "ipro_family", type => "TEXT"}, # can be more than one family, separated by dash
-        {name => "start", type => "INTEGER"}, # start of sequence on genome in bp
-        {name => "stop", type => "INTEGER"}, # end of sequence on genome in bp
-        {name => "rel_start", type => "INTEGER"}, # start of sequence on genome in bp, accounting for a circular genome
-        {name => "rel_stop", type => "INTEGER"}, # end of sequence on genome in bp, accounting for a circular genome
-        {name => "direction", type => "VARCHAR(10)"}, # "normal" or "complement"
-        {name => "type", type => "VARCHAR(8)"}, # "linear" or "circular"
-        {name => "seq_len", type => "INTEGER"}, # length of sequence in bp
-        {name => "taxon_id", type => "INTEGER"}, # taxonomy ID
-        {name => "anno_status", type => "INTEGER"}, # 1 if SwissProt, 0 if TrEMBL
-        {name => "desc", db_name => "description", type => "TEXT"}, # SwissProt or sequence description from UniProt DB
-        {name => "family_desc", type => "TEXT"}, # Pfam long name
-        {name => "ipro_family_desc", type => "TEXT"}, # InterPro long name
-        {name => "color", type => "VARCHAR(255)"},
-    ];
-}
-
-
-#
-# getQuerySchema - private static function
-#
-# Return the database schema for the attribute (query) table
-#
-# Returns:
-#    array ref where each element corresponds to a column specification
-#
-sub getQuerySchema {
-    my $sharedCols = getSharedSchema();
-    return [
-        @$sharedCols,
-        {name => "sort_order", type => "INTEGER"}, # order in which the queries were retrieved
-        {name => "strain", type => "TEXT"}, # strain from EFI database annotations table metadata field
-        {name => "cluster_num", type => "INTEGER", create_index => 1}, # cluster number that this query belongs to
-        {name => "organism", type => "TEXT"},
-        {name => "is_bound", type => "INTEGER"},
-        {name => "evalue", type => "REAL"},
-        {name => "cluster_index", type => "INTEGER", create_index => 1},
-    ];
-    #TODO: Add UniRef columns here
-}
-
-
-#
-# getNeighborSchema - private static function
-#
-# Return the database schema for the neighbors table
-#
-# Returns:
-#    array ref where each element corresponds to a column specification
-#
-sub getNeighborSchema {
-    my $sharedCols = getSharedSchema();
-    # Get rid of the embl_id column since it is the same as the attribute (query)
-    # embl_id value.
-    my @cols = grep { $_->{name} ne "embl_id" } @$sharedCols;
-    # gene_key corresponds to the SORT_KEY field in the attribute (query) table
-    return [
-        @cols,
-        {name => QUERY_GENE_KEY, type => "INTEGER", create_index => 1}, 
-    ];
 }
 
 

@@ -110,15 +110,15 @@ sub getClusterInfo {
 
         $self->{cluster_color_map}->{$seqNum} = $seqColor;
 
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM}, $seqNum, "integer"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM}, $nodeNum, "integer"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM_COLOR}, $seqColor, "string"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM_COLOR}, $nodeColor, "string"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_COUNT}, $seqCount, "integer"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_COUNT}, $nodeCount, "integer"];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM}, "integer", $seqNum];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM}, "integer", $nodeNum];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM_COLOR}, "string", $seqColor];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM_COLOR}, "string", $nodeColor];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_COUNT}, "integer", $seqCount];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_COUNT}, "integer", $nodeCount];
     } else {
         my $singNum = $self->{singleton_num}++;
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SINGLETON}, $singNum, "integer"];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SINGLETON}, "integer", $singNum];
     }
 
     return \@info;

@@ -40,11 +40,26 @@ process create_gnns {
     """
 }
 
+process add_gnt_metadata {
+    publishDir params.final_output_dir, mode: "copy"
+    input:
+        path color_ssn
+        path metanode_map
+        path gnd
+    output:
+        path "gnt_colored_ssn.xgmml", emit: "ssn_output"
+    """
+    perl $projectDir/update_color_ssn.pl --color-ssn ${color_ssn} --gnt-color-ssn gnt_colored_ssn.xgmml --metanode-map ${metanode_map} --gnd ${gnd}
+    """
+}
+
 workflow {
     // Files are published to params.final_output_dir by the processes inside the
     // color_and_retrieve workflow
     color_work = color_and_retrieve()
 
     gnn_data = create_gnns(color_work.cluster_id_map, color_work.singletons)
+
+    add_gnt_metadata(color_work.ssn_output, color_work.metanode_map, gnn_data.gnd)
 }
 

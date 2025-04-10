@@ -24,6 +24,8 @@ sub new {
     my $self = {};
     bless($self, $class);
 
+    $self->{append_new_attr} = $args{append_new_attr} // 1;
+
     $self->{ssn} = $args{ssn};
     $self->{output_ssn} = $args{output_ssn};
 
@@ -261,6 +263,12 @@ sub processAttElement {
 
     my $attName = $self->{reader}->getAttribute("name");
 
+    my $newEmptyTag = sub {
+        my $info = shift;
+        my $value = shift;
+        $self->emptyTag("att", "name" => $info->[0], "type" => $info->[1], "value" => $value);
+    };
+
     # An 'empty' element is a leaf (e.g. no child elements; <att X="Y" /> is empty);
     # also, skip existing color or cluster number attrs
     if (not $self->{skip_att}->{$attName}) {
@@ -268,15 +276,22 @@ sub processAttElement {
 
         # Write the current 'empty' element plus the cluster info if we're at the right column
         if ($self->{reader}->isEmptyElement()) {
-            $self->emptyTag("att", @attr);
+            $self->emptyTag("att", @attr) if $self->{append_new_attr};
             foreach my $h (@{ $self->{attr_handlers} }) {
                 my $newAttrs = $h->getNewAttributes($attName);
                 foreach my $info (@$newAttrs) {
-                    my @newAttr = ("name" => $info->[0], "value" => $info->[1]);
-                    push @newAttr, "type" => $info->[2] if $info->[2];
-                    $self->emptyTag("att", @newAttr);
+                    if (ref $info->[2] eq "ARRAY") {
+                        $self->startTag("att", "name" => $info->[0], "type" => "list");
+                        foreach my $value (@{ $info->[2] }) {
+                            $newEmptyTag->($info, $value);
+                        }
+                        $self->endTag("att");
+                    } else {
+                        $newEmptyTag->($info, $info->[2]);
+                    }
                 }
             }
+            $self->emptyTag("att", @attr) if not $self->{append_new_attr};
         # Start the tag for a nested att
         } else {
             $self->startTag("att", @attr);

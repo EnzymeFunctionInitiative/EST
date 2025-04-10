@@ -21,6 +21,7 @@ use constant ANNO_FIELDS_BASE_SSN => 2;
 use constant ANNO_FIELDS_SSN_NUMERIC => 4;
 use constant ANNO_FIELDS_DB_USER => 8;
 use constant ANNO_FIELDS_SSN_COLOR => 16;
+use constant ANNO_FIELDS_SSN_GNT => 32;
 
 use constant ANNO_ROW_SEP => "^";
 
@@ -331,7 +332,8 @@ sub get_annotation_data {
 # Parameters:
 #     $type - a subset of field names to retrieve. One of
 #         ANNO_FIELDS_SSN_DISPLAY, ANNO_FIELDS_BASE_SSN, ANNO_FIELDS_SSN_NUMERIC, ANNO_FIELDS_DB_USER,
-#         ANNO_FIELDS_SSN_COLOR
+#         ANNO_FIELDS_SSN_COLOR, ANNO_FIELDS_SSN_GNT
+#         If not specified, returns all.
 #
 # Returns:
 #     an array of metadata, with each entry in the array being a hash ref representing a field and it's metadata
@@ -346,8 +348,8 @@ sub get_annotation_fields {
         # db_primary_col is present if it is required to be in the same table (e.g. not stored in a JSON structure, or in an external table)
         push @fields, {name => "accession",                 field_type => "db",     type_spec => "VARCHAR(10)",     display => "",                                                                                      db_primary_col => 1,index_name => "uniprot_accession_idx",                              primary_key => 1};
         push @fields, {name => FIELD_SEQ_SRC_KEY,           field_type => "ssn",                                    display => "Sequence Source"};
-        push @fields, {name => "organism",                  field_type => "db",     type_spec => "VARCHAR(150)",    display => "Organism",                      base_ssn => 1,                                                                          json_type_spec => "str",    json_name => "o"};
-        push @fields, {name => "taxonomy_id",               field_type => "db",     type_spec => "INT",             display => "Taxonomy ID",                   base_ssn => 1,                                          db_primary_col => 1,index_name => "taxonomy_id_idx"};
+        push @fields, {name => FIELD_ORGANISM_KEY,          field_type => "db",     type_spec => "VARCHAR(150)",    display => "Organism",                      base_ssn => 1,                                                                          json_type_spec => "str",    json_name => "o"};
+        push @fields, {name => "taxonomy_id",               field_type => "db",     type_spec => "INT",             display => FIELD_TAXON_ID,                  base_ssn => 1,                                          db_primary_col => 1,index_name => "taxonomy_id_idx"};
         push @fields, {name => "swissprot_status",          field_type => "db",     type_spec => "BOOL",            display => "UniProt Annotation Status",     base_ssn => 1,                                          db_primary_col => 1,index_name => "swissprot_status_idx"};
         push @fields, {name => "description",               field_type => "db",     type_spec => "VARCHAR(255)",    display => "Description",                   base_ssn => 1,                      ssn_list_type => 1,                                 json_type_spec => "str",    json_name => "d"};
         push @fields, {name => "swissprot_description",     field_type => "ssn",                                    display => "SwissProt Description",         base_ssn => 1};
@@ -423,6 +425,11 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_COLOR_NODE_NUM_COLOR,  field_type => "color",                                  display => "Node Count Fill Color"};
         push @fields, {name => FIELD_COLOR_SEQ_COUNT,       field_type => "color",                                  display => "Cluster Sequence Count"};
         push @fields, {name => FIELD_COLOR_NODE_COUNT,      field_type => "color",                                  display => "Cluster Node Count"};
+        push @fields, {name => FIELD_GNT_PRESENT_ENA_DB,    field_type => "gnt",                                    display => "Present in ENA Database?"};
+        push @fields, {name => FIELD_GNT_NB_ENA_DB,         field_type => "gnt",                                    display => "Genome Neighbors in ENA Database?"};
+        push @fields, {name => FIELD_GNT_ENA_ID,            field_type => "gnt",                                    display => "ENA Database Genome ID"};
+        push @fields, {name => FIELD_GNT_NB_PFAM,           field_type => "gnt",                                    display => "Neighbor Pfam Families"};
+        push @fields, {name => FIELD_GNT_NB_INTERPRO,       field_type => "gnt",                                    display => "Neighbor InterPro Families"};
 
         $self->{fields} = \@fields;
     }
@@ -437,6 +444,8 @@ sub get_annotation_fields {
         return grep { $_->{field_type} eq "db" and not $_->{db_primary_col} } @{ $self->{fields} };
     } elsif ($type == ANNO_FIELDS_SSN_COLOR) {
         return grep { $_->{field_type} eq "color" and not $_->{db_primary_col} } @{ $self->{fields} };
+    } elsif ($type == ANNO_FIELDS_SSN_GNT) {
+        return grep { $_->{field_type} eq "gnt" and not $_->{db_primary_col} } @{ $self->{fields} };
     } else {
         return @{ $self->{fields} };
     }
@@ -579,8 +588,22 @@ sub get_expandable_attr {
 
 sub get_color_fields {
     my $self = shift;
-    my $anno = $self->get_annotation_data();
     my @fields = (FIELD_COLOR_SEQ_NUM, FIELD_COLOR_NODE_NUM, FIELD_COLOR_SINGLETON, FIELD_COLOR_SEQ_NUM_COLOR, FIELD_COLOR_NODE_NUM_COLOR, FIELD_COLOR_SEQ_COUNT, FIELD_COLOR_NODE_COUNT);
+    return $self->get_user_fields(@fields);
+}
+
+
+sub get_gnt_fields {
+    my $self = shift;
+    my @fields = (FIELD_GNT_PRESENT_ENA_DB, FIELD_GNT_NB_ENA_DB, FIELD_GNT_ENA_ID, FIELD_GNT_NB_PFAM, FIELD_GNT_NB_INTERPRO);
+    return $self->get_user_fields(@fields);
+}
+
+
+sub get_user_fields {
+    my $self = shift;
+    my @fields = @_;
+    my $anno = $self->get_annotation_data();
     my %display = map { $_ => $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
     return (\@fields, \%display);
 }
@@ -589,6 +612,12 @@ sub get_color_fields {
 sub get_cluster_info_insert_location {
     my $self = shift;
     return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
+}
+
+
+sub get_gnt_info_insert_location {
+    my $self = shift;
+    return $self->get_annotation_data()->{&FIELD_COLOR_NODE_COUNT}->{display};
 }
 
 

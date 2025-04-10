@@ -43,10 +43,10 @@ process color_ssn {
         path cluster_id_map
         path cluster_num_map
     output:
-        path "ssn_colored.xgmml", emit: "ssn_output"
+        path "colored_ssn.xgmml", emit: "ssn_output"
         path "cluster_colors.txt", emit: "cluster_colors"
     """
-    perl $projectDir/../shared/perl/color_xgmml.pl --ssn $ssn_file --color-ssn ssn_colored.xgmml --cluster-map $cluster_id_map \
+    perl $projectDir/../shared/perl/color_xgmml.pl --ssn $ssn_file --color-ssn colored_ssn.xgmml --cluster-map $cluster_id_map \
         --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt --color-file $projectDir/../shared/perl/colors.tab
     """
 }
@@ -167,5 +167,6 @@ workflow color_and_retrieve {
         cluster_num_map = compute_info.cluster_num_map
         cluster_id_map = compute_info.cluster_id_map
         singletons = compute_info.singletons
+        metanode_map = ssn_data.seqid_source_map
 }
 
