@@ -37,6 +37,14 @@ sub onNodeEnd {
 }
 
 
+sub onGraphAttr {
+    my $self = shift;
+    my $name = shift;
+    my $value = shift;
+    return $value;
+}
+
+
 sub getNewAttributes {
     my $self = shift;
     return [];

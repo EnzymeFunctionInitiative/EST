@@ -60,6 +60,14 @@ sub onNodeEnd {
 }
 
 
+sub onGraphAttr {
+    my $self = shift;
+    my $name = shift;
+    my $value = shift;
+    return "$value colorized";
+}
+
+
 # 
 # Get new attributes that are to be inserted at the current location in a node.  This is
 # only valid if the current node is part of a cluster.

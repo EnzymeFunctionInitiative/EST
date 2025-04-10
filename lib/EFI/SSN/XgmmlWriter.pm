@@ -96,7 +96,7 @@ sub write {
             $self->copyEdge();
         } else {
             if ($nname eq "graph") {
-                $self->copyElement($ntype);
+                $self->processGraphElement($ntype);
             } else {
                 $self->copyElementWithoutNamespace($ntype);
             }
@@ -105,6 +105,32 @@ sub write {
 
     $writer->end();
     $output->close();
+}
+
+
+#
+# processGraphElement - private method
+#
+# Handle the start of a graph element by passing it's attributes to the
+# registered handlers
+#
+# Parameters:
+#    $ntype - node type (e.g. start of tag, end of tag)
+#    
+sub processGraphElement {
+    my $self = shift;
+    my $ntype = shift;
+    if ($ntype == XML_READER_TYPE_ELEMENT) {
+        my @attr;
+        foreach my $attr ($self->{reader}->copyCurrentNode(0)->getAttributes()) {
+            my @values = map { $_->onGraphAttr($attr->name, $attr->value); } @{ $self->{attr_handlers} };
+            my $value = shift @values || $attr->value; # pick the first one, or the default value if not handled
+            push @attr, $attr->name, $value;
+        }
+        $self->createElementWithAttr(@attr);
+    } else {
+        $self->copyElement($ntype);
+    }
 }
 
 
