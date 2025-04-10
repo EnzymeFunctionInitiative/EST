@@ -11,9 +11,10 @@ use Scalar::Util qw(looks_like_number);
 use constant NONE_PFAM => "none";
 use constant FILTER_COOCCURRENCE => 1;
 use constant SKIP_SINGLETONS => 2;
+use constant DEFAULT_COOCCURRENCE_THRESHOLD => 0.20;
 
 use Exporter qw(import);
-our @EXPORT_OK = qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS);
+our @EXPORT_OK = qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS DEFAULT_COOCCURRENCE_THRESHOLD);
 
 
 sub new {

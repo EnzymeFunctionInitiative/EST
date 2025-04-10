@@ -25,6 +25,14 @@ use constant ANNO_FIELDS_SSN_GNT => 32;
 
 use constant ANNO_ROW_SEP => "^";
 
+use constant INTERPRO_DOMAIN => "domain";
+use constant INTERPRO_FAMILY => "family";
+use constant INTERPRO_HOMOLOGOUS_SUPERFAMILY => "homologous_superfamily";
+
+use Exporter qw(import);
+our %EXPORT_TAGS = (interpro => ['INTERPRO_DOMAIN', 'INTERPRO_FAMILY', 'INTERPRO_HOMOLOGOUS_SUPERFAMILY']);
+Exporter::export_ok_tags('interpro');
+
 
 sub new {
     my ($class, %args) = @_;
@@ -253,10 +261,10 @@ sub parse_interpro {
 
             #TODO: remove hardcoded constants here
             $type = lc $type;
-            push @dom, $fam if $type eq "domain";
-            push @fam, $fam if $type eq "family";
-            push @sup, $fam if $type eq "homologous_superfamily";
-            push @other, $fam if $type ne "domain" and $type ne "family" and $type ne "homologous_superfamily";
+            push @dom, $fam if $type eq INTERPRO_DOMAIN;
+            push @fam, $fam if $type eq INTERPRO_FAMILY;
+            push @sup, $fam if $type eq INTERPRO_HOMOLOGOUS_SUPERFAMILY;
+            push @other, $fam if $type ne INTERPRO_DOMAIN and $type ne INTERPRO_FAMILY and $type ne INTERPRO_HOMOLOGOUS_SUPERFAMILY;
         }
     }
 

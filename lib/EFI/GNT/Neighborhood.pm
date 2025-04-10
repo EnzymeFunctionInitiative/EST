@@ -10,7 +10,7 @@ use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 
-use EFI::Annotations;
+use EFI::Annotations qw(:interpro);
 
 
 sub new {
@@ -564,7 +564,7 @@ sub parseInterpro {
         next if exists $u{$fams[$i]};
         $u{$fams[$i]} = 1;
         my $info = {family => $fams[$i], type => lc($types[$i])};
-        if ($info->{type} eq "domain" or $info->{type} eq "family" or $info->{type} eq "homologous_superfamily") {
+        if ($info->{type} eq INTERPRO_DOMAIN or $info->{type} eq INTERPRO_FAMILY or $info->{type} eq INTERPRO_HOMOLOGOUS_SUPERFAMILY) {
             push @info, $info;
         }
     }
