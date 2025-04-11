@@ -1,3 +1,4 @@
+
 use strict;
 use warnings;
 
@@ -8,9 +9,13 @@ use lib "$FindBin::Bin/../../lib";
 
 use EFI::GNT::GND::Reader qw(:attr);
 use EFI::Options;
-use EFI::SSN::Util::ID qw(parse_metanode_map_file);
 use EFI::SSN::XgmmlWriter;
+use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
 use EFI::SSN::XgmmlWriter::AttributeHandler::GNT;
+use EFI::SSN::Util::ID qw(parse_cluster_num_map parse_cluster_map_file parse_metanode_map_file);
+use EFI::Util::Colors;
+
+
 
 
 # Exits if help is requested or errors are encountered
@@ -19,6 +24,10 @@ my $opts = validateAndProcessOptions();
 
 
 
+my $colors = new EFI::Util::Colors(color_file => $opts->{cluster_color_map});
+my ($seqSizes, $nodeSizes) = parse_cluster_num_map($opts->{cluster_num_map});
+my $clusterSizes = {seq => $seqSizes, node => $nodeSizes};
+my ($clusterMapBySize, $clusterMapByNode) = parse_cluster_map_file($opts->{cluster_map});
 # Get the metanode data (mapping of repnode/UniRef to UniProt)
 my ($idType, $metanodeMap) = parse_metanode_map_file($opts->{metanode_map});
 
@@ -26,12 +35,17 @@ my ($idType, $metanodeMap) = parse_metanode_map_file($opts->{metanode_map});
 my $gntData = getGntData($opts->{gnd}, $idType, $metanodeMap);
 
 
-my $xwriter = new EFI::SSN::XgmmlWriter(ssn => $opts->{color_ssn}, output_ssn => $opts->{gnt_color_ssn});
+my $xwriter = new EFI::SSN::XgmmlWriter(ssn => $opts->{ssn}, output_ssn => $opts->{color_gnt_ssn});
 
+
+my $colorHandler = new EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => {seq => $clusterMapBySize, node => $clusterMapByNode}, cluster_sizes => $clusterSizes, colors => $colors);
 my $gntHandler = new EFI::SSN::XgmmlWriter::AttributeHandler::GNT(gnt_data => $gntData);
+$xwriter->addAttributeHandler($colorHandler);
 $xwriter->addAttributeHandler($gntHandler);
 
+
 $xwriter->write();
+
 
 
 
@@ -106,9 +120,9 @@ sub getGntData {
             my @interpro;
             foreach my $nb (@nb) {
                 my $pfam = $gnd->getAttribute($nb, ATTR_NEIGHBOR|ATTR_PFAM);
-                push @pfam, split(m/\-/, $pfam);
+                push @pfam, sort split(m/\-/, $pfam);
                 my $interpro = $gnd->getAttribute($nb, ATTR_NEIGHBOR|ATTR_INTERPRO);
-                push @interpro, split(m/\-/, $interpro);
+                push @interpro, sort split(m/\-/, $interpro);
             }
 
             $data->{neighbor_pfam} = \@pfam;
@@ -124,12 +138,15 @@ sub getGntData {
 
 sub validateAndProcessOptions {
 
-    my $desc = "Parses a SSN XGMML file and creates a new SSN with genome neighborhood data such as ENA status (present/has context), ENA ID, and neighboring families.";
+    my $desc = "Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes based on cluster. This is done without creating a DOM since elements are written one by one to the file as they are built.";
 
     my $optParser = new EFI::Options(app_name => $0, desc => $desc);
 
-    $optParser->addOption("color-ssn=s", 1, "path to input colored SSN (XGMML) file", OPT_FILE);
-    $optParser->addOption("gnt-color-ssn=s", 1, "path to output XGMML (XML) SSN file containg GNT data", OPT_FILE);
+    $optParser->addOption("ssn=s", 1, "path to input XGMML (XML) SSN file", OPT_FILE);
+    $optParser->addOption("color-gnt-ssn=s", 1, "path to output SSN (XGMML) file containing color and GNT metadata", OPT_FILE);
+    $optParser->addOption("cluster-map=s", 1, "path to input file mapping node index (col 1) to cluster numbers (num by seq, num by nodes)", OPT_FILE);
+    $optParser->addOption("cluster-num-map=s", 1, "path to input file containing the mapping of cluster number to cluster sizes", OPT_FILE);
+    $optParser->addOption("cluster-color-map=s", 1, "path to input file mapping cluster number (sequence count) to a color", OPT_FILE);
     $optParser->addOption("metanode-map=s", 1, "path to input file mapping metanode (e.g. UniRef node) to members of metanode", OPT_FILE);
     $optParser->addOption("gnd=s", 1, "path to input SQLite file with GNDs; used to obtain GNT data", OPT_FILE);
 
@@ -141,39 +158,51 @@ sub validateAndProcessOptions {
     return $optParser->getOptions();
 }
 
-
 1;
 __END__
 
-=head1 update_color_ssn.pl
+=head1 color_xgmml.pl
 
 =head2 NAME
 
-B<update_color_ssn.pl> - add genome neighborhood data and ENA status to a SSN
+C<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after adding new attributes
 
 =head2 SYNOPSIS
 
-    update_color_ssn.pl --color-ssn <FILE> --gnt-ssn <FILE> --metanode-map <FILE> --gnd <FILE>
+    color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
+        --cluster-color-map <FILE>] --metanode-map <FILE> --gnd <FILE>
 
 =head2 DESCRIPTION
 
-B<update_color_ssn.pl> reads a SSN XGMML file and creates a new SSN with genome neighborhood data
-such as ENA status, ENA ID, and neighboring Pfam and InterPro families.  The ENA status fields
-indicate the presence or abscence of a mapping from UniProt to ENA (e.g. there is no ENA ID that
-corresponds to the given UniProt ID) as well as the presence of sequences on a chromosone that
-have an UniProt-ENA mapping.
+B<color_xgmml.pl> reads a SSN in the format of XGMML (XML) and writes it to a new file after
+adding cluster number and color attributes. The document is read and written in a stream-like
+fashion rather than creating and building a DOM for optimal memory usage.
 
 =head3 Arguments
 
 =over
 
+=item C<--ssn>
+
+Path to the input SSN
+
 =item C<--color-ssn>
 
-Path to the input SSN, colored from a previous step
+Path to the output SSN
 
-=item C<--gnt-ssn>
+=item C<--cluster-map>
 
-Path to the output SSN that will contain all of the input SSN data plus the GNT data
+Path to a file that maps UniProt sequence ID to a cluster number
+
+=item C<--cluster-num-map>
+
+Path to a file that maps cluster number to sizes; the file is four columns
+with the columns being seq-cluster-num, seq-cluster-size, node-cluster-num, node-cluster-size
+
+=item C<--cluster-color-map>
+
+Path to a file that maps cluster number based on sequence count to the color
+as determined by the pipeline upstream
 
 =item C<--metanode-map>
 
@@ -187,5 +216,4 @@ families and ENA status and ID; output from a previous step
 
 =back
 
-=cut
 

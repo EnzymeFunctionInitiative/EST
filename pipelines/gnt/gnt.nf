@@ -40,16 +40,21 @@ process create_gnns {
     """
 }
 
-process add_gnt_metadata {
+process color_gnt_ssn {
     publishDir params.final_output_dir, mode: "copy"
     input:
-        path color_ssn
+        path ssn_file
+        path cluster_id_map
+        path cluster_num_map
+        path cluster_colors
         path metanode_map
         path gnd
     output:
-        path "gnt_colored_ssn.xgmml", emit: "ssn_output"
+        path "color_ssn.xgmml", emit: "ssn_output"
     """
-    perl $projectDir/update_color_ssn.pl --color-ssn ${color_ssn} --gnt-color-ssn gnt_colored_ssn.xgmml --metanode-map ${metanode_map} --gnd ${gnd}
+    perl $projectDir/color_gnt_xgmml.pl --ssn $ssn_file --color-gnt-ssn color_ssn.xgmml \
+        --metanode-map ${metanode_map} --gnd ${gnd} --cluster-map $cluster_id_map \
+        --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt
     """
 }
 
@@ -60,6 +65,7 @@ workflow {
 
     gnn_data = create_gnns(color_work.cluster_id_map, color_work.singletons)
 
-    add_gnt_metadata(color_work.ssn_output, color_work.metanode_map, gnn_data.gnd)
+    // Color the SSN based on the computed clusters and add ENA data
+    colored_ssn = color_gnt_ssn(color_work.ssn_file, color_work.cluster_id_map, color_work.cluster_num_map, color_work.cluster_colors, color_work.metanode_map, gnn_data.gnd)
 }
 

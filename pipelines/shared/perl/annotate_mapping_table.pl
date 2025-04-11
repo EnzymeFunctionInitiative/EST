@@ -165,7 +165,7 @@ sub getAnnotationData {
 #
 # parseColorMap
 #
-# Parse the file mapping cluster number to color
+# Parse the file mapping cluster number by sequence to color
 #
 # Parameters:
 #    $mapFile - path to cluster-color map file
@@ -184,9 +184,9 @@ sub parseColorMap {
 
     while (my $line = <$fh>) {
         chomp $line;
-        my ($clusterNum, $color) = split(m/\t/, $line);
-        if (defined $clusterNum and $color) {
-            $colorMap->{$clusterNum} = $color;
+        my ($clusterNumBySeq, $color) = split(m/\t/, $line);
+        if (defined $clusterNumBySeq and $color) {
+            $colorMap->{$clusterNumBySeq} = $color;
         }
     }
 

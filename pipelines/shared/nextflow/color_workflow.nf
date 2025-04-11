@@ -36,21 +36,6 @@ process get_fasta {
     """
 }
 
-process color_ssn {
-    publishDir params.final_output_dir, mode: "copy"
-    input:
-        path ssn_file
-        path cluster_id_map
-        path cluster_num_map
-    output:
-        path "colored_ssn.xgmml", emit: "ssn_output"
-        path "cluster_colors.txt", emit: "cluster_colors"
-    """
-    perl $projectDir/../shared/perl/color_xgmml.pl --ssn $ssn_file --color-ssn colored_ssn.xgmml --cluster-map $cluster_id_map \
-        --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt --color-file $projectDir/../shared/perl/colors.tab
-    """
-}
-
 process get_ssn_id_info {
     publishDir params.final_output_dir, mode: "copy"
     input:
@@ -127,6 +112,17 @@ process compute_clusters {
     """
 }
 
+process assign_cluster_colors {
+    input:
+        path cluster_num_map
+    output:
+        path "cluster_colors.txt", emit: "cluster_colors"
+    """
+    perl $projectDir/../shared/perl/assign_cluster_colors.pl --cluster-num-map ${cluster_num_map} \
+        --cluster-color-map cluster_colors.txt
+    """
+}
+
 workflow color_and_retrieve {
     main:
         if (params.ssn_input =~ /\.zip$/) {
@@ -146,10 +142,9 @@ workflow color_and_retrieve {
 
         get_fasta(id_list)
 
-        // Color the SSN based on the computed clusters
-        colored_ssn = color_ssn(ssn_file, compute_info.cluster_id_map, compute_info.cluster_num_map)
+        cluster_colors = assign_cluster_colors(compute_info.cluster_num_map)
 
-        anno_tables = get_annotated_mapping_tables(compute_info.cluster_id_map, ssn_data.seqid_source_map, colored_ssn.cluster_colors)
+        anno_tables = get_annotated_mapping_tables(compute_info.cluster_id_map, ssn_data.seqid_source_map, cluster_colors)
 
         cr_table = get_conv_ratio_table(ssn_data.edgelist, ssn_data.index_seqid_map, compute_info.cluster_id_map, ssn_data.seqid_source_map)
 
@@ -157,7 +152,6 @@ workflow color_and_retrieve {
 
     emit:
         ssn_file
-        ssn_output = colored_ssn.ssn_output
         cluster_data_dir = cluster_data_dir
         mapping_table = anno_tables.mapping_table
         sp_clusters = anno_tables.swissprot_table
@@ -168,5 +162,6 @@ workflow color_and_retrieve {
         cluster_id_map = compute_info.cluster_id_map
         singletons = compute_info.singletons
         metanode_map = ssn_data.seqid_source_map
+        cluster_colors
 }
 
