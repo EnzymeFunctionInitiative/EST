@@ -96,9 +96,9 @@ sub getNodeInfo {
             foreach my $value (@$data) {
                 push @{ $cols{0} }, [@{$self->{shared_cols}->[0]}, "list", $getBoolValue->(1)];
                 push @{ $cols{1} }, [@{$self->{shared_cols}->[1]}, "list", $getBoolValue->($value->{has_neighbors})];
-                push @{ $cols{2} }, [@{$self->{shared_cols}->[2]}, "list", $value->{ena_ids}];
-                push @{ $cols{3} }, [@{$self->{shared_cols}->[3]}, "list", $value->{neighbor_pfam}];
-                push @{ $cols{4} }, [@{$self->{shared_cols}->[4]}, "list", $value->{neighbor_interpro}];
+                push @{ $cols{2} }, [@{$self->{shared_cols}->[2]}, "list", $value->{ena_id}];
+                push @{ $cols{3} }, [@{$self->{shared_cols}->[3]}, $value->{neighbor_pfam}];
+                push @{ $cols{4} }, [@{$self->{shared_cols}->[4]}, $value->{neighbor_interpro}];
             }
             push @info, @{ $cols{0} };
             push @info, @{ $cols{1} };
@@ -108,16 +108,16 @@ sub getNodeInfo {
         } else {
             push @info, [@{$self->{shared_cols}->[0]}, $getBoolValue->(1)];
             push @info, [@{$self->{shared_cols}->[1]}, $getBoolValue->($data->{has_neighbors})];
-            push @info, [@{$self->{shared_cols}->[2]}, $data->{ena_ids}];
-            push @info, [@{$self->{shared_cols}->[3]}, "list", $data->{neighbor_pfam}];
-            push @info, [@{$self->{shared_cols}->[4]}, "list", $data->{neighbor_interpro}];
+            push @info, [@{$self->{shared_cols}->[2]}, $data->{ena_id}];
+            push @info, [@{$self->{shared_cols}->[3]}, $data->{neighbor_pfam}];
+            push @info, [@{$self->{shared_cols}->[4]}, $data->{neighbor_interpro}];
         }
     } else {
         push @info, [@{$self->{shared_cols}->[0]}, $getBoolValue->(0)];
         push @info, [@{$self->{shared_cols}->[1]}, "n/a"];
         push @info, [@{$self->{shared_cols}->[2]}, ""];
-        push @info, [@{$self->{shared_cols}->[3]}, "list", []];
-        push @info, [@{$self->{shared_cols}->[4]}, "list", []];
+        push @info, [@{$self->{shared_cols}->[3]}, []];
+        push @info, [@{$self->{shared_cols}->[4]}, []];
     }
 
     return \@info;

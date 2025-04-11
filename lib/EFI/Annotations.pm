@@ -625,7 +625,7 @@ sub get_cluster_info_insert_location {
 
 sub get_gnt_info_insert_location {
     my $self = shift;
-    return $self->get_annotation_data()->{&FIELD_COLOR_NODE_COUNT}->{display};
+    return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
 }
 
 

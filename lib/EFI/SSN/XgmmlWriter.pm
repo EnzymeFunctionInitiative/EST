@@ -46,7 +46,7 @@ sub write {
     my $self = shift;
 
     my $reader = XML::LibXML::Reader->new(location => $self->{ssn}) or die "Cannot read input XGMML file '$self->{ssn}': $!";
-    my $output = IO::File->new(">" . $self->{output_ssn});
+    my $output = IO::File->new(">" . $self->{output_ssn}) or die "Cannot write to output file '$self->{output_ssn}': $!";
     # Disable error checking with the UNSAFE keyword; this improves performance
     my $writer = XML::Writer->new(OUTPUT => $output, UNSAFE => 1, PREFIX_MAP => '');
     $self->{writer} = $writer;
