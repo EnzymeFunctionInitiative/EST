@@ -90,6 +90,8 @@ sub validateAndProcessOptions {
         close $fh;
         $opts->{source_sequence} = $sequence;
     }
+
+    return $opts;
 }
 
 1;

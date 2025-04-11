@@ -64,7 +64,11 @@ sub onGraphAttr {
     my $self = shift;
     my $name = shift;
     my $value = shift;
-    return "$value colorized";
+    if ($name eq "label") {
+        return "$value colorized";
+    } else {
+        return $value;
+    }
 }
 
 
