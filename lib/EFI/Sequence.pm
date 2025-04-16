@@ -72,8 +72,6 @@ sub setAttribute {
     # If multiple values were passed, then convert to an array ref
     if (not ref $vals[0] and @vals > 1) {
         $val = \@vals;
-    } elsif (ref $vals[0]) {
-        $val = $vals[0];
     } else {
         $val = $vals[0];
     }
