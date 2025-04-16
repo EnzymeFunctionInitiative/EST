@@ -47,10 +47,20 @@ sub validateOptions {
     my $opts = $self->getOptions();
     my $outputDir = $self->getOutputDir();
 
+    my @errors;
+
     $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
-    $opts->{output_sequence_file} = get_default_path("all_sequences", $outputDir) if not $opts->{output_sequence_file};
+    push @errors, "Error: invalid --seq-mapping-file path '$opts->{seq_mapping_file}'" if not -f $opts->{seq_mapping_file};
     $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
+    push @errors, "Error: invalid --sequence-meta-file path '$opts->{sequence_meta_file}'" if not -f $opts->{sequence_meta_file};
+
+    $opts->{output_sequence_file} = get_default_path("all_sequences", $outputDir) if not $opts->{output_sequence_file};
     $opts->{sequence_ids_file} = get_default_path("sequence_ids", $outputDir) if not $opts->{sequence_ids_file};
+
+    if (@errors) {
+        my $help = $self->printHelp(\@errors);
+        return ($self->getErrorStatusCode(), $help);
+    }
 
     return 1;
 }

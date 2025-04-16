@@ -58,7 +58,7 @@ sub validateOptions {
     my $opts = $self->getOptions();
     my $outputDir = $self->getOutputDir();
 
-    push @errors, "Invalid --mode" if not EFI::Import::Sources::validateSource($opts->{mode});
+    push @errors, "Invalid --mode '$opts->{mode}'" if not EFI::Import::Sources::validateSource($opts->{mode});
 
     $opts->{source_meta_file} = get_default_path("source_meta", $outputDir) if not $opts->{source_meta_file};
     $opts->{source_ids_file} = get_default_path("source_ids", $outputDir) if not $opts->{source_ids_file};

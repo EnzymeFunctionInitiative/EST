@@ -61,9 +61,9 @@ sub validateOptions {
 
     # Input
     $opts->{source_meta_file} = get_default_path("source_meta", $outputDir) if not $opts->{source_meta_file};
-    push @errors, "Error: invalid --source-meta-file path" if not -f $opts->{source_meta_file};
+    push @errors, "Error: invalid --source-meta-file path '$opts->{source_meta_file}'" if not -f $opts->{source_meta_file};
     $opts->{source_ids_file} = get_default_path("source_ids", $outputDir) if not $opts->{source_ids_file};
-    push @errors, "Error: invalid --source-ids-file path" if not -f $opts->{source_ids_file};
+    push @errors, "Error: invalid --source-ids-file path '$opts->{source_ids_file}'" if not -f $opts->{source_ids_file};
 
     $opts->{sequence_version} = get_sequence_version($opts->{sequence_version});
 

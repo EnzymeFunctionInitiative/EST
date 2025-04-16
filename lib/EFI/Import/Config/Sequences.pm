@@ -43,13 +43,10 @@ sub validateOptions {
     }
 
     my $opts = $self->getOptions();
-    my $outputDir = $self->getOutputDir();
 
     my @dbFiles = glob("$opts->{fasta_db}.*");
     my @errors;
-    push @errors, "Require --fasta-db" if (not -f $opts->{fasta_db} or not @dbFiles);
-
-    $opts->{sequence_ids_file} = get_default_path("accession_table", $outputDir) if not $opts->{sequence_ids_file};
+    push @errors, "Error: invalid --fasta-db BLAST database '$opts->{fasta_db}'" if (not -f $opts->{fasta_db} or not @dbFiles);
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);

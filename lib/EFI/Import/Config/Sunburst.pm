@@ -50,10 +50,9 @@ sub validateOptions {
     my $outputDir = $self->getOutputDir();
 
     $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
-    push @errors, "Error: invalid --sequence-meta-file path" if not -f $opts->{sequence_meta_file};
-
+    push @errors, "Error: invalid --sequence-meta-file path '$opts->{sequence_meta_file}'" if not -f $opts->{sequence_meta_file};
     $opts->{accession_table_file} = get_default_path("accession_table", $outputDir) if not $opts->{accession_table_file};
-    push @errors, "Error: invalid --accession-table-file path" if not -f $opts->{accession_table_file};
+    push @errors, "Error: invalid --accession-table-file path '$opts->{accession_table_file}'" if not -f $opts->{accession_table_file};
 
     $opts->{sunburst_data_file} = get_default_path("sunburst_data", $outputDir) if not $opts->{sunburst_data_file};
 
