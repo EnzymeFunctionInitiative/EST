@@ -27,6 +27,8 @@ sub new {
     my $self = { seq => {}, fields => [], uniref50 => {}, uniref90 => {}, uniprot => {}, sequence_version => SEQ_UNIPROT };
     bless($self, $class);
 
+    $self->{attr_delimiter} = $args{attr_delimiter} if $args{attr_delimiter};
+
     return $self;
 }
 
@@ -47,7 +49,9 @@ sub addSequence {
 
     return 0 if $self->{seq}->{$id};
 
-    $self->{seq}->{$id} = new EFI::Sequence($id, attr => $attr, sequence => $seq);
+    my %args = (attr => $attr, sequence => $seq);
+    $args{attr_delimiter} = $self->{attr_delimiter} if $self->{attr_delimiter};
+    $self->{seq}->{$id} = new EFI::Sequence($id, %args);
 
     return 1;
 }

@@ -4,6 +4,12 @@ package EFI::Sequence;
 use strict;
 use warnings;
 
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../";
+
+use EFI::Annotations::Fields qw(ANNO_ROW_SEP);
+
 
 sub new {
     my $class = shift;
@@ -12,7 +18,7 @@ sub new {
 
     die "Require id argument" if not $id;
 
-    my $self = { id => $id, attr => {}, seq => "" };
+    my $self = { id => $id, attr => {}, seq => "", attr_delimiter => ANNO_ROW_SEP };
     bless($self, $class);
 
     if ($args{attr}) {
@@ -21,6 +27,7 @@ sub new {
         }
     }
     $self->{seq} = $args{sequence} if $args{sequence};
+    $self->{attr_delimiter} = $args{attr_delimiter} if $args{attr_delimiter};
 
     return $self;
 }
@@ -89,7 +96,7 @@ sub packAttributeValue {
                 push @vals, $part;
             }
         }
-        return join("^", @vals);
+        return join($self->{attr_delimiter}, @vals);
     }
 
     return $value;
@@ -100,7 +107,7 @@ sub packAttributeValue {
 sub unpackAttributeValue {
     my $self = shift;
     my $value = shift;
-    my @parts = split("^", $value);
+    my @parts = split($self->{attr_delimiter}, $value);
     if (@parts > 1) {
         if (wantarray) {
             return @parts;

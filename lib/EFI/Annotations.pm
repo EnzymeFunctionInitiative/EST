@@ -22,8 +22,6 @@ use constant ANNO_FIELDS_SSN_NUMERIC => 4;
 use constant ANNO_FIELDS_DB_USER => 8;
 use constant ANNO_FIELDS_SSN_COLOR => 16;
 
-use constant ANNO_ROW_SEP => "^";
-
 
 sub new {
     my ($class, %args) = @_;
