@@ -32,17 +32,20 @@ my $config = $optionParser->getOptions();
 
 
 
+# A mapping of line number in the original input FASTA file to sequence ID
 my $lineMapping = loadMappingFile($config->{seq_mapping_file});
 
+# All IDs come in the sequence ID list and metadata file, both those sourced from the FASTA file
+# and those IDs added by family addition
 my $seqCollection = new EFI::Sequence::Collection();
 $seqCollection->load($config->{sequence_meta_file});
-
 my @seqIds = $seqCollection->getSequenceIds();
 
 # filteredSeqIds is used to exclude any IDs/sequences in the FASTA file that were excluded due to
 # filtering in a prior step.  fastaSource is used to determine if an ID in the input ID list
-# (sequence metadata file) comes from the FASTA file; this is used to save IDs that originate only
-# from a family that was added to a fasta import job.
+# (sequence metadata file) comes from the FASTA file; this is used to save family-only IDs (e.g.
+# IDs that originated from a family added to the fasta import job) to a file that is used later in
+# the workflow.
 my %filteredSeqIds;
 my %fastaSource;
 foreach my $id (@seqIds) {
@@ -59,22 +62,14 @@ my $lineNum = 0;
 my $isValidSeq = 0;
 while (my $line = <$in>) {
     if ($line =~ m/^>/) {
-        # Check if the user-provided sequence header has a valid sequence that was parsed by the
-        # pipeline, and if the mapped ID is included in the sequence metadata file (which is
-        # created by the filter pipeline process to remove user-specified filters)
         my $mappedId = $lineMapping->{$lineNum};
-        if ($mappedId) {
-            # If true, then the ID passed the filtering in a prior step
-            if ($filteredSeqIds{$mappedId}) {
-                $out->print(">$lineMapping->{$lineNum}\n");
-                $isValidSeq = 1;
-            } else {
-                #TODO: remove this debug
-                print "REMOVED $mappedId FROM import fasta\n";
-            }
+        # If the header was valid and the ID wasn't filtered out in a previous step
+        if ($mappedId and $filteredSeqIds{$mappedId}) {
+            $out->print(">$lineMapping->{$lineNum}\n");
+            $isValidSeq = 1;
+        } else {
+            $isValidSeq = 0;
         }
-    } elsif ($line =~ m/^>/) {
-        $isValidSeq = 0;
     } elsif ($isValidSeq) {
         # Print the current line from user-specified FASTA file
         $out->print($line);
@@ -86,6 +81,7 @@ close $out;
 close $in;
 
 
+# Save the list of IDs for which sequences need to be retreived
 open my $fh, ">", $config->{sequence_ids_file} or die "Unable to write to output sequence IDs file '$config->{sequence_ids_file}': $!";
 map { $fh->print("$_\n") if not $fastaSource{$_}; } @seqIds;
 close $fh;
@@ -94,6 +90,23 @@ close $fh;
 
 
 
+
+
+
+
+
+#
+# loadMappingFile
+#
+# Load the mapping file that maps sequence ID (UniProt or unknown) to line number in the original
+# FASTA file.
+#
+# Parameters:
+#    $file - path to mapping file
+#
+# Returns:
+#    hash ref with key being line number and value being sequence ID
+#
 sub loadMappingFile {
     my $file = shift;
 
