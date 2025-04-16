@@ -58,7 +58,7 @@ sub addSequence {
 
 
 # public
-sub addUniref {
+sub associateUnirefIds {
     my $self = shift;
     my $uniprot = shift;
     my $uniref90 = shift;
@@ -325,7 +325,7 @@ sub loadIdFile {
     while (my $line = <$fh>) {
         chomp $line;
         my ($uniprot, $uniref90, $uniref50) = split(m/\t/, $line);
-        $self->addUniref($uniprot, $uniref90, $uniref50);
+        $self->associateUnirefIds($uniprot, $uniref90, $uniref50);
     }
 
     $fh->close();

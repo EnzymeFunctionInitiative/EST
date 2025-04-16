@@ -107,7 +107,7 @@ sub addUnirefIds {
     my $unirefIds = shift;
 
     if ($unirefIds) {
-        map { $seqData->addUniref($_, $unirefIds->{$_}->[0] || "", $unirefIds->{$_}->[1] || ""); } keys %$unirefIds;
+        map { $seqData->associateUnirefIds($_, $unirefIds->{$_}->[0] || "", $unirefIds->{$_}->[1] || ""); } keys %$unirefIds;
         return;
     }
 
@@ -126,7 +126,7 @@ sub addUnirefIds {
 
     my $matched = $self->{util}->batchRetrieveIds(\@ids, $sql, "accession");
     foreach my $id (sort keys %$matched) {
-        $seqData->addUniref($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
+        $seqData->associateUnirefIds($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
     }
 }
 
