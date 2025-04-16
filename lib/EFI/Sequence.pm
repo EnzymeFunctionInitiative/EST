@@ -140,7 +140,8 @@ B<EFI::Sequence> - Perl module that represents a sequence
     $attr->{&FIELD_SWISSPROT_DESC} = "Caveolin-1";
     my $fastaSeq = "MSGGKYVDSEGHLYTVPIREQGNIYKPNNKAMAEEINEKQVYDAHTKEIDLVNRDPKHLNDDVVKIDFEDVIAEPEGTHSFDGIWKASFTTFTVTKYWFYRLLSALFGIPMALIWGIYFAILSFLHIWAVVPCIKSFLIEIQCISRVYSIYVHTFCDPFFEAVGKIFSNIRINMQKEI";
 
-    my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq);
+    my $defaultDelim = "^";
+    my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq, attr_delimiter => $defaultDelim);
 
     my $seqId = $seq->getId();
     print "Sequence ID $seqId\n";
@@ -167,7 +168,7 @@ with the sequence and attributes.
 
 =head2 METHODS
 
-=head3 C<new($id, attr =E<gt> $attr, seq =E<gt> $seq)>
+=head3 C<new($id, attr =E<gt> $attr, sequence =E<gt> $seq, attr_delimiter =E<gt> $delimiter)>
 
 Creates a new B<EFI::Sequence> instance with the ID C<$id>, attributes stored in C<$attr>,
 and sequence stored in C<$seq>.
@@ -184,13 +185,20 @@ UniProt sequence identifier.
 
 Optional attributes, as a hash ref.
 
-=item C<seq>
+=item C<sequence>
 
 Optional protein sequence as a string.
+
+=item C<attr_delimiter>
+
+Optional string to use as a delimiter when serializing arrays of values into metadata
+values (defaults to caret C<^>).
 
 =back
 
 =head4 Example Usage
+
+    my $seq = new EFI::Sequence($id, attr => $attr);
 
     my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq);
 
@@ -288,7 +296,8 @@ Scalar, array, or array ref.
 =head3 C<packAttributeValue($value)>
 
 Packs the attribute value into a string that can be serialized and deserialized.
-Elements in packed arrays are separated by the caret character (C<^>).
+Elements in packed arrays are separated by the attribute delimiter (by default the
+caret character C<^>).
 
 =head4 Parameters
 

@@ -425,16 +425,18 @@ B<EFI::Sequence::Collection> - Perl module that represents a collection of seque
     my $mdFile = "sequence_metadata.tab";
     my $idFile = "accession_table.tab";
 
+    my $seqs = new EFI::Sequence::Collection();
+
     $seqs->load($mdFile, $idFile, sequence_source => $seqSource);
 
     $seqs->addSequence("B0SS77", {}, "");
 
-    $seqs->addUniref("A0AAQ2CWD6", "B0SS77", "B0SS77");
+    $seqs->associateUnirefIds("A0AAQ2CWD6", "B0SS77", "B0SS77");
     print $seqs->getUniref90Id("A0AAQ2CWD6"), "\n";
     print $seqs->getUniref50Id("A0AAQ2CWD6"), "\n";
 
     my @ids = $seqs->getSequenceIds();
-    my $seq = $seqs->getSequence("B0SS77");
+    my $seqObject = $seqs->getSequence("B0SS77");
 
     $seqs->removeSequence("A0AAQ2CWD6"); # removes only from ID list
     $seqs->removeSequence("B0SS77"); # removes all UniProt IDs in the UniRef50 cluster
@@ -449,300 +451,25 @@ B<EFI::Sequence::Collection> - Perl module that represents a collection of seque
 
 =head2 DESCRIPTION
 
-B<EFI::Sequence> is a Perl module used to represent a sequence from the EFI database
-with the sequence and attributes.
+B<EFI::Sequence::Collection> is a Perl module used to represent a collection of sequences from the
+EFI database along with the metadata, ID list, and sequence.
 
 
 =head2 METHODS
 
+=head3 C<new(attr_delimiter =E<gt> $delimiter)>
 
-=head3 C<getFields()>
-
-Return a list of all of the metadata fields in the metadata file that was loaded.  These typically
-match those in B<EFI::Annotations::Fields>.  Not all sequences may have all of the same fields.
-
-=head4 Returns
-
-An array ref containing all of the metadata fields in the file.
-
-=head4 Example Usage
-
-    my $fields = $seqs->getFields();
-    map { print "Field $_\n"; } @$fields;
-
-
-=head3 C<addSequence($id, $attr, $seq)>
-
-Add a sequence to the collection.  Optionally add attributes (C<$attr> in the form of a hash ref)
-and a protein sequence C<$seq> as metadata.
-
-=head4 Parameters
+Creates an empty sequence collection, optionally specifying the delimiter to use when saving list
+attribute values.
 
 =over
 
-=item C<$id>
+=item C<attr_delimiter>
 
-The UniProt sequence identifier.
-
-=item C<$attr>
-
-A hash ref mapping metadata fields to values for the sequence ID.
-
-=item C<$seq> (optional)
-
-The protein amino acid sequence for the sequence.
+Optional string to use as a delimiter when serializing arrays of values into metadata values.
+The default value is defined in C<EFI::Sequence>.
 
 =back
-
-=head4 Example Usage
-
-    my $id = "B0SS77";
-    my $attr = {
-        &FIELD_SPECIES => "Leptospira biflexa serovar Patoc (strain Patoc 1 / ATCC 23582 / Paris)",
-        &FIELD_SWISSPROT_DESC => "D-alanine--D-alanine ligase",
-        &FIELD_UNIREF90_CLUSTER_SIZE => 3,
-        &FIELD_UNIREF90_IDS => "B0S9U5^A0AAQ2CWD6^B0SS77",
-        "custom" => "value"
-    };
-    my $seq = "MSKIKIALLFGGISGEHIISVRSSAFIFATIDREKYDVCPVYINPNGKFWIPTVSEPIYP";
-    $seqs->addSequence($id, $attr, $seq);
-
-
-=head3 C<addUniref($uniprot, $uniref90, $uniref50)>
-
-Adds a new mapping of UniProt ID to associated UniRef sequence IDs to the ID list/mapping.
-This mapping will likely be a superset of the IDs added with the C<addSequence()> function in
-order to support sunburst diagrams for UniRef jobs (since all of the IDs are necessary, not
-just UniRef).
-
-=head4 Parameters
-
-=over
-
-=item C<$uniprot>
-
-The UniProt ID.
-
-=item C<$uniref90>
-
-The UniRef90 ID for the UniProt ID.  This may be blank in which case there is no associated
-UniRef90 ID (or the UniRef90 ID is not in the same family as the UniProt ID).
-
-=item C<$uniref50>
-
-The UniRef50 ID for the UniProt ID.  This may be blank in which case there is no associated
-UniRef50 ID (or the UniRef50 ID is not in the same family as the UniProt ID).
-
-=back
-
-=head4 Example Usage
-
-    $seqs->addUniref("A0AAQ2CWD6", "B0SS77", "B0SS77");
-    print $seqs->getUniref90Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
-    print $seqs->getUniref50Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
-
-
-=head3 C<getUniref90Id($uniprotId)>
-
-Retrieves the UniRef90 ID for the given UniProt ID.  It may be that there is no UniRef90 ID in
-which case an empty string is returned.
-
-=head4 Parameters
-
-=over
-
-=item C<$uniprotID>
-
-The UniProt ID to retrieve the UniRef90 ID for.
-
-=back
-
-=head4 Returns
-
-A UniRef90 ID.
-
-=head4 Example Usage
-
-    $seqs->addUniref("A0AAQ2CWD6", "B0SS77", "B0SS77");
-    print $seqs->getUniref90Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
-
-
-=head3 C<getUniref50Id($uniprotId)>
-
-Retrieves the UniRef50 ID for the given UniProt ID.  It may be that there is no UniRef50 ID in
-which case an empty string is returned.
-
-=head4 Parameters
-
-=over
-
-=item C<$uniprotId>
-
-The UniProt ID to retrieve the UniRef50 ID for.
-
-=back
-
-=head4 Returns
-
-A UniRef50 ID.
-
-=head4 Example Usage
-
-    $seqs->addUniref("A0AAQ2CWD6", "B0SS77", "B0SS77");
-    print $seqs->getUniref50Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
-
-
-=head3 C<getSequence($uniprotId)>
-
-Retrieve the protein amino acid sequence for the given UniProt ID.  Returns an empty string if
-there is no sequence associated with the ID.
-
-=head4 Parameters
-
-=over
-
-=item C<$uniprotId>
-
-The UniProt ID of the sequence to be retrieved.
-
-=back
-
-=head4 Returns
-
-Amino acid sequence as a string, empty if there is no sequence.
-
-=head4 Example Usage
-
-    my $seq = $seqs->getSequence("B0SS77");
-    # $seq should be something like "MSKIKIALLFGGISGEHIISVRSSAFIFATIDREKYDVCPVYINPNGKFWIPTVSEPIYP"
-
-
-=head3 C<getSequenceIds()>
-
-Retrieve all of the sequence IDs in the input metadata file (i.e. not the ID list file).  If the
-input dataset originates from UniProt, then the IDs are all UniProt.  Otherwise the IDs are
-UniRef.
-
-=head4 Returns
-
-In scalar context, an array ref of a list of all of the sequence IDs.  In list context, a list
-of all of the sequence IDs.
-
-=head4 Example Usage
-
-    my $ids = $seqs->getSequenceIds();
-    map { print "ID1 $_\n"; } @$ids;
-
-    my @ids = $seqs->getSequenceIds();
-    map { print "ID2 $_\n"; } @ids;
-
-
-=head3 C<removeSequence($sequenceId)>
-
-Remove the sequence ID from the input metadata set if it is a primary sequence.  Also remove the
-sequence ID from the ID list tables.  In the latter case, if the input dataset originates from
-UniRef IDs and the C<$sequenceId> is a UniRef ID, then all of the members of the UniRef cluster
-are also removed.  A few examples are given:
-
-B<Example 1: Input Originating in UniProt>
-
-    # Initial metadata 
-    #UniProt_ID      Attribute       Value
-    #A0A8J3V1H9      Sequence_Source FAMILY
-    #
-    # Initial ID list 
-    #uniprot_id	uniref90_id	uniref50_id
-    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
-    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
-
-    $seqs->removeSequence("A0A8J3TPF4");
-
-    # Metadata after removal
-    #UniProt_ID      Attribute       Value
-    #A0A8J3V1H9      Sequence_Source FAMILY
-    #
-    # ID list after removal
-    #uniprot_id	uniref90_id	uniref50_id
-    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
-
-B<Example 2: Input Originating in UniProt (2)>
-
-    # Initial metadata 
-    #UniProt_ID      Attribute       Value
-    #A0A8J3V1H9      Sequence_Source FAMILY
-    #
-    # Initial ID list 
-    #uniprot_id	uniref90_id	uniref50_id
-    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
-    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
-
-    $seqs->removeSequence("A0A8J3V1H9");
-
-    # Metadata after removal
-    #UniProt_ID      Attribute       Value
-    #
-    # ID list after removal
-    #uniprot_id	uniref90_id	uniref50_id
-    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
-
-B<Example 3: Input Originating in UniRef50>
-
-    # Initial metadata 
-    #UniProt_ID      Attribute       Value
-    #Q3AEU2	Sequence_Source FAMILY
-    #Q3AEU2	UniRef50_Cluster_Size   2
-    #Q3AEU2	UniRef50_IDs    A0A8J3TPF4^A0A8J3V1H9
-    #
-    # Initial ID list 
-    #uniprot_id	uniref90_id	uniref50_id
-    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
-    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
-
-    $seqs->removeSequence("A0A8J3TPF4");
-
-    # Metadata after removal
-    #UniProt_ID      Attribute       Value
-    #Q3AEU2	Sequence_Source FAMILY
-    #Q3AEU2	UniRef50_Cluster_Size   2
-    #Q3AEU2	UniRef50_IDs    A0A8J3V1H9
-    #
-    # ID list after removal
-    #uniprot_id	uniref90_id	uniref50_id
-    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
-
-B<Example 4: Input Originating in UniRef50 (2)>
-
-    # Initial metadata 
-    #UniProt_ID      Attribute       Value
-    #Q3AEU2	Sequence_Source FAMILY
-    #
-    # Initial ID list 
-    #uniprot_id	uniref90_id	uniref50_id
-    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
-    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
-
-    $seqs->removeSequence("Q3AEU2");
-
-    # Metadata after removal
-    #UniProt_ID      Attribute       Value
-    #
-    # ID list after removal
-    #uniprot_id	uniref90_id	uniref50_id
-
-
-=head3 C<updateUnirefMetadata()>
-
-Creates or updates the UniRef-related metadata fields in the sequence metadata file.  For a
-UniRef90 sequence source these fields are C<UniRef90_Cluster_Size> which represents the number
-of UniProt IDs in the UniRef90 cluster, and C<UniRef50_IDs> which represents the IDs in the
-UniRef50 cluster.  (These are stored as a text string with each ID separated by the caret
-C<^> character.)  This information comes from the ID list.
-
-=head4 Example Usage
-
-    #$seqs->addSequence(), addUniref(), etc
-    $seqs->updateUnirefMetadata();
-    # save
 
 
 =head3 C<load($metadataFile, $idFile, sequence_source =E<gt> source)>
@@ -822,22 +549,10 @@ If specified, save the ID mapping, otherwise only metadata is saved.
     #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
 
 
-=head3 C<updateUnirefMetadata()>
+=head3 C<addSequence($id, $attr, $seq)>
 
-Add the internal UniRef ID mapping to the sequence metadata so that the sequence metadata file
-(e.g. sequence_metadata.tab) contains the proper UniRef data.
-
-=head4 Example Usage
-
-    $seqs->updateUnirefMetadata();
-
-
-
-
-=head3 C<new($id, attr =E<gt> $attr, seq =E<gt> $seq)>
-
-Creates a new B<EFI::Sequence> instance with the ID C<$id>, attributes stored in C<$attr>,
-and sequence stored in C<$seq>.
+Add a sequence to the collection if it doesn't already exist.  Optionally add attributes (C<$attr>
+in the form of a hash ref) and a protein sequence C<$seq> as metadata.
 
 =head4 Parameters
 
@@ -845,138 +560,314 @@ and sequence stored in C<$seq>.
 
 =item C<$id>
 
-UniProt sequence identifier.
+The UniProt sequence identifier.
 
-=item C<attr>
+=item C<$attr>
 
-Optional attributes, as a hash ref.
+A hash ref mapping metadata fields to values for the sequence ID.
 
-=item C<seq>
+=item C<$seq> (optional)
 
-Optional protein sequence as a string.
+The protein amino acid sequence for the sequence.
 
 =back
 
-=head4 Example Usage
-
-    my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq);
-
-
-=head3 C<getId()>
-
-Get the sequence identifier.
-
 =head4 Returns
 
-Sequence identifier as a string.
+Non-zero if the sequence was successfully added to the collection, zero if the sequence ID already
+exists.
 
 =head4 Example Usage
 
-    my $id = $seq->getId();
+    my $id = "B0SS77";
+    my $attr = {
+        &FIELD_SPECIES => "Leptospira biflexa serovar Patoc (strain Patoc 1 / ATCC 23582 / Paris)",
+        &FIELD_SWISSPROT_DESC => "D-alanine--D-alanine ligase",
+        &FIELD_UNIREF90_CLUSTER_SIZE => 3,
+        &FIELD_UNIREF90_IDS => "B0S9U5^A0AAQ2CWD6^B0SS77",
+        "custom" => "value"
+    };
+    my $seq = "MSKIKIALLFGGISGEHIISVRSSAFIFATIDREKYDVCPVYINPNGKFWIPTVSEPIYP";
+    $seqs->addSequence($id, $attr, $seq);
 
 
-=head3 C<getAttribute($name)>
+=head3 C<getSequence($uniprotId)>
 
-Gets the value of the attribute with the given name.
+Retrieve the C<EFI::Sequence> object for the given UniProt ID.
 
 =head4 Parameters
 
 =over
 
-=item C<$name>
+=item C<$uniprotId>
 
-Attribute name; typically one from the available options in B<EFI::Annotations::Fields>.
+The UniProt ID of the sequence to be retrieved.
 
 =back
 
 =head4 Returns
 
-The attribute value as a string (packed if the value is a list).
+C<EFI::Sequence> object for the given ID, undef if ID doesn't exist in the input
 
 =head4 Example Usage
 
-    $seq->setAttribute("list1", ["item 1", "item 2", "item 3"]);
-    my $val = $seq->getAttribute("list1");
-    # $val is: "item 1^item 2^item 3"
+    my $seq = $seqs->getSequence("B0SS77");
+    my @attr = $seq->getAttributeNames();
 
 
-=head3 C<getAttributeNames()>
+=head3 C<removeSequence($sequenceId)>
 
-Gets the list of available attribute names for the sequence.
+Remove the sequence ID from the input metadata set if it is a primary sequence.  Also remove the
+sequence ID from the ID list tables.  In the latter case, if the input dataset originates from
+UniRef IDs and the C<$sequenceId> is a UniRef ID, then all of the members of the UniRef cluster
+are also removed.  A few examples are given:
+
+B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIPROT>>
+
+    # Initial metadata 
+    #UniProt_ID      Attribute       Value
+    #A0A8J3V1H9      Sequence_Source FAMILY
+    #
+    # Initial ID list 
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
+    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
+
+    $seqs->removeSequence("A0A8J3TPF4");
+
+    # Metadata after removal
+    #UniProt_ID      Attribute       Value
+    #A0A8J3V1H9      Sequence_Source FAMILY
+    #
+    # ID list after removal
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
+
+B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIPROT>>
+
+    # Initial metadata 
+    #UniProt_ID      Attribute       Value
+    #A0A8J3V1H9      Sequence_Source FAMILY
+    #
+    # Initial ID list 
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
+    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
+
+    $seqs->removeSequence("A0A8J3V1H9");
+
+    # Metadata after removal
+    #UniProt_ID      Attribute       Value
+    #
+    # ID list after removal
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
+
+B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF90>>
+
+    # Initial metadata 
+    #UniProt_ID      Attribute       Value
+    #A0A8J3V1H9      Sequence_Source FAMILY
+    #
+    # Initial ID list 
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
+    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
+    #B0SS72	B0SS72	Q3AEU2
+
+    $seqs->removeSequence("A0A8J3V1H9");
+
+    # Metadata after removal
+    #UniProt_ID      Attribute       Value
+    #
+    # ID list after removal
+    #uniprot_id	uniref90_id	uniref50_id
+    #B0SS72	B0SS72	Q3AEU2
+
+B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF50>>
+
+    # Initial metadata 
+    #UniProt_ID      Attribute       Value
+    #Q3AEU2	Sequence_Source FAMILY
+    #Q3AEU2	UniRef50_Cluster_Size   2
+    #Q3AEU2	UniRef50_IDs    A0A8J3TPF4^A0A8J3V1H9
+    #
+    # Initial ID list 
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
+    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
+
+    $seqs->removeSequence("A0A8J3TPF4");
+
+    # Metadata after removal
+    #UniProt_ID      Attribute       Value
+    #Q3AEU2	Sequence_Source FAMILY
+    #Q3AEU2	UniRef50_Cluster_Size   2
+    #Q3AEU2	UniRef50_IDs    A0A8J3V1H9
+    #
+    # ID list after removal
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
+
+B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF50>>
+
+    # Initial metadata 
+    #UniProt_ID      Attribute       Value
+    #Q3AEU2	Sequence_Source FAMILY
+    #Q3AEU2	UniRef50_Cluster_Size   2
+    #Q3AEU2	UniRef50_IDs    A0A8J3TPF4^A0A8J3V1H9
+    #
+    # Initial ID list 
+    #uniprot_id	uniref90_id	uniref50_id
+    #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
+    #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
+
+    $seqs->removeSequence("Q3AEU2");
+
+    # Metadata after removal
+    #UniProt_ID      Attribute       Value
+    #
+    # ID list after removal
+    #uniprot_id	uniref90_id	uniref50_id
+
+
+=head3 C<getSequenceIds()>
+
+Retrieve all of the sequence IDs in the input metadata file (i.e. not the ID list file).  If the
+input dataset originates from UniProt, then the IDs are all UniProt.  Otherwise the IDs are
+UniRef.
 
 =head4 Returns
 
-Returns an array of attribute names in array context.
-Returns an array ref of attribute names in scalar context.
+In scalar context, an array ref of a list of all of the sequence IDs.  In list context, a list
+of all of the sequence IDs.
 
 =head4 Example Usage
 
-    my @names = $seq->getAttributeNames();
-    print "Available attributes: " . join(", ", @names) . "\n";
+    my $ids = $seqs->getSequenceIds();
+    map { print "ID1 $_\n"; } @$ids;
 
-    my $names = $seq->getAttributeNames();
-    print "Available attributes: " . join(", ", @$names) . "\n";
+    my @ids = $seqs->getSequenceIds();
+    map { print "ID2 $_\n"; } @ids;
 
 
-=head3 C<setAttribute($name, $value)>
+=head3 C<associateUnirefIds($uniprot, $uniref90, $uniref50)>
 
-Sets the attribute value for the given attribute name.
+Adds a new mapping of UniProt ID to associated UniRef sequence IDs to the ID list/mapping.
+This mapping will likely be a superset of the IDs added with the C<addSequence()> function in
+order to support sunburst diagrams for UniRef jobs (since all of the IDs are necessary, not
+just UniRef).
 
 =head4 Parameters
 
 =over
 
-=item C<$name>
+=item C<$uniprot>
 
-Attribute name; typically one from the available options in B<EFI::Annotations::Fields>,
-although can be anything.
+The UniProt ID.
 
-=item C<$value>
+=item C<$uniref90>
 
-Scalar, array, or array ref.
+The UniRef90 ID for the UniProt ID.  This may be blank in which case there is no associated
+UniRef90 ID (or the UniRef90 ID is not in the same family as the UniProt ID).
+
+=item C<$uniref50>
+
+The UniRef50 ID for the UniProt ID.  This may be blank in which case there is no associated
+UniRef50 ID (or the UniRef50 ID is not in the same family as the UniProt ID).
 
 =back
 
 =head4 Example Usage
 
-    $seq->setAttribute("custom", "value");
-    $val = $seq->getAttribute("custom");
-    # $val is "value"
-
-    $seq->setAttribute("list1", ["item 1", "item 2", "item 3"]);
-    $val = $seq->getAttribute("list1");
-    # $val is: "item 1^item 2^item 3"
-
-    $seq->setAttribute("list2", "item 1", "item 2", "item 3");
-    $val = $seq->getAttribute("list1");
-    # $val is: "item 1^item 2^item 3"
+    $seqs->associateUnirefIds("A0AAQ2CWD6", "B0SS77", "B0SS77");
+    print $seqs->getUniref90Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
+    print $seqs->getUniref50Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
 
 
-=head3 C<packAttributeValue($value)>
+=head3 C<getUniref90Id($uniprotId)>
 
-Packs the attribute value into a string that can be serialized and deserialized.
-Elements in packed arrays are separated by the caret character (C<^>).
+Retrieves the UniRef90 ID for the given UniProt ID.  It may be that there is no UniRef90 ID in
+which case an empty string is returned.
 
 =head4 Parameters
 
 =over
 
-=item C<$value>
+=item C<$uniprotID>
 
-Value to pack, either a scalar or an array ref.
+The UniProt ID to retrieve the UniRef90 ID for.
 
 =back
 
 =head4 Returns
 
-Returns C<$value> if scalar.  Returns packed array if C<$value> is an array ref.
+A UniRef90 ID.
 
 =head4 Example Usage
 
-    $val = $seq->packAttributeValue("value");
-    # $val is "value"
-    $val = $seq->packAttributeValue(["item 1", "item 2", "item 3"]);
-    # $val is: "item 1^item 2^item 3"
+    $seqs->associateUnirefIds("A0AAQ2CWD6", "B0SS77", "B0SS77");
+    print $seqs->getUniref90Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
+
+
+=head3 C<getUniref50Id($uniprotId)>
+
+Retrieves the UniRef50 ID for the given UniProt ID.  It may be that there is no UniRef50 ID in
+which case an empty string is returned.
+
+=head4 Parameters
+
+=over
+
+=item C<$uniprotId>
+
+The UniProt ID to retrieve the UniRef50 ID for.
+
+=back
+
+=head4 Returns
+
+A UniRef50 ID.
+
+=head4 Example Usage
+
+    $seqs->associateUnirefIds("A0AAQ2CWD6", "B0SS77", "B0SS77");
+    print $seqs->getUniref50Id("A0AAQ2CWD6"), "\n"; # "B0SS77"
+
+
+=head3 C<updateUnirefMetadata()>
+
+Creates or updates the UniRef-related metadata fields in the sequence metadata file.  For a
+UniRef90 sequence source these fields are C<UniRef90_IDs> and C<UniRef90_Cluster_Size>.  For
+a UniRef50 sequence source these fields are C<UniRef50_IDs> and C<UniRef50_Cluster_Size>.
+For both, the C<Cluster_Size> field represents the number of UniProt IDs in the associated
+UniRef cluster.  Similarly, the C<IDs> field is a text string with each UniProt ID separated
+the field separator character (defaults to caret C<^> but can be provided as a parameter to
+the constructor.  This information comes from the ID list.
+
+=head4 Example Usage
+
+    #$seqs->addSequence()
+    #$seqs->associateUnirefIds()
+    #...
+    $seqs->updateUnirefMetadata();
+    #$seqs->save()
+
+
+=head3 C<getFields()>
+
+Return a list of all of the metadata fields in the metadata file that was loaded.  These typically
+match those in B<EFI::Annotations::Fields>.  Not all sequences may have all of the same fields.
+
+=head4 Returns
+
+An array ref containing all of the metadata fields in the file.
+
+=head4 Example Usage
+
+    my $fields = $seqs->getFields();
+    map { print "Field $_\n"; } @$fields;
+
 
 =cut
 

@@ -45,7 +45,7 @@ __END__
 
 =head2 NAME
 
-B<EFI::Database::Schema> - Perl module containing database schema constant
+B<EFI::Database::Schema> - Perl module containing database schema constants
 
 =head2 SYNOPSIS
 
@@ -79,7 +79,7 @@ Return a list of the supported database interfaces.
 
 =head4 Returns
 
-One of the constants listed below in L<CONSTANTS> (e.g. DBI_MYSQL).
+A list of the constants listed below in L<CONSTANTS> (e.g. DBI_MYSQL).
 
 =head4 Example Usage
 

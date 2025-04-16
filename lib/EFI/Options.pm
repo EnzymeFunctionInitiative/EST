@@ -265,6 +265,7 @@ EFI::Options - Perl module for parsing command line arguments
 =head2 SYNOPSIS
 
     use EFI::Options;
+    # The OPT_FILE, OPT_VALUE, and OPT_DIR_PATH constants are imported
 
     my $optParser = new EFI::Options(app_name => $0, desc => "application description", ext_desc => "extended application description");
 
@@ -273,7 +274,7 @@ EFI::Options - Perl module for parsing command line arguments
     $optParser->addOption("finalize", 0, "finalize the computation");
 
     if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
+        my $text = $optParser->printHelp();
         die "$text\n";
         exit(1);
     }
@@ -290,9 +291,20 @@ EFI::Options - Perl module for parsing command line arguments
         print "$opt: $options->{$opt}\n";
     }
 
+
 =head2 DESCRIPTION
 
-EFI::Options is a utility module to get command line arguments.
+EFI::Options is a utility module to process command line arguments, assign default values, perform
+validation, and print help.  The output provided to the user is the intersection of the set of
+options that the user provided on the CLI and those that were specified by calls to C<addOption()>.
+
+This module verifies that argument values are correct and that required arguments are present.  The
+calling script must check the result of C<parseOptions()> to see if the parse was successful and it
+is up to the script to show the help returned from C<printHelp()> and exit if validation was not
+successful.
+
+An implicit C<--help> argument is included when parsing.
+
 
 =head2 METHODS
 
@@ -301,6 +313,7 @@ EFI::Options is a utility module to get command line arguments.
 Create a new instance of this module.  The available parse options are C<app_name>, used
 to provide a custom name to the C<printHelp()> method, C<desc>, also used in C<printHelp()>,
 and C<ext_desc>, providing an extended description/help message.
+
 
 =head3 C<addOption($optSpec, $required, $help, $resultType)>
 
@@ -312,11 +325,25 @@ Adds an option to the list of available options.
 
 =item C<$optSpec>
 
-The option specification in C<Getopt::Long> format.
-For example: C<example-arg=s> (C<--example-arg value>),
-C<example-int=i> (C<--example-int 99>), C<flag> (C<--flag>).
-If the value part of the specification is not provided (e.g. C<=s>)
-the the option is assumed to be a flag.
+The option specification in C<Getopt::Long> format.  For example:
+
+    | Getopt::Long spec | Command line example                  | Result from getOptions()                      |
+    +-------------------+---------------------------------------+-----------------------------------------------+
+    | flag              | --flag                                | {flag => undef}                               |
+    | std-key-value=s   | --std-key-value value                 | {std_key_value => "value"}                    |
+    | opt-val:s         | --opt-val                             | {opt_val => undef}                            |
+    |                   | --opt-val val                         | {opt_val => "val"}                            |
+    | number=i          | --number 1                            | {number => 1}                                 |
+    | multi=s@          | --multi val1 --multi val2             | {multi => ["val1", "val2"]}                   |
+    | hash:s%           | --hash k=v --hash flag --hash l=42    | {hash => {k => "v", flag => undef, l => 42}}  |
+    +-------------------+---------------------------------------+-----------------------------------------------+
+
+A spec separator of C<:> means that the value is optional.  If the value has a suffix of C<@>
+multiple occurrences of the argument are permitted.  If the value has a suffix of C<%> then
+the values are key-value and returned as a hash ref (e.g. C<--filter fragment --filter fraction=10>
+will yield a value that is a hash reference containing C<{fragment => undef, fraction => 10}>.  If
+the value part of the specification is not provided the the option is assumed to be a flag
+(e.g. C<--flag>).
 
 =item C<$required>
 
@@ -330,7 +357,9 @@ C<--test-arg value> this could be C<"path to a file mapping sequence ID to clust
 =item C<$resultType>
 
 Optionally specify the type of the option value for help purposes.  Available
-types are C<OPT_VALUE>, C<OPT_FILE>, and C<OPT_DIR_PATH>.
+types are C<OPT_VALUE> (an argument must have a value, e.g. C<--arg value>), C<OPT_FILE> (an
+argument must have a valid file path, e.g. C<--file-path /tmp/file.txt>), and C<OPT_DIR_PATH>
+(the value to an argument must be a valid directory path, e.g. C<--dir-path /tmp>).
 
 =back
 
@@ -357,7 +386,7 @@ C<1> if the parsing was a success and all required arguments were present; C<0> 
 =head4 Example Usage
 
     if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
+        my $text = $optParser->printHelp();
         die "$text\n";
         exit(1);
     }
@@ -367,19 +396,40 @@ C<1> if the parsing was a success and all required arguments were present; C<0> 
 
 Return information about the options that were added and parsed.
 
+If an option was not provided on the command line, even though it was added to the specification
+using C<addOption()>, it will not be present in this hash ref.  For example, if the user provided
+C<--flag --arg value --extra> on the command line, and only C<flag> and C<arg=s> were passed to
+C<addOption()>, then the output from C<getOptions()> is the hash ref
+C<{flag => undef, arg => "value"}>.  If the user provided C<--flag> on the CLI, and C<flag> and
+C<arg=s> were passed to C<addOption()>, then the output from C<getOptions()> is the hash ref
+C<{flag => undef}>.  It is up to the script that uses B<EFI::Options> to decide whether to
+continue or not.
+
 =head4 Returns
 
-A hash ref mapping option key to option value.  If an option was not provided on the
-command line, even though it was added to the specification using C<addOption()>, it will
-not be present in this hash ref.  The option key is the option name provided in the
-specification to C<addOption> with the dash C<-> replaced with underscores C<_>.
+A hash ref mapping option key to option value.  The option key is the option name provided in the
+specification to C<addOption> with the dash C<-> replaced with underscores C<_> (e.g. for
+C<--file-type txt> the output is C<{file_type => "txt"}>.
 
 =head4 Example Usage
+
+    $optParser->addOption("arg=s", 1, "file path", OPT_FILE);
+    $optParser->addOption("file-type=s", 0, "file type", OPT_VALUE);
+    $optParser->addOption("flag", 0, "flag");
 
     my $options = $optParser->getOptions();
 
     foreach my $opt (keys %$options) {
         print "$opt: $options->{$opt}\n";
+    }
+
+If the user provides C<--arg value --file-type type --flag> on the command line, then the
+output is:
+
+    {
+        arg => "value",
+        file_type => "type",
+        flag => undef
     }
 
 
@@ -402,32 +452,58 @@ C<1> if the user specified C<--help> on the command line, C<0> otherwise.
     }
 
 
-=head3 C<printHelp([$outputType])>
+=head3 C<printHelp($extraErrors)>
 
-Return or display help based on the input options added via C<addOption()>.
+Return help based on the help information provided with the input options added via C<addOption()>.
+Extra error messages can be added at the end of the default help block by the use of the optional
+parameter.  If the C<--help> command line argument is provided by the user then validation is not
+performed and input errors are not displayed.  Optional arguments are surrounded by square brackets
+in output help.
 
 =head4 Parameters
 
 =over
 
-=item C<$outputType>
+=item C<$extraErrors>
 
-If the value is C<OPT_ERRORS>, then add the validation errors to the bottom of
-the help text.
+Optional array ref containing extra errors to display at the end of the help.
 
 =back
 
 =head4 Returns
 
-Return the usage, description, and option help text.
+Return the usage, description, and option help text along with validation errors.
 
 =head4 Example Usage
 
     $optParser->parseOptions();
-    # If script doesn't have --help arg, then automatically include validation errors in help message
-    my $helpWithErrors = $optParser->printHelp();
-    # If script has --help arg, then don't include validation errors in help message
+
+    # User passes invalid arguments (e.g. missing required argument) along with --help argument.
+    # No validation errors in help message
     my $helpOnly = $optParser->printHelp();
+
+    # User passes invalid arguments (e.g. missing required argument) without --help argument.
+    # Automatically include validation errors in help message.
+    my $helpWithErrors = $optParser->printHelp();
+
+    my $extraHelp = ["The --cooccurrence value must be >= 0 and <= 1."];
+    my $help = $optParser->printHelp($extraHelp);
+
+Example output from C<printHelp()>:
+
+    Usage: perl pipelines/est/import/append_blast_query.pl --blast-query-file <FILE>
+        [--output-sequence-file <FILE>] [--output-dir <FILE>]
+
+    Description:
+        Append the input BLAST query to the sequence import file.
+
+    Options:
+        --blast-query-file        path to file containing the BLAST query sequence
+        --output-sequence-file    path to output sequence file that the input sequence gets appended to
+        --output-dir              path to directory containing input files for the EST job
+
+    Errors:
+        Missing or invalid argument --blast-query-file
 
 
 =cut

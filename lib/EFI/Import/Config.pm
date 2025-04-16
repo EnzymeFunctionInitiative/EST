@@ -135,10 +135,13 @@ EFI::Import::Config - Perl module for parsing command line arguments for the EST
 
 =head2 DESCRIPTION
 
-B<EFI::Import::Config> is a utility module to get command line arguments for the EST import
-scripts.  The B<EFI::Import::Config::FastaImport>, B<EFI::Import::Config::Source>, and
-B<EFI::Import::Config::Sequences> modules derive from this and provide app-specific
-option parsing.  They should be used instead of directly using this module.
+B<EFI::Import::Config> is a utility module derived from B<EFI::Options> and is used to get
+command line arguments for the EST import scripts.  The B<EFI::Import::Config::FastaImport>,
+B<EFI::Import::Config::Filter>, B<EFI::Import::Config::Sequences>,
+B<EFI::Import::Config::Source>, and B<EFI::Import::Config::Sunburst> modules derive from
+this and provide app-specific option parsing.  They should be used instead of directly using
+this module.  See B<EFI::Options> for documentation on C<addOption()> and C<printHelp()>
+since the Config modules do not override the default functionality.
 
 
 =head2 METHODS
@@ -203,8 +206,9 @@ Path to the output directory to store results in.
 
 =head3 C<getOptions()>
 
-Returns hash ref containing option data.  This is actually in the B<EFI::Options> base module so
-that documentation should be consulted for the return value and usage.
+Returns hash ref containing option data.  By default this returns options from the parent
+B<EFI::Options> module, but if options have already been validated those are returned instead.
+B<EFI::Options> documentation should be consulted for the return value and usage.
 
 
 =cut
