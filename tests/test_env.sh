@@ -50,6 +50,10 @@ do
                         default database, and this option can be used to
                         connect tests to external, large BLAST databases used
                         in the full EFI toolset
+        --blast-import-db
+                        path to a BLAST database that is used to determine which
+                        IDs are to be used in the computation; if not specified
+                        then the test UniRef50 database is used
         --config-file   path to a configuration file used by the EFI tools to
                         connect to a database; test datasets contain a default
                         configuration file, and this option can be used to
@@ -133,6 +137,7 @@ fi
 if [[ -z "$fasta_db" ]]; then
     fasta_db="$DATA_DIR/blastdb/combined.fasta"
 fi
+
 if [[ -z "$blast_import_fasta_db" ]]; then
     blast_import_fasta_db="$DATA_DIR/blastdb/uniref50.fasta"
 fi
