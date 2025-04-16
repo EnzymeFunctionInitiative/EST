@@ -7,9 +7,9 @@ process get_source_ids {
         path 'source_ids.tab', emit: 'source_ids'
         path 'source_seq.tab', emit: 'source_meta'
         path 'source_stats.json', emit: 'source_stats'
-        path 'blast_hits.tab', emit: 'blast_hits', optional: true
+        path 'blast_hits.tab', optional: true
         path 'seq_mapping.tab', emit: 'seq_mapping', optional: true
-        path 'unmatched_id.tab', emit: 'unmatched_ids', optional: true
+        path 'unmatched_id.tab', optional: true
     script:
 
     common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode} --sequence-version ${params.sequence_version}"
@@ -76,7 +76,7 @@ process get_sunburst_data {
         path accession_table
         path sequence_metadata
     output:
-        path 'sunburst_tax.json', emit: 'sunburst_tax'
+        path 'sunburst_tax.json'
     script:
     """
     perl $projectDir/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db}
@@ -258,11 +258,12 @@ workflow {
     // ones that come from adding a family to the job
     accession_shards = split_sequence_ids(sequence_ids, params.num_accession_shards)
     fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db)
+
+    // Add the imported FASTA file if the import mode is fasta
     if (params.import_mode == "fasta") {
         fasta_files = fasta_files.concat(import_fasta_file)
     }
 
-    // Add the imported FASTA file if the import mode is fasta
     fasta_file = cat_fasta_files(fasta_files.collect())
 
     // Step 2: multiplex
