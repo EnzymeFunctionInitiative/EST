@@ -23,7 +23,7 @@ sub new {
     my $extHelp = "Filter IDs to remove fragments, restrict to taxonomic categories, etc.";
     my $self = $class->SUPER::new(%args, desc => $helpDesc, ext_desc => $extHelp);
 
-    die "Invalid predefined filter file '$args{predef_filter_file}' given" if $args{predef_filter_file} and not -f $args{predef_filter_file};
+    die "Predefined taxonomy filter file '$args{predef_filter_file}' does not exist" if $args{predef_filter_file} and not -f $args{predef_filter_file};
     $self->{predef_filter_file} = $args{predef_filter_file};
 
     return $self;
@@ -43,9 +43,6 @@ sub addImportOptions {
     $self->addOption("sequence-ids-file=s", 0, "path to the output file to save filtered sequence IDs to (for sequence retrieval)", OPT_FILE);
     $self->addOption("source-stats-file=s", 0, "path to the file containing source import stats", OPT_FILE);
     $self->addOption("stats-file=s", 0, "path to the file to save filter statistics to (appends to source stats)", OPT_FILE);
-    #TODO: added in a future issue
-    #$self->addOption("restrict-family=s", 0, "", "");
-    #$self->addOption("restrict-domain=s", 0, "", "");
 }
 
 

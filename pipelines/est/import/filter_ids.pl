@@ -9,7 +9,6 @@ use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
 use EFI::Import::Config::Filter;
-use EFI::Import::Filter;
 use EFI::Import::Filter::Fraction;
 use EFI::Import::Filter::Fragment;
 use EFI::Import::Filter::Taxonomy;
@@ -78,8 +77,7 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
     $taxFilter->applyFilter($seqData);
 }
 
-# Restrict to specified families
-#TODO
+
 
 
 # Save the filtered metadata and accession IDs to the output files

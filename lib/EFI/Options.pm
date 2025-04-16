@@ -13,12 +13,9 @@ use constant OPT_VALUE => 3;
 use constant OPT_FILE => 4;
 use constant OPT_DIR_PATH => 5;
 
-use constant OPT_PRINT_HELP => 8;
-use constant OPT_ERRORS => 16;
-
 use Exporter qw(import);
 
-our @EXPORT = qw(OPT_VALUE OPT_FILE OPT_DIR_PATH OPT_PRINT_HELP OPT_ERRORS);
+our @EXPORT = qw(OPT_VALUE OPT_FILE OPT_DIR_PATH);
 
 
 sub new {
@@ -47,14 +44,20 @@ sub addOption {
     my $resultType = shift || OPT_VALUE;
     my $defaultVal = shift || "";
 
-    # $optSpec == --test-arg=s
+    # The input string in $optSpec is something like --test-arg=s, so remove the dashes at the start
     my $getoptName = $optSpec =~ s/^\-+//r;
-    # $getoptName == test-arg=s
+
+    # Get the argument name and type (e.g. for --test-arg=s $baseName will be "test-arg" and=
+    # $optValType will be "s")
     my $baseName = $getoptName =~ s/^(.+)(=|:)(.+?)$/$1/r;
     my $optValType = $3;
-    # $baseName == test-arg
+
+    # Convert the argument spec name to a name that can serve as a hash key without wrapping the name
+    # in quotes by replacing dashes with underscores (e.g. "test-arg" becomes test_arg)
     my $keyName = $baseName =~ s/-/_/gr;
-    # $keyName = test_arg
+
+    # If $optValueType is defined, then the argument has a value (e.g. "--test-arg=s"), otherwise it
+    # is a flag (e.g. "--flag")
     my $argType = $optValType ? KEY_VALUE : FLAG;
 
     if (not $self->{options}->{$keyName}) {

@@ -19,7 +19,7 @@ sub new {
 }
 
 
-# sequenceIdData - EFI::Sequence::Collection
+# public
 sub getSunburstTaxonomy {
     my $self = shift;
     my $seqData = shift;

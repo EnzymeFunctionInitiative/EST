@@ -9,7 +9,6 @@ use Data::Dumper;
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
-use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
 
 use EFI::Annotations::Fields ':all';
 use EFI::Import::Util;
@@ -60,10 +59,10 @@ sub addError {
 }
 
 
-# Returns number of sequences found
+# The various Source::* classes override this.
 sub loadFromSource {
     my $self = shift;
-    my $seqData = shift; # populate this
+    my $seqData = shift;
     return 0;
 }
 

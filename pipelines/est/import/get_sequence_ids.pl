@@ -43,7 +43,6 @@ my $sources = new EFI::Import::Sources(config => $opts, efi_dbh => $dbh);
 
 
 # Access the primary source type (e.g. FASTA, Accession, BLAST, Family)
-#TODO: move the config parameter creation to this file (i.e. don't bury it in the Sources::XX modules)
 my $source = $sources->createSource($opts->{mode});
 if (not $source) {
     $logger->error($sources->getErrors());

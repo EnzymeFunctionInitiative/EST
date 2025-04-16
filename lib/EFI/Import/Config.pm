@@ -37,7 +37,7 @@ sub getOutputDir {
 # Add default shared options to the available command line parsing list; call in sub classes
 #
 # Parameters:
-#    include_config - if specified as an optional value, then include the command line options
+#    include_config - if specified as an optional value, then also add the command line options
 #        that are required by the import scripts (i.e. path to database config file and path or
 #        name of database) 
 #
@@ -45,7 +45,6 @@ sub addImportOptions {
     my $self = shift;
     my %args = @_;
     $self->addOption("output-dir=s", 0, "path to directory to store output in; if not specified, defaults to current working directory", OPT_DIR_PATH);
-    #TODO: document this
     if ($args{include_config}) {
         $self->addOption("efi-config-file=s", 1, "path to EFI database configuration file", OPT_FILE);
         $self->addOption("efi-db=s", 1, "EFI database name, or path to EFI SQLite database file");
@@ -87,6 +86,7 @@ sub validateOptions {
 }
 
 
+# Call parent, EFI::Options, unless we already have parsed the options.
 sub getOptions {
     my $self = shift;
     return $self->{opts} if $self->{opts};

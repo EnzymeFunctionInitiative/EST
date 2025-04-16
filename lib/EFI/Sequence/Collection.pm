@@ -118,7 +118,9 @@ sub getSequenceIds {
 }
 
 
-# dangerous - should be called only from EFI::Sunburst::Data
+# This should be called only from EFI::Sunburst::Data - returns the list of all of the sequences in
+# the ID list including those that are not in the user's data set and this is only useful to the
+# sunburst data retrieval.
 sub getAllSequenceIds {
     my $self = shift;
     my @ids = keys %{ $self->{uniprot} };
