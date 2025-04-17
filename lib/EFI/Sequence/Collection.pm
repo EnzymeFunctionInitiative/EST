@@ -17,27 +17,26 @@ sub new {
     my $class = shift;
     my %args = @_;
 
+    # Default the sequence version to UniProt, later set by load()
+    my $seqVersion = SEQ_UNIPROT;
+
     # seqs is a hash ref containing a mapping of sequence ID to EFI::Sequence object (the sequence
     # IDs are either UniProt or UniRef depending on the input
-    my $seqs = {};
+    #
     # fields is an array ref containing a list of the attributes in the metadata file
-    my $fields = [];
-
+    #
     # uniref50 is a hash ref that maps UniRef50 IDs to the UniRef90 IDs in the cluster
-    my $uniref50 = {};
+    #
     # uniref90 is a hash ref that maps UniRef90 IDs to the UniProt IDs in the cluster
-    my $uniref90 = {};
+    #
     # uniprot is a hash ref that maps UniProt IDs to the associated UniRef IDs
-    my $uniprot = {};
+    #
     # These three hashes allow the removal of sequences from the input.  For example, if we want
     # to filter by fragment and a given UniRef50 ID is a fragment, then we need to find all of
     # the UniRef90 IDs in the UniRef50 ID, then all of the UniProt IDs in those UniRef90 IDs, and
     # remove all of those.  The hashes above let us figure that out.
 
-    # sequence_version is the sequence version (later set by load(), default to UniProt here)
-    my $seqVersion = SEQ_UNIPROT;
-
-    my $self = { seq => $seqs, fields => $fields, uniref50 => $uniref50, uniref90 => $uniref90, uniprot => $uniref50, sequence_version => $seqVersion };
+    my $self = { seq => {}, fields => [], uniref50 => {}, uniref90 => {}, uniprot => {}, sequence_version => $seqVersion };
     bless($self, $class);
 
     $self->{attr_delimiter} = $args{attr_delimiter} if $args{attr_delimiter};
@@ -79,10 +78,10 @@ sub associateUnirefIds {
 
     if ($uniref50) {
         $uniref90 = $uniprot if not $uniref90;
-        $self->{uniref50}->{$uniref50}->{$uniref90}++;
+        $self->{uniref50}->{$uniref50}->{$uniref90} = 1;
     }
     if ($uniref90) {
-        $self->{uniref90}->{$uniref90}->{$uniprot}++;
+        $self->{uniref90}->{$uniref90}->{$uniprot} = 1;
     }
     $self->{uniprot}->{$uniprot} = [$uniref90, $uniref50];
 }
