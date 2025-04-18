@@ -155,7 +155,22 @@ sub validateAndProcessOptions {
         exit(not $optParser->wantHelp());
     }
 
-    return $optParser->getOptions();
+    my $opts = $optParser->getOptions();
+
+    my @errors;
+    push @errors, "Error: invalid --ssn path '$opts->{ssn}'" if not -f $opts->{ssn};
+    push @errors, "Error: invalid --cluster-map path '$opts->{cluster_map}'" if not -f $opts->{cluster_map};
+    push @errors, "Error: invalid --cluster-num-map path '$opts->{cluster_num_map}'" if not -f $opts->{cluster_num_map};
+    push @errors, "Error: invalid --cluster-color-map path '$opts->{cluster_color_map}'" if not -f $opts->{cluster_color_map};
+    push @errors, "Error: invalid --metanode-map path '$opts->{metanode_map}'" if not -f $opts->{metanode_map};
+    push @errors, "Error: invalid --gnd path '$opts->{gnd}'" if not -f $opts->{gnd};
+
+    if (@errors) {
+        print $optParser->printHelp(\@errors);
+        exit(1);
+    }
+
+    return $opts;
 }
 
 1;
@@ -165,18 +180,18 @@ __END__
 
 =head2 NAME
 
-C<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after adding new attributes
+B<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after adding color attributes
 
 =head2 SYNOPSIS
 
-    color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
-        --cluster-color-map <FILE>] --metanode-map <FILE> --gnd <FILE>
+    color_gnt_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
+        --cluster-color-map <FILE> --metanode-map <FILE> --gnd <FILE>
 
 =head2 DESCRIPTION
 
-B<color_xgmml.pl> reads a SSN in the format of XGMML (XML) and writes it to a new file after
-adding cluster number and color attributes. The document is read and written in a stream-like
-fashion rather than creating and building a DOM for optimal memory usage.
+B<color_gnt_xgmml.pl> reads a SSN in the XGMML (XML) format and writes it to a new file after
+adding cluster number, color, and genome neighborhood tool (GNT) attributes such as ENA status
+and neighboring families.
 
 =head3 Arguments
 
@@ -207,7 +222,7 @@ as determined by the pipeline upstream
 =item C<--metanode-map>
 
 Path to a file that maps metanodes (e.g. UniRef or RepNode nodes in the SSN) to UniProt IDs
-in the metanode; if the file is empty then the network is a UniProt SSN
+in the metanode.  The file will be empty if the input SSN is a UniProt network
 
 =item C<--gnd>
 
@@ -215,5 +230,4 @@ Path to a GND file (SQLite format) that contains genome context data; used to ob
 families and ENA status and ID; output from a previous step
 
 =back
-
 

@@ -71,8 +71,22 @@ sub validateAndProcessOptions {
         exit(not $optParser->wantHelp());
     }
 
-    return $optParser->getOptions();
+    my $opts = $optParser->getOptions();
+
+    my @errors;
+    push @errors, "Error: invalid --ssn path '$opts->{ssn}'" if not -f $opts->{ssn};
+    push @errors, "Error: invalid --cluster-map path '$opts->{cluster_map}'" if not -f $opts->{cluster_map};
+    push @errors, "Error: invalid --cluster-num-map path '$opts->{cluster_num_map}'" if not -f $opts->{cluster_num_map};
+    push @errors, "Error: invalid --cluster-color-map path '$opts->{cluster_color_map}'" if not -f $opts->{cluster_color_map};
+
+    if (@errors) {
+        print $optParser->printHelp(\@errors);
+        exit(1);
+    }
+
+    return $opts;
 }
+
 
 1;
 __END__

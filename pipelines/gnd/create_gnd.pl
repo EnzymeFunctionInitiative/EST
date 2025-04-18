@@ -54,7 +54,9 @@ my $metadata = {
 };
 
 my %args = (network_type => $networkType, cluster_names => $clusterNames, matched_ids => $matchedIds, unmatched_ids => $unmatchedIds);
-$gnd->save($opts->{gnd}, $gnn, $metadata, %args);
+if (not $gnd->save($opts->{gnd}, $gnn, $metadata, %args)) {
+    die "Unable to save GND to '$opts->{gnd}'";
+}
 
 
 

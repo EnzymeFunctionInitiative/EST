@@ -74,7 +74,9 @@ if ($opts->{gnd}) {
     my $networkType = ""; #TODO
     my $clusterNames = {}; #TODO
     my %args = (network_type => $networkType, cluster_names => $clusterNames, sort_sequence_ids => 1);
-    $gnd->save($opts->{gnd}, $gnn, $metadata, %args);
+    if (not $gnd->save($opts->{gnd}, $gnn, $metadata, %args)) {
+        die "Unable to save GND to '$opts->{gnd}'";
+    }
 }
 
 
