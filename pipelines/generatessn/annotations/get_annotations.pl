@@ -11,12 +11,14 @@ use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin/../../../lib";
 
-use EFI::Database qw(:dbi);
+use EFI::Database;
+use EFI::Database::Schema qw(:dbi);
 use EFI::IdMapping::Util;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
 use EFI::IdMapping::Util qw(:ids);
-use EFI::EST::Metadata;
+use EFI::Sequence::Collection;
+use EFI::Sequence::Type qw(is_unknown_sequence);
 
 
 my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
@@ -76,8 +78,12 @@ if ($unirefVersion) {
 }
 
 
-my $parser = new EFI::EST::Metadata;
-my ($idMeta, $fieldNames) = $parser->parseFile($metaFileIn, $idListFile);
+my $inputIds = new EFI::Sequence::Collection();
+my $outputIds = new EFI::Sequence::Collection();
+
+$inputIds->load($metaFileIn);
+my $accessions = $inputIds->getSequenceIds();
+my $metaAttrs = $inputIds->getFields();
 
 my $unirefLenFiltWhere = getUnirefLenFiltWhere();
 my $annoSpec = readAnnoSpec($annoSpecFile);
@@ -90,12 +96,10 @@ if ($db->getDbiType() == DBI_MYSQL) {
 }
 
 
-my $ssnAnno = {};
-
 my %unirefIds;
 my %unirefClusterIdSeqLen;
-foreach my $accession (sort keys %$idMeta){
-    next if $accession =~ /^Z/i;
+foreach my $accession (sort @$accessions){
+    next if is_unknown_sequence($accession);
 
     # If we are using UniRef, we need to get the attributes for all of the IDs in the UniRef seed
     # sequence cluster.  This code does that.
@@ -112,13 +116,13 @@ foreach my $accession (sort keys %$idMeta){
 
     my @ncbiIds = getNcbiIds($accession);
     
-    my $data = formatAnnoData($accession, $idMeta->{$accession}, \@rows, \@ncbiIds, \%unirefIds, \%unirefClusterIdSeqLen);
+    my $data = formatAnnoData($accession, \@rows, \@ncbiIds, \%unirefIds, \%unirefClusterIdSeqLen);
 
-    $ssnAnno->{$accession} = $data;
+    $outputIds->addSequence($accession, $data);
 }
 
 
-$parser->writeData($annoOut, $ssnAnno);
+$outputIds->save($annoOut);
 
 
 $dbh->disconnect();
@@ -145,7 +149,6 @@ $dbh->disconnect();
 
 sub formatAnnoData {
     my $accession = shift;
-    my $seqMeta = shift;
     my $rows = shift;
     my $ncbiIds = shift;
     my $unirefIds = shift;
@@ -154,9 +157,11 @@ sub formatAnnoData {
     my @params = ($rows, $ncbiIds);
     push @params, $annoSpec ? $annoSpec : undef;
 
+    # Get the attributes in hash ref format for the given SQL results
     my $data = $anno->build_annotations(@params);
 
-    foreach my $field (keys %$seqMeta) {
+    # Add any existing metadata attributes in to the data for the ID
+    foreach my $field (@$metaAttrs) {
         if ($field eq $clusterField) {
             my @ids = map { $_->[0] } @{$unirefIds->{$accession}};
             $data->{$field} = join(",", $accession, @ids);
@@ -165,7 +170,8 @@ sub formatAnnoData {
             $data->{$field} = $size;
             $data->{&FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY} = $unirefClusterIdSeqLen->{$accession} if $unirefClusterIdSeqLen->{$accession};
         } elsif (not $data->{$field}) {
-            $data->{$field} = $seqMeta->{$field};
+            my $value = $inputIds->getSequence($accession)->getAttribute($field);
+            $data->{$field} = $value;
         }
     }
 
@@ -240,15 +246,17 @@ sub queryDatabase {
 sub getUnirefQuerySql {
     my $accession = shift;
 
-    my @sql;
+    return () if (not $unirefVersion or not $clusterField);
 
-    if ($unirefVersion and $clusterField and exists $idMeta->{$accession}->{$clusterField}) {
-        my @allIds = split(m/,/, $idMeta->{$accession}->{$clusterField});
-        my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
-        while (my @chunk = splice(@idList, 0, 200)) {
-            my $sql = $anno->build_query_string(\@chunk, $unirefLenFiltWhere);
-            push @sql, $sql;
-        }
+    my $value = $inputIds->getSequence($accession)->getAttribute($clusterField);
+    return () if not $value;
+
+    my @sql;
+    my @allIds = split(m/,/, );
+    my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
+    while (my @chunk = splice(@idList, 0, 200)) {
+        my $sql = $anno->build_query_string(\@chunk, $unirefLenFiltWhere);
+        push @sql, $sql;
     }
 
     return @sql;

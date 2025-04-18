@@ -7,20 +7,11 @@ use warnings;
 use DBI;
 use Config::IniFiles;
 
-use constant DBI_MYSQL => 1;
-use constant DBI_MARIADB => 2;
-use constant DBI_SQLITE => 3;
-use constant DBI_MYSQL_NAME => "mysql";
-use constant DBI_MARIADB_NAME => "mariadb";
-use constant DBI_SQLITE_NAME => "sqlite";
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../";
 
-use Exporter qw(import);
-
-our @EXPORT_OK = qw(DBI_MYSQL DBI_MYSQL_NAME DBI_MARIADB DBI_MARIADB_NAME DBI_SQLITE DBI_SQLIT_NAME);
-our %EXPORT_TAGS = (
-    dbi => ['DBI_MYSQL', 'DBI_MARIADB', 'DBI_SQLITE', 'DBI_MYSQL_NAME', 'DBI_MARIADB_NAME', 'DBI_SQLITE_NAME'],
-);
-Exporter::export_ok_tags('dbi');
+use EFI::Database::Schema qw(:dbi get_dbi_name);
 
 
 use constant ERR_DBI => 1;
@@ -325,23 +316,17 @@ should be the path to the C<.sqlite> file.
 =head3 C<getDbiType()>
 
 Returns the type of the database interface.  Should only be used to compare
-to the C<DBI_*> constants.
+to the C<DBI_*> constants defined in B<EFI::Database::Schema>.
 
 =head4 Returns
 
-One of C<DBI_MYSQL>, C<DBI_SQLITE>, or C<DBI_MARIADB>.
+One of the DBI constants defined in B<EFI::Database::Schema> (e.g. C<DBI_MYSQL>).
 
 =head4 Example Usage
 
-    use EFI::Database qw(:dbi);
+    use EFI::Database::Schema qw(:dbi get_dbi_name);
     my $dbiType = $db->getDbiType();
-    if ($dbiType == DBI_MYSQL) {
-        print "Database interface is " . DBI_MYSQL_NAME . "\n";
-    } elsif ($dbiType == DBI_SQLITE) {
-        print "Database interface is " . DBI_SQLITE_NAME . "\n";
-    } elsif ($dbiType == DBI_MARIADB) {
-        print "Database interface is " . DBI_MARIADB_NAME . "\n";
-    }
+    print "Database interface is " . get_dbi_name($dbiType) . "\n";
 
 
 =head3 C<getHandle()>

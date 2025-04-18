@@ -9,7 +9,7 @@ use Capture::Tiny qw(capture);
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
-use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
+use lib dirname(abs_path(__FILE__)) . "/../.."; # Global libs
 
 use EFI::Data::LengthHistogram;
 
@@ -20,9 +20,9 @@ sub new {
 
     my $self = {};
     bless($self, $class);
-    $self->{config} = $args{config} // die "Fatal error: unable to set up database: missing config arg";
+
     $self->{batch_size} = 500; # How many IDs to provide to the FASTA command since we divide up into chunks
-    $self->{fasta_db} = $self->{config}->getFastaDb();
+    $self->{fasta_db} = $args{fasta_db} // die "Fatal error: unable to set up database: missing fasta db arg";
 
     return $self;
 }

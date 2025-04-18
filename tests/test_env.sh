@@ -6,6 +6,7 @@ data_dir=
 results_dir=
 db_name=
 fasta_db=
+blast_import_fasta_db=
 config_file=
 EFI_DB_NAME=
 EFI_TEST_ENV=
@@ -49,6 +50,10 @@ do
                         default database, and this option can be used to
                         connect tests to external, large BLAST databases used
                         in the full EFI toolset
+        --blast-import-db
+                        path to a BLAST database that is used to determine which
+                        IDs are to be used in the computation; if not specified
+                        then the test UniRef50 database is used
         --config-file   path to a configuration file used by the EFI tools to
                         connect to a database; test datasets contain a default
                         configuration file, and this option can be used to
@@ -79,6 +84,9 @@ do
 	elif [[ ${!index} == "--fasta-db" ]]; then
 		fasta_db="${!idx}"
 		echo "Using $fasta_db as the FASTA database path"
+	elif [[ ${!index} == "--blast-importfasta-db" ]]; then
+		blast_import_fasta_db="${!idx}"
+		echo "Using $blast_import_fasta_db as the UniRef BLAST import FASTA database path"
 	# manually specify the configuration file
 	elif [[ ${!index} == "--config-file" ]]; then
 		config_file="${!idx}"
@@ -130,11 +138,16 @@ if [[ -z "$fasta_db" ]]; then
     fasta_db="$DATA_DIR/blastdb/combined.fasta"
 fi
 
+if [[ -z "$blast_import_fasta_db" ]]; then
+    blast_import_fasta_db="$DATA_DIR/blastdb/uniref50.fasta"
+fi
+
 
 export EFI_DATA_DIR=$data_dir
 export EFI_CONFIG_FILE=$config_file
 export EFI_DB_NAME=$db_name
 export EFI_FASTA_DB=$fasta_db
+export EFI_BLAST_IMPORT_FASTA_DB=$blast_import_fasta_db
 export EFI_TEST_ACC_FILE="$DATA_DIR/accession_test.txt"
 export EFI_TEST_FASTA_FILE="$DATA_DIR/fasta_test.fasta"
 export EFI_TEST_BLAST_SEQ="$DATA_DIR/blast_query.fa"

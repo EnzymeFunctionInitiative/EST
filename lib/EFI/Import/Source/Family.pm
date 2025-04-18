@@ -4,8 +4,6 @@ package EFI::Import::Source::Family;
 use warnings;
 use strict;
 
-use Data::Dumper;
-
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../";
@@ -13,9 +11,13 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
 use EFI::Annotations::Fields ':source';
+use EFI::Sequence::Type;
 
+use Exporter qw(import);
+use constant FAMILY_SOURCE_NAME => "family";
+our @EXPORT_OK = qw(FAMILY_SOURCE_NAME);
 
-our $TYPE_NAME = "family";
+our $TYPE_NAME = FAMILY_SOURCE_NAME;
 
 
 sub new {
@@ -41,53 +43,47 @@ sub init {
     my $efiDbh = shift;
     $self->SUPER::init($config, $efiDbh, @_);
 
-    my $fams = $config->getConfigValue("family");
-    $self->{fams} = $fams;
+    $self->addError("Require one or more --family args") and return undef if not $config->{family};
 
-    if (not $fams) {
-        $self->addError("Require one or more --family args");
-        return undef;
-    } else {
-        return 1;
-    }
+    $self->{fams} = [ split(m/,/, $config->{family}) ];
+    $self->{use_domain} = $config->{domain} // 0;
+
+    return 1;
 }
 
 
 
 
 #
-# getSequenceIds - called to obtain IDs from the FASTA file.  See parent class for usage.
+# loadFromSource - called to obtain IDs from the FASTA file.  See parent class for usage.
 #
-sub getSequenceIds {
+sub loadFromSource {
     my $self = shift;
+    my $destSeqData = shift;
 
     my $queryData = $self->prepareQueries();
-    my $status = $self->executeQueries($queryData);
-    if (not $status) {
-        return undef;
+
+    my ($ids, $numIds, $uniprotUniref) = $self->executeQueries($queryData);
+
+    my $numFullFamily = keys %$uniprotUniref;
+
+    my $numSharedSeq = $self->makeMetadata($ids, $destSeqData);
+
+    # Get the UniRef IDs that are in the input family(s)
+    my ($numUniref90Matched, $numUniref50Matched) = $self->getUnirefIds($uniprotUniref);
+
+    # Add the UniRef IDs to the metadata file
+    $self->addUnirefIds($destSeqData, $self->{sequence_version}, $uniprotUniref);
+
+    $self->addStatsValue("num_ids", $numIds);
+    if ($self->{sequence_version} ne SEQ_UNIPROT) {
+        $self->addStatsValue("num_full_family", $numFullFamily);
+        $self->addStatsValue("num_uniref90_in_family", $numUniref90Matched);
+        $self->addStatsValue("num_uniref50_in_family", $numUniref50Matched);
     }
+    $self->addStatsValue("num_shared_ids", $numSharedSeq) if $numSharedSeq; # overlap between primary import source and family
 
-    my $meta = $self->createMetadata();
-
-    $self->saveStats();
-
-    my $seqType = $self->{uniref_version} ? $self->{uniref_version} : "uniprot";
-
-    return {ids => $self->{data}->{ids}, type => $seqType, meta => $meta};
-}
-
-
-
-
-#
-# createMetadata - calls parent implementation with extra parameter.  See parent class for usage.
-#
-sub createMetadata {
-    my $self = shift;
-
-    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FAMILY, $self->{data}->{ids}, $self->{data}->{uniref_mapping});
-
-    return $meta;
+    return $numIds;
 }
 
 
@@ -97,8 +93,6 @@ sub createMetadata {
 # prepareQueries - internal method
 #
 # Create a list of parameters to be executed later inside an SQL query.  There is one query per family.
-#
-# Parameters:
 #
 # Returns:
 #     hash ref of an array of parameters
@@ -115,14 +109,23 @@ sub prepareQueries {
     foreach my $tableName (keys %$tables) {
         foreach my $fam (@{ $tables->{$tableName} }) {
             # Columns
-            my @c = ("start", "end", "uniref50_seed", "uniref90_seed");
-            # Conditions (in WHERE clause, joined by AND)
+            my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end");
+            push @c, "uniref.uniref90_seed", "uniref.uniref50_seed";
+            #my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end",
+            #    "IF ($tableName.id = f3.id, uniref.uniref90_seed, NULL) AS uniref90_seed",
+            #    "IF ($tableName.id = f2.id, uniref.uniref50_seed, NULL) AS uniref50_seed");
+            # Conditions (in WHERE clause, joined by AND); one for family ID is already included
             my @w = ();
             # Paramerized values (first one is the family ID)
             my @p = ($fam);
             # Joins, array of {table => "targetTable", joinCol => "primaryCol", targetCol => "targetCol"}
-            my @j = ({table => "uniref", joinCol => "$tableName.accession", targetCol => "uniref.accession"});
-            push @all, {table => $tableName, joins => \@j, cols => \@c, cond => \@w, params => \@p};
+            my @j = ();
+            push @j, {table => "uniref", joinCol => "$tableName.accession", targetCol => "uniref.accession"};
+            #push @j, {table => "PFAM AS f2", joinCol => "f2.accession", targetCol => "uniref.uniref50_seed"};
+            #push @j, {table => "PFAM AS f3", joinCol => "f3.accession", targetCol => "uniref.uniref90_seed"};
+            my $g = "";
+            #my $g = "$tableName.accession";
+            push @all, {table => $tableName, joins => \@j, cols => \@c, cond => \@w, params => \@p, group_by => $g};
         }
     }
 
@@ -179,15 +182,17 @@ sub getFamilyNames {
 #     $queryData - hash ref pointing to list of query parameters
 #
 # Returns:
+#     hash ref of IDs mapping to family domain
+#     total number of IDs found
+#     hash ref of mapping of UniProt to corresponding UniRef90 and UniRef50 IDs
 #
 sub executeQueries {
     my $self = shift;
     my $queryData = shift;
 
     my $ids = {};
-    my $unirefMapping = {};
-    my $numUniprotIds = 0;
-    my $numUnirefIds = 0;
+    my $numIds = 0;
+    my $uniprotUniref = {};
 
     # Look at every family in the input set; one query corresponds to one family
     foreach my $query (@{ $queryData->{queries} }) {
@@ -204,17 +209,12 @@ sub executeQueries {
             return undef;
         }
 
-        my ($numUp, $numUr) = $self->processQuery($sth, $ids, $unirefMapping);
-        $numUniprotIds += $numUp;
-        $numUnirefIds += $numUr;
+        # Returns the number of UniProt or UniRef sequences
+        my $numUp = $self->processQuery($sth, $ids, $uniprotUniref);
+        $numIds += $numUp;
     }
 
-    $self->{data}->{ids} = $ids;
-    $self->{data}->{num_uniprot_ids} = $numUniprotIds;
-    $self->{data}->{uniref_mapping} = $unirefMapping if $self->{uniref_version};
-    $self->{data}->{num_uniref_ids} = $numUnirefIds if $self->{uniref_version};
-
-    return 1;
+    return ($ids, $numIds, $uniprotUniref);
 }
 
 
@@ -245,7 +245,9 @@ sub makeSqlStatement {
 
     my $joins = join(" ", map { "LEFT JOIN $_->{table} ON $_->{joinCol} = $_->{targetCol}" } @{ $query->{joins} });
 
-    my $sql = "SELECT $acCol AS accession $cols FROM $query->{table} $joins WHERE $query->{table}.id = ? $cond";
+    my $groupBy = $query->{group_by} ? "GROUP BY $query->{group_by}" : "";
+
+    my $sql = "SELECT $acCol AS accession $cols FROM $query->{table} $joins WHERE $query->{table}.id = ? $cond $groupBy";
     return $sql;
 }
 
@@ -259,82 +261,100 @@ sub makeSqlStatement {
 #
 # Parameters:
 #     $sth - DBI statement handle, used for retrieving results
-#     $ids - hash ref, output data structure; hash ref so we can easily merge results
-#     $unirefMapping - hash ref, output UniRef mapping data structure (ignored
-#         if UniRef is not used
+#     $ids - hash ref, output data structure; hash ref to store domain regions
+#     $uniprotUniref - hash ref, mapping UniProt ID to corresponding UniRef90 and UniRef50 IDs
 #
 # Returns:
 #     number of UniProt IDs in the query
-#     number of UniRef IDs in the query (zero if UniRef is not used)
 #
 sub processQuery {
     my $self = shift;
     my $sth = shift;
     my $ids = shift;
-    my $unirefMapping = shift;
+    my $uniprotUniref = shift;
 
-    my $numUniprotIds = 0;
-    my $numUnirefIds = 0;
+    my $numIds = 0;
 
-    my $unirefField = $self->{uniref_version} ? "$self->{uniref_version}_seed" : "";
-
-    # The retrieval process gets all IDs even if we're using UniRef
-
-    while (my $row = $sth->fetchrow_hashref()) {
-        (my $uniprotId = $row->{accession}) =~ s/\-\d+$//; #remove homologues
-        my $unirefId = $unirefField ? $row->{$unirefField} : "";
-
-        # If we're using UniRef and this is a member of a UniRef cluster, add it to a mapping of UniRef cluster ID -> members
-        if ($unirefId and $unirefId ne $uniprotId) {
-            push @{ $unirefMapping->{$unirefId} }, $uniprotId;
-        } else {
-            # If this is a UniRef ID or we're not using UniRef, then this gets added to the list of IDs to retrieve
-            my $piece = {'start' => $row->{start}, 'end' => $row->{end}};
-            push @{$ids->{$uniprotId}}, $piece;
-
-            # If we're using UniRef and this is the main UniRef cluster ID, this will create the mapping
-            if ($unirefId) {
-                push @{ $unirefMapping->{$unirefId} }, $uniprotId;
-                $numUnirefIds++;
-            }
-        }
-
-        # Add all IDs to the sunburst
-        $self->addIdToSunburst($uniprotId, {uniref90 => $row->{uniref90_seed}, uniref50 => $row->{uniref50_seed}});
-        $numUniprotIds++;
+    my $uniprotCol = "accession";
+    my $seqCol = $uniprotCol;
+    my $isUniref = 0;
+    if ($self->{sequence_version} eq SEQ_UNIREF90 or $self->{sequence_version} eq SEQ_UNIREF50) {
+        $seqCol = "$self->{sequence_version}_seed";
+        $isUniref = 1;
     }
 
-    return ($numUniprotIds, $numUnirefIds);
+    # The retrieval process gets all IDs even if we're using UniRef so that we can get easily get
+    # the domain.
+
+    while (my $row = $sth->fetchrow_hashref()) {
+        # Remove isoforms
+        my $uniprotId = $row->{accession} =~ s/\-\d+$//r;
+        my $seqId = $isUniref ? ($row->{$seqCol} || "") =~ s/\-\d+$//r : $uniprotId;
+
+        if ($isUniref) {
+            if ($uniprotId eq $seqId) {
+                my $domain = [ $row->{start}, $row->{end} ];
+                push @{ $ids->{$seqId} }, $domain;
+            }
+        } else {
+            my $domain = [ $row->{start}, $row->{end} ];
+            push @{ $ids->{$seqId} }, $domain;
+        }
+
+        #$uniprotUniref->{$uniprotId} = [$row->{uniref90_seed} || "", $row->{uniref50_seed} || ""];
+        $uniprotUniref->{$uniprotId} = ["", ""];
+
+        $numIds++;
+    }
+
+    return $numIds;
 }
 
 
 
 
 #
-# saveStats - internal method
+# getUnirefIds - private method
 #
-# Computes and saves import statistics to the parent class stats object.
+# Gets all of the UniRef IDs that are in the family.  Since a UniProt sequence in a given family
+# can be in a UniRef sequence that is not also part of the family, those should be excluded.
 #
 # Parameters:
+#    $ids - hash ref mapping uniprot to an array ref of [uniref90_seed, uniref50_seed]
 #
 # Returns:
+#    number of UniRef90 IDs that were in the family
+#    number of UniRef50 IDs that were in the family
 #
-sub saveStats {
+sub getUnirefIds {
     my $self = shift;
- 
-    my $numUniprot = $self->{data}->{num_uniprot_ids};
-    my $numUniref = $self->{data}->{num_uniref_ids};
-    my $numIds = $self->{uniref_version} ? $numUniref : $numUniprot;
+    my $ids = shift;
 
-    $self->addStatsValue("num_ids", $numIds);
-    $self->addStatsValue("num_full_family", $numUniprot) if $self->{uniref_version};
+    my @ids = keys %$ids;
+
+    my $getIds = sub {
+        my $field = shift;
+        my $idx = shift;
+        my $sql = "SELECT * FROM uniref WHERE $field IN (<IDS>)";
+        my $matched = $self->{util}->batchRetrieveIds(\@ids, $sql, "accession");
+        my $numMatched = 0;
+        foreach my $id (@ids) {
+            $ids->{$id}->[$idx] = $matched->{$id}->{$field} and $numMatched++ if $matched->{$id};
+        }
+        return $numMatched;
+    };
+
+    my $numUniref90Matched = $getIds->("uniref90_seed", 0);
+    my $numUniref50Matched = $getIds->("uniref50_seed", 1);
+
+    return ($numUniref90Matched, $numUniref50Matched);
 }
 
 
 
 
 #
-# retrieveFamiliesForClans - internal method
+# retrieveFamiliesForClans - private method
 #
 # Retrieves all of the PFAMs for the input PFAM clans.
 #
@@ -360,6 +380,54 @@ sub retrieveFamiliesForClans {
     }
 
     return @fams;
+}
+
+
+
+
+#
+# makeMetadata - private method
+#
+# Creates Family-specific metadata.
+#
+# Parameters:
+#     $ids - hash ref with the keys being the IDs identified from the families
+#     $destSeqData - reference to EFI::Sequence::Collection; add sequences into this
+#
+# Returns:
+#     if the family is being added to another import source, the number of sequences that are
+#         shared between the primary import source and the family(s)
+#
+sub makeMetadata {
+    my $self = shift;
+    my $ids = shift;
+    my $destSeqData = shift;
+
+    my $numShared = 0;
+
+    foreach my $id (keys %$ids) {
+        my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FAMILY };
+        # Set the domain region (e.g. start,end)
+        $attr->{&FIELD_SEQ_DOMAIN} = $ids->{$id} if $self->{use_domain};
+        # This returns false if the sequence already exists from another source (i.e. we're adding
+        # a family in to another import option)
+        if (not $destSeqData->addSequence($id, $attr)) {
+            my $seq = $destSeqData->getSequence($id);
+            my $source = $seq->getAttribute(FIELD_SEQ_SRC_KEY);
+            if (not $source) {
+                $source = FIELD_SEQ_SRC_VALUE_FAMILY;
+            } elsif ($source eq FIELD_SEQ_SRC_VALUE_FASTA) {
+                $source = FIELD_SEQ_SRC_VALUE_BOTH;
+                $numShared++;
+            } elsif ($source eq FIELD_SEQ_SRC_VALUE_BLASTHIT) {
+                $source = FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY;
+                $numShared++;
+            }
+            $seq->setAttribute(FIELD_SEQ_SRC_KEY, $source);
+        }
+    }
+
+    return $numShared;
 }
 
 

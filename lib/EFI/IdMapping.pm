@@ -18,6 +18,7 @@ sub new {
     bless($self, $class);
 
     $self->{dbh} = $args{efi_dbh} // die "Require efi_dbh database handle argument for EFI::IdMapping";
+    $self->{validate_uniprot} = $args{validate_uniprot} // 1;
 
     return $self;
 }
@@ -45,7 +46,7 @@ sub reverseLookup {
         my $foreignIdCol = "foreign_id";
         my $foreignIdCheck = " AND foreign_id_type = '$type'";
         if ($type eq UNIPROT) {
-            if (not $self->{uniprot_check}) {
+            if (not $self->{validate_uniprot}) {
                 (my $upId = $id) =~ s/\.\d+$//;
                 push(@uniprotIds, $upId);
                 push(@{ $uniprotRevMap{$upId} }, $id);
@@ -84,7 +85,7 @@ EFI::IdMapping - Perl module for mapping non-UniProt protein sequence IDs to Uni
     use EFI::IdMapping;
     use EFI::IdMapping::Util qw(AUTO);
 
-    my $mapper = new EFI::IdMapping(efi_dbh => $efiDbh); # $efiDbh is required and is a database handle from EFI::Database
+    my $mapper = new EFI::IdMapping(efi_dbh => $efiDbh, validate_uniprot => 1); # $efiDbh is required and is a database handle from EFI::Database
     
     # Automatically detect ID type based on format
     my $typeHint = AUTO;
@@ -104,7 +105,7 @@ module).
 
 =head2 METHODS
 
-=head3 C<new(efi_dbh =E<gt> $efiDbh)>
+=head3 C<new(efi_dbh =E<gt> $efiDbh, validate_uniprot =E<gt> $flag)>
 
 Create an instance of EFI::IdMapping object.
 
@@ -115,6 +116,12 @@ Create an instance of EFI::IdMapping object.
 =item C<efi_dbh>
 
 A database connection handle created by the B<EFI::Database> object.
+
+=item C<validate_uniprot>
+
+If true, all IDs in the UniProt ID format are checked to see if they are in the EFI database.
+By default this is enabled.  If it is disabled, then UniProt IDs in the UniProt standard format
+are returned as-is by the mapper without validation.
 
 =back
 

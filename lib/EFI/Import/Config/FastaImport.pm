@@ -1,75 +1,68 @@
 
 package EFI::Import::Config::FastaImport;
 
-use warnings;
 use strict;
-
-use Data::Dumper;
+use warnings;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../";
 use parent qw(EFI::Import::Config);
 
-use EFI::Import::Config::Defaults;
+use EFI::Import::Config::Defaults qw(get_default_path);
+use EFI::Options;
 
 
 sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = $class->SUPER::new(%args);
-
-    $self->getOptions();
+    my $helpDesc = "Import user-specified FASTA sequences into a form usable by the SSN creation pipeline";
+    my $self = $class->SUPER::new(%args, desc => $helpDesc);
 
     return $self;
 }
 
 
-sub getFastaDb {
+sub addImportOptions {
     my $self = shift;
-    return $self->getConfigValue("fasta_db");
+    $self->SUPER::addImportOptions();
+
+    $self->addOption("uploaded-fasta=s", 1, "user-specified FASTA file containing sequences to use for all-by-all", OPT_FILE);
+    $self->addOption("seq-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir", OPT_FILE);
+    $self->addOption("sequence-meta-file=s", 0, "file containing sequence metadata (post filtering)", OPT_FILE);
+    $self->addOption("output-sequence-file=s", 0, "path to output file to save sequences in; defaults into --output-dir", OPT_FILE);
+    $self->addOption("sequence-ids-file=s", 0, "path to output file to save sequences IDs in; defaults into --output-dir", OPT_FILE);
 }
 
 
-sub getOptions {
+sub validateOptions {
     my $self = shift;
 
-    my @spec = (
-        "uploaded-fasta=s" => "",
-        "seq-mapping-file=s",
-        "output-sequence-file=s" => "",
-    );
-    my %defaults = (
-        uploaded_fasta => "",
-        seq_mapping_file => "",
-        output_sequence_file => "",
-    );
-    
-    $self->SUPER::getOptions(\%defaults, \@spec);
-}
+    my ($status, $help) = $self->SUPER::validateOptions();
+    if ($help) {
+        return ($status, $help);
+    }
 
-
-sub validateAndProcessOptions {
-    my $self = shift;
-
-    my ($err, $help) = $self->SUPER::validateAndProcessOptions();
-
-    my $h = $self->getAllOptions();
+    my $opts = $self->getOptions();
     my $outputDir = $self->getOutputDir();
 
-    push @$err, "Require --uploaded-fasta" if not $h->{uploaded_fasta};
+    my @errors;
 
-    $h->{seq_mapping_file} = $h->{seq_mapping_file} || get_default_path("seq_mapping", $outputDir);
-    $h->{output_sequence_file} = $h->{output_sequence_file} || get_default_path("all_sequences", $outputDir);
+    $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
+    push @errors, "Error: invalid --seq-mapping-file path '$opts->{seq_mapping_file}'" if not -f $opts->{seq_mapping_file};
+    $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
+    push @errors, "Error: invalid --sequence-meta-file path '$opts->{sequence_meta_file}'" if not -f $opts->{sequence_meta_file};
 
-    $self->addHelp("--uploaded-fasta", "<FASTA_FILE>", "User-specified FASTA file containing sequences to use for all-by-all", 1);
-    $self->addHelp("--seq-mapping-file", "<FILE>", "File for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir");
-    $self->addHelp("--output-sequence-file", "<FASTA_FILE>", "Path to output file to put sequences in; defaults into --output-dir");
+    $opts->{output_sequence_file} = get_default_path("all_sequences", $outputDir) if not $opts->{output_sequence_file};
+    $opts->{sequence_ids_file} = get_default_path("sequence_ids", $outputDir) if not $opts->{sequence_ids_file};
 
-    $self->addHelpDescription("Import user-specified FASTA sequences into a form usable by the SSN creation pipeline");
+    if (@errors) {
+        my $help = $self->printHelp(\@errors);
+        return ($self->getErrorStatusCode(), $help);
+    }
 
-    return ($err, $help);
+    return 1;
 }
 
 

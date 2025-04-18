@@ -102,14 +102,15 @@ Example Usage
 ~~~~~~~~~~~~~~~~
 
 Returns the type of the database interface. Should only be used to
-compare to the ``DBI_*`` constants.
+compare to the ``DBI_*`` constants defined in **EFI::Database::Schema**.
 
 
 
 Returns
 ^^^^^^^
 
-One of ``DBI_MYSQL``, ``DBI_SQLITE``, or ``DBI_MARIADB``.
+One of the DBI constants defined in **EFI::Database::Schema** (e.g.
+``DBI_MYSQL``).
 
 
 
@@ -118,15 +119,9 @@ Example Usage
 
 ::
 
-   use EFI::Database qw(:dbi);
+   use EFI::Database::Schema qw(:dbi get_dbi_name);
    my $dbiType = $db->getDbiType();
-   if ($dbiType == DBI_MYSQL) {
-       print "Database interface is " . DBI_MYSQL_NAME . "\n";
-   } elsif ($dbiType == DBI_SQLITE) {
-       print "Database interface is " . DBI_SQLITE_NAME . "\n";
-   } elsif ($dbiType == DBI_MARIADB) {
-       print "Database interface is " . DBI_MARIADB_NAME . "\n";
-   }
+   print "Database interface is " . get_dbi_name($dbiType) . "\n";
 
 
 

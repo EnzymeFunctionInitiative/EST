@@ -1,4 +1,3 @@
-#!/bin/env perl
 
 use strict;
 use warnings;
@@ -18,30 +17,28 @@ use EFI::Import::Logger;
 
 my $logger = new EFI::Import::Logger();
 
-my $config = new EFI::Import::Config::Sequences();
-my ($err) = $config->validateAndProcessOptions();
+my $optionParser = new EFI::Import::Config::Sequences();
+my ($status, $help) = $optionParser->validateOptions();
 
-if ($config->wantHelp()) {
-    $config->printHelp($0);
-    exit(0);
+if ($help) {
+    print "$help\n";
+    exit(not $status); # if error, status is 0, so exit non zero to indicate to shell that there was a problem
 }
 
-if (@$err) {
-    #$logger->error(@$err);
-    $config->printHelp($0, $err);
-    die "\n";
-}
+my $config = $optionParser->getOptions();
 
 
-my $seqDb = new EFI::Import::SequenceDB(config => $config);
+
+
+my $seqDb = new EFI::Import::SequenceDB(fasta_db => $config->{fasta_db});
 
 # Populates the sequence structure with sequences from the sequence database
-my $inputIdsFile = $config->getConfigValue("sequence_ids_file");
-my $outputFile = $config->getConfigValue("output_sequence_file");
+my $inputIdsFile = $config->{sequence_ids_file};
+my $outputFile = $config->{output_sequence_file};
 
 my $_start = time();
 
-$logger->message("Retrieving the sequences from the IDs in $inputIdsFile from " . $config->getFastaDb());
+$logger->message("Retrieving the sequences from the IDs in $inputIdsFile from " . $config->{fasta_db});
 my $numIds = $seqDb->getSequences($inputIdsFile, $outputFile);
 
 my $_elapsed = int((time() - $_start) * 1000);

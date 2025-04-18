@@ -5,35 +5,33 @@ Usage
 
 ::
 
-	Usage: perl pipelines/est/import/get_sequence_ids.pl [--output-dir <OUTPUT_DIR>]
-	    --mode blast|family|accession|fasta --efi-config-file <CONFIG_FILE>
-	    --efi-db <EFI_DB> [--output-metadata-file <FILE>]
-	    [--output-sunburst-ids-file <FILE>] [--output-stats-file <FILE>]
-	    [--sequence-ids-file <FILE>] [--sequence-version uniprot|uniref90|uniref50]
-	    [--family <ONE_OR_MORE_FAM_IDS>] [--fasta <FASTA_FILE>]
-	    [--seq-mapping-file <FILE>] [--accessions <FILE>] [--blast-query <FILE>]
-	    [--blast-output <FILE>]
+	Usage: perl pipelines/est/import/get_sequence_ids.pl --efi-config-file <FILE> --efi-db <VALUE>
+	    --mode <VALUE> [--output-dir <DIR_PATH>] [--output-stats-file <FILE>]
+	    [--source-meta-file <FILE>] [--source-ids-file <FILE>] [--sequence-version <VALUE>]
+	    [--family <VALUE>] [--fasta <FILE>] [--seq-mapping-file <FILE>] [--accessions <FILE>]
+	    [--unmatched-ids <FILE>] [--blast-query <FILE>] [--blast-output <FILE>]
 	
 	Description:
-	    Retrieve sequence IDs from a database or file and saves them for use by a
-	    script later in the EST import pipeline
+	    Retrieve sequence IDs from a database or file and saves them for use by a script later in the
+	    EST import pipeline
 	
 	Options:
-	    --output-dir                  If not specified, defaults to current working directory
-	    --mode                        Specify the type of retrieval to use
-	    --efi-config-file             Path to EFI database configuration file
-	    --efi-db                      Path to SQLite database file, or MySQL/MariaDB database name
-	    --output-metadata-file        Output file to put metadata into (defaults into --output-dir
-	    --output-sunburst-ids-file    Output file to put sunburst data into (defaults into --output-dir)
-	    --output-stats-file           Output file to put sequence ID statistics into (defaults into --output-dir)
-	    --sequence-ids-file           Output file to put sequence IDs into (defaults into --output-dir)
-	    --sequence-version            Sequence type to retrieve; defaults to uniprot
-	    --family                      One or more protein families (PF#####, IPR######); required for --mode family
-	    --fasta                       User-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta
-	    --seq-mapping-file            File for mapping UniProt and anonymous IDs in FASTA file (internal)
-	    --accessions                  User-specified file containing list of accession IDs to use for all-by-all; required for --mode accession
-	    --blast-query                 Path to file containing sequence for initial BLAST; required for --mode blast
-	    --blast-output                Output file to put BLAST results into; required for --mode blast
+	    --output-dir           path to directory to store output in; if not specified, defaults to current working directory
+	    --efi-config-file      path to EFI database configuration file
+	    --efi-db               EFI database name, or path to EFI SQLite database file
+	    --mode                 the sequence retrieval mode (one of blast, family, accession, or fasta)
+	    --output-stats-file    output file to put sequence ID statistics into (defaults into --output-dir)
+	    --source-meta-file     output file to put sequence ID and source data into (defaults into --output-dir)
+	    --source-ids-file      path to the output file to save list of UniRef and UniProt accession IDs to (defaults into --output-dir)
+	    --sequence-version     sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot
+	    --family               one or more protein families (PF#####, IPR######); required for --mode family
+	    --fasta                user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta
+	    --seq-mapping-file     file for mapping UniProt and anonymous IDs in FASTA file (internal)
+	    --accessions           user-specified file containing list of accession IDs to use for all-by-all; required for --mode accession
+	    --unmatched-ids        file containing IDs in FASTA or accession ID files that were not matched in the EFI database
+	    --blast-query          path to file containing sequence for initial BLAST; required for --mode blast
+	    --blast-output         output file to put BLAST results into; required for --mode blast
+	
 
 Reference
 ---------

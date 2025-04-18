@@ -27,6 +27,7 @@ sub new {
     my $self = $class->SUPER::new(%args);
     $self->{_type} = $TYPE_NAME;
     $self->{use_headers} = 1;
+    $self->{unmatched_ids} = [];
 
     return $self;
 }
@@ -43,9 +44,8 @@ sub init {
     my $efiDbh = shift;
     $self->SUPER::init($config, $efiDbh, @_);
 
-    my $file = $config->getConfigValue("accessions");
+    my $file = $config->{accessions};
     $self->{acc_file} = $file;
-    $self->{dbh} = $efiDbh // die "Require efh dbh argument";
 
     if (not $self->{acc_file}) {
         $self->addError("Require --accessions arg");
@@ -59,29 +59,36 @@ sub init {
 
 
 # 
-# getSequenceIds - called to obtain IDs from the accession ID file.  See parent class for usage.
+# loadFromSource - called to obtain IDs from the accession ID file.  See parent class for usage.
 #
-sub getSequenceIds {
+sub loadFromSource {
     my $self = shift;
+    my $destSeqData = shift; # populate this
 
     my $rawIds = $self->parseAccessions();
-    my ($ids, $sourceInfo) = $self->identifyAccessionIds($rawIds);
 
-    # Maps UniRef50/UniRef90 to UniProt
-    my $unirefMapping = $self->retrieveUnirefIds($ids);
+    my $numIds = $self->identifyAccessionIds($rawIds, $destSeqData);
 
-    my $metadata = $self->createMetadata($ids, $unirefMapping, $sourceInfo);
+    $self->addUnirefIds($destSeqData);
 
-    $self->addSunburstIds($ids, $unirefMapping);
+    return $numIds;
+}
 
-    #TODO: add sequences from family
-    #TODO: apply tax/family filters here??? ???
-    my $numRemoved = 0;
 
-    $self->addStatsValue("num_filter_removed", $numRemoved);
 
-    my $seqType = $self->{uniref_version} ? $self->{uniref_version} : "uniprot";
-    return {ids => $ids, type => $seqType, meta => $metadata};
+
+sub hasUnmatchedIds {
+    my $self = shift;
+    return @{ $self->{unmatched_ids} };
+}
+
+
+sub saveUnmatchedIds {
+    my $self = shift;
+    my $file = shift;
+    open my $fh, ">", $file or die "Unable to write to unmatched ID list file '$file': $!";
+    map { $fh->print("$_\n"); } @{ $self->{unmatched_ids} };
+    close $fh;
 }
 
 
@@ -100,10 +107,10 @@ sub getSequenceIds {
 sub parseAccessions {
     my $self = shift;
 
-    print("Parsing accession file $self->{acc_file}\n");
+    ###print("Parsing accession file $self->{acc_file}\n");
 
     open my $afh, "<", $self->{acc_file} or die "Unable to open user accession file $self->{acc_file}: $!";
-    
+
     # Read the case where we have a mac file (CR \r only); we read in the entire file and then split.
     my $delim = $/;
     $/ = undef;
@@ -116,10 +123,10 @@ sub parseAccessions {
 
     my @lines = split /[\r\n\s]+/, $line;
     foreach my $accId (grep m/.+/, map { split(",", $_) } @lines) {
-        $rawIds{$accId} = [];
+        $rawIds{$accId} = ();
     }
 
-    return \%rawIds;
+    return [ keys %rawIds ];
 }
 
 
@@ -129,39 +136,38 @@ sub parseAccessions {
 # identifyAccessionIds - internal method
 #
 # Examines the input IDs to find UniProt IDs (or IDs that can be mapped back to UniProt IDs).
+# Stores them into the sequence data object.
 #
 # Parameters:
-#     $rawIds - hash ref of IDs to data; only keys are used
+#     $rawIds - array ref of raw, un-mapped IDs
+#     $destSeqData - reference to EFI::Sequence::Collection; add sequences into this
 #
 # Returns:
-#     hash ref mapping UniProt IDs to empty array (empty for future use)
-#     hash ref of metadata (the foreign ID if not UniProt)
+#     number of sequences identified (e.g. UniProt sequences)
 #
 sub identifyAccessionIds {
     my $self = shift;
     my $rawIds = shift;
+    my $destSeqData = shift; # add sequences to this
 
     my $idMapper = new EFI::IdMapping(efi_dbh => $self->{dbh});
 
-    my @ids = keys %$rawIds;
+    my @ids = @$rawIds;
     my ($upIds, $noMatches, $reverseMap) = $idMapper->reverseLookup(EFI::IdMapping::Util::AUTO, @ids);
     my @uniprotIds = @$upIds;
 
-    my %ids = map { $_ => [] } @uniprotIds;
-
     my $numUniprotIds = scalar @uniprotIds;
     my $numNoMatches = scalar @$noMatches;
-
-    print("There were $numUniprotIds IDs that had UniProt matches and $numNoMatches IDs that could not be identified\n");
+    $self->{unmatched_ids} = $noMatches;
 
     my $numForeign = 0;
-    my $sourceInfo = {};
     foreach my $id (@uniprotIds) {
-        $sourceInfo->{$id} = {query_ids => []};
+        my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FASTA };
         if (exists $reverseMap->{$id}) {
-            $sourceInfo->{$id}->{query_ids} = $reverseMap->{$id};
+            $attr->{Query_IDs} = $reverseMap->{$id};
             $numForeign++ if ($reverseMap->{$id}->[0] and $id ne $reverseMap->{$id}->[0]);
         }
+        $destSeqData->addSequence($id, $attr);
     }
 
     $self->addStatsValue("num_ids", scalar @ids);
@@ -169,50 +175,7 @@ sub identifyAccessionIds {
     $self->addStatsValue("num_unmatched", $numNoMatches);
     $self->addStatsValue("num_foreign", $numForeign);
 
-    return (\%ids, $sourceInfo);
-}
-
-
-
-
-#
-# createMetadata - calls parent implementation with extra parameter.  See parent class for usage.
-#
-# Parameters:
-#     $ids - hash ref with the keys being the IDs identified from the initial BLAST
-#     $unirefMapping - a hash ref mapping UniRef IDs to UniProt IDs
-#     $sourceInfo - a hash ref mapping metadata fields to metadata field names
-#
-# Returns:
-#     hash ref of metadata with the key being an ID and the value being metadata
-#
-sub createMetadata {
-    my $self = shift;
-    my $ids = shift;
-    my $unirefMapping = shift;
-    my $sourceInfo = shift;
-
-    if ($self->{uniref_version}) {
-        $unirefMapping = $self->{uniref_version} eq "uniref50" ? $unirefMapping->{50} : $unirefMapping->{90};
-    }
-
-    my $metaKeyMap = {
-        query_ids => "Query_IDs",
-        other_ids => "Other_IDs",
-        description => "Description",
-    };
-
-    my $addMetadataFn = sub {
-        my ($id, $meta) = @_;
-        foreach my $k (keys %{ $sourceInfo->{$id} }) {
-            my $metaKey = $metaKeyMap->{$k} // $k;
-            $meta->{$metaKey} = $sourceInfo->{$id}->{$k};
-        }
-    };
-
-    my $meta = $self->SUPER::createMetadata(FIELD_SEQ_SRC_VALUE_FASTA, $ids, $unirefMapping, $addMetadataFn);
-
-    return $meta;
+    return $numUniprotIds;
 }
 
 

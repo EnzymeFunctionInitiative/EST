@@ -24,6 +24,8 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
+    common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
+    common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
     shared_args.add_args(common_parser)
 
     # add a subparser for each import mode
@@ -35,9 +37,8 @@ def add_args(parser: argparse.ArgumentParser):
     blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90")
 
     # option B: Family
-    family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group('Family Options')
-    family_parser.add_argument("--exclude-fragments", action="store_true", help="Do not import sequences marked as fragments by UniProt")
-    family_parser.add_argument("--families", type=str, required=True, help="Comma-separated list of families to add")
+    family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group("Family Options")
+    # Can add families to every job type
 
     # option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
@@ -72,13 +73,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             fail = True
         else:
             args.blast_query_file = os.path.abspath(args.blast_query_file)
-        if args.sequence_version != "uniprot":
-            if args.import_blast_fasta_db is None:
-                print("--import-blast-fasta-db is required when sequence version is not uniprot")
-                fail = True
-            else:
-                # Use the UniRef database for the BLAST
-                args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
+        if args.import_blast_fasta_db is not None:
+            # Use the UniRef database for the BLAST
+            args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
         else:
             # Use the main database for the BLAST
             args.import_blast_fasta_db = os.path.abspath(args.fasta_db)
@@ -94,6 +91,15 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             fail = True
         else:
             args.accessions_file = os.path.abspath(args.accessions_file)
+
+    # Can't validate in the argparse library because --family can be used in modes other family
+    # and in that case it is optional; when mode is family then it is required so we validate here
+    if args.import_mode == "family" and not args.families:
+        print(f"Family mode requires --family argument")
+        fail = True
+
+    args.sequence_filter = args.filter
+    del args.filter
 
     if fail:
         print("Failed to render params template")
@@ -111,7 +117,8 @@ def create_parser() -> argparse.ArgumentParser:
 def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id,
                   efi_config, fasta_db, efi_db, multiplex, blast_evalue,
                   import_mode, sequence_version,
-                  families=None, exclude_fragments=None,
+                  families=None,
+                  sequence_filter=None,
                   fasta_file=None,
                   accessions_file=None,
                   blast_query_file=None,
@@ -130,7 +137,7 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "fasta_db": fasta_db,
         "efi_db": efi_db,
         "import_mode": import_mode,
-        "exclude_fragments": exclude_fragments,
+        "filter": sequence_filter,
         "multiplex": multiplex,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version
@@ -138,13 +145,7 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
     if import_mode == "blast":
         params |= {
             "blast_query_file": blast_query_file,
-            "import_blast_fasta_db": fasta_db
-        }
-        if sequence_version != "uniprot":
-            params["import_blast_fasta_db"] = args.import_blast_fasta_db
-    elif import_mode == "family":
-        params |= {
-            "families": families
+            "import_blast_fasta_db": import_blast_fasta_db
         }
     elif import_mode == "fasta":
         params |= {
@@ -154,7 +155,12 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         params |= {
             "accessions_file": accessions_file
         }
-    
+
+    if families is not None:
+        params |= {
+            "families": families
+        }
+
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)

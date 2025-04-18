@@ -23,8 +23,6 @@ use constant ANNO_FIELDS_DB_USER => 8;
 use constant ANNO_FIELDS_SSN_COLOR => 16;
 use constant ANNO_FIELDS_SSN_GNT => 32;
 
-use constant ANNO_ROW_SEP => "^";
-
 use constant INTERPRO_DOMAIN => "domain";
 use constant INTERPRO_FAMILY => "family";
 use constant INTERPRO_HOMOLOGOUS_SUPERFAMILY => "homologous_superfamily";
