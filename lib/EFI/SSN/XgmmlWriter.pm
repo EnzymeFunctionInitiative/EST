@@ -24,6 +24,8 @@ sub new {
     my $self = {};
     bless($self, $class);
 
+    $self->{append_new_attr} = $args{append_new_attr} // 1;
+
     $self->{ssn} = $args{ssn};
     $self->{output_ssn} = $args{output_ssn};
 
@@ -44,7 +46,7 @@ sub write {
     my $self = shift;
 
     my $reader = XML::LibXML::Reader->new(location => $self->{ssn}) or die "Cannot read input XGMML file '$self->{ssn}': $!";
-    my $output = IO::File->new(">" . $self->{output_ssn});
+    my $output = IO::File->new(">" . $self->{output_ssn}) or die "Cannot write to output file '$self->{output_ssn}': $!";
     # Disable error checking with the UNSAFE keyword; this improves performance
     my $writer = XML::Writer->new(OUTPUT => $output, UNSAFE => 1, PREFIX_MAP => '');
     $self->{writer} = $writer;
@@ -94,7 +96,7 @@ sub write {
             $self->copyEdge();
         } else {
             if ($nname eq "graph") {
-                $self->copyElement($ntype);
+                $self->processGraphElement($ntype);
             } else {
                 $self->copyElementWithoutNamespace($ntype);
             }
@@ -103,6 +105,32 @@ sub write {
 
     $writer->end();
     $output->close();
+}
+
+
+#
+# processGraphElement - private method
+#
+# Handle the start of a graph element by passing it's attributes to the
+# registered handlers
+#
+# Parameters:
+#    $ntype - node type (e.g. start of tag, end of tag)
+#    
+sub processGraphElement {
+    my $self = shift;
+    my $ntype = shift;
+    if ($ntype == XML_READER_TYPE_ELEMENT) {
+        my @attr;
+        foreach my $attr ($self->{reader}->copyCurrentNode(0)->getAttributes()) {
+            my @values = map { $_->onGraphAttr($attr->name, $attr->value); } @{ $self->{attr_handlers} };
+            my $value = shift @values || $attr->value; # pick the first one, or the default value if not handled
+            push @attr, $attr->name, $value;
+        }
+        $self->createElementWithAttr(@attr);
+    } else {
+        $self->copyElement($ntype);
+    }
 }
 
 
@@ -261,6 +289,12 @@ sub processAttElement {
 
     my $attName = $self->{reader}->getAttribute("name");
 
+    my $newEmptyTag = sub {
+        my $info = shift;
+        my $value = shift;
+        $self->emptyTag("att", "name" => $info->[0], "type" => $info->[1], "value" => $value);
+    };
+
     # An 'empty' element is a leaf (e.g. no child elements; <att X="Y" /> is empty);
     # also, skip existing color or cluster number attrs
     if (not $self->{skip_att}->{$attName}) {
@@ -268,15 +302,22 @@ sub processAttElement {
 
         # Write the current 'empty' element plus the cluster info if we're at the right column
         if ($self->{reader}->isEmptyElement()) {
-            $self->emptyTag("att", @attr);
+            $self->emptyTag("att", @attr) if $self->{append_new_attr};
             foreach my $h (@{ $self->{attr_handlers} }) {
                 my $newAttrs = $h->getNewAttributes($attName);
                 foreach my $info (@$newAttrs) {
-                    my @newAttr = ("name" => $info->[0], "value" => $info->[1]);
-                    push @newAttr, "type" => $info->[2] if $info->[2];
-                    $self->emptyTag("att", @newAttr);
+                    if (ref $info->[2] eq "ARRAY") {
+                        $self->startTag("att", "name" => $info->[0], "type" => "list");
+                        foreach my $value (@{ $info->[2] }) {
+                            $newEmptyTag->($info, $value);
+                        }
+                        $self->endTag("att");
+                    } else {
+                        $newEmptyTag->($info, $info->[2]);
+                    }
                 }
             }
+            $self->emptyTag("att", @attr) if not $self->{append_new_attr};
         # Start the tag for a nested att
         } else {
             $self->startTag("att", @attr);
@@ -311,8 +352,8 @@ sub getAttAttr {
 #
 # getSkipAtt - private method
 #
-# Gets a list of fields to skip (e.g. existing color-related fields) as well as the
-# names of the color-related fields that will be inserted into the SSN
+# Sets a list of fields to skip.  Used to overwrite any existing fields that attribute handlers
+# will parse instead.
 #
 sub getSkipAtt {
     my $self = shift;
@@ -332,7 +373,7 @@ __END__
 
 =head2 NAME
 
-EFI::SSN::XgmmlWriter - Perl module for rewriting a XGMML file from a source to a target
+B<EFI::SSN::XgmmlWriter> - Perl module for rewriting a XGMML file from a source to a target
 while inserting color and cluster number information
 
 =head2 SYNOPSIS
@@ -340,9 +381,9 @@ while inserting color and cluster number information
     use EFI::SSN::XgmmlWriter;
     use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
 
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap, colors => $colors);
+    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color->new(cluster_map => $clusterMap, colors => $colors);
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn, append_new_attr => 1);
     $xwriter->addAttributeHandler($colorHandler);
     $xwriter->write();
 
@@ -356,7 +397,7 @@ derived classes are used to provide metadata.
 
 =head2 METHODS
 
-=head3 C<new(ssn =E<gt> $ssnFile, output_ssn =E<gt> $outputSsn)>
+=head3 C<new(ssn =E<gt> $ssnFile, output_ssn =E<gt> $outputSsn, append_new_attr =E<gt> 1)>
 
 Creates a new B<EFI::SSN::XgmmlWriter> object.
 
@@ -366,13 +407,27 @@ Creates a new B<EFI::SSN::XgmmlWriter> object.
 
 =item C<ssn>
 
-Path to a SSN file in XGMML format (XML) that is to be parsed and rewritten.
+Path to a SSN file in XGMML format (XML) that is to be parsed.
+
+=item C<output_ssn>
+
+Path to the SSN file to write.
+
+=item C<append_new_attr>
+
+If true (non-zero), then new attributes are appended after the node attribute location
+specified by B<EFI::Annotations> (e.g. C<get_cluster_info_insert_location> and
+C<get_gnt_info_insert_location>).  Otherwise the new node attributes will be prepended
+to the location.  I<Defaults to true (e.g. appending).>
 
 =back
 
 =head4 Example Usage
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn,
+        append_new_attr => 0);
+    # If the location is the node attribute "Organism", then fields will be inserted
+    # before the "Organism" attribute and then "Organism" will be added.
 
 
 =head3 C<write()>

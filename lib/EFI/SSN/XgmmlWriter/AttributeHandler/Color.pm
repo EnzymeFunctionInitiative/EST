@@ -20,8 +20,9 @@ sub new {
 
     my $self = $class->SUPER::new(%args);
 
+    $self->{cluster_map} = $self->flipClusterMap($args{cluster_map});
+
     $self->{colors} = $args{colors};
-    $self->{cluster_map} = $args{cluster_map};
     $self->{cluster_sizes} = $args{cluster_sizes};
     $self->{cluster_color_map} = {};
     $self->{singleton_num} = 1;
@@ -29,6 +30,26 @@ sub new {
     $self->{anno} = new EFI::Annotations;
 
     return $self;
+}
+
+
+sub flipClusterMap {
+    my $self = shift;
+    my $sourceMap = shift || {};
+
+    my $clusterMap = {seq => {}, node => {}};
+
+    my $remap = sub {
+        my $mapKey = shift;
+        foreach my $clusterNum (keys %{ $sourceMap->{$mapKey} }) {
+            map { $clusterMap->{$mapKey}->{$_} = $clusterNum; } @{ $sourceMap->{$mapKey}->{$clusterNum} };
+        }
+    };
+
+    $remap->("seq");
+    $remap->("node");
+
+    return $clusterMap;
 }
 
 
@@ -57,6 +78,18 @@ sub onNodeStart {
 sub onNodeEnd {
     my $self = shift;
     $self->{current_cluster} = undef;
+}
+
+
+sub onGraphAttr {
+    my $self = shift;
+    my $name = shift;
+    my $value = shift;
+    if ($name eq "label") {
+        return "$value colorized";
+    } else {
+        return $value;
+    }
 }
 
 
@@ -97,12 +130,11 @@ sub getClusterInfo {
     my $seqId = shift;
 
     my @info;
-    my $cmap = $self->{cluster_map}->{$seqId};
-    if ($cmap) {
-        # Cluster number by number of sequences in cluster
-        my $seqNum = $cmap->[0] || 0;
-        # Cluster number by number of nodes in cluster
-        my $nodeNum = $cmap->[1] || $seqNum;
+    # Cluster number by number of sequences in cluster
+    my $seqNum = $self->{cluster_map}->{seq}->{$seqId};
+    # Cluster number by number of nodes in cluster
+    my $nodeNum = $self->{cluster_map}->{node}->{$seqId} || $seqNum;
+    if (defined $seqNum and defined $nodeNum) {
         my $seqCount = $self->{cluster_sizes}->{seq}->{$seqNum} // 0;
         my $nodeCount = $self->{cluster_sizes}->{node}->{$nodeNum} // $seqCount;
         my $seqColor = $self->{colors}->getColor($seqNum);
@@ -110,15 +142,17 @@ sub getClusterInfo {
 
         $self->{cluster_color_map}->{$seqNum} = $seqColor;
 
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM}, $seqNum, "integer"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM}, $nodeNum, "integer"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM_COLOR}, $seqColor, "string"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM_COLOR}, $nodeColor, "string"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_COUNT}, $seqCount, "integer"];
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_COUNT}, $nodeCount, "integer"];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM}, "integer", $seqNum];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM}, "integer", $nodeNum];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_COUNT}, "integer", $seqCount];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_COUNT}, "integer", $nodeCount];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_NUM_COLOR}, "string", $seqColor];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_NUM_COLOR}, "string", $nodeColor];
     } else {
         my $singNum = $self->{singleton_num}++;
-        push @info, [$self->{color_fields}->{&FIELD_COLOR_SINGLETON}, $singNum, "integer"];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SINGLETON}, "integer", $singNum];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_SEQ_COUNT}, "integer", 1];
+        push @info, [$self->{color_fields}->{&FIELD_COLOR_NODE_COUNT}, "integer", 1];
     }
 
     return \@info;
@@ -143,7 +177,7 @@ __END__
 
 =head2 NAME
 
-EFI::SSN::XgmmlWriter::AttributeHandler::Color - Perl module for saving color attributes
+B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> - Perl module for saving color attributes
 based on cluster number into a SSN.
 
 =head2 SYNOPSIS
@@ -153,7 +187,7 @@ based on cluster number into a SSN.
 
     my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
 
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap,
+    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color->new(cluster_map => $clusterMap,
         colors => $colors, cluster_sizes => $sizes);
     $xwriter->addAttributeHandler($colorHandler);
 
@@ -174,7 +208,7 @@ is determined by a method in the B<EFI::Annotations> class.
 
 =head2 METHODS
 
-=head3 C<new(cluster_map =E<gt> $clusterMap, colors =E<gt> $colors, cluster_sizes =E<gt> $sizes)>
+=head3 C<new(cluster_map =E<gt> $clusterMapSizes, colors =E<gt> $colors, cluster_sizes =E<gt> $sizes)>
 
 Creates a new B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> object and uses the
 given parameters to determine node colors.
@@ -185,9 +219,13 @@ given parameters to determine node colors.
 
 =item C<cluster_map>
 
-Hash ref that maps sequence ID (e.g. node label) to cluster number.  Each value
-is an array ref where the first element is the cluster number based on sequences
-in cluster and the second element is the cluster number based on nodes in cluster.
+Hash ref with two keys:
+
+C<size> with a hash ref value that maps cluster number by sequence to a list of
+sequence IDs (e.g. node label) in the cluster.
+
+C<node> with a hash ref value that maps cluster number by node to a list of
+sequence IDs (e.g. node label) in the cluster.
 
 =item C<colors>
 
@@ -212,12 +250,6 @@ of nodes.  For example:
     }
 
 =back
-
-=head4 Example Usage
-
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap,
-        colors => $colors, cluster_sizes => $sizes);
-    $xwriter->addAttributeHandler($colorHandler);
 
 
 =head3 C<getClusterColors()>

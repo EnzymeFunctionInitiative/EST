@@ -5,8 +5,8 @@ Usage
 
 ::
 
-	Usage: perl append_blast_query.pl --blast-query-file <FILE> [--output-sequence-file <FILE>]
-	    [--output-dir <FILE>]
+	Usage: perl pipelines/est/import/append_blast_query.pl --blast-query-file <FILE>
+	    [--output-sequence-file <FILE>] [--output-dir <FILE>]
 	
 	Description:
 	    Append the input BLAST query to the sequence import file.

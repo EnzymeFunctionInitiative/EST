@@ -13,7 +13,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
 use EFI::GNT::GNN::XgmmlWriter::Util;
-use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE);
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE DEFAULT_COOCCURRENCE_THRESHOLD);
 
 
 sub new {
@@ -25,7 +25,7 @@ sub new {
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
     $self->{util} = new EFI::GNT::GNN::XgmmlWriter::Util(gnt_anno => $args{gnt_anno});
     #$self->{colors} is created by the parent class
-    $self->{cooc_threshold} = 0.20; #TODO: set this somewhere
+    $self->{cooc_threshold} = DEFAULT_COOCCURRENCE_THRESHOLD;
 
     return $self;
 }

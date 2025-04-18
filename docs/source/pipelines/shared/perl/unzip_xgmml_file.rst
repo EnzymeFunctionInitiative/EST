@@ -5,7 +5,7 @@ Usage
 
 ::
 
-	Usage: perl unzip_xgmml_file.pl --in <FILE> --out <FILE> [--out-ext <FILE>]
+	Usage: perl pipelines/shared/perl/unzip_xgmml_file.pl --in <FILE> --out <FILE> [--out-ext <FILE>]
 	
 	Description:
 	    Extracts the first .xgmml (or specified extension) file in the input archive.

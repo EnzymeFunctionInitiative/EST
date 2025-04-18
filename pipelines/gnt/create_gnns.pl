@@ -63,7 +63,20 @@ $tables->saveIdsWithNoContext($opts->{no_context}) if $opts->{no_context};
 
 if ($opts->{gnd}) {
     my $gnd = new EFI::GNT::GND();
-    $gnd->save($gnn, $opts->{gnd});
+
+    my $metadata = {
+        neighborhood_size => $opts->{nb_size},
+        coccurrence => $opts->{cooc_threshold},
+        title => $opts->{title} // "",
+        type => "gnn",
+    };
+
+    my $networkType = "uniprot";
+    my $clusterNames = {};
+    my %args = (network_type => $networkType, cluster_names => $clusterNames, sort_sequence_ids => 1);
+    if (not $gnd->save($opts->{gnd}, $gnn, $metadata, %args)) {
+        die "Unable to save GND to '$opts->{gnd}'";
+    }
 }
 
 
@@ -87,6 +100,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("cooc-threshold=f", 0, "cooccurrence threshold (>= 0.0 and <= 1.0)", OPT_VALUE, $defaultCoocThreshold);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
+    $optParser->addOption("title=s", 0, "title of the GNN and GND for display purposes");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -110,7 +124,7 @@ C<create_gnns.pl> - read a SSN XGMML file and write it to a new file after addin
     create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
         --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
         [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
-        [--nb-size <INTEGER> --cooc-threshold <NUMBER>]
+        [--nb-size <INTEGER> --cooc-threshold <NUMBER> --title "<TITLE>"]
 
 
 =head2 DESCRIPTION
@@ -192,6 +206,10 @@ Path to the C<efi.config> file used for database connection options.
 =item C<--db-name>
 
 Name of the database to use (path to file for SQLite).
+
+=item C<--title>
+
+Optional title to use for display purposes in the GND viewer.
 
 =back
 
