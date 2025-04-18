@@ -397,7 +397,9 @@ The result may be an empty hash ref in the case that the file is empty (which
 occurs when the input to the pipeline is a UniProt network). Metanodes are
 simply sequence IDs that represent multiple sequences. There may only be an
 one-to-one mapping in which case the metanode represents itself (equivalent
-to a UniProt ID).
+to a UniProt ID). In the case that a RepNode network is based on a UniRef network,
+the mapping returns a RepNode ID to a hash of lists, mapping RepNode to UniRef
+ID to UniProt IDs in UniRef cluster.
 
 =head4 Parameters
 
@@ -412,6 +414,15 @@ and the second column is the sequence within the metanode.
 
 =head4 Returns
 
+=over
+
+=item C<$idType>
+
+One of C<repnode>, C<uniref90>, C<uniref50>, or C<uniprot>, indicating the
+sequence type.
+
+=item C<$sourceIdMap>
+
 A hash ref that maps metanode to a list of sequences. For example:
 
     {
@@ -422,10 +433,25 @@ A hash ref that maps metanode to a list of sequences. For example:
         ...
     }
 
+If the input network is a RepNode network based on UniRef sequences, then the
+result is more complicated:
+
+    {
+        "REPNODE_ID1" => {"UNIPROT_ID" => ["UNIPROT_ID1"]},
+        "REPNODE_ID2" => {"METANODE_ID1" => ["UNIPROT_ID9", "UNIPROT_ID10", ...],
+                          "METANODE_ID2" => ["UNIPROT_ID20", "UNIPROT_ID30", ...]},
+        ...
+    }
+
+=back
+
 =head4 Example Usage
 
     # $metanodeMapFile comes from another utility, ssn_to_id_list.pl
     my ($idType, $sourceIdMap) = parse_metanode_map_file($metanodeMapFile);
+    use Data::Dumper;
+    print "Source network type: $idType\n";
+    print Dumper($sourceIdMap);
 
 
 =head3 C<resolve_mapping($clusterToId, $idType, $sourceIdMap)>

@@ -24,6 +24,7 @@ use constant FIELD_REPNODE_IDS => "ACC";
 use constant FIELD_REPNODE_SIZE => "Cluster Size";
 use constant FIELD_SWISSPROT_DESC => "Swissprot Description";
 use constant FIELD_TAXON_ID => "Taxonomy ID";
+use constant FIELD_ORGANISM_KEY => "organism";
 use constant FIELD_SPECIES => "Species";
 use constant FIELD_UNIREF50_IDS => "UniRef50_IDs";
 use constant FIELD_UNIREF90_IDS => "UniRef90_IDs";
@@ -31,13 +32,19 @@ use constant FIELD_UNIREF100_IDS => "UniRef100_IDs";
 use constant FIELD_UNIREF50_CLUSTER_SIZE => "UniRef50_Cluster_Size";
 use constant FIELD_UNIREF90_CLUSTER_SIZE => "UniRef90_Cluster_Size";
 use constant FIELD_UNIREF100_CLUSTER_SIZE => "UniRef100_Cluster_Size";
-use constant FIELD_COLOR_SEQ_NUM => "FIELD_COLOR_SEQ_NUM";
-use constant FIELD_COLOR_NODE_NUM => "FIELD_COLOR_NODE_NUM";
-use constant FIELD_COLOR_SINGLETON => "FIELD_COLOR_SINGLETON";
-use constant FIELD_COLOR_SEQ_NUM_COLOR => "FIELD_COLOR_SEQ_NUM_COLOR";
-use constant FIELD_COLOR_NODE_NUM_COLOR => "FIELD_COLOR_NODE_NUM_COLOR";
-use constant FIELD_COLOR_SEQ_COUNT => "FIELD_COLOR_SEQ_COUNT";
-use constant FIELD_COLOR_NODE_COUNT => "FIELD_COLOR_NODE_COUNT";
+use constant FIELD_COLOR_SEQ_NUM => "color_seq_num";
+use constant FIELD_COLOR_NODE_NUM => "color_num_num";
+use constant FIELD_COLOR_SINGLETON => "color_singleton";
+use constant FIELD_COLOR_SEQ_NUM_COLOR => "color_seq_num_color";
+use constant FIELD_COLOR_NODE_NUM_COLOR => "color_node_num_color";
+use constant FIELD_COLOR_SEQ_COUNT => "color_seq_count";
+use constant FIELD_COLOR_NODE_COUNT => "color_node_count";
+use constant FIELD_GNT_PRESENT_ENA_DB => "present_in_ena_db";
+use constant FIELD_GNT_NB_ENA_DB => "genome_neighbors_in_ena";
+use constant FIELD_GNT_ENA_ID => "ena_genome_id";
+use constant FIELD_GNT_NB_PFAM => "neighbor_pfams";
+use constant FIELD_GNT_NB_INTERPRO => "neighbor_interpros";
+
 
 use constant INPUT_SEQ_ID => "ZINPUTSEQ";
 
@@ -49,8 +56,9 @@ our @EXPORT_OK = qw(INPUT_SEQ_ID FIELD_SEQ_LEN_KEY ANNO_ROW_SEP);
 our %EXPORT_TAGS = (
     meta => ['ANNO_ROW_SEP'],
     source => ['FIELD_SEQ_KEY', 'FIELD_SEQ_SRC_KEY', 'FIELD_SEQ_SRC_VALUE_BOTH', 'FIELD_SEQ_SRC_VALUE_FASTA', 'FIELD_SEQ_SRC_VALUE_FAMILY', 'FIELD_SEQ_SRC_VALUE_INPUT', 'FIELD_SEQ_SRC_VALUE_BLASTHIT', 'FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY', 'FIELD_SEQ_SRC_BLAST_INPUT', 'INPUT_SEQ_ID'],
-    annotations => ['FIELD_SEQ_KEY', 'FIELD_SEQ_LEN_KEY', 'FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY', 'FIELD_SEQ_DOM_LEN_KEY', 'FIELD_SEQ_DOMAIN', 'FIELD_UNIREF50_IDS', 'FIELD_UNIREF90_IDS', 'FIELD_UNIREF100_IDS', 'FIELD_UNIREF50_CLUSTER_SIZE', 'FIELD_UNIREF90_CLUSTER_SIZE', 'FIELD_UNIREF100_CLUSTER_SIZE', 'FIELD_REPNODE_IDS', 'FIELD_REPNODE_SIZE', 'FIELD_SWISSPROT_DESC', 'FIELD_TAXON_ID', 'FIELD_SPECIES'],
+    annotations => ['FIELD_SEQ_KEY', 'FIELD_SEQ_LEN_KEY', 'FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY', 'FIELD_SEQ_DOM_LEN_KEY', 'FIELD_SEQ_DOMAIN', 'FIELD_UNIREF50_IDS', 'FIELD_UNIREF90_IDS', 'FIELD_UNIREF100_IDS', 'FIELD_UNIREF50_CLUSTER_SIZE', 'FIELD_UNIREF90_CLUSTER_SIZE', 'FIELD_UNIREF100_CLUSTER_SIZE', 'FIELD_REPNODE_IDS', 'FIELD_REPNODE_SIZE', 'FIELD_SWISSPROT_DESC', 'FIELD_ORGANISM_KEY', 'FIELD_TAXON_ID', 'FIELD_SPECIES'],
     color => ['FIELD_COLOR_SEQ_NUM', 'FIELD_COLOR_NODE_NUM', 'FIELD_COLOR_SINGLETON', 'FIELD_COLOR_SEQ_NUM_COLOR', 'FIELD_COLOR_NODE_NUM_COLOR', 'FIELD_COLOR_SEQ_COUNT', 'FIELD_COLOR_NODE_COUNT'],
+    gnt => ['FIELD_GNT_PRESENT_ENA_DB', 'FIELD_GNT_NB_ENA_DB', 'FIELD_GNT_ENA_ID', 'FIELD_GNT_NB_PFAM', 'FIELD_GNT_NB_INTERPRO'],
 );
 
 {
@@ -62,6 +70,7 @@ our %EXPORT_TAGS = (
 Exporter::export_ok_tags('source');
 Exporter::export_ok_tags('annotations');
 Exporter::export_ok_tags('color');
+Exporter::export_ok_tags('gnt');
 Exporter::export_ok_tags('all');
 
 

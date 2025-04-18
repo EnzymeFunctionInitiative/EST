@@ -6,8 +6,11 @@ use warnings;
 
 use DBI;
 
-use constant SORT_KEY => "sort_key";
-use constant QUERY_GENE_KEY => "gene_key"; # links the neighbors to corresponding query sequences
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../..";
+
+use EFI::GNT::GND::Schema qw(:schema);
 
 
 sub new {
@@ -21,31 +24,137 @@ sub new {
     $self->{insert_count} = 0;
     $self->{insert_max} = 100000;
 
-    $self->{query_id_cols} = getQuerySchema();
-    $self->{neighbor_cols} = getNeighborSchema();
-
     return $self;
 }
 
 
 sub save {
     my $self = shift;
-    my $gnn = shift;
     my $gndFile = shift;
+    my $gnn = shift;
+    my $metadata = shift || {};
+    my %args = @_;
 
-    if (!$self->initializeDatabase($gndFile)) {
+    my $networkType = $args{network_type} // "";
+
+    # Map cluster number to cluster name
+    my $clusterNames = \%{ $args{cluster_names} // {} }; # make a copy then create a reference
+    # IDs that were matched from FASTA or ID_LOOKUP job types from the GND pipeline
+    my $matchedIds = $args{matched_ids} // {};
+    my $unmatchedIds = $args{unmatched_ids} // [];
+
+    if (not $self->initializeDatabase($gndFile, $networkType)) {
         return 0;
     }
 
     my $clusterData = $gnn->getClusterData();
 
-    my $families = {};
+    my ($families, $clusterIndex) = $self->insertClusterData($clusterData, $clusterNames, $args{sort_sequence_ids});
+    $self->insertMetadata($metadata);
+    $self->insertFamilies($families);
+    $self->insertClusterIndex($clusterIndex);
+    $self->insertClusterNames($clusterNames);
+    $self->insertUnmatchedIds($unmatchedIds);
+    $self->insertMatchedIds($matchedIds);
 
+    $self->{dbh}->commit();
+
+    return 1;
+}
+
+
+#
+# initializeDatabase - private method
+#
+# Connects to a SQLite database (creates if it doesn't exist) and initializes the database
+# with the required schema.
+#
+# Parameters:
+#    $gndFile - path to the output GND SQLite file
+#    $networkType - type of the input network, e.g. UniProt or UniRef
+#
+# Returns:
+#    0 if failed, non-zero if success
+#
+sub initializeDatabase {
+    my $self = shift;
+    my $gndFile = shift;
+    my $networkType = shift;
+
+    $self->{dbh} = DBI->connect("DBI:SQLite:dbname=$gndFile", "", "");
+    return 0 if not $self->{dbh};
+
+    # Turn on transactions (e.g. don't automatically commit after every insert)
+    $self->{dbh}->{AutoCommit} = 0;
+
+    $self->{schema} = new EFI::GNT::GND::Schema(network_type => $networkType, dbh => $self->{dbh});
+    return $self->{schema}->initializeDatabase();
+}
+
+
+#
+# insertClusterData - private method
+#
+# Inserts the sequence IDs, associated metadata, neighbors, and obtains information necessary for
+# the GND viewer to work.
+#
+# Parameters:
+#    $clusterData - hash ref mapping cluster to sequences and GNN-obtained data
+#    $clusterNames - hash ref mapping cluster number to cluster names (e.g. "1" -> "Cluster 1");
+#        this is provided so that a default cluster number is set if there is no mapping for a
+#        particular cluster
+#    $sortSequenceIds - set to true to sort the IDs inside of the cluster alphanumerically; by
+#        default IDs are ordered as they exist in the input
+#
+# Returns:
+#    $families - array ref of list of all Pfam and InterPro families that were in the input,
+#        including those in neighbors
+#    $clusterIndex - hash ref mapping a cluster number to the start/end row index for IDs in the
+#        cluster as they are stored in the database
+#
+sub insertClusterData {
+    my $self = shift;
+    my $clusterData = shift;
+    my $clusterNames = shift;
+    my $sortSequenceIds = shift || 0;
+
+    my $families = {};
     my $sortKey = 0;
-    foreach my $clusterNum (sort { $a <=> $b } keys %$clusterData) {
-        foreach my $idData (@{ $clusterData->{$clusterNum} }) {
-            my $queryData = $idData->{attributes};
+    my $clusterIndex = {};
+    # Map sequence ID to the query_key in the network, used for UniRef
+    my $idIndexMap = {};
+    # Map sequence ID to the cluster it belongs in, used for UniRef
+    my $idClusterMap = {};
+
+    # Create a closure for code clarity
+    my $getQueryData = sub {
+        my $idData = shift;
+        my $queryData = $idData->{attributes};
+        # Make a copy because we modify it later
+        my %queryData = %$queryData;
+        $queryData{cluster_index} = $sortKey;
+        return \%queryData;
+    };
+
+    my $sortIdFn = sub { $a->{attributes}->{id} cmp $b->{attributes}->{id} };
+
+    my @clusterNums = sort { $a cmp $b } keys %$clusterData;
+    foreach my $clusterNum (@clusterNums) {
+        $clusterNames->{$clusterNum} = $clusterNum if not exists $clusterNames->{$clusterNum};
+        my $startKey = $sortKey;
+
+        # Get the list of data for each sequence in the cluster, and sort if required
+        my @idData = @{ $clusterData->{$clusterNum} };
+        @idData = sort $sortIdFn @idData if $sortSequenceIds;
+
+        foreach my $idData (@idData) {
+            my $queryData = $getQueryData->($idData);
+
             $self->insertQueryId($sortKey, $queryData);
+
+            $idIndexMap->{$queryData->{id}} = $sortKey;
+            $idClusterMap->{$queryData->{id}} = $clusterNum;
+
             my $nbFamilies = $self->insertNeighbors($sortKey, $idData->{neighbors});
             $sortKey++;
 
@@ -53,19 +162,168 @@ sub save {
             $families->{$idData->{family}} = 1 if $idData->{family};
             $families->{$idData->{ipro_family}} = 1 if $idData->{ipro_family};
         }
+        $clusterIndex->{$clusterNum} = [$startKey, $sortKey - 1];
     }
 
-    #TODO: save families
-    #TODO: save cluster_degree
-    #TODO: save cluster_index
-    #TODO: save cluster_num_map 
-    #TODO: save unmatched
-    #TODO: save matched
-    #TODO: save metadata
+    my @families = sort keys %$families;
+    return \@families, $clusterIndex;
+}
+
+
+#
+# insertMatchedIds - private method
+#
+# Insert the mapping between a UniProt ID and user-provided IDs.  This only occurs if the input
+# data originated from an ID list or FASTA file.  There may be more than one user input ID that
+# has a match in the UniProt database.
+#
+# Parameters:
+#    $matchedIds - hash ref of UniProt IDs that map to an array ref of user-inputted IDs
+#
+sub insertMatchedIds {
+    my $self = shift;
+    my $matchedIds = shift;
+
+    my $sql = "INSERT INTO matched (uniprot_id, id_list) VALUES (?, ?)";
+    my $sth = $self->{dbh}->prepare($sql);
+
+    foreach my $id (keys %$matchedIds) {
+        my $ids = join(",", @{ $matchedIds->{$id} });
+        $sth->execute($id, $ids);
+    }
 
     $self->{dbh}->commit();
+}
 
-    return 1;
+
+#
+# insertUnmatchedIds - private method
+#
+# Insert any unmatched IDs into the table that stores the list of unmatched IDs.  This only occurs
+# if the input data originated from an ID list or FASTA file, and IDs were included by the user
+# that were not matched in the EFI database.
+#
+# Parameters:
+#    $unmatchedIds - array ref of IDs
+#
+sub insertUnmatchedIds {
+    my $self = shift;
+    my $unmatchedIds = shift;
+
+    my $sql = "INSERT INTO unmatched (id_list) VALUES (?)";
+    my $sth = $self->{dbh}->prepare($sql);
+
+    foreach my $id (@$unmatchedIds) {
+        $sth->execute($id);
+    }
+
+    $self->{dbh}->commit();
+}
+
+
+#
+# insertClusterNames - private method
+#
+# Insert the table containing a mapping between cluster number and cluster names.  Cluster name
+# can be numeric (e.g. same as the cluster number).
+#
+# Parameters:
+#    $clusterNames - hash ref mapping cluster number to cluster name
+#
+sub insertClusterNames {
+    my $self = shift;
+    my $clusterNames = shift;
+
+    my $sql = "INSERT INTO cluster_num_map (cluster_num, cluster_id) VALUES (?, ?)";
+    my $sth = $self->{dbh}->prepare($sql);
+
+    foreach my $clusterNum (sort { $a cmp $b } keys %$clusterNames) {
+        $sth->execute($clusterNum, $clusterNames->{$clusterNum});
+    }
+
+    $self->{dbh}->commit();
+}
+
+
+#
+# insertClusterIndex - private method
+#
+# Insert the cluster index table, used for mapping cluster numbers to rows in the database.
+#
+# Parameters:
+#    $clusterIndex - hash ref mapping cluster number to array ref of start/end positions
+#
+sub insertClusterIndex {
+    my $self = shift;
+    my $clusterIndex = shift;
+
+    my $sql = "INSERT INTO cluster_index (cluster_num, start_index, end_index) VALUES (?, ?, ?)";
+    my $sth = $self->{dbh}->prepare($sql);
+
+    foreach my $clusterNum (sort { $a cmp $b } keys %$clusterIndex) {
+        $sth->execute($clusterNum, $clusterIndex->{$clusterNum}->[0], $clusterIndex->{$clusterNum}->[1]);
+    }
+
+    $self->{dbh}->commit();
+}
+
+
+#
+# insertFamilies - private method
+#
+# Insert a list of families into the families table.
+#
+# Parameters:
+#    $families - array ref of all families, Pfam and InterPro
+#
+sub insertFamilies {
+    my $self = shift;
+    my $families = shift;
+
+    my $sql = "INSERT INTO families (family) VALUES (?)";
+    my $sth = $self->{dbh}->prepare($sql);
+
+    foreach my $fam (sort @$families) {
+        $sth->execute($fam);
+    }
+
+    $self->{dbh}->commit();
+}
+
+
+#
+# insertMetadata - private method
+#
+# Inserts metadata into the metadata table.  Available values are cooccurrence,
+# neighborhood_size, title, type, sequence.
+#
+# Parameters:
+#    $metadata - hash ref with one or more of the keys above
+#
+sub insertMetadata {
+    my $self = shift;
+    my $metadata = shift;
+
+    my @cols;
+    my @ph;
+    my @vals;
+
+    my @mdKeys = ("cooccurrence", "neighborhood_size", "name", "type", "sequence", "network_type");
+    foreach my $mdKey (@mdKeys) {
+        if (exists $metadata->{$mdKey}) {
+            push @cols, $mdKey;
+            push @vals, $metadata->{$mdKey};
+        }
+    }
+
+    if (@cols) {
+        my $ph = join(", ", map "?", 0..$#cols);
+        my $cols = join(", ", @cols);
+        my $sql = "INSERT INTO metadata ($cols) VALUES($ph)";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute(@vals);
+        $self->{dbh}->commit();
+    }
 }
 
 
@@ -88,12 +346,12 @@ sub insertNeighbors {
     my $sortKey = 0;
 
     if (not $self->{insert_neighbor_sth}) {
-        my @cols = map { $_->{db_name} // $_->{name} } grep { not $_->{primary_key} } @{ $self->{neighbor_cols} };
+        my @cols = map { $_->{db_name} // $_->{name} } grep { not $_->{primary_key} } @{ $self->{schema}->getNeighborCols() };
         my @vals = map { "?" } @cols;
 
         my $colNames = join(", ", @cols);
         my $vals = join(", ", @vals);
-        my $sql = "INSERT INTO neighbors ($colNames) VALUES ($vals)";
+        my $sql = "INSERT INTO " . NEIGHBOR_TABLE . " ($colNames) VALUES ($vals)";
 
         my $sth = $self->{dbh}->prepare($sql);
         if (not $sth) {
@@ -105,9 +363,9 @@ sub insertNeighbors {
     my %families;
     foreach my $neighbor (@$neighbors) {
         my @row;
-        foreach my $col (@{ $self->{neighbor_cols} }) {
-            next if $col->{primary_key}; # don't insert sort_key, since it's auto increment
-            if ($col->{name} eq QUERY_GENE_KEY) {
+        foreach my $col (@{ $self->{schema}->getNeighborCols() }) {
+            next if $col->{primary_key}; # don't insert sort_key for neighbors, since it's auto increment
+            if ($col->{name} eq QUERY_KEY or $col->{name} eq LEGACY_QUERY_KEY) {
                 push @row, $querySortKey;
             } else {
                 push @row, $neighbor->{$col->{name}} // "";
@@ -138,17 +396,17 @@ sub insertQueryId {
     my $queryData = shift;
 
     my @row;
-    foreach my $col (@{ $self->{query_id_cols} }) {
+    foreach my $col (@{ $self->{schema}->getQueryIdCols() }) {
         push @row, $queryData->{$col->{name}} // "";
     }
 
     if (not $self->{insert_query_sth}) {
-        my @cols = map { $_->{db_name} // $_->{name} } @{ $self->{query_id_cols} };
+        my @cols = map { $_->{db_name} // $_->{name} } @{ $self->{schema}->getQueryIdCols() };
         my @vals = map { "?" } @cols;
 
         my $colNames = join(", ", @cols);
         my $vals = join(", ", @vals);
-        my $sql = "INSERT INTO attributes ($colNames) VALUES ($vals)";
+        my $sql = "INSERT INTO " . QUERY_TABLE . " ($colNames) VALUES ($vals)";
 
         my $sth = $self->{dbh}->prepare($sql);
         if (not $sth) {
@@ -193,187 +451,6 @@ sub insert {
 }
 
 
-#
-# initializeDatabase - private method
-#
-# Creates the tables and indexes necessary to store data for a GNN.  If
-# none or not all of the expected tables exist then any existing data is
-# overwritten.
-#
-# Parameters:
-#    $gndFile - path to an output GND file
-#
-# Returns:
-#    1 if the database already exists, 0 otherwise
-#
-sub initializeDatabase {
-    my $self = shift;
-    my $gndFile = shift;
-
-    if (-e $gndFile) {
-        return 0;
-    }
-
-    $self->{dbh} = DBI->connect("DBI:SQLite:dbname=$gndFile", "", "");
-    # Turn on transactions (e.g. don't automatically commit after every insert)
-    $self->{dbh}->{AutoCommit} = 0;
-
-    my @queryIndexCols = $self->initializeTable("attributes", $self->{query_id_cols});
-    my @neighborIndexCols = $self->initializeTable("neighbors", $self->{neighbor_cols});
-
-    my @indexCols;
-    push @indexCols, ["attributes", \@queryIndexCols];
-    push @indexCols, ["neighbors", \@neighborIndexCols];
-
-    # Create indexes
-    foreach my $colGroup (@indexCols) {
-        my $tableName = $colGroup->[0];
-        foreach my $col (@{ $colGroup->[1] }) {
-            my $indexName = "${tableName}_$col";
-            my $sql = "CREATE INDEX $indexName ON $tableName ($col)";
-            $self->{dbh}->do($sql);
-            $self->{dbh}->commit();
-        }
-    }
-
-    return 1;
-}
-
-
-#
-# initializeTable - private method
-#
-# Creates a table. The input is a table name and column specification.
-# Each value in a column spec contains the name of the column, the
-# database type of the column, and optional additional parameters
-# 'not_null' (1 if the column is NOT NULL), 'create_index' (1 if an
-# index must be created for the column), and 'primary_key' (1 if the
-# column is a primary key; multiple columns can be primary keys).
-#
-# Parameters:
-#    $tableName - name of the table to create
-#    $tableCols - column specification; array ref, each element
-#        is a hash ref (from getQuerySchema() or getNeighorSchema())
-#
-# Returns:
-#    list of column names that must be indexed
-#
-sub initializeTable {
-    my $self = shift;
-    my $tableName = shift;
-    my $tableCols = shift;
-
-    my @cols;
-    my @pk;
-    my @indexCols;
-    foreach my $col (@$tableCols) {
-        my $colName = $col->{db_name} // $col->{name};
-        my $spec = "$colName $col->{type}";
-        $spec .= " NOT NULL" if $col->{not_null};
-        push @pk, $colName if $col->{primary_key};
-        push @indexCols, $colName if $col->{create_index};
-        push @cols, $spec;
-    }
-
-    # Drop the table if the database is partially initialized or is out of date
-    $self->{dbh}->do("DROP TABLE IF EXISTS $tableName");
-    $self->{dbh}->commit();
-
-    my $cols = join(", ", @cols);
-    my $pk = join(", ", @pk);
-    $cols .= ", PRIMARY KEY ($pk)" if $pk;
-    my $sql = "CREATE TABLE $tableName ($cols)";
-
-    $self->{dbh}->do($sql);
-    $self->{dbh}->commit();
-
-    return @indexCols;
-}
-
-
-#
-# getSharedSchema - private static function
-#
-# Return schema that is shared between the attribute (query) and neighbors tables.
-# The 'name' field is both the input data structure and database field names, but
-# if the 'db_name' field is present then that value is used for the database name
-# column.  For example, the 'embl_id' field is in the input data structure, and
-# the 'db_name' field in the schema indicates that those values should be stored
-# in a column in the database named 'id'.
-#
-# Returns:
-#    array ref where each element corresponds to a column specification
-#
-sub getSharedSchema {
-    return [
-        {name => SORT_KEY, type => "INTEGER", primary_key => 1, create_index => 1},
-        {name => "id", db_name => "accession", type => "VARCHAR(20)", create_index => 1},
-        {name => "embl_id", db_name => "id", type => "VARCHAR(30)"},
-        {name => "num", type => "INTEGER"},
-        {name => "family", type => "TEXT"}, # can be more than one family, separated by dash
-        {name => "ipro_family", type => "TEXT"}, # can be more than one family, separated by dash
-        {name => "start", type => "INTEGER"}, # start of sequence on genome in bp
-        {name => "stop", type => "INTEGER"}, # end of sequence on genome in bp
-        {name => "rel_start", type => "INTEGER"}, # start of sequence on genome in bp, accounting for a circular genome
-        {name => "rel_stop", type => "INTEGER"}, # end of sequence on genome in bp, accounting for a circular genome
-        {name => "direction", type => "VARCHAR(10)"}, # "normal" or "complement"
-        {name => "type", type => "VARCHAR(8)"}, # "linear" or "circular"
-        {name => "seq_len", type => "INTEGER"}, # length of sequence in bp
-        {name => "taxon_id", type => "INTEGER"}, # taxonomy ID
-        {name => "anno_status", type => "INTEGER"}, # 1 if SwissProt, 0 if TrEMBL
-        {name => "desc", db_name => "description", type => "TEXT"}, # SwissProt or sequence description from UniProt DB
-        {name => "family_desc", type => "TEXT"}, # Pfam long name
-        {name => "ipro_family_desc", type => "TEXT"}, # InterPro long name
-        {name => "color", type => "VARCHAR(255)"},
-    ];
-}
-
-
-#
-# getQuerySchema - private static function
-#
-# Return the database schema for the attribute (query) table
-#
-# Returns:
-#    array ref where each element corresponds to a column specification
-#
-sub getQuerySchema {
-    my $sharedCols = getSharedSchema();
-    return [
-        @$sharedCols,
-        {name => "sort_order", type => "INTEGER"}, # order in which the queries were retrieved
-        {name => "strain", type => "TEXT"}, # strain from EFI database annotations table metadata field
-        {name => "cluster_num", type => "INTEGER", create_index => 1}, # cluster number that this query belongs to
-        {name => "organism", type => "TEXT"},
-        {name => "is_bound", type => "INTEGER"},
-        {name => "evalue", type => "REAL"},
-        {name => "cluster_index", type => "INTEGER", create_index => 1},
-    ];
-    #TODO: Add UniRef columns here
-}
-
-
-#
-# getNeighborSchema - private static function
-#
-# Return the database schema for the neighbors table
-#
-# Returns:
-#    array ref where each element corresponds to a column specification
-#
-sub getNeighborSchema {
-    my $sharedCols = getSharedSchema();
-    # Get rid of the embl_id column since it is the same as the attribute (query)
-    # embl_id value.
-    my @cols = grep { $_->{name} ne "embl_id" } @$sharedCols;
-    # gene_key corresponds to the SORT_KEY field in the attribute (query) table
-    return [
-        @cols,
-        {name => QUERY_GENE_KEY, type => "INTEGER", create_index => 1}, 
-    ];
-}
-
-
 1;
 __END__
 
@@ -383,7 +460,7 @@ __END__
 
 =head2 NAME
 
-EFI::GNT::GND - Perl module for writing genome neighborhood diagram database files
+B<EFI::GNT::GND> - Perl module for writing genome neighborhood diagram database files
 
 =head2 SYNOPSIS
 
@@ -447,129 +524,7 @@ Returns 0 if there was an error or the file exists; 1 otherwise.
 
 =head2 SCHEMA
 
-The B<EFI::GNT::GNN> module stores raw cluster data that is in a cluster-centric
-structure that maps cluster numbers to lists of query sequences, and each
-sequence contains a list of neighbors.  This structure contains metadata such
-as position on the genome, taxonomic identifier, family data, plus more.  The
-structure is serialized into two tables, the C<attribute> table with one row for
-every ID in the cluster and the C<neighbors> table for the neighbors of each
-query.  The C<neighbors> table is linked to the C<query> table through the use
-of the C<gene_key> field which maps to the query C<sort_key> field.  The schema
-is defined as follows:
-
-    Table attributes {
-        // A number automatically assigned that provides a relationship to the
-        // neighbors table
-        sort_key integer [primary key]
-        // UniProt ID
-        accession varchar(20)
-        // ENA genome ID
-        embl_id varchar(30)
-        // The sequential number on the genome, i.e. the Nth protein from the
-        // start of the genome
-        num integer
-        // Pfam family ID(s)
-        family text
-        // InterPro family ID(s)
-        ipro_family text
-        // Start codon of the AA sequence on the genome
-        start integer
-        // End codon of the AA sequence on the genome
-        stop integer
-        // Start codon, but relative to the start of this sequence; for entries
-        // in this table this will always be zero
-        rel_start integer
-        // End codon, but relative to the start of this sequence; for entries
-        // in this table this will always be the sequence length
-        rel_stop integer
-        // Direction of the sequence, either 'normal' or 'complement'
-        direction varchar(10)
-        // Type of the sequence, either 'linear' or 'circular'
-        type varchar(8)
-        // Length of the sequence
-        seq_len integer
-        // Taxonomy identifier of the organism as provided by NCBI
-        taxon_id integer
-        // SwissProt status; 1 if the sequence is a SwissProt sequence, 0 if TrEMBL
-        anno_status integer
-        // Sequence description if SwissProt
-        desc text
-        // Pfam family description(s)
-        family_desc text
-        // InterPro family description(s)
-        ipro_family_desc text
-        // Sequence color, based on Pfam
-        color varchar(255)
-        // Sorting order in the display
-        sort_order integer
-        // Organism strain
-        strain text
-        // The number in the cluster; 0 if there is no cluster associated
-        cluster_num integer
-        // The organism that this sequence belongs to
-        organism text
-        // This will be 1 if the window (e.g. number of neighbors to the left
-        // and right of the query sequence) is outside of the bounds of the
-        // genome; for example, if the window is 10, the query is at position
-        // 3 and the total number of sequences is 7, then this value will be
-        // 1, e.g. true
-        is_bound integer
-        // Reserved for future use
-        evalue real
-        // Reserved for future use
-        cluster_index integer
-    }
-    
-    Table neighbors {
-        // A number automatically assigned unique to this table
-        sort_key integer [primary key]
-        // UniProt ID
-        accession varchar(20)
-        // The sequential number on the genome, i.e. the Nth protein from the
-        // start of the genome
-        num integer
-        // Pfam family ID(s)
-        family text
-        // InterPro family ID(s)
-        ipro_family text
-        // Start codon of the AA sequence on the genome
-        start integer
-        // End codon of the AA sequence on the genome
-        stop integer
-        // Start codon, but relative to the start of the query sequence in the
-        // attributes table that this is related to; if it is to the left of
-        // the query sequence then it will be negative, if to the right, then
-        // positive
-        rel_start integer
-        // End codon, but relative to the start of the query sequence in the
-        // attributes table that this is related to; if it is to the left of
-        // the query sequence then it will be negative, if to the right, then
-        // positive.  It is equal to rel_start + seq_len
-        rel_stop integer
-        // Direction of the sequence, either 'normal' or 'complement'
-        direction varchar(10)
-        // Type of the sequence, either 'linear' or 'circular'
-        type varchar(8)
-        // Length of the sequence
-        seq_len integer
-        // Taxonomy identifier of the organism as provided by NCBI
-        taxon_id integer
-        // SwissProt status; 1 if the sequence is a SwissProt sequence, 0 if TrEMBL
-        anno_status integer
-        // Sequence description if SwissProt
-        desc text
-        // Pfam family description(s)
-        family_desc text
-        // InterPro family description(s)
-        ipro_family_desc text
-        // Sequence color, based on Pfam
-        color varchar(255)
-        // A neighbor has exactly one related entry in the attributes table;
-        // the relationship is determined by matching neighbors.gene_key with
-        // attributes.sort_key, and many neighbors can share the same gene_key
-        gene_key integer
-    }
-
+See B<EFI::GNT::GND::Schema> for the database schema.
 
 =cut
 

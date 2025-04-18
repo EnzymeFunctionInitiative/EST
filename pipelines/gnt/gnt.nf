@@ -25,10 +25,36 @@ process create_gnns {
     cat ${cluster_id_map} > \$id_map_file
     awk '{if(NR>1)print}' ${singletons} >> \$id_map_file
     perl $projectDir/create_gnns.pl \
-        --config ${params.efi_config} --db-name ${params.efi_db} --cluster-map \$id_map_file \
-        --cluster-gnn cluster_gnn.xgmml --pfam-gnn pfam_gnn.xgmml \
-        --hub-count hub_count.txt --cooc-table cooc_table.txt --no-context nomatches_noneighbors.txt \
-        --nb-pfam-list-dir nb_pfam --gnd gnd.sqlite
+        --cluster-map \$id_map_file \
+        --cluster-gnn cluster_gnn.xgmml \
+        --pfam-gnn pfam_gnn.xgmml \
+        --gnd gnd.sqlite \
+        --cooc-table cooc_table.txt \
+        --hub-count hub_count.txt \
+        --nb-pfam-list-dir nb_pfam \
+        --no-context nomatches_noneighbors.txt \
+        --nb-size ${params.nb_size} \
+        --cooc-threshold ${params.cooc_threshold} \
+        --config ${params.efi_config} \
+        --db-name ${params.efi_db}
+    """
+}
+
+process color_gnt_ssn {
+    publishDir params.final_output_dir, mode: "copy"
+    input:
+        path ssn_file
+        path cluster_id_map
+        path cluster_num_map
+        path cluster_colors
+        path metanode_map
+        path gnd
+    output:
+        path "color_ssn.xgmml", emit: "ssn_output"
+    """
+    perl $projectDir/color_gnt_xgmml.pl --ssn $ssn_file --color-gnt-ssn color_ssn.xgmml \
+        --metanode-map ${metanode_map} --gnd ${gnd} --cluster-map $cluster_id_map \
+        --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt
     """
 }
 
@@ -38,5 +64,8 @@ workflow {
     color_work = color_and_retrieve()
 
     gnn_data = create_gnns(color_work.cluster_id_map, color_work.singletons)
+
+    // Color the SSN based on the computed clusters and add ENA data
+    colored_ssn = color_gnt_ssn(color_work.ssn_file, color_work.cluster_id_map, color_work.cluster_num_map, color_work.cluster_colors, color_work.metanode_map, gnn_data.gnd)
 }
 
