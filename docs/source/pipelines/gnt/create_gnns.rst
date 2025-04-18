@@ -5,7 +5,7 @@ Usage
 
 ::
 
-	Usage: perl create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
+	Usage: perl pipelines/gnt/create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
 	    --config <FILE> --db-name <VALUE> [--gnd <FILE>] [--cooc-table <FILE>] [--hub-count <FILE>]
 	    [--nb-pfam-list-dir <DIR_PATH>] [--no-context <FILE>] [--nb-size <VALUE>]
 	    [--cooc-threshold <VALUE>]

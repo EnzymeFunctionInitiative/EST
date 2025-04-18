@@ -5,8 +5,8 @@ Usage
 
 ::
 
-	Usage: perl compute_conv_ratio.pl --cluster-map <FILE> --index-seqid-map <FILE> --edgelist <FILE>
-	    --conv-ratio <FILE> [--seqid-source-map <FILE>]
+	Usage: perl pipelines/shared/perl/compute_conv_ratio.pl --cluster-map <FILE>
+	    --index-seqid-map <FILE> --edgelist <FILE> --conv-ratio <FILE> [--seqid-source-map <FILE>]
 	
 	Description:
 	    Outputs a file listing the convergence ratio for each cluster in the input cluster map

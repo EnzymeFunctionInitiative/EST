@@ -5,8 +5,8 @@ Usage
 
 ::
 
-	Usage: perl create_gnd.pl --cluster-map <FILE> --gnd <FILE> --config <FILE> --db-name <VALUE>
-	    [--nb-size <VALUE>]
+	Usage: perl pipelines/gnd/create_gnd.pl --cluster-map <FILE> --gnd <FILE> --config <FILE>
+	    --db-name <VALUE> [--nb-size <VALUE>]
 	
 	Description:
 	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline

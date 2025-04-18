@@ -5,8 +5,8 @@ Usage
 
 ::
 
-	Usage: perl color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE>
-	    --cluster-num-map <FILE> [--cluster-color-map <FILE>]
+	Usage: perl pipelines/shared/perl/color_xgmml.pl --ssn <FILE> --color-ssn <FILE>
+	    --cluster-map <FILE> --cluster-num-map <FILE> [--cluster-color-map <FILE>]
 	
 	Description:
 	    Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes

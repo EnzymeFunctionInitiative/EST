@@ -187,11 +187,11 @@ B<EFI::Sunburst::Data> - Perl module that represents a sequence
 
     use EFI::Sunburst::Data;
 
-    my $seqData = new EFI::Sequence::Collection();
+    my $sequenceIdData = new EFI::Sequence::Collection();
     # Populate $seqData by loading files, see module documentation
 
     my $sb = new EFI::Sunburst::Data(dbh => $dbh);
-    my $data = $sb->getSunburstTaxonomy($seqData);
+    my $data = $sb->getSunburstTaxonomy($sequenceIdData);
     my $json = encode_json($data);
     # Save $json to file
 
@@ -287,8 +287,8 @@ stores the UniProt (C<"sa">), UniRef50 (C<"sa50">), and UniRef90 C<"sa90"> IDs.
 
 =head4 Example Usage
 
-    # $seqData comes from a script, e.g. filter_ids.pl
-    my $data = $sb->getSunburstTaxonomy($seqData);
+    # $sequenceIdData comes from a script, e.g. filter_ids.pl
+    my $data = $sb->getSunburstTaxonomy($sequenceIdData);
     my $json = encode_json($data);
     # save $json to file
 

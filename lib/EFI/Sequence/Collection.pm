@@ -865,7 +865,7 @@ a UniRef50 sequence source these fields are C<UniRef50_IDs> and C<UniRef50_Clust
 For both, the C<Cluster_Size> field represents the number of UniProt IDs in the associated
 UniRef cluster.  Similarly, the C<IDs> field is a text string with each UniProt ID separated
 the field separator character (defaults to caret C<^> but can be provided as a parameter to
-the constructor.  This information comes from the ID list.
+the constructor).  This information comes from the ID list.
 
 =head4 Example Usage
 

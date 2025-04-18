@@ -5,19 +5,18 @@ Usage
 
 ::
 
-	Usage: perl pipelines/shared/perl/get_sequences.pl [--output-dir <OUTPUT_DIR>]
-	    --fasta-db <BLAST_DB> [--sequence-ids-file <ACCESSION_IDS_FILE>]
-	    [--output-sequence-file <FASTA_FILE>]
+	Usage: perl pipelines/shared/perl/get_sequences.pl --fasta-db <FILE> --sequence-ids-file <FILE>
+	    [--output-dir <DIR_PATH>] [--output-sequence-file <FILE>]
 	
 	Description:
-	    Retrieve the FASTA sequences for each ID in a file with UniProt accession
-	    IDs
+	    Retrieve the FASTA sequences for each ID in a file with UniProt accession IDs
 	
 	Options:
-	    --output-dir              If not specified, defaults to current working directory
-	    --fasta-db                Path to BLAST-formatted sequence database
-	    --sequence-ids-file       Path to text file containing list of accession IDs
-	    --output-sequence-file    Path to output file to put sequences in
+	    --output-dir              path to directory to store output in; if not specified, defaults to current working directory
+	    --fasta-db                path to BLAST-formatted sequence database
+	    --sequence-ids-file       path to text file containing list of accession IDs
+	    --output-sequence-file    path to output file to put sequences in; defaults into --output-dir
+	
 
 Reference
 ---------
