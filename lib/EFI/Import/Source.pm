@@ -10,9 +10,9 @@ use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 
-use EFI::Annotations::Fields ':all';
+use EFI::Annotations::Fields qw(:all);
 use EFI::Import::Util;
-use EFI::Sequence::Type;
+use EFI::Sequence::Type qw(:types);
 
 
 our $TYPE_NAME = "";

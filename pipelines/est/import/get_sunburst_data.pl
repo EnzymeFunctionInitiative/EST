@@ -10,7 +10,6 @@ use lib "$FindBin::Bin/../../../lib";
 use EFI::Database;
 use EFI::Import::Config::Sunburst;
 use EFI::Sequence::Collection;
-use EFI::Sequence::Type;
 use EFI::Sunburst::Data;
 
 

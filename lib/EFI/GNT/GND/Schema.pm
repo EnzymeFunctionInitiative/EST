@@ -4,7 +4,11 @@ package EFI::GNT::GND::Schema;
 use strict;
 use warnings;
 
-use DBI;
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../..";
+
+use EFI::Sequence::Type qw(:types);
 
 use constant SORT_KEY => "sort_key";
 use constant QUERY_KEY => "query_key"; # links the neighbors to corresponding query sequences
@@ -12,17 +16,12 @@ use constant LEGACY_QUERY_KEY => "gene_key"; # legacy column name, replaced in t
 use constant QUERY_TABLE => "attributes";
 use constant NEIGHBOR_TABLE => "neighbors";
 
+use constant UNIREF90_TABLE => "uniref90";
+use constant UNIREF50_TABLE => "uniref50";
+
 use Exporter qw(import);
 our %EXPORT_TAGS = (schema => ['SORT_KEY', 'QUERY_KEY', 'QUERY_TABLE', 'NEIGHBOR_TABLE', 'LEGACY_QUERY_KEY']);
 Exporter::export_ok_tags('schema');
-
-# These should come from EFI::Sequence::Type (which exists in a branch yet to be merged)
-use constant SEQ_UNIPROT => "uniprot";
-use constant SEQ_UNIREF50 => "uniref50";
-use constant SEQ_UNIREF90 => "uniref90";
-
-use constant UNIREF90_TABLE => "uniref90";
-use constant UNIREF50_TABLE => "uniref50";
 
 
 sub new {

@@ -10,7 +10,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../";
 
 use EFI::Annotations::Fields qw(:annotations);
 use EFI::Sequence;
-use EFI::Sequence::Type;
+use EFI::Sequence::Type qw(:types);
 
 
 sub new {
@@ -441,7 +441,7 @@ B<EFI::Sequence::Collection> - Perl module that represents a collection of seque
 
     use EFI::Sequence;
     use EFI::Sequence::Collection;
-    use EFI::Sequence::Type;
+    use EFI::Sequence::Type qw(:types);
 
     my $seqSource = SEQ_UNIREF50;
     my $mdFile = "sequence_metadata.tab";

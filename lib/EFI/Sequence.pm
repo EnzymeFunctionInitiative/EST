@@ -132,7 +132,6 @@ B<EFI::Sequence> - Perl module that represents a sequence
 =head2 SYNOPSIS
 
     use EFI::Sequence;
-    use EFI::Sequence::Type;
     use EFI::Annotations::Fields qw(:source :annotations);
 
     my $id = "A0M8S7";
