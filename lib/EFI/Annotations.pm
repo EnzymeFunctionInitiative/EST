@@ -597,18 +597,31 @@ sub get_expandable_attr {
 sub get_color_fields {
     my $self = shift;
     my @fields = (FIELD_COLOR_SEQ_NUM, FIELD_COLOR_NODE_NUM, FIELD_COLOR_SINGLETON, FIELD_COLOR_SEQ_NUM_COLOR, FIELD_COLOR_NODE_NUM_COLOR, FIELD_COLOR_SEQ_COUNT, FIELD_COLOR_NODE_COUNT);
-    return $self->get_user_fields(@fields);
+    return $self->get_anno_group_fields(@fields);
 }
 
 
 sub get_gnt_fields {
     my $self = shift;
     my @fields = (FIELD_GNT_PRESENT_ENA_DB, FIELD_GNT_NB_ENA_DB, FIELD_GNT_ENA_ID, FIELD_GNT_NB_PFAM, FIELD_GNT_NB_INTERPRO);
-    return $self->get_user_fields(@fields);
+    return $self->get_anno_group_fields(@fields);
 }
 
 
-sub get_user_fields {
+#
+# get_anno_group_fields - internal method
+#
+# Retrieves a group of annotation field names and their display values.  The input fields names
+# are the internal format (e.g. FIELD_SEQ_SRC_KEY).
+#
+# Parameters:
+#     @fields - list of field names (internal naming, e.g. FIELD_SEQ_SRC_KEY)
+#
+# Returns:
+#     array ref of internal field names (same as input)
+#     hash ref mapping internal field name to display name (e.g. FIELD_SEQ_SRC_KEY => "Sequence Source")
+#
+sub get_anno_group_fields {
     my $self = shift;
     my @fields = @_;
     my $anno = $self->get_annotation_data();

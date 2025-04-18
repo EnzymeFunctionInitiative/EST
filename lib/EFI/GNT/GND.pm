@@ -63,21 +63,6 @@ sub save {
 }
 
 
-sub uniref {
-    # need a hash ref mapping UniRef90 ID to array ref of UniProt IDs
-    # need a hash ref mapping UniRef50 ID to array ref of UniRef90 IDs
-    #
-    # need to sort ids in the uniref clusters alphanumerically
-    # 
-    # if uniref50
-    #   sort ids by the number of uniref90 ids in uniref50 cluster
-    # if uniref90
-    #   sort ids by the number of uniprot ids in the uniref90 cluster
-    # uniref90 IDs in uniref50 clusters should be sorted by uniref90 size
-    # uniref90 IDs are always
-}
-
-
 #
 # initializeDatabase - private method
 #

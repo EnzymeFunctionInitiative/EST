@@ -56,7 +56,7 @@ $xwriter->write();
 
 sub validateAndProcessOptions {
 
-    my $desc = "Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes based on cluster. This is done without creating a DOM since elements are written one by one to the file as they are built.";
+    my $desc = "Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes based on cluster.";
 
     my $optParser = new EFI::Options(app_name => $0, desc => $desc);
 
@@ -95,7 +95,7 @@ __END__
 
 =head2 NAME
 
-C<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after adding new attributes
+B<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after adding color attributes
 
 =head2 SYNOPSIS
 
@@ -104,9 +104,8 @@ C<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after addin
 
 =head2 DESCRIPTION
 
-B<color_xgmml.pl> reads a SSN in the format of XGMML (XML) and writes it to a new file after
-adding cluster number and color attributes. The document is read and written in a stream-like
-fashion rather than creating and building a DOM for optimal memory usage.
+B<color_xgmml.pl> reads a SSN in the XGMML (XML) format and writes it to a new file after
+adding cluster number and color attributes.
 
 =head3 Arguments
 

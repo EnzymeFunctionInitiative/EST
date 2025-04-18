@@ -103,8 +103,6 @@ sub getGntData {
     my $gnd = new EFI::GNT::GND::Reader();
     $gnd->load($gndFile);
 
-    #TODO: handle UniRef/metanodes
-
     my $gntData = {};
     foreach my $cluster ($gnd->getClusterNums()) {
         my @queryIds = $gnd->getQueryIds($cluster);
@@ -115,7 +113,6 @@ sub getGntData {
             my @nb = $gnd->getNeighborIds($queryId);
             $data->{has_neighbors} = @nb > 0;
 
-            #TODO: what is the neighborhood for fams? all?
             my @pfam;
             my @interpro;
             foreach my $nb (@nb) {
@@ -138,7 +135,7 @@ sub getGntData {
 
 sub validateAndProcessOptions {
 
-    my $desc = "Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes based on cluster. This is done without creating a DOM since elements are written one by one to the file as they are built.";
+    my $desc = "Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes based on cluster, and adding GNT node attributes.";
 
     my $optParser = new EFI::Options(app_name => $0, desc => $desc);
 
@@ -173,14 +170,15 @@ sub validateAndProcessOptions {
     return $opts;
 }
 
+
 1;
 __END__
 
-=head1 color_xgmml.pl
+=head1 color_gnt_xgmml.pl
 
 =head2 NAME
 
-B<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after adding color attributes
+B<color_gnt_xgmml.pl> - read a SSN XGMML file and write it to a new file after adding color and GNT attributes
 
 =head2 SYNOPSIS
 

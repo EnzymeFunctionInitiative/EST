@@ -386,60 +386,9 @@ B<EFI::GNT::GND::Schema> is a Perl module for genome neighborhood diagram databa
 in SQLite format.
 
 
-=head2 METHODS
-
-=head3 C<initializeDatabase()>
-
-#
-# initializeDatabase - private method
-#
-# Creates the tables and indexes necessary to store data for a GNN.  If
-# none or not all of the expected tables exist then any existing data is
-# overwritten.
-#
-# Parameters:
-#    $gndFile - path to an output GND file
-#
-# Returns:
-#    1 if the database already exists, 0 otherwise
-#
-#
-
-
-=head2 UNIREF
-
-# Maps a cluster to uniref## index
-# The way this works is as follows:
-#   1. If user loads UniRef50 GND:
-#       a. Query uniref_cluster_index table for the requested cluster
-#       b. Get uniref##_start/end_index
-#       c. Query uniref##_index table using indexes from (b)
-#       d. Get list of cluster_index, corresponding to the UniRef50 IDs
-#       e. Query attribute table using cluster_index list (just like UniProt)
-#   2. If user loads UniRef50 GND:
-#       a. (a)->(c) from (1)
-#       b.
-#       c.
-#       d. Get list of cluster_index, corresponding to the UniRef90 IDs
-#       e. (e) from (1)
-#   3. If user loads UniProt use getClusterIndexTableSql
-#   4. If user loads UniRef50 GND but requests specific UniRef50 ID cluster:
-#       a. Query uniref50_range for the specific uniref50_id
-#       b. Get list of start_index/end_index which correspond to the UniRef90 IDs in the UniRef50 cluster
-#       c. Query uniref50_index using the index list from (b) as uniref_index
-#       d. Get list of cluster_index, corresponding to the UniRef90 IDs
-#       e. Query attribute table using the index list
-#   5. If user loads UniRef90 GND but requests specific UniRef90 ID cluster:
-#       a. Query uniref90_range for the specific uniref90_id
-#       b. Get list of start_index/end_index which correspond to the UniProt IDs in the UniRef90 cluster
-#       c. Query uniref90_index using the index list from (b) as uniref_index
-#       d. Get list of cluster_index, corresponding to the UniProt IDs
-#       e. Query attribute table using the index list
-#
-
 =head2 SCHEMA
 
-The B<EFI::GNT::GND> module stores raw cluster data that is in a cluster-centric
+The B<EFI::GNT::GND::Schema> module stores raw cluster data that is in a cluster-centric
 structure that maps cluster numbers to lists of query sequences, and each
 sequence contains a list of neighbors.  This structure contains metadata such
 as position on the genome, taxonomic identifier, family data, plus more.  The

@@ -352,8 +352,8 @@ sub getAttAttr {
 #
 # getSkipAtt - private method
 #
-# Gets a list of fields to skip (e.g. existing color-related fields) as well as the
-# names of the color-related fields that will be inserted into the SSN
+# Sets a list of fields to skip.  Used to overwrite any existing fields that attribute handlers
+# will parse instead.
 #
 sub getSkipAtt {
     my $self = shift;

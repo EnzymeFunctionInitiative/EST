@@ -172,7 +172,7 @@ __END__
 
 =head2 NAME
 
-B<EFI::GNT::GND::Reader> - Perl module for writing genome neighborhood diagram database files
+B<EFI::GNT::GND::Reader> - Perl module for reading genome neighborhood diagram database files
 
 =head2 SYNOPSIS
 

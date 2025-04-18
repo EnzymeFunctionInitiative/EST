@@ -94,7 +94,7 @@ sub saveClusterColorMap {
 
 sub validateAndProcessOptions {
 
-    my $desc = "Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes based on cluster. This is done without creating a DOM since elements are written one by one to the file as they are built.";
+    my $desc = "Read cluster mapping files and assign colors to each cluster";
 
     my $optParser = new EFI::Options(app_name => $0, desc => $desc);
 
@@ -117,7 +117,7 @@ __END__
 
 =head2 NAME
 
-C<assign_cluster_colors.pl> - read cluster mapping files and assign colors to each cluster
+B<assign_cluster_colors.pl> - read cluster mapping files and assign colors to each cluster
 
 =head2 SYNOPSIS
 
