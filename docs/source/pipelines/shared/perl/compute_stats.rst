@@ -5,8 +5,8 @@ Usage
 
 ::
 
-	Usage: perl compute_stats.pl --cluster-map <FILE> --seqid-source-map <FILE> --singletons <FILE>
-	    --stats <FILE>
+	Usage: perl pipelines/shared/perl/compute_stats.pl --cluster-map <FILE> --seqid-source-map <FILE>
+	    --singletons <FILE> --stats <FILE>
 	
 	Description:
 	    Outputs a file listing the convergence ratio for each cluster in the input cluster map

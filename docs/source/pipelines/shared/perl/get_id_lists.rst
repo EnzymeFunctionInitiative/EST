@@ -5,9 +5,9 @@ Usage
 
 ::
 
-	Usage: perl get_id_lists.pl --cluster-map <FILE> --uniprot <DIR_PATH> --cluster-sizes <FILE>
-	    --config <FILE> --db-name <VALUE> [--uniref90 <DIR_PATH>] [--uniref50 <DIR_PATH>]
-	    [--seqid-source-map <FILE>] [--singletons <FILE>]
+	Usage: perl pipelines/shared/perl/get_id_lists.pl --cluster-map <FILE> --uniprot <DIR_PATH>
+	    --cluster-sizes <FILE> --config <FILE> --db-name <VALUE> [--uniref90 <DIR_PATH>]
+	    [--uniref50 <DIR_PATH>] [--seqid-source-map <FILE>] [--singletons <FILE>]
 	
 	Description:
 	    Organizes the IDs in the input cluster map file into files by cluster

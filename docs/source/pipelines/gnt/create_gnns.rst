@@ -5,10 +5,10 @@ Usage
 
 ::
 
-	Usage: perl create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
+	Usage: perl pipelines/gnt/create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
 	    --config <FILE> --db-name <VALUE> [--gnd <FILE>] [--cooc-table <FILE>] [--hub-count <FILE>]
 	    [--nb-pfam-list-dir <DIR_PATH>] [--no-context <FILE>] [--nb-size <VALUE>]
-	    [--cooc-threshold <VALUE>]
+	    [--cooc-threshold <VALUE>] [--title <VALUE>]
 	
 	Description:
 	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline
@@ -22,10 +22,11 @@ Usage
 	    --hub-count           path to the output hub count table file
 	    --nb-pfam-list-dir    path to an output directory containing files for each Pfam hub
 	    --no-context          path to an output file to save a list of input IDs that didn't have an ENA entry or didn't have neighbors
-	    --nb-size             neighborhood size (number of sequences to retrieve on either side of query
-	    --cooc-threshold      Cooccurrence threshold (>= 0.0 and <= 1.0)
+	    --nb-size             neighborhood size (number of sequences) to retrieve on either side of query (> 0 and <= 20)
+	    --cooc-threshold      cooccurrence threshold (>= 0.0 and <= 1.0)
 	    --config              path to the config file for database connection
 	    --db-name             name of the EFI database to connect to for retrieving UniRef sequences
+	    --title               title of the GNN and GND for display purposes
 
 Reference
 ---------
@@ -47,7 +48,7 @@ SYNOPSIS
    create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
        --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
        [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
-       [--nb-size <INTEGER> --cooc-threshold <NUMBER>]
+       [--nb-size <INTEGER> --cooc-threshold <NUMBER> --title "<TITLE>"]
 
 
 
@@ -112,7 +113,7 @@ Arguments
 
 ``--nb-size``
    Optional number of neighbors on the left and right of the input IDs
-   to include in the analysis, an integer > 0.
+   to include in the analysis, an integer > 0 and <= 20.
 
 ``--cooc-threshold``
    Optional co-occurrence threshold to use for computing the Pfam hubs,
@@ -123,3 +124,6 @@ Arguments
 
 ``--db-name``
    Name of the database to use (path to file for SQLite).
+
+``--title``
+   Optional title to use for display purposes in the GND viewer.
