@@ -123,7 +123,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   accessions_file=None,
                   blast_query_file=None,
                   import_blast_fasta_db=None,
-                  nextflow_config=None
+                  nextflow_config=None,
+                  templates_dir=None, template=None, template_env=None):
                   ):
     params = {
         "final_output_dir": output_dir,
@@ -169,6 +170,6 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
 
 if __name__ == "__main__":
     args = check_args(create_parser().parse_args())
-    render_params(**vars(args))
-    shared_args.save_run_script(args, NXF_SCRIPT)
+    params_file = render_params(**vars(args))
+    shared_args.save_run_script(args, workflow_def=NXF_SCRIPT, params_file=params_file)
 

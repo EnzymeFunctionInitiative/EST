@@ -1,10 +1,4 @@
 #!/bin/bash
-#SBATCH --partition=efi
-#SBATCH -c 2
-#SBATCH --mem=32GB
-#SBATCH --job-name="{{ jobtype }}-{{ job_id }}"
-#SBATCH -o {{ output_dir }}/nextflow.stdout
-#SBATCH -e {{ output_dir }}/nextflow.stderr
 
 {% for env_line in system_env %}
 {{ env_line }}

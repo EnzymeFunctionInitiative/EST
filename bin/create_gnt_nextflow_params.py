@@ -61,7 +61,8 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_threshold, output_dir, job_id, nextflow_config=None):
+def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_threshold, output_dir, job_id,
+        nextflow_config=None, templates_dir=None, template=None, template_env=None):
     params = {
         "final_output_dir": output_dir,
         "ssn_input": ssn_input,
@@ -79,6 +80,6 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_thresho
 
 if __name__ == "__main__":
     args = check_args(create_parser().parse_args())
-    render_params(**vars(args))
-    shared_args.save_run_script(args, NXF_SCRIPT)
+    params_file = render_params(**vars(args))
+    shared_args.save_run_script(args, workflow_def=NXF_SCRIPT, params_file=params_file)
 
