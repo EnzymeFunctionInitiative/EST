@@ -124,7 +124,7 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   blast_query_file=None,
                   import_blast_fasta_db=None,
                   nextflow_config=None,
-                  templates_dir=None, template=None, template_env=None):
+                  templates_dir=None, template=None):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,

@@ -1,14 +1,26 @@
 #!/bin/bash
-#SBATCH --partition=efi
-#SBATCH -c 2
-#SBATCH --mem=32GB
-#SBATCH --job-name="{{ jobtype }}-{{ job_id }}"
+#
+# Instructions:
+#     1. Change -p PARTITION to the Slurm partition that the jobs will run on
+#     2. Change -c NCPU to the number of CPUs allowed per task; this should match the number of
+#        BLAST instances that will be used in the all-by-all computation
+#     3. Change --mem=XXGB to the amount of memory that is required per node, where XX is the
+#        RAM size in GB
+#     4. No changes should be made to the -J, -o, and -e arguments
+#     5. Add any other #SBATCH lines required, e.g. --mail-user, after
+#
+#SBATCH -p PARTITION
+#SBATCH -c NCPU
+#SBATCH --mem=XXGB
+#SBATCH -J "{{ jobtype }}-{{ job_id }}" # useful for running on a cluster, to identify the job
 #SBATCH -o {{ output_dir }}/nextflow.stdout
 #SBATCH -e {{ output_dir }}/nextflow.stderr
 
-{% for env_line in system_env %}
-{{ env_line }}
-{% endfor %}
 
+# Include any additional environment variables, sources, or module loads necessary to run the
+# scripts on this system, e.g. a Python venv or module load BLAST, here
+
+
+# Normally nothing should be changed here
 nextflow -C {{ config_path }} -log {{ output_dir }}/nextflow.log run {{ workflow_definition }} -params-file {{ params_file }} -with-report {{ output_dir }}/{{ report_file }} -with-timeline {{ output_dir }}/{{ timeline_file }} -w {{ output_dir }}/work
 

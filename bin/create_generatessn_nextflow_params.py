@@ -107,8 +107,7 @@ def create_parser():
 def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter,
         filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version,
         efi_config, db_version, job_id, efi_db, mode,
-        est_output_dir=None, nextflow_config=None, templates_dir=None, template=None,
-        template_env=None):
+        est_output_dir=None, nextflow_config=None, templates_dir=None, template=None):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,

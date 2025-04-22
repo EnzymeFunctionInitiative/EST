@@ -22,8 +22,9 @@ def add_args(parser: argparse.ArgumentParser, use_output_dir: bool = True):
     # template args, for creating run scripts
     default_template_path = os.path.join(os.path.dirname(__file__), "templates")
     parser.add_argument("--templates-dir", type=str, default=default_template_path, help="Directory where job script templates are stored")
-    parser.add_argument("--template", type=str, default=DEFAULT_TEMPLATE, help="Name of template file to use -- must be one of those located in templates dir")
-    parser.add_argument("--template-env", type=str, help="Path to environment file to include into script template")
+    # do not add a default value for --template because the create_nextflow_job.py script needs
+    # to know if a template was specified or not
+    parser.add_argument("--template", type=str, help="Name of template file to use -- must be one of those located in --templates-dir or bin/templates")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -51,6 +52,10 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"EFI config file '{args.efi_config}' does not exist")
         fail = True
 
+    # set the default template
+    if args.template is None:
+        args.template = DEFAULT_TEMPLATE
+
     if fail:
         return None
     else:
@@ -60,27 +65,6 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         if os.path.exists(args.efi_db):
             args.efi_db = os.path.abspath(args.efi_db)
         return args
-
-def load_env_file(file_path: str) -> list:
-    """
-    Get all of the lines from the file and return them as a list.  The file is assumed to be a
-    file containing environment variables and other environment settings necessary to run Nextflow.
-    All lines are returned from the file.
-
-    Parameters
-    ----------
-        file_path
-            Path to a file, typically shell script
-
-    Returns
-    -------
-        list of lines
-    """
-    lines = []
-    with open(file_path, "r") as fh:
-        for line in fh:
-            lines.append(line.strip())
-    return lines
 
 def save_run_script(args: argparse.Namespace, workflow_def: str, params_file: str):
     """
@@ -99,18 +83,12 @@ def save_run_script(args: argparse.Namespace, workflow_def: str, params_file: st
     env = Environment(loader=FileSystemLoader(args.templates_dir), autoescape=select_autoescape())
     sh_template = env.get_template(args.template)
 
-    if args.template_env:
-        system_env = load_env_file(args.template_env)
-    else:
-        system_env = []
-
     pipeline_name = os.path.splitext(os.path.basename(workflow_def))
 
     run_script = sh_template.render(workflow_definition=workflow_def, 
                                     params_file=params_file,
                                     output_dir=args.output_dir,
                                     config_path=args.nextflow_config,
-                                    system_env=system_env,
                                     jobtype=pipeline_name,
                                     job_id=args.job_id,
                                     report_file="report.html",
