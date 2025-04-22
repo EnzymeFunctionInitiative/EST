@@ -116,7 +116,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id,
+def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_num_matches, job_id,
                   efi_config, fasta_db, efi_db, multiplex, blast_evalue,
                   import_mode, sequence_version,
                   families=None,
@@ -142,7 +142,7 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "import_mode": import_mode,
         "filter": sequence_filter,
         "multiplex": multiplex,
-        "blast_num_matches": blast_matches,
+        "blast_num_matches": blast_num_matches,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version
     }
