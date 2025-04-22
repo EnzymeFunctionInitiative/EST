@@ -11,7 +11,7 @@ use parent qw(EFI::Import::Config);
 
 use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Options;
-use EFI::Sequence::Type;
+use EFI::Sequence::Type qw(get_sequence_version);
 
 
 

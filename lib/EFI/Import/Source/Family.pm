@@ -10,8 +10,8 @@ use lib dirname(abs_path(__FILE__)) . "/../../../";
 use lib dirname(abs_path(__FILE__)) . "/../../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
-use EFI::Annotations::Fields ':source';
-use EFI::Sequence::Type;
+use EFI::Annotations::Fields qw(:source);
+use EFI::Sequence::Type qw(:types);
 
 use Exporter qw(import);
 use constant FAMILY_SOURCE_NAME => "family";

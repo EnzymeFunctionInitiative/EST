@@ -15,7 +15,6 @@ use EFI::Import::Filter::Taxonomy;
 use EFI::Import::Statistics;
 use EFI::Options;
 use EFI::Sequence::Collection;
-use EFI::Sequence::Type;
 
 
 my $defaultPredefTaxFiltFileName = "assets/predefined_taxonomy_filters.yml";

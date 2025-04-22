@@ -14,7 +14,6 @@ use EFI::Import::Source::Family qw(FAMILY_SOURCE_NAME);
 use EFI::Import::Sources;
 use EFI::Import::Statistics;
 use EFI::Sequence::Collection;
-use EFI::Sequence::Type;
 
 
 my $logger = new EFI::Import::Logger();
