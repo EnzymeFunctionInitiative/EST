@@ -43,11 +43,21 @@ EST pipeline-specific arguments for the various modes are:
 
 * **blast** mode:
 
-  * ``--blast-query-file``: path to a file containing a single sequence.
+  * ``--import-blast-query-file``: path to a file containing a single sequence.
     [*required*]
 
   * ``--import-blast-fasta-db``: optional path to an alternative sequence
     database, used when the ``--sequence-version`` option is provided.
+
+  * ``--import-blast-num-matches``: optional integer value used to set the
+    maximum number of sequence alignment matches returned from the initial
+    ``blastall`` call used to retrieve sequences to be further analyzed. 
+    Default value is 1000. 
+  
+  * ``--import-blast-evalue``: optional float value setting the threshold
+    e-value applied to the initial ``blastall`` call used to retrieve sequences
+    to be further analyzed. Default value is 1e-5. 
+    
 
 * **families** mode:
 
@@ -123,7 +133,7 @@ usage with ``--duckdb-memory-limit``.  DuckDB generally does a good job of
 swapping results to disk if it is memory constrained but some operations
 require some minimum amount of memory.  If these solutions did not solve the
 problem, try using the newest version of DuckDB (which may require manually
-building the docker image) or decreasing the number of ``--blast-matches``
+building the docker image) or decreasing the number of ``--blast-num-matches``
 which will reduce the total number of edges processed.  Multiplexing will also
 reduce the number of sequences analyzed and can help solve these errors.
 
