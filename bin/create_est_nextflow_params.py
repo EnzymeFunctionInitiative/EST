@@ -34,7 +34,7 @@ def add_args(parser: argparse.ArgumentParser):
     # option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
     blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
-    blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90")
+    blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
     blast_parser.add_argument("--import-blast-num-matches", default=1000, type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
     blast_parser.add_argument("--import-blast-evalue", default="1e-5", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
 
