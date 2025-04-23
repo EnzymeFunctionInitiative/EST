@@ -19,9 +19,9 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
     common_parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
     common_parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
-    common_parser.add_argument("--blast-matches", default=250, type=int, help="Number of matches BLAST should return")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
+    common_parser.add_argument("--blast-num-matches", default=250, type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
@@ -34,7 +34,9 @@ def add_args(parser: argparse.ArgumentParser):
     # option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
     blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
-    blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90")
+    blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
+    blast_parser.add_argument("--import-blast-num-matches", default=1000, type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
+    blast_parser.add_argument("--import-blast-evalue", default="1e-5", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
 
     # option B: Family
     family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group("Family Options")
@@ -114,7 +116,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_matches, job_id,
+def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards, accession_shards, blast_num_matches, job_id,
                   efi_config, fasta_db, efi_db, multiplex, blast_evalue,
                   import_mode, sequence_version,
                   families=None,
@@ -123,6 +125,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   accessions_file=None,
                   blast_query_file=None,
                   import_blast_fasta_db=None,
+                  import_blast_num_matches=None,
+                  import_blast_evalue=None,
                   nextflow_config=None
                   ):
     params = {
@@ -131,7 +135,6 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "duckdb_threads": duckdb_threads,
         "num_fasta_shards": fasta_shards,
         "num_accession_shards": accession_shards,
-        "num_blast_matches": blast_matches,
         "job_id": job_id,
         "efi_config": efi_config,
         "fasta_db": fasta_db,
@@ -139,13 +142,16 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "import_mode": import_mode,
         "filter": sequence_filter,
         "multiplex": multiplex,
+        "blast_num_matches": blast_num_matches,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version
     }
     if import_mode == "blast":
         params |= {
             "blast_query_file": blast_query_file,
-            "import_blast_fasta_db": import_blast_fasta_db
+            "import_blast_fasta_db": import_blast_fasta_db,
+            "import_blast_num_matches": import_blast_num_matches,
+            "import_blast_evalue": import_blast_evalue
         }
     elif import_mode == "fasta":
         params |= {
