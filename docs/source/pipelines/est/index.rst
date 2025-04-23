@@ -43,7 +43,7 @@ EST pipeline-specific arguments for the various modes are:
 
 * **blast** mode:
 
-  * ``--import-blast-query-file``: path to a file containing a single sequence.
+  * ``--blast-query-file``: path to a file containing a single sequence.
     [*required*]
 
   * ``--import-blast-fasta-db``: optional path to an alternative sequence
