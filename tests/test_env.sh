@@ -50,7 +50,7 @@ do
                         default database, and this option can be used to
                         connect tests to external, large BLAST databases used
                         in the full EFI toolset
-        --blast-import-db
+        --blast-import-fasta-db
                         path to a BLAST database that is used to determine which
                         IDs are to be used in the computation; if not specified
                         then the test UniRef50 database is used
@@ -84,7 +84,7 @@ do
 	elif [[ ${!index} == "--fasta-db" ]]; then
 		fasta_db="${!idx}"
 		echo "Using $fasta_db as the FASTA database path"
-	elif [[ ${!index} == "--blast-importfasta-db" ]]; then
+	elif [[ ${!index} == "--blast-import-fasta-db" ]]; then
 		blast_import_fasta_db="${!idx}"
 		echo "Using $blast_import_fasta_db as the UniRef BLAST import FASTA database path"
 	# manually specify the configuration file
