@@ -84,7 +84,7 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
 }
 
 
-# Family: Restrict to families (FASTA and Accession options only)
+# Family: Restrict to families (applies to FASTA and Accession input options only)
 if ($opts->{family_filter}) {
     my $familyFilter = new EFI::Import::Filter::Family(%defaultFilterArgs, families => $opts->{family_filter});
     $familyFilter->applyFilter($seqData);
