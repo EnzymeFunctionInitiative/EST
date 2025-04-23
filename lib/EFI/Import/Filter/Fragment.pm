@@ -9,7 +9,6 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
 use parent qw(EFI::Import::Filter);
 
-use EFI::Annotations::Fields qw(:annotations);
 use EFI::Sequence::Type qw(is_unknown_sequence);
 
 

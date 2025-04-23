@@ -34,7 +34,7 @@ sub addImportOptions {
     my $self = shift;
     $self->SUPER::addImportOptions(include_config => 1);
 
-    $self->addOption("filter:s%", 0, "filters to apply (predef-name, predef-file, user-file, fragments, fraction)");
+    $self->addOption("filter:s%", 0, "filters to apply (predef-name, predef-file, user-file, fragments, fraction, family)");
     $self->addOption("source-meta-file=s", 0, "path to the input file containing the source data to filter", OPT_FILE);
     $self->addOption("source-ids-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
     $self->addOption("sequence-version=s", 0, "source sequence type (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
@@ -71,6 +71,7 @@ sub validateOptions {
     my $filter = $opts->{filter} || {};
     $opts->{fraction} = ($filter->{fraction} and $filter->{fraction} =~ m/^\d+$/) ? $filter->{fraction} : 1;
     $opts->{remove_fragments} = exists $filter->{fragments} ? 1 : 0;
+    $opts->{family_filter} = $filter->{family};
     my @taxFilterErrors = $self->parseTaxonomyFilterOptions($filter, $opts);
     push @errors, @taxFilterErrors;
 

@@ -206,6 +206,21 @@ sub getSequence {
 
 
 # public
+sub getSequenceAttributeMapping {
+    my $self = shift;
+    my $attrName = shift;
+
+    my $values = {};
+    foreach my $id (keys %{ $self->{seq} }) {
+        my $val = $self->{seq}->{$id}->getAttribute($attrName) // "";
+        $values->{$id} = $val;
+    }
+
+    return $values;
+}
+
+
+# public
 sub updateUnirefMetadata {
     my $self = shift;
 
@@ -771,9 +786,57 @@ of all of the sequence IDs.
     map { print "ID2 $_\n"; } @ids;
 
 
+=head3 C<getAllSequenceIds()>
+
+Get a list of all of the sequence IDs in the input ID list file.  All IDs are UniProt.
+
+=head4 Returns
+
+In scalar context, an array ref of a list of all of the sequence IDs.  In list context, a list
+of all of the sequence IDs.
+
+=head4 Example Usage
+
+    my $ids = $seqs->getAllSequenceIds();
+    map { print "All IDs ID: $_\n"; } @$ids;
+
+
+=head3 C<getSequenceAttributeMapping($attrName)>
+
+Get a mapping of ID to attribute values for the given attribute name for all sequences in the
+input dataset (not in the master ID list).
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+Attribute name (e.g. C<FIELD_SEQ_SRC_KEY>)
+
+=back
+
+=head4 Returns
+
+A hash ref mapping ID to attribute value.  If the attribute doesn't exist or is undefined then an
+empty string C<""> is saved as the hash value.
+
+=head4 Example Usage
+
+    my $attrName = FIELD_SEQ_SRC_KEY;
+    my $attrs = $seqs->getSequenceAttributeMapping($attrName);
+    foreach my $id ($seqs->getSequenceIds()) {
+        if ($attrs->{$id}) {
+            print "Sequence source for $id is $attrs->{$id}\n";
+        } else {
+            print "No sequence source defined for $id\n";
+        }
+    }
+
+
 =head3 C<associateUnirefIds($uniprot, $uniref90, $uniref50)>
 
-Adds a new mapping of UniProt ID to associated UniRef sequence IDs to the ID list/mapping.
+Add a new mapping of UniProt ID to associated UniRef sequence IDs to the ID list/mapping.
 This mapping will likely be a superset of the IDs added with the C<addSequence()> function in
 order to support sunburst diagrams for UniRef jobs (since all of the IDs are necessary, not
 just UniRef).
