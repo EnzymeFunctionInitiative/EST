@@ -85,21 +85,21 @@ Database Downloading
 ====================
 As mentioned above, the metadata and sequence databases are available for 
 download at 
-https://efi.igb.illinois.edu/downloads/databases/ where the lastest as well as
-past versions of the EFI databases are provided. Database version names follow
-a year month date format (YYYYMMDD). The ``VERSION.txt`` file in each directory
+https://efi.igb.illinois.edu/downloads/databases/ where the latest as well as
+past versions of the EFI databases are provided. Database directory names follow
+a year month date format (YYYYMMDD). The ``VERSION.txt`` file in each directory 
 contains the metadata associated with the provided database files, including 
-the EFI DB version name (e.g. IP104) as well as the UniProt and InterPro 
-release IDs. 
+the EFI DB version name (e.g. IP104) as well as the UniProt and InterPro release 
+IDs. 
 
 The metadata database consists of a single gzip'd sqlite file that is roughly
 80 GB in size. The BLAST and DIAMOND database files are tar'd directories and 
 are both roughly 185 GB. Unzipping and untarring these files requires close to 
 1 TB of available storage. To avoid potential errors or corrupted data while 
-downloading these large database files, we also provide splits of the full 
-tar/zip files. These split files are each 5 GB in size and can be recombined 
+downloading these large database files, splits of the full tar/zip files are 
+also provided. These split files are each 5 GB in size and can be recombined 
 to create the full database, enabling a download process that is more 
-resilient. We provide a script that will automate the download process for 
+resilient. A script is provided to automate the download process for 
 the three databases in ``EST/scripts/download_efi_db.sh``. ::
 
     bash scripts/download_efi_dbs.sh --help
