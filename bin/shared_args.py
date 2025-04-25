@@ -18,6 +18,7 @@ def add_args(parser: argparse.ArgumentParser, use_output_dir: bool = True):
     parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     parser.add_argument("--nextflow-config", required=True, type=str, help="Path to the Nextflow configuration file to use (e.g. conf/est/docker.config)")
     parser.add_argument("--job-id", default=42, help="Identifier used to in the job name when submitting a Nextflow job to a scheduler")
+    parser.add_argument("--workflow-def", help="Path to the Nextflow workflow definition file, relative to repository root (e.g. pipelines/est/est.nf)")
 
     # template args, for creating run scripts
     default_template_path = os.path.join(os.path.dirname(__file__), "templates")
@@ -55,6 +56,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     # set the default template
     if args.template is None:
         args.template = DEFAULT_TEMPLATE
+
+    if args.workflow_def is not None:
+        args.workflow_def = os.path.abspath(args.workflow_def)
 
     if fail:
         return None

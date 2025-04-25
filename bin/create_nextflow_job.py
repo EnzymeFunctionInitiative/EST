@@ -85,19 +85,14 @@ if __name__ == "__main__":
     # create params.yml file in the output directory
     if pipeline == "colorssn":
         params_file = create_colorssn_nextflow_params.render_params(**vars(args))
-        workflow_def = create_colorssn_nextflow_params.NXF_SCRIPT
     elif pipeline == "est":
         params_file = create_est_nextflow_params.render_params(**vars(args))
-        workflow_def = create_est_nextflow_params.NXF_SCRIPT
     elif pipeline == "generatessn":
         params_file = create_generatessn_nextflow_params.render_params(**vars(args))
-        workflow_def = create_generatessn_nextflow_params.NXF_SCRIPT
     elif pipeline == "gnt":
         params_file = create_gnt_nextflow_params.render_params(**vars(args))
-        workflow_def = create_gnt_nextflow_params.NXF_SCRIPT
     elif pipeline == "gnd":
         params_file = create_gnd_nextflow_params.render_params(**vars(args))
-        workflow_def = create_gnd_nextflow_params.NXF_SCRIPT
 
-    shared_args.save_run_script(args, workflow_def=workflow_def, params_file=params_file)
+    shared_args.save_run_script(args, workflow_def=args.workflow_def, params_file=params_file)
 
