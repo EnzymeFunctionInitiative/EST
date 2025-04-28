@@ -47,6 +47,25 @@ sub batchRetrieveIds {
 }
 
 
+sub retrieveFamiliesForClans {
+    my $self = shift;
+    my (@clans) = @_;
+
+    my @fams;
+    foreach my $clan (@clans) {
+        my $sql = "SELECT pfam_id FROM PFAM_clans WHERE clan_id = ?";
+        my $sth = $self->{dbh}->prepare($sql);
+        $sth->execute($clan);
+    
+        while (my $row = $sth->fetchrow_arrayref) {
+            push @fams, $row->[0];
+        }
+    }
+
+    return @fams;
+}
+
+
 1;
 __END__
 
@@ -67,6 +86,8 @@ B<EFI::Import::Util> - Perl module for B<EFI::Import> modules
     my $idCol = "accession";
 
     my $matched = $util->batchRetrieveIds(\@ids, $sqlPattern, $idCol);
+
+    my @pfams = $util->retrieveFamiliesForClans("CL0001");
 
 
 =head2 DESCRIPTION
@@ -128,6 +149,37 @@ database then those IDs will not be containined in the return value hash.
             print "$id was NOT found in the database\n";
         }
     }
+
+
+=head3 C<retrieveFamiliesForClans(@clans)>
+
+Retrieves all of the Pfams that are in the input Pfam clans.
+
+=head4 Parameters
+
+=over
+
+=item C<@clans>
+
+List of Pfam clans (e.g. C<CL####>)
+
+=back
+
+=head4 Returns
+
+A list of Pfam families
+
+=head4 Example Usage
+
+    my @clans = ("CL0881", "CL0884");
+    my @pfams = $util->retrieveFamiliesForClans(@clans);
+
+    # @pfams should contain:
+    #    PF02140
+    #    PF11875
+    #    PF12161
+    #    PF20465
+    #    PF21106
 
 
 =cut

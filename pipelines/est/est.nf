@@ -22,7 +22,7 @@ process get_source_ids {
     if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
         """
-        blastall -p blastp -i ${params.blast_query_file} -d ${params.import_blast_fasta_db} -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o init_blast.out
+        blastall -p blastp -i ${params.blast_query_file} -d ${params.import_blast_fasta_db} -m 8 -e ${params.import_blast_evalue} -b ${params.import_blast_num_matches} -o init_blast.out
         if [[ -s init_blast.out ]]; then
             awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
         else
@@ -145,7 +145,7 @@ process all_by_all_blast {
         path "${frac}.tab.sorted.parquet"
     """
     # run blast to get similarity metrics
-    blastall -p blastp -i $frac -d $blast_db_name -m 8 -e ${params.blast_evalue} -b ${params.num_blast_matches} -o ${frac}.tab
+    blastall -p blastp -i $frac -d $blast_db_name -m 8 -e ${params.blast_evalue} -b ${params.blast_num_matches} -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet
     python $projectDir/axa_blast/transcode_blast.py --blast-output ${frac}.tab

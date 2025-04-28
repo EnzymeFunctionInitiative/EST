@@ -10,8 +10,8 @@ use lib dirname(abs_path(__FILE__)) . "/../../../";
 use lib dirname(abs_path(__FILE__)) . "/../../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
-use EFI::Annotations::Fields ':source';
-use EFI::Sequence::Type;
+use EFI::Annotations::Fields qw(:source);
+use EFI::Sequence::Type qw(:types);
 
 use Exporter qw(import);
 use constant FAMILY_SOURCE_NAME => "family";
@@ -164,7 +164,7 @@ sub getFamilyNames {
         }
     }
 
-    push @{ $tables{PFAM} }, $self->retrieveFamiliesForClans(@clans);
+    push @{ $tables{PFAM} }, $self->{util}->retrieveFamiliesForClans(@clans);
 
     return \%tables;
 }
@@ -348,38 +348,6 @@ sub getUnirefIds {
     my $numUniref50Matched = $getIds->("uniref50_seed", 1);
 
     return ($numUniref90Matched, $numUniref50Matched);
-}
-
-
-
-
-#
-# retrieveFamiliesForClans - private method
-#
-# Retrieves all of the PFAMs for the input PFAM clans.
-#
-# Parameters:
-#     @clans - list of PFAM clans
-#
-# Returns:
-#     list of PFAM families in the clans
-#
-sub retrieveFamiliesForClans {
-    my $self = shift;
-    my (@clans) = @_;
-
-    my @fams;
-    foreach my $clan (@clans) {
-        my $sql = "SELECT pfam_id FROM PFAM_clans WHERE clan_id = ?";
-        my $sth = $self->{dbh}->prepare($sql);
-        $sth->execute($clan);
-    
-        while (my $row = $sth->fetchrow_arrayref) {
-            push @fams, $row->[0];
-        }
-    }
-
-    return @fams;
 }
 
 

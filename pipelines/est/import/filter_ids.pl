@@ -9,13 +9,13 @@ use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
 use EFI::Import::Config::Filter;
+use EFI::Import::Filter::Family;
 use EFI::Import::Filter::Fraction;
 use EFI::Import::Filter::Fragment;
 use EFI::Import::Filter::Taxonomy;
 use EFI::Import::Statistics;
 use EFI::Options;
 use EFI::Sequence::Collection;
-use EFI::Sequence::Type;
 
 
 my $defaultPredefTaxFiltFileName = "assets/predefined_taxonomy_filters.yml";
@@ -50,21 +50,26 @@ $stats->load($opts->{source_stats_file});
 $defaultFilterArgs{stats} = $stats;
 
 
-# Only retain a fraction of the sequences
+
+
+# Apply filters.  Filters modify the input sequence collection rather than returning a new set.
+
+
+# Fraction: Only retain a fraction of the sequences
 if ($opts->{fraction} > 1) {
     my $fracFilter = new EFI::Import::Filter::Fraction(%defaultFilterArgs, fraction => $opts->{fraction});
     $fracFilter->applyFilter($seqData);
 }
 
 
-# Remove fragments
+# Fragments: Remove fragments
 if ($opts->{remove_fragments}) {
     my $fragFilter = new EFI::Import::Filter::Fragment(%defaultFilterArgs);
     $fragFilter->applyFilter($seqData);
 }
 
 
-# Restrict to specified taxonomy categories
+# Taxonomy: Restrict to specified taxonomy categories
 if ($opts->{user_filter_file} or $opts->{predef_filter}) {
     my %args;
     if ($opts->{user_filter_file}) {
@@ -75,6 +80,13 @@ if ($opts->{user_filter_file} or $opts->{predef_filter}) {
     }
     my $taxFilter = new EFI::Import::Filter::Taxonomy(%defaultFilterArgs, %args);
     $taxFilter->applyFilter($seqData);
+}
+
+
+# Family: Restrict to families (applies to FASTA and Accession input options only)
+if ($opts->{family_filter}) {
+    my $familyFilter = new EFI::Import::Filter::Family(%defaultFilterArgs, families => $opts->{family_filter});
+    $familyFilter->applyFilter($seqData);
 }
 
 

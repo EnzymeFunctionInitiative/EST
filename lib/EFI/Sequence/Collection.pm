@@ -10,7 +10,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../";
 
 use EFI::Annotations::Fields qw(:annotations);
 use EFI::Sequence;
-use EFI::Sequence::Type;
+use EFI::Sequence::Type qw(:types);
 
 
 sub new {
@@ -98,7 +98,7 @@ sub removeSequence {
     }
 
     # Now remove from the accession ID table.  Primary sequence type refers to the sequence
-    # type of the source sequences
+    # type of the sequence version (e.g. UniProt, UniRef)
 
     # If the primary sequence type is UniRef50 and this ID is a UniRef50 ID then delete all
     # UniRef90 and UniProt IDs that are in that UniRef50 cluster
@@ -144,9 +144,7 @@ sub getSequenceIds {
 }
 
 
-# This should be called only from EFI::Sunburst::Data - returns the list of all of the sequences in
-# the ID list including those that are not in the user's data set and this is only useful to the
-# sunburst data retrieval.
+# public
 sub getAllSequenceIds {
     my $self = shift;
     my @ids = keys %{ $self->{uniprot} };
@@ -204,6 +202,21 @@ sub getSequence {
     my $self = shift;
     my $id = shift;
     return $self->{seq}->{$id};
+}
+
+
+# public
+sub getSequenceAttributeMapping {
+    my $self = shift;
+    my $attrName = shift;
+
+    my $values = {};
+    foreach my $id (keys %{ $self->{seq} }) {
+        my $val = $self->{seq}->{$id}->getAttribute($attrName) // "";
+        $values->{$id} = $val;
+    }
+
+    return $values;
 }
 
 
@@ -441,15 +454,15 @@ B<EFI::Sequence::Collection> - Perl module that represents a collection of seque
 
     use EFI::Sequence;
     use EFI::Sequence::Collection;
-    use EFI::Sequence::Type;
+    use EFI::Sequence::Type qw(:types);
 
-    my $seqSource = SEQ_UNIREF50;
+    my $seqVersion = SEQ_UNIREF50;
     my $mdFile = "sequence_metadata.tab";
     my $idFile = "accession_table.tab";
 
     my $seqs = new EFI::Sequence::Collection();
 
-    $seqs->load($mdFile, $idFile, sequence_source => $seqSource);
+    $seqs->load($mdFile, $idFile, sequence_version => $seqVersion);
 
     $seqs->addSequence("B0SS77", {}, "");
 
@@ -494,7 +507,7 @@ The default value is defined in C<EFI::Sequence>.
 =back
 
 
-=head3 C<load($metadataFile, $idFile, sequence_source =E<gt> source)>
+=head3 C<load($metadataFile, $idFile, sequence_version =E<gt> version)>
 
 Loads metadata and ID lists from files.  See C<save()> for the file format.
 
@@ -511,9 +524,9 @@ Path to metadata file (e.g. "sequence_metadata.tab").
 Path to ID list file (e.g. "accession_table.tab").
 If specified, load the ID mapping, otherwise only metadata is loaded.
 
-=item C<sequence_source> (optional)
+=item C<sequence_version> (optional)
 
-If specified, used instead of sequence source defined at object creation.  One of C<SEQ_UNIPROT>,
+If specified, used instead of sequence version defined at object creation.  One of C<SEQ_UNIPROT>,
 C<SEQ_UNIREF90>, or C<SEQ_UNIREF50> from B<EFI::Sequence::Type>.
 
 =back
@@ -524,8 +537,8 @@ C<SEQ_UNIREF90>, or C<SEQ_UNIREF50> from B<EFI::Sequence::Type>.
 
 =head4 Example Usage
 
-    my $seqSource = SEQ_UNIREF50;
-    my $retval = $seqs->load($mdFile, $idFile, sequence_source => $seqSource);
+    my $seqVersion = SEQ_UNIREF50;
+    my $retval = $seqs->load($mdFile, $idFile, sequence_version => $seqVersion);
     die "Unable to load $mdFile, $idFile" if not $retval;
 
 
@@ -534,7 +547,7 @@ C<SEQ_UNIREF90>, or C<SEQ_UNIREF50> from B<EFI::Sequence::Type>.
 Saves the metadata and ID lists.  The metadata file contains a mapping of keys and values for
 attributes for each sequence ID.  The ID list file contains a mapping of UniProt and UniRef IDs.
 The IDs in the ID list may be a superset of the IDs in the metadata file; this will occur when
-the input data set originates from a UniRef source, and the ID list must contain a mapping of
+the input data set originates from a UniRef version, and the ID list must contain a mapping of
 UniProt to UniRef for future steps (e.g. filtering and sunburst diagrams).
 
 =head4 Parameters
@@ -644,7 +657,7 @@ sequence ID from the ID list tables.  In the latter case, if the input dataset o
 UniRef IDs and the C<$sequenceId> is a UniRef ID, then all of the members of the UniRef cluster
 are also removed.  A few examples are given:
 
-B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIPROT>>
+B<Example: C<load()> with C<sequence_version> = C<SEQ_UNIPROT>>
 
     # Initial metadata 
     #UniProt_ID      Attribute       Value
@@ -665,7 +678,7 @@ B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIPROT>>
     #uniprot_id	uniref90_id	uniref50_id
     #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
 
-B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIPROT>>
+B<Example: C<load()> with C<sequence_version> = C<SEQ_UNIPROT>>
 
     # Initial metadata 
     #UniProt_ID      Attribute       Value
@@ -685,7 +698,7 @@ B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIPROT>>
     #uniprot_id	uniref90_id	uniref50_id
     #A0A8J3TPF4	A0A8J3V1H9	Q3AEU2
 
-B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF90>>
+B<Example: C<load()> with C<sequence_version> = C<SEQ_UNIREF90>>
 
     # Initial metadata 
     #UniProt_ID      Attribute       Value
@@ -706,7 +719,7 @@ B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF90>>
     #uniprot_id	uniref90_id	uniref50_id
     #B0SS72	B0SS72	Q3AEU2
 
-B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF50>>
+B<Example: C<load()> with C<sequence_version> = C<SEQ_UNIREF50>>
 
     # Initial metadata 
     #UniProt_ID      Attribute       Value
@@ -731,7 +744,7 @@ B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF50>>
     #uniprot_id	uniref90_id	uniref50_id
     #A0A8J3V1H9	A0A8J3V1H9	Q3AEU2
 
-B<Example: C<load()> with C<sequence_source> = C<SEQ_UNIREF50>>
+B<Example: C<load()> with C<sequence_version> = C<SEQ_UNIREF50>>
 
     # Initial metadata 
     #UniProt_ID      Attribute       Value
@@ -773,9 +786,57 @@ of all of the sequence IDs.
     map { print "ID2 $_\n"; } @ids;
 
 
+=head3 C<getAllSequenceIds()>
+
+Get a list of all of the sequence IDs in the input ID list file.  All IDs are UniProt.
+
+=head4 Returns
+
+In scalar context, an array ref of a list of all of the sequence IDs.  In list context, a list
+of all of the sequence IDs.
+
+=head4 Example Usage
+
+    my $ids = $seqs->getAllSequenceIds();
+    map { print "All IDs ID: $_\n"; } @$ids;
+
+
+=head3 C<getSequenceAttributeMapping($attrName)>
+
+Get a mapping of ID to attribute values for the given attribute name for all sequences in the
+input dataset (not in the master ID list).
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+Attribute name (e.g. C<FIELD_SEQ_SRC_KEY>)
+
+=back
+
+=head4 Returns
+
+A hash ref mapping ID to attribute value.  If the attribute doesn't exist or is undefined then an
+empty string C<""> is saved as the hash value.
+
+=head4 Example Usage
+
+    my $attrName = FIELD_SEQ_SRC_KEY;
+    my $attrs = $seqs->getSequenceAttributeMapping($attrName);
+    foreach my $id ($seqs->getSequenceIds()) {
+        if ($attrs->{$id}) {
+            print "Sequence source for $id is $attrs->{$id}\n";
+        } else {
+            print "No sequence source defined for $id\n";
+        }
+    }
+
+
 =head3 C<associateUnirefIds($uniprot, $uniref90, $uniref50)>
 
-Adds a new mapping of UniProt ID to associated UniRef sequence IDs to the ID list/mapping.
+Add a new mapping of UniProt ID to associated UniRef sequence IDs to the ID list/mapping.
 This mapping will likely be a superset of the IDs added with the C<addSequence()> function in
 order to support sunburst diagrams for UniRef jobs (since all of the IDs are necessary, not
 just UniRef).
@@ -860,8 +921,8 @@ A UniRef50 ID.
 =head3 C<updateUnirefMetadata()>
 
 Creates or updates the UniRef-related metadata fields in the sequence metadata file.  For a
-UniRef90 sequence source these fields are C<UniRef90_IDs> and C<UniRef90_Cluster_Size>.  For
-a UniRef50 sequence source these fields are C<UniRef50_IDs> and C<UniRef50_Cluster_Size>.
+UniRef90 sequence version these fields are C<UniRef90_IDs> and C<UniRef90_Cluster_Size>.  For
+a UniRef50 sequence version these fields are C<UniRef50_IDs> and C<UniRef50_Cluster_Size>.
 For both, the C<Cluster_Size> field represents the number of UniProt IDs in the associated
 UniRef cluster.  Similarly, the C<IDs> field is a text string with each UniProt ID separated
 the field separator character (defaults to caret C<^> but can be provided as a parameter to
