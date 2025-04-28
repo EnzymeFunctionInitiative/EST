@@ -31,6 +31,7 @@ sub parseFamilies {
 
     my @fams = split(m/,/, uc $families);
     my $fams = {};
+    my @clans;
 
     foreach my $fam (@fams) {
         my $key;
@@ -38,12 +39,16 @@ sub parseFamilies {
             $key = "PFAM";
         } elsif ($fam =~ m/^IPR/) {
             $key = "INTERPRO";
-        } else {
-            next; # Only support Pfam and InterPro families
+        } elsif ($fam =~ m/^CL/) {
+            push @clans, $fam;
         }
         # Valid families only include alphanumeric characters
-        next if $fam !~ m/^[A-Z0-9]+$/;
+        next if not $key or $fam !~ m/^[A-Z0-9]+$/;
         push @{ $fams->{$key} }, $fam;
+    }
+
+    if (@clans) {
+        push @{ $fams->{PFAM} }, $self->{util}->retrieveFamiliesForClans(@clans);
     }
 
     return $fams;
