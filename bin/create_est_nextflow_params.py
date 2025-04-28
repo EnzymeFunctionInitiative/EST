@@ -120,7 +120,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
-                  accession_shards, blast_matches, job_id, efi_config, fasta_db, efi_db, multiplex,
+                  accession_shards, blast_num_matches, job_id, efi_config, fasta_db, efi_db, multiplex,
                   blast_evalue, import_mode, sequence_version,
                   families=None, sequence_filter=None, fasta_file=None, accessions_file=None,
                   blast_query_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
