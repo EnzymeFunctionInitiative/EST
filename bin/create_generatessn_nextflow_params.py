@@ -90,6 +90,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     else:
         args = validated_args
 
+    if args.workflow_def is None:
+        args.workflow_def = os.path.abspath(NXF_SCRIPT)
+
     if fail:
         print("Failed to render params template")
         exit(1)
@@ -104,7 +107,9 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter, filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version, efi_config, db_version, job_id, efi_db, mode, est_output_dir=None, nextflow_config=None):
+def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter,
+        filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version,
+        efi_config, db_version, job_id, efi_db, mode, **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
@@ -131,6 +136,6 @@ def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_p
 
 if __name__ == "__main__":
     args = check_args(create_parser().parse_args())
-    render_params(**vars(args))
-    shared_args.save_run_script(args, NXF_SCRIPT)
+    params_file = render_params(**vars(args))
+    shared_args.save_run_script(args, workflow_def=args.workflow_def, params_file=params_file)
 

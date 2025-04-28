@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# This is the default command-line interface template that is used for testing or by a user when
+# running on a system through Docker or a manual installation.  Include here any environment setup
+# that is required (e.g. source, venv) to run.
+
+# Normally nothing should be changed here
+nextflow -C {{ config_path }} -log {{ output_dir }}/nextflow.log run {{ workflow_definition }} -params-file {{ params_file }} -with-report {{ output_dir }}/{{ report_file }} -with-timeline {{ output_dir }}/{{ timeline_file }} -w {{ output_dir }}/work
+

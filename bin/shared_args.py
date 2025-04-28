@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 
 SCRIPT_NAME = "run_nextflow.sh"
 PARAMS_NAME = "params.yml"
+DEFAULT_TEMPLATE = "run_nextflow_cli.sh.jinja"
 
 def add_args(parser: argparse.ArgumentParser, use_output_dir: bool = True):
     """
@@ -15,7 +17,15 @@ def add_args(parser: argparse.ArgumentParser, use_output_dir: bool = True):
     parser.add_argument("--efi-config", required=True, type=str, help="EFI configuration file path")
     parser.add_argument("--efi-db", required=True, type=str, help="Name of the MySQL database to use (e.g. efi_202406) or name of the SQLite file")
     parser.add_argument("--nextflow-config", required=True, type=str, help="Path to the Nextflow configuration file to use (e.g. conf/est/docker.config)")
-    parser.add_argument("--job-id", default=131, help="ID used when running on the EFI website. Not important otherwise")
+    parser.add_argument("--job-id", default=42, help="Identifier used to in the job name when submitting a Nextflow job to a scheduler")
+    parser.add_argument("--workflow-def", help="Path to the Nextflow workflow definition file, relative to repository root (e.g. pipelines/est/est.nf)")
+
+    # template args, for creating run scripts
+    default_template_path = os.path.join(os.path.dirname(__file__), "templates")
+    parser.add_argument("--templates-dir", type=str, default=default_template_path, help="Directory where job script templates are stored")
+    # do not add a default value for --template because the create_nextflow_job.py script needs
+    # to know if a template was specified or not
+    parser.add_argument("--template", type=str, help="Name of template file to use -- must be one of those located in --templates-dir or bin/templates")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -43,6 +53,13 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"EFI config file '{args.efi_config}' does not exist")
         fail = True
 
+    # set the default template
+    if args.template is None:
+        args.template = DEFAULT_TEMPLATE
+
+    if args.workflow_def is not None:
+        args.workflow_def = os.path.abspath(args.workflow_def)
+
     if fail:
         return None
     else:
@@ -53,7 +70,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
             args.efi_db = os.path.abspath(args.efi_db)
         return args
 
-def save_run_script(args: argparse.Namespace, nxf_script_path: str):
+def save_run_script(args: argparse.Namespace, workflow_def: str, params_file: str):
     """
     Save the nextflow execution command to a file for easier use by the user.
 
@@ -61,19 +78,28 @@ def save_run_script(args: argparse.Namespace, nxf_script_path: str):
     ----------
         args
             ArgumentParser containing all the arguments used to generate the params file
-        nxf_script_path
-            path to the nextflow script relative to the repo root (e.g. 'pipelines/est/est.nf')
+        workflow_def
+            Path to a Nextflow workflow definition
+        params_file
+            Path to a file containing the parameters passed to a Nextflow workflow
     """
-    script = os.path.join(args.output_dir, SCRIPT_NAME)
-    efi_data_dir = os.path.dirname(args.efi_config)
-    nxf_log_file = os.path.join(args.output_dir, "nextflow.log")
-    nxf_work_dir = os.path.join(args.output_dir, "work")
-    params_file = os.path.join(args.output_dir, PARAMS_NAME)
-    nxf_script_path = os.path.join(os.path.dirname(__file__), "../", nxf_script_path)
 
-    with open(script, "w") as fh:
-        fh.write("#!/bin/bash\n")
-        fh.write(f"export EFI_DATA_DIR=\"{efi_data_dir}\"\n")
-        fh.write(f"nextflow -C {args.nextflow_config} -log {nxf_log_file} run {nxf_script_path} -params-file {params_file} -w {nxf_work_dir}\n")
-        #nextflow -log $OUTPUT_DIR/est_nextflow.log -C $NXF_EST_CONFIG_FILE run pipelines/est/est.nf -params-file $OUTPUT_DIR/params.yml -w $OUTPUT_DIR/est_work
+    env = Environment(loader=FileSystemLoader(args.templates_dir), autoescape=select_autoescape())
+    sh_template = env.get_template(args.template)
+
+    pipeline_name = os.path.splitext(os.path.basename(workflow_def))
+
+    run_script = sh_template.render(workflow_definition=workflow_def, 
+                                    params_file=params_file,
+                                    output_dir=args.output_dir,
+                                    config_path=args.nextflow_config,
+                                    jobtype=pipeline_name,
+                                    job_id=args.job_id,
+                                    report_file="report.html",
+                                    timeline_file="timeline.html")
+    startup_script = os.path.join(args.output_dir, SCRIPT_NAME)
+    with open(startup_script, "w") as f:
+        f.write(run_script)
+        f.write("\n")
+    print(f"Wrote Nextflow script to {startup_script}")
 

@@ -38,6 +38,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"FASTA database '{args.fasta_db}' not found")
         fail = True
 
+    if args.workflow_def is None:
+        args.workflow_def = os.path.abspath(NXF_SCRIPT)
+
     if fail:
         print("Failed to render params template")
         exit(1)
@@ -51,7 +54,7 @@ def create_parser() -> argparse.ArgumentParser:
     add_args(parser)
     return parser
 
-def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir, job_id, nextflow_config=None):
+def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "ssn_input": ssn_input,
@@ -67,6 +70,6 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir, job_id, n
 
 if __name__ == "__main__":
     args = check_args(create_parser().parse_args())
-    render_params(**vars(args))
-    shared_args.save_run_script(args, NXF_SCRIPT)
+    params_file = render_params(**vars(args))
+    shared_args.save_run_script(args, workflow_def=args.workflow_def, params_file=params_file)
 
