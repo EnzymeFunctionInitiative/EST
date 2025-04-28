@@ -42,17 +42,13 @@ $seqCollection->load($config->{sequence_meta_file});
 my @seqIds = $seqCollection->getSequenceIds();
 
 # filteredSeqIds is used to exclude any IDs/sequences in the FASTA file that were excluded due to
-# filtering in a prior step.  fastaSource is used to determine if an ID in the input ID list
+# filtering in a prior step.  fastaSourceIds is used to determine if an ID in the input ID list
 # (sequence metadata file) comes from the FASTA file; this is used to save family-only IDs (e.g.
 # IDs that originated from a family added to the fasta import job) to a file that is used later in
 # the workflow.
-my %filteredSeqIds;
-my %fastaSource;
-foreach my $id (@seqIds) {
-    $filteredSeqIds{$id} = 1;
-    my $source = $seqCollection->getSequence($id)->getAttribute(FIELD_SEQ_SRC_KEY) // "";
-    $fastaSource{$id} = ($source eq FIELD_SEQ_SRC_VALUE_BOTH or $source eq FIELD_SEQ_SRC_VALUE_FASTA);
-}
+my %filteredSeqIds = map { $_ => 1 } @seqIds;
+my $sourceAttr = $seqCollection->getSequenceAttributeMapping(FIELD_SEQ_SRC_KEY);
+my @fastaSourceIds = grep { ($sourceAttr->{$_} eq FIELD_SEQ_SRC_VALUE_BOTH or $sourceAttr->{$_} eq FIELD_SEQ_SRC_VALUE_FASTA) } keys %$sourceAttr;
 
 
 open my $in, "<", $config->{uploaded_fasta} or die "Unable to read input fasta file $config->{uploaded_fasta}: $!";
@@ -83,7 +79,7 @@ close $in;
 
 # Save the list of IDs for which sequences need to be retreived
 open my $fh, ">", $config->{sequence_ids_file} or die "Unable to write to output sequence IDs file '$config->{sequence_ids_file}': $!";
-map { $fh->print("$_\n") if not $fastaSource{$_}; } @seqIds;
+map { $fh->print("$_\n") } @fastaSourceIds;
 close $fh;
 
 
