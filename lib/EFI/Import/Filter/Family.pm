@@ -13,6 +13,8 @@ use EFI::Annotations::Fields qw(:source);
 use EFI::Sequence::Type qw(is_unknown_sequence);
 
 
+# Remove sequences from FASTA and accession input sources that match one or more families
+
 sub new {
     my $class = shift;
     my %args = @_;
@@ -62,11 +64,13 @@ sub applyFilter {
     # Get the sequence sources for all of the IDs in the input file
     my $sources = $seqs->getSequenceAttributeMapping(FIELD_SEQ_SRC_KEY);
 
+    my %userSources = (&FIELD_SEQ_SRC_VALUE_FASTA => 1,
+                       &FIELD_SEQ_SRC_VALUE_FASTA_FAMILY => 1,
+                       &FIELD_SEQ_SRC_VALUE_ACCESSION => 1,
+                       &FIELD_SEQ_SRC_VALUE_ACCESSION_FAMILY => 1);
+
     # Get all of the IDs that originate from FASTA or Accession sources
-    my @sourceIds = grep { (not is_unknown_sequence($_) and
-                            ($sources->{$_} eq FIELD_SEQ_SRC_VALUE_BOTH or
-                             $sources->{$_} eq FIELD_SEQ_SRC_VALUE_FASTA))
-                         } keys %$sources;
+    my @sourceIds = grep { (not is_unknown_sequence($_) and $userSources{$sources->{$_}}) } keys %$sources;
 
     # Use a hash so that we can only loop over sequences that haven't been deleted yet
     my %sourceIds = map { $_ => 1 } @sourceIds;

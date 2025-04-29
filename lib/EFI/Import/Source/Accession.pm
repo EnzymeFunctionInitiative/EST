@@ -162,7 +162,7 @@ sub identifyAccessionIds {
 
     my $numForeign = 0;
     foreach my $id (@uniprotIds) {
-        my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FASTA };
+        my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_ACCESSION };
         if (exists $reverseMap->{$id}) {
             $attr->{Query_IDs} = $reverseMap->{$id};
             $numForeign++ if ($reverseMap->{$id}->[0] and $id ne $reverseMap->{$id}->[0]);

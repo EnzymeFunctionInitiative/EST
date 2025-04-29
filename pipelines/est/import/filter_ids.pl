@@ -7,6 +7,7 @@ use File::Copy;
 
 use lib "$FindBin::Bin/../../../lib";
 
+use EFI::Annotations::Fields qw(:source);
 use EFI::Database;
 use EFI::Import::Config::Filter;
 use EFI::Import::Filter::Family;
@@ -97,14 +98,36 @@ $seqData->updateUnirefMetadata();
 $seqData->save($opts->{sequence_meta_file}, $opts->{accession_table_file});
 
 
-my @sequenceIds = $seqData->getSequenceIds();
-open my $fh, ">", $opts->{sequence_ids_file} or die "Unable to write to sequence IDs file '$opts->{sequence_ids_file}': $!";
-map { $fh->print("$_\n"); } @sequenceIds;
-close $fh;
+# Save the IDs that are to be retrieved, i.e. those that are not FASTA
+my @retrievalIds = getRetrievalIds($seqData);
+open my $rfh, ">", $opts->{retrieval_ids_file} or die "Unable to write to retrieval IDs file '$opts->{retrieval_ids_file}': $!";
+map { $rfh->print("$_\n"); } @retrievalIds;
+close $rfh;
+
+
 
 
 $stats->save($opts->{stats_file});
 
 
 
+
+
+
+
+
+
+
+
+sub getRetrievalIds {
+    my $seqData = shift;
+
+    my $sourceAttr = $seqData->getSequenceAttributeMapping(FIELD_SEQ_SRC_KEY);
+    my %userSources = (&FIELD_SEQ_SRC_VALUE_FASTA => 1,
+                       &FIELD_SEQ_SRC_VALUE_FASTA_FAMILY => 1);
+
+    my @ids = grep { not exists $userSources{$sourceAttr->{$_}} } keys %$sourceAttr;
+
+    return @ids;
+}
 

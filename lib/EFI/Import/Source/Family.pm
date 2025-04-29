@@ -385,7 +385,10 @@ sub makeMetadata {
             if (not $source) {
                 $source = FIELD_SEQ_SRC_VALUE_FAMILY;
             } elsif ($source eq FIELD_SEQ_SRC_VALUE_FASTA) {
-                $source = FIELD_SEQ_SRC_VALUE_BOTH;
+                $source = FIELD_SEQ_SRC_VALUE_FASTA_FAMILY;
+                $numShared++;
+            } elsif ($source eq FIELD_SEQ_SRC_VALUE_ACCESSION) {
+                $source = FIELD_SEQ_SRC_VALUE_ACCESSION_FAMILY;
                 $numShared++;
             } elsif ($source eq FIELD_SEQ_SRC_VALUE_BLASTHIT) {
                 $source = FIELD_SEQ_SRC_VALUE_BLASTHIT_FAMILY;
