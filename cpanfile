@@ -14,5 +14,4 @@ requires 'Array::Utils', '0.5';
 
 # General
 requires 'Pod::Spell', '1.26';
-requires 'Pod::Checker', '1.77';
 
