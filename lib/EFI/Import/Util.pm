@@ -28,6 +28,7 @@ sub batchRetrieveIds {
     my $ids = shift;
     my $sqlPattern = shift;
     my $idCol = shift;
+    my $allowMultipleId = shift || 0;
 
     my %matched;
 
@@ -39,7 +40,11 @@ sub batchRetrieveIds {
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute();
         while (my $row = $sth->fetchrow_hashref()) {
-            $matched{$row->{$idCol}} = $row;
+            if ($allowMultipleId) {
+                push @{ $matched{$row->{$idCol}} }, $row;
+            } else {
+                $matched{$row->{$idCol}} = $row;
+            }
         }
     }
 

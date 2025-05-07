@@ -7,7 +7,7 @@ use File::Copy;
 
 use lib "$FindBin::Bin/../../../lib";
 
-use EFI::Annotations::Fields qw(:source);
+use EFI::Annotations::Fields qw(:source :annotations ANNO_ROW_SEP);
 use EFI::Database;
 use EFI::Import::Config::Filter;
 use EFI::Import::Filter::Family;
@@ -126,8 +126,40 @@ sub getRetrievalIds {
     my %userSources = (&FIELD_SEQ_SRC_VALUE_FASTA => 1,
                        &FIELD_SEQ_SRC_VALUE_FASTA_FAMILY => 1);
 
+    my $domains = getDomains($seqData);
+
     my @ids = grep { not exists $userSources{$sourceAttr->{$_}} } keys %$sourceAttr;
+
+    if (keys %$domains) {
+        my @domainIds;
+        foreach my $id (@ids) {
+            if ($domains->{$id}) {
+                map { push @domainIds, join(":", $id, @$_) } @{ $domains->{$id} };
+            } else {
+                push @domainIds, $id;
+            }
+        }
+        @ids = @domainIds;
+    }
 
     return @ids;
 }
+
+
+sub getDomains {
+    my $seqData = shift;
+
+    my $attrs = $seqData->getSequenceAttributeMapping(FIELD_SEQ_DOMAIN);
+
+    my $domains = {};
+
+    foreach my $id (keys %$attrs) {
+        my $attrVal = $attrs->{$id};
+        my @doms = split(ANNO_ROW_SEP, $attrVal);
+        map { s/^(\d+),(\d+)(,.*)?$//; push @{ $domains->{$id} }, [$1, $2] } @doms;
+    }
+
+    return $domains;
+}
+
 

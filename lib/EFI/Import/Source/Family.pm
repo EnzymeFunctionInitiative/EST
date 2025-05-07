@@ -10,7 +10,8 @@ use lib dirname(abs_path(__FILE__)) . "/../../../";
 use lib dirname(abs_path(__FILE__)) . "/../../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
-use EFI::Annotations::Fields qw(:source);
+use EFI::Annotations::Fields qw(:source :annotations);
+use EFI::Import::Domains;
 use EFI::Sequence::Type qw(:types);
 
 use Exporter qw(import);
@@ -46,7 +47,10 @@ sub init {
     $self->addError("Require one or more --family args") and return undef if not $config->{family};
 
     $self->{fams} = [ split(m/,/, $config->{family}) ];
-    $self->{use_domain} = $config->{domain} // 0;
+
+    if ($config->{domain}) {
+        $self->{domain} = new EFI::Import::Domains(region => $config->{domain});
+    }
 
     return 1;
 }
@@ -111,9 +115,7 @@ sub prepareQueries {
             # Columns
             my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end");
             push @c, "uniref.uniref90_seed", "uniref.uniref50_seed";
-            #my @c = ("$tableName.id AS id", "$tableName.start", "$tableName.end",
-            #    "IF ($tableName.id = f3.id, uniref.uniref90_seed, NULL) AS uniref90_seed",
-            #    "IF ($tableName.id = f2.id, uniref.uniref50_seed, NULL) AS uniref50_seed");
+            push @c, "annotations.seq_len";
             # Conditions (in WHERE clause, joined by AND); one for family ID is already included
             my @w = ();
             # Paramerized values (first one is the family ID)
@@ -121,10 +123,8 @@ sub prepareQueries {
             # Joins, array of {table => "targetTable", joinCol => "primaryCol", targetCol => "targetCol"}
             my @j = ();
             push @j, {table => "uniref", joinCol => "$tableName.accession", targetCol => "uniref.accession"};
-            #push @j, {table => "PFAM AS f2", joinCol => "f2.accession", targetCol => "uniref.uniref50_seed"};
-            #push @j, {table => "PFAM AS f3", joinCol => "f3.accession", targetCol => "uniref.uniref90_seed"};
+            push @j, {table => "annotations", joinCol => "$tableName.accession", targetCol => "annotations.accession"};
             my $g = "";
-            #my $g = "$tableName.accession";
             push @all, {table => $tableName, joins => \@j, cols => \@c, cond => \@w, params => \@p, group_by => $g};
         }
     }
@@ -193,6 +193,7 @@ sub executeQueries {
     my $ids = {};
     my $numIds = 0;
     my $uniprotUniref = {};
+    my $sequenceLengths = {};
 
     # Look at every family in the input set; one query corresponds to one family
     foreach my $query (@{ $queryData->{queries} }) {
@@ -210,8 +211,14 @@ sub executeQueries {
         }
 
         # Returns the number of UniProt or UniRef sequences
-        my $numUp = $self->processQuery($sth, $ids, $uniprotUniref);
+        my $numUp = $self->processQuery($sth, $ids, $uniprotUniref, $sequenceLengths);
         $numIds += $numUp;
+    }
+
+    # Alter the domains to fit the given region if the user specifies a domain region that is
+    # not the central domain
+    if ($self->{domain}) {
+        $ids = $self->{domain}->processDomains($ids, $sequenceLengths);
     }
 
     return ($ids, $numIds, $uniprotUniref);
@@ -263,6 +270,7 @@ sub makeSqlStatement {
 #     $sth - DBI statement handle, used for retrieving results
 #     $ids - hash ref, output data structure; hash ref to store domain regions
 #     $uniprotUniref - hash ref, mapping UniProt ID to corresponding UniRef90 and UniRef50 IDs
+#     $sequenceLengths - hash ref, mapping UniProt ID to sequence length
 #
 # Returns:
 #     number of UniProt IDs in the query
@@ -272,6 +280,7 @@ sub processQuery {
     my $sth = shift;
     my $ids = shift;
     my $uniprotUniref = shift;
+    my $sequenceLengths = shift;
 
     my $numIds = 0;
 
@@ -283,6 +292,13 @@ sub processQuery {
         $isUniref = 1;
     }
 
+    my $rowData = sub {
+        my $row = shift;
+        # First element is N, second is C
+        my @r = ($row->{start}, $row->{end});
+        return \@r;
+    };
+
     # The retrieval process gets all IDs even if we're using UniRef so that we can get easily get
     # the domain.
 
@@ -292,17 +308,22 @@ sub processQuery {
         my $seqId = $isUniref ? ($row->{$seqCol} || "") =~ s/\-\d+$//r : $uniprotId;
 
         if ($isUniref) {
+            # This is true when the sequence row corresponds to a UniRef sequence ID
             if ($uniprotId eq $seqId) {
-                my $domain = [ $row->{start}, $row->{end} ];
+                my $domain = $rowData->($row);
                 push @{ $ids->{$seqId} }, $domain;
             }
         } else {
-            my $domain = [ $row->{start}, $row->{end} ];
+            my $domain = $rowData->($row);
             push @{ $ids->{$seqId} }, $domain;
         }
 
         #$uniprotUniref->{$uniprotId} = [$row->{uniref90_seed} || "", $row->{uniref50_seed} || ""];
         $uniprotUniref->{$uniprotId} = ["", ""];
+
+        if (not $sequenceLengths->{$uniprotId} and defined $row->{seq_len}) {
+            $sequenceLengths->{$uniprotId} = $row->{seq_len};
+        }
 
         $numIds++;
     }
@@ -375,8 +396,8 @@ sub makeMetadata {
 
     foreach my $id (keys %$ids) {
         my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FAMILY };
-        # Set the domain region (e.g. start,end)
-        $attr->{&FIELD_SEQ_DOMAIN} = $ids->{$id} if $self->{use_domain};
+        # Set the domain region (e.g. start,end), includes multiple domains if present
+        $attr->{&FIELD_SEQ_DOMAIN} = $ids->{$id} if $self->{domain} and @{ $ids->{$id} };
         # This returns false if the sequence already exists from another source (i.e. we're adding
         # a family in to another import option)
         if (not $destSeqData->addSequence($id, $attr)) {

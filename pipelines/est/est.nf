@@ -19,6 +19,13 @@ process get_source_ids {
         family_args = "--family " + params.families
     }
 
+    if (params.domain) {
+        family_args = family_args + " --domain " + params.domain
+        if (params.domain_family) {
+            family_args = family_args + " --domain-family " + params.domain_family
+        }
+    }
+
     if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
         """

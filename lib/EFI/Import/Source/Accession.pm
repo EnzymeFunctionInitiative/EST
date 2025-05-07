@@ -4,16 +4,14 @@ package EFI::Import::Source::Accession;
 use strict;
 use warnings;
 
-use Data::Dumper;
-
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
 use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
-use EFI::Annotations::Fields ':source';
-
+use EFI::Annotations::Fields qw(:source :annotations);
+use EFI::Import::Domains;
 use EFI::Util::FASTA::Headers;
 
 
@@ -50,6 +48,10 @@ sub init {
     if (not $self->{acc_file}) {
         $self->addError("Require --accessions arg");
         return undef;
+    }
+
+    if ($config->{domain} and $config->{domain_family}) {
+        $self->{domain} = new EFI::Import::Domains(dbh => $self->{dbh}, region => $config->{domain}, domain_family => $config->{domain_family}, import_util => $self->{util});
     }
 
     return 1;
@@ -160,9 +162,17 @@ sub identifyAccessionIds {
     my $numNoMatches = scalar @$noMatches;
     $self->{unmatched_ids} = $noMatches;
 
+    # Compute the domains for the sequences, if the user specified the domain and domain family
+    # options
+    my $domains = {};
+    if ($self->{domain}) {
+        $domains = $self->{domain}->computeDomains(\@uniprotIds);
+    }
+
     my $numForeign = 0;
     foreach my $id (@uniprotIds) {
         my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_ACCESSION };
+        $attr->{&FIELD_SEQ_DOMAIN} = $domains->{$id} if $self->{domain} and $domains->{$id};
         if (exists $reverseMap->{$id}) {
             $attr->{Query_IDs} = $reverseMap->{$id};
             $numForeign++ if ($reverseMap->{$id}->[0] and $id ne $reverseMap->{$id}->[0]);

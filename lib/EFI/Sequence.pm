@@ -89,7 +89,7 @@ sub packAttributeValue {
         my @vals;
         foreach my $part (@$value) {
             if (ref $part eq "ARRAY") {
-                push @vals, join(",", @$part);
+                push @vals, join(",", map { defined ? $_ : "" } @$part);
             } else {
                 push @vals, $part;
             }

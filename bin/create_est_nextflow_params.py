@@ -26,6 +26,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
+    common_parser.add_argument("--domain", choices=["central", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
     shared_args.add_args(common_parser)
 
     # add a subparser for each import mode
@@ -49,6 +50,7 @@ def add_args(parser: argparse.ArgumentParser):
     # option D: Accession IDs
     accession_parser = subparsers.add_parser("accessions", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
     accession_parser.add_argument("--accessions-file", required=True, type=str, help="The list of Accession IDs to pull sequences for, one per line")
+    accession_parser.add_argument("--domain-family", type=str, help="Family to use when trimming sequences to domain boundaries")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
@@ -124,7 +126,7 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   blast_evalue, import_mode, sequence_version,
                   families=None, sequence_filter=None, fasta_file=None, accessions_file=None,
                   blast_query_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
-                  import_blast_evalue=None, **kwargs: dict):
+                  import_blast_evalue=None, domain=None, domain_family=None, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
@@ -162,6 +164,15 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         params |= {
             "families": families
         }
+
+    if domain is not None:
+        params |= {
+            "domain": domain
+        }
+        if import_mode == "accessions" and domain_family is not None:
+            params |= {
+                "domain_family": domain_family
+            }
 
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
