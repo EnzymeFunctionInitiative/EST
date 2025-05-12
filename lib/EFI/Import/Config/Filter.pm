@@ -42,7 +42,7 @@ sub addImportOptions {
     $self->addOption("accession-table-file=s", 0, "path to the output file to save the filtered UniRef and UniProt accession ID table to (for sunburst)", OPT_FILE);
     $self->addOption("source-stats-file=s", 0, "path to the file containing source import stats", OPT_FILE);
     $self->addOption("stats-file=s", 0, "path to the file to save filter statistics to (appends to source stats)", OPT_FILE);
-    $self->addOption("retrieval-ids=s", 0, "path to the file to save IDs that are for retrieving, as opposed to those sequences in a user-specified FASTA", OPT_FILE);
+    $self->addOption("retrieval-ids-file=s", 0, "path to the file to save IDs that are for retrieving, as opposed to those sequences in a user-specified FASTA", OPT_FILE);
 }
 
 

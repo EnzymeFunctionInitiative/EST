@@ -102,7 +102,7 @@ B<EFI::Import::Util> is a utility module containing helpers for the various B<EF
 
 =head2 METHODS
 
-=head3 C<batchRetrieveIds($ids, $sqlPattern, $idCol)>
+=head3 C<batchRetrieveIds($ids, $sqlPattern, $idCol, $allowMultipleId)>
 
 Retrieves sequence ID-related information from an EFI database using the given list of IDs, a SQL
 pattern, and the ID column relating IDs to the database.  The queries are retrieved in groups of
@@ -132,6 +132,10 @@ with values, removing the brackets.  The C<E<lt>IDSE<gt>> string should be inser
 
 The name of the sequence ID column (typically C<accession>) to use (should match the C<[id_col]>
 value in C<$sqlPattern>.
+
+=item C<$allowMultipleId>
+
+If true and the ID occurs in multiple rows, the output is stored as a list of values.
 
 =back
 
