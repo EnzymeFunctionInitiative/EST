@@ -20,8 +20,8 @@ my %files = (
     # output from filter_ids.pl
     sequence_meta => "sequence_metadata.tab",
     accession_table => "accession_table.tab",
-    sequence_ids => "sequence_ids.tab",
     import_stats => "import_stats.json",
+    retrieval_ids => "retrieval_ids.tab",
 
     # output from get_sunburst_data.pl
     sunburst_ids => "sunburst_ids.tab",

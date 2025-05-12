@@ -19,6 +19,13 @@ process get_source_ids {
         family_args = "--family " + params.families
     }
 
+    if (params.domain) {
+        family_args = family_args + " --domain " + params.domain
+        if (params.domain_family) {
+            family_args = family_args + " --domain-family " + params.domain_family
+        }
+    }
+
     if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
         """
@@ -57,8 +64,8 @@ process filter_ids {
     output:
         path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
-        path 'sequence_ids.tab', emit: 'sequence_ids'           // list of primary sequence IDs in the metadata file
         path 'import_stats.json', emit: 'import_stats'          // statistics of source and filter import processes
+        path 'retrieval_ids.tab', emit: 'retrieval_ids'         // list of IDs that came from the database, as opposed to user-specified FASTA files, including domain data
     script:
     filter_args = ""
     if (params.filter) {
@@ -104,12 +111,10 @@ process cat_fasta_files {
 process import_fasta {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path accession_table
         path sequence_metadata
         path seq_mapping
     output:
         path "imported_sequences.fasta", emit: "fasta_file"
-        path "sequence_ids.tab", emit: "sequence_ids"
     """
     perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file} --seq-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
     """
@@ -240,27 +245,18 @@ workflow {
     // Get sunburst data for all sequence IDs, after filtering
     get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)
 
-    // If importing FASTA file, reformat the FASTA file and create the file that will be added to
-    // the dataset for all-by-all BLAST
-    import_fasta_file = ""
-    if (params.import_mode == "fasta") {
-        fasta_import_files = import_fasta(sequence_id_files.accession_table, sequence_id_files.sequence_metadata, source_data.seq_mapping)
-        import_fasta_file = fasta_import_files.fasta_file
-        // In a later step, only retrieve sequences for IDs not in the FASTA file (e.g. added
-        // from families
-        sequence_ids = fasta_import_files.sequence_ids
-    } else {
-        sequence_ids = sequence_id_files.sequence_ids
-    }
-
     // Split up the sequence ID list into separate files to enable parallel sequence retrieval
     // from the BLAST sequence database.  If the import mode is FASTA, then these IDs are only
     // ones that come from adding a family to the job
-    accession_shards = split_sequence_ids(sequence_ids, params.num_accession_shards)
+    accession_shards = split_sequence_ids(sequence_id_files.retrieval_ids, params.num_accession_shards)
     fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db)
 
-    // Add the imported FASTA file if the import mode is fasta
+    // If importing FASTA file, reformat the FASTA file and create the file that will be added to
+    // the dataset for all-by-all BLAST
     if (params.import_mode == "fasta") {
+        // sequence metadata is used to ensure that any sequences that were filtered out in a
+        // prior step are also removed when rewriting the user fasta
+        import_fasta_file = import_fasta(sequence_id_files.sequence_metadata, source_data.seq_mapping)
         fasta_files = fasta_files.concat(import_fasta_file)
     }
 

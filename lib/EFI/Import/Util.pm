@@ -28,6 +28,7 @@ sub batchRetrieveIds {
     my $ids = shift;
     my $sqlPattern = shift;
     my $idCol = shift;
+    my $allowMultipleId = shift || 0;
 
     my %matched;
 
@@ -39,7 +40,11 @@ sub batchRetrieveIds {
         my $sth = $self->{dbh}->prepare($sql);
         $sth->execute();
         while (my $row = $sth->fetchrow_hashref()) {
-            $matched{$row->{$idCol}} = $row;
+            if ($allowMultipleId) {
+                push @{ $matched{$row->{$idCol}} }, $row;
+            } else {
+                $matched{$row->{$idCol}} = $row;
+            }
         }
     }
 
@@ -97,12 +102,7 @@ B<EFI::Import::Util> is a utility module containing helpers for the various B<EF
 
 =head2 METHODS
 
-=head3 C<new()>
-
-Create a new instance of this module.
-
-
-=head3 C<batchRetrieveIds($ids, $sqlPattern, $idCol>
+=head3 C<batchRetrieveIds($ids, $sqlPattern, $idCol, $allowMultipleId)>
 
 Retrieves sequence ID-related information from an EFI database using the given list of IDs, a SQL
 pattern, and the ID column relating IDs to the database.  The queries are retrieved in groups of
@@ -133,6 +133,12 @@ with values, removing the brackets.  The C<E<lt>IDSE<gt>> string should be inser
 The name of the sequence ID column (typically C<accession>) to use (should match the C<[id_col]>
 value in C<$sqlPattern>.
 
+=item C<$allowMultipleId>
+
+If true and the ID occurs in multiple rows, the output is stored as a list of values.
+
+=back
+
 =head4 Returns
 
 A hash ref containing a mapping of sequence ID to query results.  Note that only sequences that
@@ -141,10 +147,29 @@ database then those IDs will not be containined in the return value hash.
 
 =head4 Example Usage
 
+    my $sqlPattern = "SELECT uniprot_id, uniref50_seed FROM uniref WHERE uniref_id IN (<IDS>)";
+    my $idCol = "uniref_id";
+
+    my @ids = ("B0SS77", ...);
     my $matched = $util->batchRetrieveIds(\@ids, $sqlPattern, $idCol);
     foreach my $id (@ids) {
         if ($matched->{$id}) {
             print "$id was found in the database\n";
+        } else {
+            print "$id was NOT found in the database\n";
+        }
+    }
+
+An example when allowing multiple instances of the same ID:
+
+    my $sqlPattern = "SELECT uniprot_id, uniref50_seed FROM uniref WHERE uniref50_seed IN (<IDS>)";
+    my $idCol = "uniref50_seed";
+
+    my $allowMultipleId = 1;
+    my $matched = $util->batchRetrieveIds(\@ids, $sqlPattern, $idCol, $allowMultipleId);
+    foreach my $id (@ids) {
+        if ($matched->{$id}) {
+            print "UniRef50 ID $id has UniProt IDs " . join(",", map { $_->{uniprot_id} } @{ $matched->{$id} }) . "\n";
         } else {
             print "$id was NOT found in the database\n";
         }
