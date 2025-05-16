@@ -1,5 +1,5 @@
 
-package EFI::SSN::XgmmlWriter::AttributeHandler::Color;
+package EFI::SSN::AttributeWriter::Handler::Color;
 
 use strict;
 use warnings;
@@ -11,7 +11,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../..";
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:color);
 
-use parent qw(EFI::SSN::XgmmlWriter::AttributeHandler);
+use parent qw(EFI::SSN::AttributeWriter::Handler);
 
 
 
@@ -173,21 +173,21 @@ __END__
 
 =pod
 
-=head1 EFI::SSN::XgmmlWriter::AttributeHandler::Color
+=head1 EFI::SSN::AttributeWriter::Handler::Color
 
 =head2 NAME
 
-B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> - Perl module for saving color attributes
+B<EFI::SSN::AttributeWriter::Handler::Color> - Perl module for saving color attributes
 based on cluster number into a SSN.
 
 =head2 SYNOPSIS
 
-    use EFI::SSN::XgmmlWriter;
-    use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
+    use EFI::SSN::AttributeWriter;
+    use EFI::SSN::AttributeWriter::Handler::Color;
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
 
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color->new(cluster_map => $clusterMap,
+    my $colorHandler = EFI::SSN::AttributeWriter::Handler::Color->new(cluster_map => $clusterMap,
         colors => $colors, cluster_sizes => $sizes);
     $xwriter->addAttributeHandler($colorHandler);
 
@@ -199,8 +199,8 @@ based on cluster number into a SSN.
 
 =head2 DESCRIPTION
 
-B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> is a Perl module that is a node handler
-used by EFI::SSN::XgmmlWriter to insert attributes into an XGMML file that is being written.
+B<EFI::SSN::AttributeWriter::Handler::Color> is a Perl module that is a node handler
+used by EFI::SSN::AttributeWriter to insert attributes into an XGMML file that is being written.
 This handler saves new node attributes into each node that specifies colors based on
 the cluster number.  The node attributes are inserted into the node at a location that
 is determined by a method in the B<EFI::Annotations> class.
@@ -210,7 +210,7 @@ is determined by a method in the B<EFI::Annotations> class.
 
 =head3 C<new(cluster_map =E<gt> $clusterMapSizes, colors =E<gt> $colors, cluster_sizes =E<gt> $sizes)>
 
-Creates a new B<EFI::SSN::XgmmlWriter::AttributeHandler::Color> object and uses the
+Creates a new B<EFI::SSN::AttributeWriter::Handler::Color> object and uses the
 given parameters to determine node colors.
 
 =head4 Parameters

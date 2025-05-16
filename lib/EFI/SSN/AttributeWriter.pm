@@ -1,5 +1,5 @@
 
-package EFI::SSN::XgmmlWriter;
+package EFI::SSN::AttributeWriter;
 
 use strict;
 use warnings;
@@ -369,37 +369,37 @@ __END__
 
 =pod
 
-=head1 EFI::SSN::XgmmlWriter
+=head1 EFI::SSN::AttributeWriter
 
 =head2 NAME
 
-B<EFI::SSN::XgmmlWriter> - Perl module for rewriting a XGMML file from a source to a target
+B<EFI::SSN::AttributeWriter> - Perl module for rewriting a XGMML file from a source to a target
 while inserting color and cluster number information
 
 =head2 SYNOPSIS
 
-    use EFI::SSN::XgmmlWriter;
-    use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
+    use EFI::SSN::AttributeWriter;
+    use EFI::SSN::AttributeWriter::Handler::Color;
 
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color->new(cluster_map => $clusterMap, colors => $colors);
+    my $colorHandler = EFI::SSN::AttributeWriter::Handler::Color->new(cluster_map => $clusterMap, colors => $colors);
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn, append_new_attr => 1);
+    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_ssn => $outputSsn, append_new_attr => 1);
     $xwriter->addAttributeHandler($colorHandler);
     $xwriter->write();
 
 
 =head2 DESCRIPTION
 
-B<EFI::SSN::XgmmlWriter> is a Perl module for stream reading XGMML files and writing
+B<EFI::SSN::AttributeWriter> is a Perl module for stream reading XGMML files and writing
 them to a new XGMML file while including metadata for nodes (e.g. things like colors,
-cluster numbers, etc.).  The B<EFI::SSN::XgmmlWriter::AttributeHandler> and
+cluster numbers, etc.).  The B<EFI::SSN::AttributeWriter::Handler> and
 derived classes are used to provide metadata.
 
 =head2 METHODS
 
 =head3 C<new(ssn =E<gt> $ssnFile, output_ssn =E<gt> $outputSsn, append_new_attr =E<gt> 1)>
 
-Creates a new B<EFI::SSN::XgmmlWriter> object.
+Creates a new B<EFI::SSN::AttributeWriter> object.
 
 =head4 Parameters
 
@@ -424,7 +424,7 @@ to the location.  I<Defaults to true (e.g. appending).>
 
 =head4 Example Usage
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn,
+    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_ssn => $outputSsn,
         append_new_attr => 0);
     # If the location is the node attribute "Organism", then fields will be inserted
     # before the "Organism" attribute and then "Organism" will be added.
@@ -452,7 +452,7 @@ Adds a handler to the list of handlers that are called for each node attribute.
 
 =item C<$handler>
 
-An object derived from B<EFI::SSN::XgmmlWriter::AttributeHandler>.
+An object derived from B<EFI::SSN::AttributeWriter::Handler>.
 
 =back
 
