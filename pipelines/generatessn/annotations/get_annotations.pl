@@ -90,11 +90,6 @@ my $annoSpec = readAnnoSpec($annoSpecFile);
 
 
 
-if ($db->getDbiType() == DBI_MYSQL) {
-    # Increase the amount of elements that can be concat together (to avoid truncation)
-    $dbh->do('SET @@group_concat_max_len = 3000');
-}
-
 
 my %unirefIds;
 my %unirefClusterIdSeqLen;
