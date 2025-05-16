@@ -1,5 +1,5 @@
 
-package EFI::SSN::XgmmlWriter::AttributeHandler::GNT;
+package EFI::SSN::AttributeWriter::Handler::GNT;
 
 use strict;
 use warnings;
@@ -11,7 +11,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../..";
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:gnt);
 
-use parent qw(EFI::SSN::XgmmlWriter::AttributeHandler);
+use parent qw(EFI::SSN::AttributeWriter::Handler);
 
 
 
@@ -149,22 +149,22 @@ __END__
 
 =pod
 
-=head1 EFI::SSN::XgmmlWriter::AttributeHandler::GNT
+=head1 EFI::SSN::AttributeWriter::Handler::GNT
 
 =head2 NAME
 
-B<EFI::SSN::XgmmlWriter::AttributeHandler::GNT> - Perl module for saving GNT-specific attributes
+B<EFI::SSN::AttributeWriter::Handler::GNT> - Perl module for saving GNT-specific attributes
 based on cluster number into a SSN.
 
 =head2 SYNOPSIS
 
-    use EFI::SSN::XgmmlWriter;
-    use EFI::SSN::XgmmlWriter::AttributeHandler::GNT;
+    use EFI::SSN::AttributeWriter;
+    use EFI::SSN::AttributeWriter::Handler::GNT;
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
 
     my $gntData = {}; # comes from elsewhere
-    my $gntHandler = EFI::SSN::XgmmlWriter::AttributeHandler::GNT->new(gnt_data => $gntData);
+    my $gntHandler = EFI::SSN::AttributeWriter::Handler::GNT->new(gnt_data => $gntData);
     $xwriter->addAttributeHandler($gntHandler);
 
     $xwriter->write();
@@ -172,8 +172,8 @@ based on cluster number into a SSN.
 
 =head2 DESCRIPTION
 
-B<EFI::SSN::XgmmlWriter::AttributeHandler::GNT> is a Perl module that is a node handler
-used by EFI::SSN::XgmmlWriter to insert GNT-specific attributes into an XGMML file that
+B<EFI::SSN::AttributeWriter::Handler::GNT> is a Perl module that is a node handler
+used by EFI::SSN::AttributeWriter to insert GNT-specific attributes into an XGMML file that
 is being written.  This handler saves five attributes for each B<node>:
 
 =over
@@ -216,7 +216,7 @@ this field.
 
 =head3 C<new(gnt_data =E<gt> $gntData)>
 
-Creates a new B<EFI::SSN::XgmmlWriter::AttributeHandler::GNT> object and saves the
+Creates a new B<EFI::SSN::AttributeWriter::Handler::GNT> object and saves the
 given data object for use when stream reading/writing.  The C<gnt_data> structure is a
 hash ref that maps sequence IDs (e.g. node/metanode IDs) to the associated GNT data.
 
@@ -254,7 +254,7 @@ or UniProt nodes.
         },
     };
 
-    my $gntHandler = EFI::SSN::XgmmlWriter::AttributeHandler::GNT->new(gnt_data => $gntData);
+    my $gntHandler = EFI::SSN::AttributeWriter::Handler::GNT->new(gnt_data => $gntData);
     $xwriter->addAttributeHandler($gntHandler);
     # Automatically uses the handler when parsing the file
     $xwriter->write();
