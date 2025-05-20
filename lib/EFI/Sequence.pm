@@ -44,8 +44,13 @@ sub getId {
 sub getAttribute {
     my $self = shift;
     my $attr = shift || die "Require attribute name";
+    my $doUnpack = shift || 0;
     my $val = $self->{attr}->{$attr};
-    return $val;
+    if ($doUnpack) {
+        return $self->unpackAttributeValue($val);
+    } else {
+        return $val;
+    }
 }
 
 
@@ -157,6 +162,9 @@ B<EFI::Sequence> - Perl module that represents a sequence
 
     my $valueAsString = $seq->packAttributeValue("value");
     my $list1AsString = $seq->packAttributeValue(["item 1", "item 2", "item 3"]);
+
+    my $value = $seq->unpackAttributeValue("value");
+    my $list = $seq->unpackAttributeValue("item 1^item 2^item 3");
 
 
 =head2 DESCRIPTION
@@ -318,6 +326,36 @@ Returns C<$value> if scalar.  Returns packed array if C<$value> is an array ref.
     # $val is "value"
     $val = $seq->packAttributeValue(["item 1", "item 2", "item 3"]);
     # $val is: "item 1^item 2^item 3"
+
+
+=head3 C<unpackAttributeValue($value)>
+
+Unpacks the attribute value from a string that was serialized by C<packAttributeValue>.
+Elements in packed arrays are separated by the attribute delimiter (by default the
+caret character C<^>).
+
+=head4 Parameters
+
+=over
+
+=item C<$value>
+
+Value to unpack.
+
+=back
+
+=head4 Returns
+
+Returns C<$value> if is not packed (i.e. does not contain delimiter).
+
+Returns array ref if C<$value> was an array that was packed (i.e. contains delimiter).
+
+=head4 Example Usage
+
+    $val = $seq->unpackAttributeValue("value");
+    # $val is "value"
+    $val = $seq->unpackAttributeValue("item 1^item 2^item 3");
+    # $val is: ["item 1", "item 2", "item 3"]
 
 =cut
 

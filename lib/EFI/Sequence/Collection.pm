@@ -48,7 +48,11 @@ sub new {
 # public
 sub getFields {
     my $self = shift;
-    return $self->{fields};
+    if (wantarray) {
+        return @{ $self->{fields} };
+    } else {
+        return $self->{fields};
+    }
 }
 
 
@@ -482,6 +486,11 @@ B<EFI::Sequence::Collection> - Perl module that represents a collection of seque
     $seqs->save($mdFile, $idFile);
     $seqs->save("$mdFile.2");
 
+    my $attrName = FIELD_SEQ_SRC_KEY;
+    my $attrs = $seqs->getSequenceAttributeMapping($attrName);
+    foreach my $id ($seqs->getSequenceIds()) {
+        print "$id $attrs->{$id}\n";
+    }
 
 
 =head2 DESCRIPTION
