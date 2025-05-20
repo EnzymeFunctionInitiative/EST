@@ -5,8 +5,6 @@ use strict;
 use warnings;
 
 use XML::LibXML::Reader;
-use XML::Writer;
-use IO::File;
 
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
@@ -15,7 +13,7 @@ use lib dirname(abs_path(__FILE__)) . "/../..";
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:color);
 
-
+use parent qw(EFI::Xgmml::Writer);
 
 
 sub new {
@@ -46,11 +44,9 @@ sub write {
     my $self = shift;
 
     my $reader = XML::LibXML::Reader->new(location => $self->{ssn}) or die "Cannot read input XGMML file '$self->{ssn}': $!";
-    my $output = IO::File->new(">" . $self->{output_ssn}) or die "Cannot write to output file '$self->{output_ssn}': $!";
-    # Disable error checking with the UNSAFE keyword; this improves performance
-    my $writer = XML::Writer->new(OUTPUT => $output, UNSAFE => 1, PREFIX_MAP => '');
-    $self->{writer} = $writer;
     $self->{reader} = $reader;
+
+    $self->open();
 
     # Skip these fields in the input SSN from being output
     $self->getSkipAtt();
@@ -59,7 +55,7 @@ sub write {
         $h->onInit();
     }
 
-    $self->{writer}->xmlDecl("UTF-8");
+    $self->preamble();
 
     # Notes:
     #    - XML_READER_TYPE_ELEMENT = start of an XML element, both empty and non-empty
@@ -103,8 +99,7 @@ sub write {
         }
     }
 
-    $writer->end();
-    $output->close();
+    $self->close();
 }
 
 
@@ -227,54 +222,6 @@ sub copyEdge {
     } elsif ($self->{reader}->nodeType == XML_READER_TYPE_END_ELEMENT) {
         $self->endTag("edge");
     }
-}
-
-
-#
-# endTag - private method
-#
-# Wrapper around the XML writer endTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
-sub endTag {
-    my $self = shift;
-    $self->{writer}->endTag(@_);
-    $self->{writer}->characters("\n");
-}
-
-
-#
-# startTag - private method
-#
-# Wrapper around the XML writer startTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
-sub startTag {
-    my $self = shift;
-    $self->{writer}->startTag(@_);
-    $self->{writer}->characters("\n");
-}
-
-
-#
-# emptyTag - private method
-#
-# Wrapper around the XML writer emptyTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
-sub emptyTag {
-    my $self = shift;
-    $self->{writer}->emptyTag(@_);
-    $self->{writer}->characters("\n");
 }
 
 

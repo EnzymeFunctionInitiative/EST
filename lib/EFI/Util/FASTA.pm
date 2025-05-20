@@ -6,25 +6,11 @@ use warnings;
 
 use Exporter qw(import);
 
-our @EXPORT_OK = qw(format_sequence sanitize_sequence);
+our @EXPORT_OK = qw(format_sequence sanitize_sequence read_fasta_file);
 
 
 
 
-#
-# format_sequence
-#
-# Format an input sequence in FASTA format (e.g. a header and
-# sequence data wrapped at 80 characters.
-#
-# Parameters:
-#    $sequenceId - sequence ID (e.g. UniProt)
-#    $sequence - protein sequence; spaces and new lines will be
-#        removed before formatting
-#
-# Returns:
-#    string containing formatted sequence
-#
 sub format_sequence {
     my $sequenceId = shift;
     my $sequence = shift || "";
@@ -46,19 +32,6 @@ sub format_sequence {
 }
 
 
-#
-# sanitize_sequence
-#
-# Remove any invalid characters from a protein sequence (e.g. from a
-# FASTA file).
-#
-# Parameters:
-#    $sequence - sequence, optionally including FASTA header
-#    $removeHeader - optional, non-zero to remove FASTA header
-#
-# Returns:
-#    a string with all invalid characters removed
-#
 sub sanitize_sequence {
     my $sequence = shift;
     my $removeHeader = shift || 0;
@@ -75,6 +48,29 @@ sub sanitize_sequence {
     $sequence =~ s/[^A-Z]//gis;
 
     return format_sequence($header, $sequence);
+}
+
+
+sub read_fasta_file {
+    my $filePath = shift;
+
+    my $seqId = "";
+    my $sequences = {};
+
+    open my $fh, "<", $filePath or die "Unable to read FASTA file '$filePath': $!";
+
+    while (my $line = <$fh>) {
+        chomp $line;
+        if ($line =~ m/^>(.+)/) {
+            $seqId = $1;
+        } elsif ($line =~ m/\S/) {
+            $sequences->{$seqId} .= $line;
+        }
+    }
+
+    close $fh;
+
+    return $sequences;
 }
 
 
@@ -103,6 +99,10 @@ B<EFI::Util::FASTA> - Perl module with utility functions for FASTA sequences
     my $seq = "MSKIKIALLFGGISGEHIISVRSSAFIFATIDREKYDVCPVYINPNGKFWIPTVSEPIYPDP" .
               ".....AK+AEEAMTLVD------DRVLVQKLVSGTEVSIGVLEKPEGKKRNPFPLVPTEIRP";
     my $fasta = sanitize_sequence($seq);
+
+    my $file = "...";
+    my $sequences = read_fasta_file($file);
+
 
 =head2 DESCRIPTION
 
@@ -209,6 +209,34 @@ Results in the following string:
 
     MSKIKIALLFGGISGEHIISVRSSAFIFATIDREKYDVCPVYINPNGKFWIPTVSEPIYPDPAKAEEAMTLVDDRVLVQK
     LVSGTEVSIGVLEKPEGKKRNPFPLVPTEIRP
+
+
+=head3 C<read_fasta_file($fastaFile)>
+
+Reads a FASTA file into a hash ref.  Dies if the file could not be opened.
+
+=head4 Parameters
+
+=over
+
+=item C<$fastaFile>
+
+Path to fasta file.
+
+=back
+
+=head4 Returns
+
+A hash ref that maps sequence ID to sequence.
+
+=head4 Example Usage
+
+    my $file = "...";
+    my $sequences = read_fasta_file($file);
+
+    my @ids = keys %$sequences;
+    print "Sequence IDs are: ", join(",", @ids), "\n";
+
 
 =cut
 
