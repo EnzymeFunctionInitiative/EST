@@ -1,18 +1,19 @@
 #!/usr/bin/env perl
 
-#this program creates an xgmml with all nodes and edges
-
 use strict;
 use warnings;
 
 use FindBin;
 use Getopt::Long;
+use JSON;
 use List::MoreUtils qw{uniq};
 
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Annotations::Fields qw(:annotations);
+use EFI::EST::AlignmentScore qw(compute_ascore);
 use EFI::Options;
+use EFI::Sequence::Collection;
 use EFI::Sequence::Type qw(get_sequence_type);
 use EFI::SSN::XgmmlWriter;
 use EFI::Util::FASTA qw(read_fasta_file);
@@ -48,10 +49,11 @@ my $connectivity = load_connectivity($opts->{nc_map});
 
 my $edges = load_edges($opts->{blast});
 
-my $writer = new EFI::SSN::XgmmlWriter(file => $opts->{output}, use_min_edge_attr => $opts->{use_min_edge_attr}, db_version => $dbVersion, seq_type => $seqType);
+my $writer = new EFI::SSN::XgmmlWriter(output_file => $opts->{output}, use_min_edge_attr => $opts->{use_min_edge_attr}, db_version => $dbVersion, seq_type => $seqType);
 $writer->write($inputIds, $sequences, $connectivity, $title, $edges);
 
 
+save_stats($opts->{stats}, $writer->getStats()) if $opts->{stats};
 
 
 
@@ -64,6 +66,47 @@ $writer->write($inputIds, $sequences, $connectivity, $title, $edges);
 
 
 
+
+
+
+
+
+#
+# save_stats
+#
+# Saves SSN statistics to a JSON-formatted output file.
+#
+# Parameters:
+#    $stats - hash ref returned from EFI::SSN::XgmmlWriter
+#
+sub save_stats {
+    my $file = shift;
+    my $stats = shift;
+
+    my $mergedStats = {};
+    if (-f $file) {
+        my $json = "";
+        open my $fh, "<", $file or die "Unable to open existing stats file '$file': $!";
+        while (my $line = <$fh>) {
+            chomp $line;
+            $json .= $line;
+        }
+        close $fh;
+
+        $mergedStats = decode_json($json);
+        $mergedStats = {} if not $mergedStats;
+    }
+
+    foreach my $key (keys %$stats) {
+        $mergedStats->{$key} = $stats->{$key};
+    }
+
+    my $json = encode_json($mergedStats);
+
+    open my $fh, ">", $file or die "Unable to write to stats file '$file': $!";
+    $fh->print($json);
+    close $fh;
+}
 
 
 #
@@ -195,6 +238,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("db-version=s", 0, "EFI database version");
     $optParser->addOption("use-min-edge-attr", 0, "only use the minimum number of edge attributes required; makes file size smaller");
     $optParser->addOption("nc-map=s", 0, "path to a network connectivity map file");
+    $optParser->addOption("stats=s", 0, "path to file containing SSN statistics");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();

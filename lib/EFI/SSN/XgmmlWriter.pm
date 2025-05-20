@@ -4,10 +4,12 @@ package EFI::SSN::XgmmlWriter;
 use strict;
 use warnings;
 
+use File::Basename;
 use FindBin;
 
 use lib "$FindBin::Bin/../..";
 
+use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations :source FIELD_CYTOSCAPE_COLOR);
 use EFI::Sequence::Type qw(is_unknown_sequence SEQ_FULL SEQ_DOMAIN);
 
@@ -19,19 +21,18 @@ use constant MISSING_VALUE => "None";
 sub new {
     my ($class, %args) = @_;
 
-    die "Require output SSN file" if not $args{output_ssn};
-
-    my $self = {};
+    my $self = $class->SUPER::new(%args);
     bless($self, $class);
 
     $self->{data_indent} = $args{data_indent} // 0;
-    $self->{output_ssn} = $args{output_ssn};
     $self->{use_min_edge_attr} = $args{use_min_edge_attr} // 0;
     $self->{db_version} = $args{db_version} // 0;
     $self->{seq_type} = $args{seq_type} // SEQ_FULL;
 
     $self->{has_fasta_attribute} = 0;
     $self->{fields} = [];
+
+    $self->{stats} = { num_nodes => 0, num_edges => 0 };
 
     return $self;
 }
@@ -71,6 +72,16 @@ sub write {
 }
 
 
+# public
+sub getStats {
+    my $self = shift;
+    my $fileName = fileparse($self->{output_file});
+    my $fileSize = -s $self->{output_file};
+    my $stats = { num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, filename => $fileName, size => $fileSize };
+    return $stats;
+}
+
+
 # private
 sub writeStarting {
     my $self = shift;
@@ -100,6 +111,7 @@ sub writeNodes {
     foreach my $id (@$ids) {
         my $attr = $attrs->{$id};
         $self->writeNode($id, $attr);
+        $self->{stats}->{num_nodes}++;
     }
 }
 
@@ -148,6 +160,7 @@ sub writeEdges {
 
     foreach my $edge (@$edges) {
         $self->writeEdge($edge);
+        $self->{stats}->{num_edges}++;
     }
 }
 
@@ -157,9 +170,9 @@ sub writeEdge {
     my $self = shift;
     my $edge = shift;
 
-    my $qid = $edge->{qid};
-    my $sid = $edge->{sid};
-    my %idAttr = (id => "$qid,$sid", label => "$qid,$sid", source => $qid, target => $sid);
+    my $source = $edge->{source};
+    my $target = $edge->{target};
+    my %idAttr = (id => "$source,$target", label => "$source,$target", source => $source, target => $target);
 
     if ($self->{use_min_edge_attr}) {
         $self->emptyTag("edge", %idAttr);
@@ -188,15 +201,17 @@ sub getNodeAttributes {
         $attrs->{$id} = $nodeAttr;
     }
 
+    my $anno = new EFI::Annotations;
+
     # $self->{hash_fasta_attribute} is set in makeNodeAttributes if a sequence should be added as
     # a node attribute
     push @fields, FIELD_SEQ_KEY if $self->{has_fasta_attribute};
-    @fields = $self->{anno}->sort_annotations(@fields);
+    @fields = $anno->sort_annotations(@fields);
 
     foreach my $field (@fields) {
-        my $type = $self->{anno}->get_attribute_type($field);
-        my $displayName = $self->{anno}->get_display_name($field);
-        my $isList = $self->{anno}->is_list_attribute($field);
+        my $type = $anno->get_attribute_type($field);
+        my $displayName = $anno->get_display_name($field);
+        my $isList = $anno->is_list_attribute($field);
         push @{ $self->{fields} }, { name => $field, type => $type, display => $displayName, is_list => $isList };
     }
 
