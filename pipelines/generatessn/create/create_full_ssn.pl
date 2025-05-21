@@ -28,7 +28,7 @@ use constant VALID => 1;
 my $opts = validateAndProcessOptions();
 
 
-my ($status, $seqType, $numEdges) = validate_input_blast($opts->{blast}, $opts->{max_edges});
+my ($status, $seqType, $numEdges) = validateInputBlast($opts->{blast}, $opts->{max_edges});
 if ($status != VALID) {
     print "Unable to create SSN: BLAST file size ($numEdges edges) exceeds the maximum number of edges ($opts->{max_edges})\n";
     exit(1);
@@ -45,15 +45,15 @@ $inputIds->load($opts->{metadata});
 
 my $sequences = read_fasta_file($opts->{fasta});
 
-my $connectivity = load_connectivity($opts->{nc_map});
+my $connectivity = loadConnectivity($opts->{nc_map});
 
-my $edges = load_edges($opts->{blast});
+my $edges = loadEdges($opts->{blast});
 
 my $writer = new EFI::SSN::XgmmlWriter(output_file => $opts->{output}, use_min_edge_attr => $opts->{use_min_edge_attr}, db_version => $dbVersion, seq_type => $seqType);
 $writer->write($inputIds, $sequences, $connectivity, $title, $edges);
 
 
-save_stats($opts->{stats}, $writer->getStats()) if $opts->{stats};
+saveStats($opts->{stats}, $writer->getStats()) if $opts->{stats};
 
 
 
@@ -72,14 +72,14 @@ save_stats($opts->{stats}, $writer->getStats()) if $opts->{stats};
 
 
 #
-# save_stats
+# saveStats
 #
 # Saves SSN statistics to a JSON-formatted output file.
 #
 # Parameters:
 #    $stats - hash ref returned from EFI::SSN::XgmmlWriter
 #
-sub save_stats {
+sub saveStats {
     my $file = shift;
     my $stats = shift;
 
@@ -110,7 +110,7 @@ sub save_stats {
 
 
 #
-# load_edges
+# loadEdges
 #
 # Loads the SSN edges by reading the BLAST results file and computing the alignment score.
 #
@@ -125,7 +125,7 @@ sub save_stats {
 # An edge consists of a source (the BLAST query ID, qid), target (the BLAST source ID, sid), an
 # alignment score (ascore), percent identity (pid), and alignment length (alen).
 #
-sub load_edges {
+sub loadEdges {
     my $inputBlast = shift;
 
     # Write edges to the SSN
@@ -152,7 +152,7 @@ sub load_edges {
 
 
 #
-# load_connectivity
+# loadConnectivity
 #
 # Loads the neighborhood connectivity data.
 #
@@ -163,7 +163,7 @@ sub load_edges {
 # Returns:
 #    hash ref mapping ID to NC and color; empty hash if file doesn't exist or is not specified
 #
-sub load_connectivity {
+sub loadConnectivity {
     my $ncMapFile = shift;
 
     my $connectivity = {};
@@ -183,7 +183,7 @@ sub load_connectivity {
 
 
 #
-# validate_input_blast
+# validateInputBlast
 #
 # Verify that the number of edges (i.e. the number of results from the all-by-all BLAST) is within
 # an acceptable range.  A zero value indicates an unlimited amount of edges are permitted.
@@ -197,7 +197,7 @@ sub load_connectivity {
 #    sequence type (e.g. family domain or full)
 #    number of edges in the BLAST file (computed using the Linux 'wc' command)
 #
-sub validate_input_blast {
+sub validateInputBlast {
     my $inputBlast = shift;
     my $maxEdges = shift;
 
