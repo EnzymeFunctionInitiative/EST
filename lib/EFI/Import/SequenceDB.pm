@@ -73,7 +73,7 @@ sub parseIdFile {
         chomp($line);
         my ($id, @p) = split(m/:/, $line);
         if (@p == 2) {
-            push @{ $domains->{$id} }, [$2, $3];
+            push @{ $domains->{$id} }, [@p];
             $out->print("$id\n") if not $ids{$id};
             $ids{$id} = 1;
         } else {
@@ -102,7 +102,7 @@ sub convertSequences {
 
     while (my $line = <$in>) {
         chomp($line);
-        if ($line =~ m/^>(\w\w\|)?([A-Za-z0-9_\.]+)(\|.*)?$/) {
+        if ($line =~ m/^>(\w\w\|)?([A-Za-z0-9_\.]+).*?$/) {
             $curId = $2;
             $numIds++;
         } elsif ($line !~ m/^\s*$/) {
