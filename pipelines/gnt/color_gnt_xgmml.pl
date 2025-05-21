@@ -35,7 +35,7 @@ my ($idType, $metanodeMap) = parse_metanode_map_file($opts->{metanode_map});
 my $gntData = getGntData($opts->{gnd}, $idType, $metanodeMap);
 
 
-my $xwriter = new EFI::SSN::AttributeWriter(ssn => $opts->{ssn}, output_ssn => $opts->{color_gnt_ssn});
+my $xwriter = new EFI::SSN::AttributeWriter(ssn => $opts->{ssn}, output_file => $opts->{color_gnt_ssn});
 
 
 my $colorHandler = new EFI::SSN::AttributeWriter::Handler::Color(cluster_map => {seq => $clusterMapBySize, node => $clusterMapByNode}, cluster_sizes => $clusterSizes, colors => $colors);

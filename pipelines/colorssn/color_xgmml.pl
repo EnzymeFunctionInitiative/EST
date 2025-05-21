@@ -28,7 +28,7 @@ my $clusterSizes = {seq => $seqSizes, node => $nodeSizes};
 my ($clusterMapBySize, $clusterMapByNode) = parse_cluster_map_file($opts->{cluster_map});
 
 
-my $xwriter = new EFI::SSN::AttributeWriter(ssn => $opts->{ssn}, output_ssn => $opts->{color_ssn});
+my $xwriter = new EFI::SSN::AttributeWriter(ssn => $opts->{ssn}, output_file => $opts->{color_ssn});
 
 
 my $colorHandler = new EFI::SSN::AttributeWriter::Handler::Color(cluster_map => {seq => $clusterMapBySize, node => $clusterMapByNode}, cluster_sizes => $clusterSizes, colors => $colors);

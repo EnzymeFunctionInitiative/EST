@@ -19,13 +19,10 @@ use parent qw(EFI::Xgmml::Writer);
 sub new {
     my ($class, %args) = @_;
 
-    my $self = {};
-    bless($self, $class);
+    my $self = $class->SUPER::new(%args);
 
     $self->{append_new_attr} = $args{append_new_attr} // 1;
-
     $self->{ssn} = $args{ssn};
-    $self->{output_ssn} = $args{output_ssn};
 
     $self->{attr_handlers} = [];
 
@@ -330,7 +327,7 @@ while inserting color and cluster number information
 
     my $colorHandler = EFI::SSN::AttributeWriter::Handler::Color->new(cluster_map => $clusterMap, colors => $colors);
 
-    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_ssn => $outputSsn, append_new_attr => 1);
+    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_file => $outputSsn, append_new_attr => 1);
     $xwriter->addAttributeHandler($colorHandler);
     $xwriter->write();
 
@@ -344,7 +341,7 @@ derived classes are used to provide metadata.
 
 =head2 METHODS
 
-=head3 C<new(ssn =E<gt> $ssnFile, output_ssn =E<gt> $outputSsn, append_new_attr =E<gt> 1)>
+=head3 C<new(ssn =E<gt> $ssnFile, output_file =E<gt> $outputSsn, append_new_attr =E<gt> 1)>
 
 Creates a new B<EFI::SSN::AttributeWriter> object.
 
@@ -356,7 +353,7 @@ Creates a new B<EFI::SSN::AttributeWriter> object.
 
 Path to a SSN file in XGMML format (XML) that is to be parsed.
 
-=item C<output_ssn>
+=item C<output_file>
 
 Path to the SSN file to write.
 
@@ -371,7 +368,7 @@ to the location.  I<Defaults to true (e.g. appending).>
 
 =head4 Example Usage
 
-    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_ssn => $outputSsn,
+    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_file => $outputSsn,
         append_new_attr => 0);
     # If the location is the node attribute "Organism", then fields will be inserted
     # before the "Organism" attribute and then "Organism" will be added.
