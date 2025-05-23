@@ -391,9 +391,9 @@ sub get_annotation_fields {
 
         push @fields, {name => "uniprot_pfam",              field_type => "db",                                                                                                                                                                         json_type_spec => "array",                      db_hidden => 1};
 
-        push @fields, {name => "IPRO_DOM",                  field_type => "ssn",                                    display => "InterPro (Domain)",             base_ssn => 1};
-        push @fields, {name => "IPRO_FAM",                  field_type => "ssn",                                    display => "InterPro (Family)",             base_ssn => 1};
-        push @fields, {name => "IPRO_SUP",                  field_type => "ssn",                                    display => "InterPro (Homologous Superfamily)", base_ssn => 1};
+        push @fields, {name => "IPRO_DOM",                  field_type => "ssn",                                    display => "InterPro (Domain)",             base_ssn => 1,                      ssn_list_type => 1};
+        push @fields, {name => "IPRO_FAM",                  field_type => "ssn",                                    display => "InterPro (Family)",             base_ssn => 1,                      ssn_list_type => 1};
+        push @fields, {name => "IPRO_SUP",                  field_type => "ssn",                                    display => "InterPro (Homologous Superfamily)", base_ssn => 1,                  ssn_list_type => 1};
         push @fields, {name => "IPRO",                      field_type => "ssn",                                    display => "InterPro (Other)",              base_ssn => 1,                      ssn_list_type => 1};
 
         push @fields, {name => "uniprot_interpro",          field_type => "db",                                                                                                                                                                         json_type_spec => "array",                      db_hidden => 1};

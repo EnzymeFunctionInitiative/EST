@@ -52,12 +52,14 @@ sub write {
     $self->{nb_conn} = $connectivity;
     $self->{title} = $title;
 
-    my @ids = $self->{metadata}->getSequenceIds();
+    my @ids = sort $self->{metadata}->getSequenceIds();
 
     my $attrs = $self->getNodeAttributes(\@ids);
 
+    # From EFI::Xgmml::Writer
     $self->open();
 
+    # From EFI::Xgmml::Writer
     $self->preamble();
 
     $self->writeStarting();
@@ -68,6 +70,7 @@ sub write {
 
     $self->writeClosing();
 
+    # From EFI::Xgmml::Writer
     $self->close();
 }
 
@@ -82,7 +85,11 @@ sub getStats {
 }
 
 
-# private
+#
+# writeStarting - private
+#
+# Write the starting tags, e.g. graph.
+#
 sub writeStarting {
     my $self = shift;
 
@@ -95,14 +102,26 @@ sub writeStarting {
 }
 
 
-# private
+#
+# writeClosing - private
+#
+# Write the ending tag, e.g. graph
+#
 sub writeClosing {
     my $self = shift;
     $self->endTag("graph");
 }
 
 
-# private
+#
+# writeNodes - private
+#
+# Writes nodes and attributes for the nodes to the SSN.
+#
+# Parameters:
+#    $ids - array ref of list of sequence IDs
+#    $attrs - hash ref mapping IDs to attributes
+#
 sub writeNodes {
     my $self = shift;
     my $ids = shift;
@@ -116,7 +135,15 @@ sub writeNodes {
 }
 
 
-# private
+#
+# writeNode - private
+#
+# Saves an individual node and attributes to the SSN.
+#
+# Parameters:
+#    $id - sequence ID
+#    $attr - hash ref containing field metadata and values
+#
 sub writeNode {
     my $self = shift;
     my $id = shift;
@@ -125,10 +152,10 @@ sub writeNode {
     $self->startTag("node", "id" => $id, "label" => $id);
 
     foreach my $field (@{ $self->{fields} }) {
-        next if not exists $attr->{$field->{name}};
+        next if not defined $attr->{$field->{name}};
 
         if ($field->{is_list}) {
-            $self->startTag("att", "name" => $field->{display}, "type" => "list");
+            $self->startTag("att", "type" => "list", "name" => $field->{display});
 
             my $value = $attr->{$field->{name}};
 
@@ -140,7 +167,7 @@ sub writeNode {
             }
 
             foreach my $val (@values) {
-                $self->emptyTag("att", "name" => $field->{display}, "type" => $field->{type}, "value" => $val);
+                $self->emptyTag("att", "type" => $field->{type}, "name" => $field->{display}, "value" => $val);
             }
 
             $self->endTag("att");
@@ -153,7 +180,14 @@ sub writeNode {
 }
 
 
-# private
+#
+# writeEdges - private
+#
+# Writes the edges to the file.
+#
+# Parameters:
+#    $edges - array ref of edge data
+#
 sub writeEdges {
     my $self = shift;
     my $edges = shift;
@@ -165,19 +199,26 @@ sub writeEdges {
 }
 
 
-# private
+#
+# writeEdge - private
+#
+# Writes an individual edge to the file.
+#
+# Parameters:
+#    $edge - hash ref containing edge data (e.g. source, target, ascore, etc)
+#
 sub writeEdge {
     my $self = shift;
     my $edge = shift;
 
     my $source = $edge->{source};
     my $target = $edge->{target};
-    my %idAttr = (id => "$source,$target", label => "$source,$target", source => $source, target => $target);
+    my @idAttr = (source => $source, target => $target, id => "$source,$target", label => "$source,$target");
 
     if ($self->{use_min_edge_attr}) {
-        $self->emptyTag("edge", %idAttr);
+        $self->emptyTag("edge", @idAttr);
     } else {
-        $self->startTag("edge", %idAttr);
+        $self->startTag("edge", @idAttr);
         $self->emptyTag("att", "name" => '%id', "type" => "real", "value" => $edge->{pid});
         $self->emptyTag("att", "name" => "alignment_score", "type"=> "real", "value" => $edge->{ascore});
         $self->emptyTag("att", "name" => "alignment_len", "type" => "integer", "value" => $edge->{alen});
@@ -186,54 +227,114 @@ sub writeEdge {
 }
 
 
-# private
+#
+# getNodeAttributes - private
+#
+# Gets all of the attributes for the input nodes.
+#
+# Parameters:
+#    $ids - list of IDs in array ref
+#
+# Returns:
+#    hash ref that maps IDs to hash refs containing attributes for the sequence
+#
 sub getNodeAttributes {
     my $self = shift;
     my $ids = shift;
 
+    my $anno = new EFI::Annotations;
+
     my $attrs = {};
 
-    my @fields = $self->{metadata}->getFields();
-    $self->{field} = \@fields; # for makeNodeAttributes
+    my %fieldMeta;
+    foreach my $field ($self->{metadata}->getFields()) {
+        $fieldMeta{$field} = $self->getFieldMetadata($field, $anno);
+    }
 
     foreach my $id (@$ids) {
-        my $nodeAttr = $self->makeNodeAttributes($id);
+        my $nodeAttr = $self->makeNodeAttributes($id, \%fieldMeta);
         $attrs->{$id} = $nodeAttr;
     }
 
-    my $anno = new EFI::Annotations;
+    # If any ID has a FASTA sequence attached to it as an attribute (e.g. for Option C jobs), then
+    # we need to add the sequence field as an attribute to the SSN.  $self->{hash_fasta_attribute}
+    # is set in makeNodeAttributes if this attribute is found.
+    $fieldMeta{&FIELD_SEQ_KEY} = $self->getFieldMetadata(FIELD_SEQ_KEY, $anno) if $self->{has_fasta_attribute};
+    my @fields = $anno->sort_annotations(keys %fieldMeta);
 
-    # $self->{hash_fasta_attribute} is set in makeNodeAttributes if a sequence should be added as
-    # a node attribute
-    push @fields, FIELD_SEQ_KEY if $self->{has_fasta_attribute};
-    @fields = $anno->sort_annotations(@fields);
-
+    $self->{fields} = [];
     foreach my $field (@fields) {
-        my $type = $anno->get_attribute_type($field);
-        my $displayName = $anno->get_display_name($field);
-        my $isList = $anno->is_list_attribute($field);
-        push @{ $self->{fields} }, { name => $field, type => $type, display => $displayName, is_list => $isList };
+        push @{ $self->{fields} }, $fieldMeta{$field};
     }
 
     return $attrs;
 }
 
 
-# private
+#
+# getFieldMetadata - private
+#
+# Returns metadata for a field, including type, SSN name, and value structure type.
+#
+# Parameters:
+#    $field - name of attribute, from EFI::Annotations::Fields
+#    $anno - EFI::Annotations object
+#
+# Returns:
+#    hash ref containing field name ('name', same as input), value type ('type'), display name
+#        (the column name in the SSN, 'display'), and value structure type ('is_list', true if
+#        the output data is a list structure)
+#
+sub getFieldMetadata {
+    my $self = shift;
+    my $field = shift;
+    my $anno = shift;
+
+    my $type = $anno->get_attribute_type($field);
+    my $displayName = $anno->get_display_name($field);
+    my $isList = $anno->is_list_attribute($field);
+    
+    my $meta = { name => $field, type => $type, display => $displayName, is_list => $isList };
+    return $meta;
+}
+
+
+#
+# makeNodeAttributes - private
+#
+# Creates a data structure of node attributes for a single node.  Uses the given field metadata
+# to populate a hash ref containing values to insert as attributes in the SSN.
+#
+# Parameters:
+#    $id - sequence ID
+#    $fields - hash ref of field metadata
+#
+# Returns:
+#    hash ref that maps field names to values; some values are array refs, in which case they
+#        are saved as XGMML lists by the code that writes the tags
+#
 sub makeNodeAttributes {
     my $self = shift;
     my $id = shift;
+    my $fields = shift;
 
     my $source = "";
     my $nodeAttr = {};
 
-    foreach my $field (@{ $self->{fields} }) {
+    foreach my $field (keys %$fields) {
         # Skip any sequence defined in the metadata file
         next if $field eq FIELD_SEQ_KEY;
 
         my $value = $self->{metadata}->getSequence($id)->getAttribute($field, 1);
         $value = MISSING_VALUE if not $value;
         $source = $value if $field eq FIELD_SEQ_SRC_KEY;
+
+        # If the value is a scalar, but the field type is a list, then split the value into pieces
+        # to force the values into a XGMML list.  This is done because database fields with
+        # multiple values are separated by commas.
+        if ($fields->{$field}->{is_list} and not ref $value) {
+            $value = [ split(m/[,\^]/, $value) ];
+        }
 
         $nodeAttr->{$field} = $value;
     }
@@ -253,6 +354,8 @@ sub makeNodeAttributes {
             $nodeAttr->{&FIELD_CYTOSCAPE_COLOR} = $nc->{color};
         }
     }
+
+    return $nodeAttr;
 }
 
 
