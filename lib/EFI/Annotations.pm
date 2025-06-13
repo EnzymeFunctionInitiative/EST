@@ -257,7 +257,6 @@ sub parse_interpro {
             my $type = $types[$i];
             my $fam = $fams[$i];
 
-            #TODO: remove hardcoded constants here
             $type = lc $type;
             push @dom, $fam if $type eq INTERPRO_DOMAIN;
             push @fam, $fam if $type eq INTERPRO_FAMILY;
@@ -359,7 +358,7 @@ sub get_annotation_fields {
         push @fields, {name => "swissprot_status",          field_type => "db",     type_spec => "BOOL",            display => "UniProt Annotation Status",     base_ssn => 1,                                          db_primary_col => 1,index_name => "swissprot_status_idx"};
         push @fields, {name => "description",               field_type => "db",     type_spec => "VARCHAR(255)",    display => "Description",                   base_ssn => 1,                      ssn_list_type => 1,                                 json_type_spec => "str",    json_name => "d"};
         push @fields, {name => "swissprot_description",     field_type => "ssn",                                    display => "SwissProt Description",         base_ssn => 1};
-        push @fields, {name => "seq_len",                   field_type => "db",     type_spec => "INT",             display => "Sequence Length",               base_ssn => 1,  ssn_num_type => 1,                      db_primary_col => 1};
+        push @fields, {name => FIELD_SEQ_LEN_KEY,           field_type => "db",     type_spec => "INT",             display => "Sequence Length",               base_ssn => 1,  ssn_num_type => 1,                      db_primary_col => 1};
 
         push @fields, {name => FIELD_REPNODE_IDS,           field_type => "ssn",                                    display => "List of IDs in Rep Node"};
         push @fields, {name => FIELD_REPNODE_SIZE,          field_type => "ssn",                                    display => "Number of IDs in Rep Node",                     ssn_num_type => 1};
@@ -392,9 +391,9 @@ sub get_annotation_fields {
 
         push @fields, {name => "uniprot_pfam",              field_type => "db",                                                                                                                                                                         json_type_spec => "array",                      db_hidden => 1};
 
-        push @fields, {name => "IPRO_DOM",                  field_type => "ssn",                                    display => "InterPro (Domain)",             base_ssn => 1};
-        push @fields, {name => "IPRO_FAM",                  field_type => "ssn",                                    display => "InterPro (Family)",             base_ssn => 1};
-        push @fields, {name => "IPRO_SUP",                  field_type => "ssn",                                    display => "InterPro (Homologous Superfamily)", base_ssn => 1};
+        push @fields, {name => "IPRO_DOM",                  field_type => "ssn",                                    display => "InterPro (Domain)",             base_ssn => 1,                      ssn_list_type => 1};
+        push @fields, {name => "IPRO_FAM",                  field_type => "ssn",                                    display => "InterPro (Family)",             base_ssn => 1,                      ssn_list_type => 1};
+        push @fields, {name => "IPRO_SUP",                  field_type => "ssn",                                    display => "InterPro (Homologous Superfamily)", base_ssn => 1,                  ssn_list_type => 1};
         push @fields, {name => "IPRO",                      field_type => "ssn",                                    display => "InterPro (Other)",              base_ssn => 1,                      ssn_list_type => 1};
 
         push @fields, {name => "uniprot_interpro",          field_type => "db",                                                                                                                                                                         json_type_spec => "array",                      db_hidden => 1};
@@ -419,7 +418,6 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_UNIREF90_CLUSTER_SIZE, field_type => "ssn",                                    display => "UniRef90 Cluster Size",                         ssn_num_type => 1};
         push @fields, {name => FIELD_UNIREF100_IDS,         field_type => "ssn",                                    display => "UniRef100 Cluster IDs",                                             ssn_list_type => 1};
         push @fields, {name => FIELD_UNIREF100_CLUSTER_SIZE,field_type => "ssn",                                    display => "UniRef100 Cluster Size",                        ssn_num_type => 1};
-        push @fields, {name => "Sequence",                  field_type => "ssn",                                    display => "Sequence"};
         push @fields, {name => "User_IDs_in_Cluster",       field_type => "ssn",                                    display => "User IDs in Cluster",                                               ssn_list_type => 1};
 
         push @fields, {name => "is_fragment",               field_type => "db",     type_spec => "BOOL",            display => "Sequence Status",               base_ssn => 1,                                          db_primary_col => 1,index_name => "is_fragment_idx"};
@@ -427,7 +425,7 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_COLOR_SEQ_NUM,         field_type => "color",                                  display => "Sequence Count Cluster Number"};
         push @fields, {name => FIELD_COLOR_NODE_NUM,        field_type => "color",                                  display => "Node Count Cluster Number"};
         push @fields, {name => FIELD_COLOR_SINGLETON,       field_type => "color",                                  display => "Singleton Number"};
-        push @fields, {name => FIELD_COLOR_SEQ_NUM_COLOR,   field_type => "color",                                  display => "node.fillColor"};
+        push @fields, {name => FIELD_COLOR_SEQ_NUM_COLOR,   field_type => "color",                                  display => FIELD_CYTOSCAPE_COLOR};
         push @fields, {name => FIELD_COLOR_NODE_NUM_COLOR,  field_type => "color",                                  display => "Node Count Fill Color"};
         push @fields, {name => FIELD_COLOR_SEQ_COUNT,       field_type => "color",                                  display => "Cluster Sequence Count"};
         push @fields, {name => FIELD_COLOR_NODE_COUNT,      field_type => "color",                                  display => "Cluster Node Count"};
@@ -436,6 +434,9 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_GNT_ENA_ID,            field_type => "gnt",                                    display => "ENA Database Genome ID"};
         push @fields, {name => FIELD_GNT_NB_PFAM,           field_type => "gnt",                                    display => "Neighbor Pfam Families"};
         push @fields, {name => FIELD_GNT_NB_INTERPRO,       field_type => "gnt",                                    display => "Neighbor InterPro Families"};
+
+        push @fields, {name => FIELD_SEQ_KEY,               field_type => "ssn",                                    display => "Sequence"};
+        push @fields, {name => "connectivity",              field_type => "ssn",                                    display => "Neighborhood Connectivity"};
 
         $self->{fields} = \@fields;
     }
@@ -541,6 +542,18 @@ sub get_attribute_type {
         return "integer";
     } else {
         return "string";
+    }
+}
+
+
+sub get_display_name {
+    my $self = shift;
+    my $attrName = shift;
+    my $anno = $self->get_annotation_data();
+    if ($anno->{$attrName}) {
+        return $anno->{$attrName}->{display};
+    } else {
+        return $attrName;
     }
 }
 
@@ -1027,6 +1040,35 @@ The string "integer" if the type is numeric, "string" otherwise.
     my $attrName = "Sequence Length";
     my $theType = $anno->get_attribute_type($attrName);
     # $theType is "integer"
+
+=head3 C<get_display_name($attrName)>
+
+Returns the SSN node display name for the attribute field name.  For example, for a field name of
+C<seq_len>, returns "Sequence Length".
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+A SSN field name (e.g. ones coming from B<EFI::Annotations::Fields>).
+
+=back
+
+=head4 Returns
+
+A string containing the display name.
+
+=head4 Example Usage
+
+    my $field = "organism";
+    my $displayName = $anno->get_display_name($field);
+    # $displayName is "Organism"
+
+    my $field = "seq_len";
+    my $displayName = $anno->get_display_name($field);
+    # $displayName is "Sequence Length"
 
 
 =head3 C<is_expandable_attr($attrName)>

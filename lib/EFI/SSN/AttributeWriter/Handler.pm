@@ -1,5 +1,5 @@
 
-package EFI::SSN::XgmmlWriter::AttributeHandler;
+package EFI::SSN::AttributeWriter::Handler;
 
 use strict;
 use warnings;
@@ -63,21 +63,21 @@ __END__
 
 =pod
 
-=head1 EFI::SSN::XgmmlWriter::AttributeHandler
+=head1 EFI::SSN::AttributeWriter::Handler
 
 =head2 NAME
 
-B<EFI::SSN::XgmmlWriter::AttributeHandler> - Perl module interface to process elements from XGMML
+B<EFI::SSN::AttributeWriter::Handler> - Perl module interface to process elements from XGMML
 file during parsing
 
 =head2 SYNOPSIS
 
-    use EFI::SSN::XgmmlWriter;
-    use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
+    use EFI::SSN::AttributeWriter;
+    use EFI::SSN::AttributeWriter::Handler::Color;
 
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
+    my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
 
-    my $handler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(...);
+    my $handler = EFI::SSN::AttributeWriter::Handler::Color(...);
     $xwriter->addAttributeHandler($handler);
 
     $xwriter->write();
@@ -85,14 +85,14 @@ file during parsing
 
 =head2 DESCRIPTION
 
-B<EFI::SSN::XgmmlWriter::AttributeHandler> is a Perl module that defines an interface for parse
+B<EFI::SSN::AttributeWriter::Handler> is a Perl module that defines an interface for parse
 handlers.  This module is not used by itself, rather modules are derived from it to perform
 specific tasks, such as color SSN attribute insertion.  It supports handling the tag attributes
 on the C<E<gt>graphE<lt>> tag (e.g. C<label>) as well as C<E<gt>attE<lt>> tags that occur within
 C<E<gt>nodeE<lt>> tags.
 
-Each attribute handler must be registered with the B<EFI::SSN::XgmmlWriter> instance using the
-C<EFI::SSN::XgmmlWriter::addAttributeHandler> method.  Whenever certain elements are encountered
+Each attribute handler must be registered with the B<EFI::SSN::AttributeWriter> instance using the
+C<EFI::SSN::AttributeWriter::addAttributeHandler> method.  Whenever certain elements are encountered
 while parsing the input XGMML file, the registered handlers are called on those elements using
 the interface defined below, which derived classes must implement.
 
@@ -136,7 +136,7 @@ The Cytoscape identifier (e.g. C<id> attribute).  This may be the same as C<labe
 
 =head4 Example Usage
 
-For the above XGMML file, when encountering the C<E<gt>nodeE<lt>> tag, the B<XgmmlWriter> will
+For the above XGMML file, when encountering the C<E<gt>nodeE<lt>> tag, the B<AttributeWriter> will
 call C<onNodeStart> function with the following parameters:
 
     $h->onNodeStart("A0A010ZH43", "A0A010ZH43");
@@ -148,7 +148,7 @@ Called when the end tag of a node is encountered.
 
 =head4 Example Usage
 
-For the above XGMML file, when encountering the C<E<gt>/nodeE<lt>> tag, the B<XgmmlWriter> will
+For the above XGMML file, when encountering the C<E<gt>/nodeE<lt>> tag, the B<AttributeWriter> will
 call C<onNodeEnd>:
 
     $h->onNodeEnd();
@@ -179,7 +179,7 @@ A replacement value for the attribute.  For example, C<"TDS_UP Full Network colo
 
 =head4 Example Usage
 
-For the above XGMML, when encountering the C<E<gt>graphE<lt>> tag, the B<XgmmlWriter> will execute
+For the above XGMML, when encountering the C<E<gt>graphE<lt>> tag, the B<AttributeWriter> will execute
 the following sequence of function calls (in psuedocode):
 
     # Input tag is: <graph label="TDS_UP Full Network" xmlns="http://www.cs.rpi.edu/XGMML">
@@ -206,7 +206,7 @@ convention).
 =head3 C<getNewAttributes($attName)>
 
 Gets new attributes that are to be inserted into a node.  This is called whenever an C<att> tag
-is encountered during parsing.  The B<XgmmlWriter> will insert the existing tag into the output
+is encountered during parsing.  The B<AttributeWriter> will insert the existing tag into the output
 and then add any new attribute tags returned by this function.  If multiple handlers should
 insert new attributes into the XGMML in a consecutive location, they should all handle the same
 tag.  For example, if the Color SSN node attributes (from the B<AttributeHandler::Color> handler)
@@ -236,7 +236,7 @@ tag).  The attribute value can be an array ref, in which case a XGMML list is in
 =head4 Example Usage
 
 Let's assume that the handler is designed to insert a node attribute when the C<"Sequence Length">
-attribute is encountered.  The B<XgmmlWriter> would execute the following psuedocode:
+attribute is encountered.  The B<AttributeWriter> would execute the following psuedocode:
 
     my $newAtt = $h->getNewAttributes("Sequence Source");
 

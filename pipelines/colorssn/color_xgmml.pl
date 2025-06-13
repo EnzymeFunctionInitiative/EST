@@ -8,8 +8,8 @@ use FindBin;
 use lib "$FindBin::Bin/../../lib";
 
 use EFI::Options;
-use EFI::SSN::XgmmlWriter;
-use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
+use EFI::SSN::AttributeWriter;
+use EFI::SSN::AttributeWriter::Handler::Color;
 use EFI::SSN::Util::ID qw(parse_cluster_num_map parse_cluster_map_file);
 use EFI::Util::Colors;
 
@@ -28,10 +28,10 @@ my $clusterSizes = {seq => $seqSizes, node => $nodeSizes};
 my ($clusterMapBySize, $clusterMapByNode) = parse_cluster_map_file($opts->{cluster_map});
 
 
-my $xwriter = new EFI::SSN::XgmmlWriter(ssn => $opts->{ssn}, output_ssn => $opts->{color_ssn});
+my $xwriter = new EFI::SSN::AttributeWriter(ssn => $opts->{ssn}, output_file => $opts->{color_ssn});
 
 
-my $colorHandler = new EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => {seq => $clusterMapBySize, node => $clusterMapByNode}, cluster_sizes => $clusterSizes, colors => $colors);
+my $colorHandler = new EFI::SSN::AttributeWriter::Handler::Color(cluster_map => {seq => $clusterMapBySize, node => $clusterMapByNode}, cluster_sizes => $clusterSizes, colors => $colors);
 $xwriter->addAttributeHandler($colorHandler);
 
 

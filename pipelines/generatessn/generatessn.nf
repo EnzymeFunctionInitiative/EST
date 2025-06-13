@@ -60,19 +60,11 @@ process create_full_ssn {
         path ssn_meta_file
     output:
         path "full_ssn.xgmml"
+        path "job.finish"
+        path "stats.json"
     """
-    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output full_ssn.xgmml  --title ${params.ssn_title} --dbver ${params.db_version}
-    """
-}
-
-process compute_stats {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path full_ssn
-    output:
-        path "stats.tab"
-    """
-    perl $projectDir/stats/stats.pl -run-dir . -out stats.tab
+    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output full_ssn.xgmml  --title ${params.ssn_title} --db-version ${params.db_version} --stats stats.json
+    touch job.finish
     """
 }
 
@@ -89,7 +81,4 @@ workflow {
 
     // create networks
     full_ssn = create_full_ssn(filtered_blast, fasta_filter_outputs.filtered_fasta, ssn_meta_file)
-
-    // compute stats
-    stats = compute_stats(full_ssn)
 }

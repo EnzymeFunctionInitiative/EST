@@ -10,10 +10,12 @@ use Exporter qw(import);
 use constant SEQ_UNIPROT => "uniprot";
 use constant SEQ_UNIREF50 => "uniref50";
 use constant SEQ_UNIREF90 => "uniref90";
+use constant SEQ_DOMAIN => "domain";
+use constant SEQ_FULL => "full";
 
 
-our @EXPORT_OK = qw(is_unknown_sequence SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 get_sequence_version);
-our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90']);
+our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL);
+our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90', 'SEQ_DOMAIN', 'SEQ_FULL']);
 Exporter::export_ok_tags('types');
 
 
@@ -29,6 +31,16 @@ sub get_sequence_version {
 sub is_unknown_sequence {
     my $seq = shift;
     return $seq =~ m/^Z/i;
+}
+
+
+sub get_sequence_type {
+    my $id = shift;
+    if ($id =~ m/:/) {
+        return SEQ_DOMAIN;
+    } else {
+        return SEQ_FULL;
+    }
 }
 
 
@@ -49,6 +61,9 @@ B<EFI::Sequence::Type> - Perl module for sequence ID types
 
     my $seqId = "zzzz42";
     print "Sequence $seqId is ", (is_unknown_sequence($seqId) ? "Unknown" : "UniProt-formatted"), "\n";
+
+    my $seqId = "B0SS77:1:100";
+    print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
 
 
 =head2 DESCRIPTION
@@ -130,6 +145,64 @@ For UniRef50 (C<uniref50>) ID types.
 =item C<SEQ_UNIREF90>
 
 For UniRef90 (C<uniref90>) ID types.
+
+=back
+
+
+=head3 C<get_sequence_type($id)>
+
+Indicates if a sequence is a family domain sequence (e.g. a subset that corresponds to the
+family-defined start and end position in the sequence string) or full sequence.  Domain sequence
+IDs contain a colon C<:> character.
+
+=head4 Parameters
+
+=over
+
+=item C<$id>
+
+The sequence ID to check.
+
+=back
+
+=head4 Returns
+
+C<SEQ_DOMAIN> if the sequence is a domain sequence ID, C<SEQ_FULL> if the sequence is a full
+sequence.
+
+=head4 Example Usage
+
+    my $seqId = "B0SS77";
+    print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
+    #prints "Sequence B0SS77 is full"
+    my $seqId = "B0SS75:1:100";
+    print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
+    #prints "Sequence B0SS75 is domain"
+
+
+=head2 CONSTANTS
+
+=over
+
+=item C<SEQ_UNIPROT>
+
+For UniProt (C<uniprot>) ID types.
+
+=item C<SEQ_UNIREF50>
+
+For UniRef50 (C<uniref50>) ID types.
+
+=item C<SEQ_UNIREF90>
+
+For UniRef90 (C<uniref90>) ID types.
+
+=item C<SEQ_FULL>
+
+For IDs that represent full sequences.
+
+=item C<SEQ_DOMAIN>
+
+For IDs that represent family domain portions of a sequence.
 
 =back
 

@@ -180,6 +180,9 @@ sub getHandle {
             return undef;
         }
 
+        # Increase the amount of elements that can be concat together (to avoid truncation)
+        $dbh->do('SET @@group_concat_max_len = 3000') if $self->{dbi} == DBI_MYSQL;
+
         $dbh->{mysql_auto_reconnect} = 1 if $self->{dbi} == DBI_MYSQL;
     } elsif ($self->{dbi} == DBI_SQLITE) {
         eval {

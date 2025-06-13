@@ -9,9 +9,9 @@ use lib "$FindBin::Bin/../../lib";
 
 use EFI::GNT::GND::Reader qw(:attr);
 use EFI::Options;
-use EFI::SSN::XgmmlWriter;
-use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
-use EFI::SSN::XgmmlWriter::AttributeHandler::GNT;
+use EFI::SSN::AttributeWriter;
+use EFI::SSN::AttributeWriter::Handler::Color;
+use EFI::SSN::AttributeWriter::Handler::GNT;
 use EFI::SSN::Util::ID qw(parse_cluster_num_map parse_cluster_map_file parse_metanode_map_file);
 use EFI::Util::Colors;
 
@@ -35,11 +35,11 @@ my ($idType, $metanodeMap) = parse_metanode_map_file($opts->{metanode_map});
 my $gntData = getGntData($opts->{gnd}, $idType, $metanodeMap);
 
 
-my $xwriter = new EFI::SSN::XgmmlWriter(ssn => $opts->{ssn}, output_ssn => $opts->{color_gnt_ssn});
+my $xwriter = new EFI::SSN::AttributeWriter(ssn => $opts->{ssn}, output_file => $opts->{color_gnt_ssn});
 
 
-my $colorHandler = new EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => {seq => $clusterMapBySize, node => $clusterMapByNode}, cluster_sizes => $clusterSizes, colors => $colors);
-my $gntHandler = new EFI::SSN::XgmmlWriter::AttributeHandler::GNT(gnt_data => $gntData);
+my $colorHandler = new EFI::SSN::AttributeWriter::Handler::Color(cluster_map => {seq => $clusterMapBySize, node => $clusterMapByNode}, cluster_sizes => $clusterSizes, colors => $colors);
+my $gntHandler = new EFI::SSN::AttributeWriter::Handler::GNT(gnt_data => $gntData);
 $xwriter->addAttributeHandler($colorHandler);
 $xwriter->addAttributeHandler($gntHandler);
 
@@ -74,7 +74,7 @@ $xwriter->write();
 #
 # Returns:
 #    hash ref mapping (meta)node to GNT data for the node in a format that is expected
-#        by the EFI::SSN::XgmmlWriter::AttributeHandler::GNT module
+#        by the EFI::SSN::AttributeWriter::Handler::GNT module
 #
 #    For example:
 #        {

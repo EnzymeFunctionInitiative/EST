@@ -12,6 +12,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
+use EFI::Annotations::Fields qw(FIELD_CYTOSCAPE_COLOR);
 use EFI::GNT::GNN::XgmmlWriter::Util;
 use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE DEFAULT_COOCCURRENCE_THRESHOLD);
 
@@ -120,7 +121,7 @@ sub getSpokeData {
     push @fields, {name => "Hub Pfam Neighbors",                            value => [],                                        type => "string"};
     push @fields, {name => "Hub Average and Median Distance",               value => [],                                        type => "string"};
     push @fields, {name => "Hub Co-occurrence and Ratio",                   value => [],                                        type => "string"};
-    push @fields, {name => "node.fillColor",                                value => $color,                                    type => "string"};
+    push @fields, {name => FIELD_CYTOSCAPE_COLOR,                           value => $color,                                    type => "string"};
     push @fields, {name => "node.shape",                                    value => $shape,                                    type => "string"};
     push @fields, {name => "node.size",                                     value => $nodeSize,                                 type => "string"};
 
@@ -175,7 +176,7 @@ sub getHubData {
     push @fields, {name => "Hub Pfam Neighbors",                            value => \@pfamNeighbors,       type => "string"};
     push @fields, {name => "Hub Average and Median Distances",              value => \@distances,           type => "string"};
     push @fields, {name => "Hub Co-occurrence and Ratio",                   value => \@coocData,            type => "string"};
-    push @fields, {name => "node.fillColor",                                value => $color,                type => "string"};
+    push @fields, {name => FIELD_CYTOSCAPE_COLOR,                           value => $color,                type => "string"};
     push @fields, {name => "node.shape",                                    value => $shape,                type => "string"};
     push @fields, {name => "node.size",                                     value => $nodeSize,             type => "string"};
 

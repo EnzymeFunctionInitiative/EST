@@ -71,12 +71,13 @@ sub parseIdFile {
 
     while (my $line = <$in>) {
         chomp($line);
-        if ($line =~ m/^([^:]+):(\d+):(\d+)$/) {
-            push @{ $domains->{$1} }, [$2, $3];
-            $out->print("$1\n") if not $ids{$1};
-            $ids{$1} = 1;
+        my ($id, @p) = split(m/:/, $line);
+        if (@p == 2) {
+            push @{ $domains->{$id} }, [@p];
+            $out->print("$id\n") if not $ids{$id};
+            $ids{$id} = 1;
         } else {
-            $out->print("$line\n") if not $ids{$1};
+            $out->print("$line\n") if not $ids{$id};
         }
     }
 
@@ -101,7 +102,7 @@ sub convertSequences {
 
     while (my $line = <$in>) {
         chomp($line);
-        if ($line =~ m/^>(\w\w\|)?([A-Za-z0-9_\.]+)(\|.*)?$/) {
+        if ($line =~ m/^>(\w\w\|)?([A-Za-z0-9_\.]+).*?$/) {
             $curId = $2;
             $numIds++;
         } elsif ($line !~ m/^\s*$/) {

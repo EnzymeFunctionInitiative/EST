@@ -46,7 +46,7 @@ sub validateOptions {
 
     my @dbFiles = glob("$opts->{fasta_db}.*");
     my @errors;
-    push @errors, "Error: invalid --fasta-db BLAST database '$opts->{fasta_db}'" if (not -f $opts->{fasta_db} or not @dbFiles);
+    push @errors, "Error: invalid --fasta-db BLAST database '$opts->{fasta_db}'" if (not -f $opts->{fasta_db} and not @dbFiles);
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);
