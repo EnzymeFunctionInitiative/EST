@@ -202,7 +202,6 @@ sub parseFasta {
     }
 
     $self->addStatsValue("num_ids", $seqCount);
-    $self->addStatsValue("orig_count", $seqCount);
     $self->addStatsValue("num_headers", $headerCount);
     $self->addStatsValue("num_matched", $numMatched);
     $self->addStatsValue("num_unmatched", $seqCount - $numMatched);

@@ -38,9 +38,9 @@ if __name__ == "__main__":
     node_count = pq.ParquetFile(args.fasta).metadata.num_rows
     conv_ratio = compute_conv_ratio(node_count, edge_count)
     output = {
-        "ConvergenceRatio": conv_ratio,
-        "EdgeCount": edge_count,
-        "UniqueSeq": node_count
+        "convergence_ratio": conv_ratio,
+        "num_blast_edges": edge_count,
+        "num_unique_ids": node_count
     }
 
     with open(args.output, "w") as f:

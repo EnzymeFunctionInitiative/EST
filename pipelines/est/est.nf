@@ -64,7 +64,7 @@ process filter_ids {
     output:
         path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
-        path 'import_stats.json', emit: 'import_stats'          // statistics of source and filter import processes
+        path 'import_stats.json', emit: 'import_stats'          // final statistics of source and filter import processes
         path 'retrieval_ids.tab', emit: 'retrieval_ids'         // list of IDs that came from the database, as opposed to user-specified FASTA files, including domain data
     script:
     filter_args = ""
@@ -206,13 +206,16 @@ process compute_stats {
     input:
         path blast_parquet
         path fasta_file
+        path import_stats
     output:
         path "boxplot_stats.parquet", emit: boxplot_stats
         path "evalue.tab", emit: evaluetab
-        path "acc_counts.json", emit: acc_counts
+        path "stats.json", emit: final_stats
     """
     # compute convergence ratio
-    python $projectDir/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output acc_counts.json
+    python $projectDir/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output conv_ratio.json
+
+    python $projectDir/statistics/merge_stats.py --import-stats $import_stats --conv-ratio-stats conv_ratio.json --output stats.json
 
     # compute boxplot stats and evalue.tab
     python $projectDir/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
@@ -283,7 +286,7 @@ workflow {
     }
 
     // Step 5: compute convergence ratio and boxplot stats
-    stats = compute_stats(reduced_blast_parquet, fasta_lengths_parquet)
+    stats = compute_stats(reduced_blast_parquet, fasta_lengths_parquet, sequence_id_files.import_stats)
 
     // Step 6: visualize
     plots = visualize(stats.boxplot_stats)

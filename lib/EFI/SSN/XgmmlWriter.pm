@@ -80,7 +80,7 @@ sub getStats {
     my $self = shift;
     my $fileName = fileparse($self->{output_file});
     my $fileSize = -s $self->{output_file};
-    my $stats = { num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, filename => $fileName, size => $fileSize };
+    my $stats = { $fileName => { type => "full", num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize } };
     return $stats;
 }
 
