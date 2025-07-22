@@ -102,7 +102,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     # Can't validate in the argparse library because --family can be used in modes other family
     # and in that case it is optional; when mode is family then it is required so we validate here
     if args.import_mode == "family" and not args.families:
-        print(f"Family mode requires --family argument")
+        print(f"Family mode requires --families argument")
         fail = True
 
     args.sequence_filter = args.filter
