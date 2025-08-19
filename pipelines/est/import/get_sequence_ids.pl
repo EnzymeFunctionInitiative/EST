@@ -61,7 +61,11 @@ my $_start = time();
 # Populate the sequence collection from the source
 my $numLoaded = $source->loadFromSource($seqData);
 if (not $numLoaded) {
-    $logger->error($source->getErrors());
+    my @errors = $source->getErrors();
+    if (not @errors) {
+        push @errors, "No sequences found with input parameter set";
+    }
+    $logger->error(@errors);
     die "\n";
 }
 my $numIds = $numLoaded;
@@ -239,13 +243,13 @@ anonymous sequence IDs are assigned that begin with the letters C<ZZ>.
 
 A path to a file containing FASTA sequences.  Identifiers are pulled from the sequence headers in the file.
 
-=item C<--seq-mapping-file> (optional, defaults)
+=item C<--sequence-mapping-file> (optional, defaults)
 
 This file is necessary to map UniProt or anonymous identifiers to the proper header line in the
 input FASTA file.  The file is provided to the B<C<import_fasta.pl>> script which reformats the
 user FASTA file into an acceptable format with proper header IDs.  If this is not specified, the
-file is named according to the C<seq_mapping> value in the B<EFI::Import::Config::Defaults> module
-and put in the output directory.
+file is named according to the C<sequence_mapping> value in the B<EFI::Import::Config::Defaults>
+module and put in the output directory.
 
 =back
 

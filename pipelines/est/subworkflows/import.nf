@@ -44,7 +44,7 @@ process get_source_ids {
         """
     } else if (params.import_mode == "fasta") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --fasta ${params.uploaded_fasta_file} --seq-mapping-file seq_mapping.tab
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --fasta ${params.uploaded_fasta_file} --sequence-mapping-file seq_mapping.tab
         """
     } else if (params.import_mode == "family") {
         """
@@ -116,7 +116,7 @@ process import_fasta {
     output:
         path "imported_sequences.fasta", emit: "fasta_file"
     """
-    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file} --seq-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
+    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file} --sequence-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
     """
 }
 

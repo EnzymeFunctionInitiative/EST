@@ -12,7 +12,7 @@ my %files = (
     # output from get_sequence_ids.pl
     source_ids => "source_ids.tab",
     source_meta => "source_seq.tab",
-    seq_mapping => "seq_mapping.tab",
+    sequence_mapping => "seq_mapping.tab",
     blastout => "blastout.tab",
     source_stats => "source_stats.json",
     unmatched_ids => "unmatched_ids.tab",

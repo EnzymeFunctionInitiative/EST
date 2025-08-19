@@ -151,6 +151,7 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "uploaded_fasta_file": None,
         "blast_query_file": None,
         "domain_family": None,
+        "families": None,
     }
     if import_mode == "blast":
         params |= {
