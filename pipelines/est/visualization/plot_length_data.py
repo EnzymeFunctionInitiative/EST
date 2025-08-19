@@ -55,6 +55,10 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
     print(f"Reading lengths from '{lengths_file}'")
     df = count_lengths(lengths_file, frac)
 
+    if (len(df) == 0):
+        print("No data remaining after processing. No image files will be created.")
+        return
+
     print("Plotting histogram")
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(18, 9))
     axs.bar(
