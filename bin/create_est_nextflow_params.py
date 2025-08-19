@@ -142,7 +142,15 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "multiplex": multiplex,
         "blast_num_matches": blast_num_matches,
         "blast_evalue": blast_evalue,
-        "sequence_version": sequence_version
+        "sequence_version": sequence_version,
+        "domain": None,
+        "import_blast_fasta_db": None,
+        "accessions_file": None,
+        "import_blast_num_matches": None,
+        "import_blast_evalue": None,
+        "uploaded_fasta_file": None,
+        "blast_query_file": None,
+        "domain_family": None,
     }
     if import_mode == "blast":
         params |= {
