@@ -1,11 +1,13 @@
+
 import argparse
 import os
 
-import numpy as np
 import pandas as pd
 
-from pyEFI.plot import draw_boxplot, draw_histogram
 from pyEFI.cli import parse_proxies
+from pyEFI.plot import draw_boxplot, draw_histogram
+from pyEFI.processing import compute_outlying_groups, delete_outlying_groups
+
 
 def create_parser():
     parser = argparse.ArgumentParser(description="Render plots from BLAST output")
@@ -65,77 +67,6 @@ def parse_args(parser):
     else:
         return args
 
-
-def compute_outlying_groups(group_edge_counts: pd.DataFrame, min_num_edges: int, min_num_groups: int) -> set[int]:
-    """
-    Determine groups to exclude from plots
-
-    Considers groups in sorted order and locates the first and last group which has less than
-    ``min_num_edges``. Cuts groups that are less than the first or greater than the last group. Some
-    groups between these endpoints may still have less than `min_num_edges`. If the the number of
-    groups present after removing the outliers is less than `min_group_size`, the upper cutoff
-    index is incremented until the group size meets the minimum or no more groups are left to
-    include.
-
-    Parameters
-    ----------
-        group_metadata
-            cache metadata from `group_output_data`
-
-        min_num_edges
-            minimum number of edges needed to retain a group
-
-        min_num_groups
-            keep at least this many groups (may override min_num_edges)
-
-    Returns
-    -------
-        A set of group numbers to exclude
-    """
-    sizes = sorted(group_edge_counts.itertuples(index=False))
-
-    lower_bound_idx = 0
-    upper_bound_idx = 0
-    # find first group with at least min_num_edges edges
-    for i, t in enumerate(sizes):
-        if t.edge_count >= min_num_edges:
-            lower_bound_idx = i
-            break
-
-    # find last group with at least min_num_edges edges
-    for i, t in enumerate(reversed(sizes)):
-        if t.edge_count >= min_num_edges:
-            upper_bound_idx = i
-            break
-
-    # ensure we have at least min_num_groups, walk upper index forward if not
-    while upper_bound_idx < len(sizes) and upper_bound_idx - lower_bound_idx + 1 < min_num_groups:
-        upper_bound_idx += 1
-    # extract `alignment_score`s from sizes array, put in Set of O(1) lookups in subsequent filter
-    if upper_bound_idx - lower_bound_idx + 1 < min_num_groups:
-        return set()
-    else:
-        groups_to_keep = set(k.alignment_score for k in sizes[lower_bound_idx:-upper_bound_idx])
-        return set([k.alignment_score for k in sizes]) - groups_to_keep
-
-
-def delete_outlying_groups(stats: pd.DataFrame, groups_to_delete: set) -> pd.DataFrame:
-    """
-    Removes outlying groups from metadata
-
-    Parameters
-    ----------
-        stats
-            dataframe of boxplot stats
-
-        groups_to_delete
-            set of alignment scores to exclude from the returned dataframe
-
-    Returns
-    -------
-        Metadata dict with groups removed
-    """
-    return stats[~stats["alignment_score"].isin(groups_to_delete)]
 
 def main(
     boxplot_stats,

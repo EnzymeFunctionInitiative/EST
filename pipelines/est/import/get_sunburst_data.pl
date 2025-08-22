@@ -109,18 +109,18 @@ connection parameters are specified in the C<--efi-config> file.
 =item C<--sequence-meta-file> (required, default value)
 
 Path to the file containing sequence metadata, such as sequence source.
-Defaults to C<sequence_metadata.tab> in the current directory.
+Defaults to C<sequence_metadata.tab> in the current directory if not specified.
 
 =item C<--accession-table-file> (required, default value)
 
 Path to the file containing the accession ID mapping table.
-Defaults to C<accession_table.tab> in the current directory.
+Defaults to C<accession_table.tab> in the current directory if not specified.
 
 =item C<--sunburst-data-file> (required, default value)
 
 Path to the output file that will contain the JSON data necessary for the web UI to display
 sunburst diagrams.
-Defaults to C<sunburst_tax.json> in the current directory.
+Defaults to C<sunburst_tax.json> in the current directory if not specified.
 
 =item C<--pretty-print> (optional)
 

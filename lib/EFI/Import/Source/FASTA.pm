@@ -53,7 +53,7 @@ sub init {
         return undef;
     }
 
-    $self->{map_file} = $config->{seq_mapping_file};
+    $self->{map_file} = $config->{sequence_mapping_file};
 
     return 1;
 }

@@ -29,7 +29,7 @@ sub addImportOptions {
     $self->SUPER::addImportOptions();
 
     $self->addOption("uploaded-fasta=s", 1, "user-specified FASTA file containing sequences to use for all-by-all", OPT_FILE);
-    $self->addOption("seq-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir", OPT_FILE);
+    $self->addOption("sequence-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir", OPT_FILE);
     $self->addOption("sequence-meta-file=s", 0, "file containing sequence metadata (post filtering)", OPT_FILE);
     $self->addOption("output-sequence-file=s", 0, "path to output file to save sequences in; defaults into --output-dir", OPT_FILE);
     $self->addOption("sequence-ids-file=s", 0, "path to output file to save sequences IDs in; defaults into --output-dir", OPT_FILE);
@@ -49,8 +49,8 @@ sub validateOptions {
 
     my @errors;
 
-    $opts->{seq_mapping_file} = get_default_path("seq_mapping", $outputDir) if not $opts->{seq_mapping_file};
-    push @errors, "Error: invalid --seq-mapping-file path '$opts->{seq_mapping_file}'" if not -f $opts->{seq_mapping_file};
+    $opts->{sequence_mapping_file} = get_default_path("sequence_mapping", $outputDir) if not $opts->{sequence_mapping_file};
+    push @errors, "Error: invalid --sequence-mapping-file path '$opts->{sequence_mapping_file}'" if not -f $opts->{sequence_mapping_file};
     $opts->{sequence_meta_file} = get_default_path("sequence_meta", $outputDir) if not $opts->{sequence_meta_file};
     push @errors, "Error: invalid --sequence-meta-file path '$opts->{sequence_meta_file}'" if not -f $opts->{sequence_meta_file};
 
