@@ -11,7 +11,8 @@ process color_ssn {
         path "color_ssn.xgmml", emit: "ssn_output"
     """
     perl $projectDir/color_xgmml.pl --ssn $ssn_file --color-ssn color_ssn.xgmml \
-        --cluster-map $cluster_id_map --cluster-num-map $cluster_num_map --cluster-color-map $cluster_colors
+        --cluster-map $cluster_id_map --cluster-num-map $cluster_num_map --cluster-color-map $cluster_colors \
+        --stats stats.json
     """
 }
 

@@ -17,6 +17,7 @@ use EFI::Sequence::Collection;
 use EFI::Sequence::Type qw(get_sequence_type);
 use EFI::SSN::XgmmlWriter;
 use EFI::Util::FASTA qw(read_fasta_file);
+use EFI::Util::FileStats qw(save_stats);
 
 use constant DEFAULT_MAX_EDGES => 10000000;
 use constant VALID => 1;
@@ -53,7 +54,7 @@ my $writer = new EFI::SSN::XgmmlWriter(output_file => $opts->{output}, use_min_e
 $writer->write($inputIds, $sequences, $connectivity, $title, $edges);
 
 
-saveStats($opts->{stats}, $writer->getStats()) if $opts->{stats};
+save_stats($opts->{stats}, $writer->getStats()) if $opts->{stats};
 
 
 
@@ -69,44 +70,6 @@ saveStats($opts->{stats}, $writer->getStats()) if $opts->{stats};
 
 
 
-
-
-#
-# saveStats
-#
-# Saves SSN statistics to a JSON-formatted output file.
-#
-# Parameters:
-#    $stats - hash ref returned from EFI::SSN::XgmmlWriter
-#
-sub saveStats {
-    my $file = shift;
-    my $stats = shift;
-
-    my $mergedStats = {};
-    if (-f $file) {
-        my $json = "";
-        open my $fh, "<", $file or die "Unable to open existing stats file '$file': $!";
-        while (my $line = <$fh>) {
-            chomp $line;
-            $json .= $line;
-        }
-        close $fh;
-
-        $mergedStats = decode_json($json);
-        $mergedStats = {} if not $mergedStats;
-    }
-
-    foreach my $key (keys %$stats) {
-        $mergedStats->{$key} = $stats->{$key};
-    }
-
-    my $json = encode_json($mergedStats);
-
-    open my $fh, ">", $file or die "Unable to write to stats file '$file': $!";
-    $fh->print($json);
-    close $fh;
-}
 
 
 #
@@ -238,7 +201,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("db-version=s", 0, "EFI database version");
     $optParser->addOption("use-min-edge-attr", 0, "only use the minimum number of edge attributes required; makes file size smaller");
     $optParser->addOption("nc-map=s", 0, "path to a network connectivity map file");
-    $optParser->addOption("stats=s", 0, "path to file containing SSN statistics");
+    $optParser->addOption("stats=s", 0, "path to file to output SSN statistics to");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();

@@ -25,6 +25,8 @@ sub new {
     $self->{output_file} = $args{gnn_file};
     $self->{colors} = $args{colors} // new EFI::Util::Colors;
 
+    $self->{stats} = { num_nodes => 0, num_edges => 0 };
+
     return $self;
 }
 
@@ -125,6 +127,7 @@ sub writeEdge {
     my $source = shift;
     my $target = shift;
     $self->emptyTag("edge", label => "$source to $target", source => $source, target => $target);
+    $self->{stats}->{num_edges}++;
 }
 
 
@@ -141,6 +144,20 @@ sub writeNode {
     }
 
     $self->endTag("node");
+
+    $self->{stats}->{num_nodes}++;
+}
+
+
+# public
+sub getStats {
+    my $self = shift;
+    my $fileName = fileparse($self->{output_file});
+    my $fileSize = -s $self->{output_file};
+    my $info = { num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize };
+    $info->{type} = $self->{network_type} if $self->{network_type};
+    my $stats = { $fileName => $info };
+    return $stats;
 }
 
 
@@ -176,6 +193,8 @@ B<EFI::GNT::GNN::XgmmlWriter> - Perl interface for writing XGMML files for vario
     $xwriter->writeEdge("node1", "node2");
 
     $xwriter->close();
+
+    my $stats = $xwriter->getStats();
 
 
 =head2 DESCRIPTION
@@ -409,6 +428,33 @@ The target node Id
     $xwriter->writeEdge("cluster_id", "pfam_id", "cluster_id to pfam_id");
     # renders as:
     #   <edge source="cluster_id" target="pfam_id" label="cluster_id to pfam_id" />
+
+
+=head3 C<getStats()>
+
+Returns statistics, such as the number of nodes and edges, which are computed as the file is
+written.  The statistics can be written to a file for use by an external application.
+
+=head4 Returns
+
+Hash ref containing a single key-value, with the key being the output file name and the value
+being the statistics that will be written.
+
+    # {
+    #     "file_name.xgmml" => {
+    #         num_nodes => 100,
+    #         num_edges => 1000,
+    #         size => 10000
+    #     }
+    # }
+
+=head4 Example Usage
+
+    use EFI::Util::FileStats qw(save_stats);
+
+    my $stats = $xwriter->getStats();
+
+    save_stats("stats.json", $stats);
 
 
 =cut

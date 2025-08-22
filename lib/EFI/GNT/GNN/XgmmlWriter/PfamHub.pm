@@ -25,6 +25,8 @@ sub new {
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
     $self->{util} = new EFI::GNT::GNN::XgmmlWriter::Util(gnt_anno => $args{gnt_anno});
 
+    $self->{network_type} = "pfam_hub";
+
     return $self;
 }
 

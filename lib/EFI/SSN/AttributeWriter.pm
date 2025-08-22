@@ -7,7 +7,7 @@ use warnings;
 use XML::LibXML::Reader;
 
 use Cwd qw(abs_path);
-use File::Basename qw(dirname);
+use File::Basename;
 use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::Annotations;
@@ -64,6 +64,8 @@ sub write {
     #      2) node ID (the value from the SSN 'id' attribute on a 'node' element); and
     #      3) node label (the sequence ID)
 
+    my $stats = { num_nodes => 0, num_edges => 0 };
+
     while ($reader->read) {
         my $ntype = $reader->nodeType;
         my $nname = $reader->name;
@@ -75,6 +77,7 @@ sub write {
                 map { $_->onNodeStart($seqId, $id); } @{ $self->{attr_handlers} };
                 my @attr = ("id" => $id, "label" => $seqId);
                 $self->startTag("node", @attr);
+                $stats->{num_nodes}++;
             } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
                 $self->endTag("node");
                 map { $_->onNodeEnd(); } @{ $self->{attr_handlers} };
@@ -87,6 +90,7 @@ sub write {
             }
         } elsif ($nname eq "edge") {
             $self->copyEdge();
+            $stats->{num_edges}++ if $ntype == XML_READER_TYPE_ELEMENT; # increment if start element
         } else {
             if ($nname eq "graph") {
                 $self->processGraphElement($ntype);
@@ -97,6 +101,16 @@ sub write {
     }
 
     $self->close();
+}
+
+
+# public
+sub getStats {
+    my $self = shift;
+    my $fileName = fileparse($self->{output_file});
+    my $fileSize = -s $self->{output_file};
+    my $stats = { $fileName => { type => "colorssn", num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize } };
+    return $stats;
 }
 
 
@@ -399,6 +413,34 @@ Adds a handler to the list of handlers that are called for each node attribute.
 An object derived from B<EFI::SSN::AttributeWriter::Handler>.
 
 =back
+
+
+=head3 C<getStats()>
+
+Returns statistics, such as the number of nodes and edges, which are computed as the file is
+written.  The statistics can be written to a file for use by an external application.
+
+=head4 Returns
+
+Hash ref containing a single key-value, with the key being the output file name and the value
+being the statistics that will be written.
+
+    # {
+    #     "file_name.xgmml" => {
+    #         type => "colorssn",
+    #         num_nodes => 100,
+    #         num_edges => 1000,
+    #         size => 10000
+    #     }
+    # }
+
+=head4 Example Usage
+
+    use EFI::Util::FileStats qw(save_stats);
+
+    my $stats = $xwriter->getStats();
+
+    save_stats("stats.json", $stats);
 
 
 =cut

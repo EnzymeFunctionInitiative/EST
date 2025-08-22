@@ -12,6 +12,7 @@ use EFI::SSN::AttributeWriter;
 use EFI::SSN::AttributeWriter::Handler::Color;
 use EFI::SSN::Util::ID qw(parse_cluster_num_map parse_cluster_map_file);
 use EFI::Util::Colors;
+use EFI::Util::FileStats qw(save_stats);
 
 
 
@@ -36,6 +37,11 @@ $xwriter->addAttributeHandler($colorHandler);
 
 
 $xwriter->write();
+
+
+my $stats = $xwriter->getStats();
+
+save_stats($opts->{stats}, $stats) if $opts->{stats};
 
 
 
@@ -65,6 +71,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("cluster-map=s", 1, "path to input file mapping node index (col 1) to cluster numbers (num by seq, num by nodes)", OPT_FILE);
     $optParser->addOption("cluster-num-map=s", 1, "path to input file containing the mapping of cluster number to cluster sizes", OPT_FILE);
     $optParser->addOption("cluster-color-map=s", 1, "path to input file mapping cluster number (sequence count) to a color", OPT_FILE);
+    $optParser->addOption("stats=s", 0, "path to file to output SSN statistics to");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -100,7 +107,7 @@ B<color_xgmml.pl> - read a SSN XGMML file and write it to a new file after addin
 =head2 SYNOPSIS
 
     color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
-        --cluster-color-map <FILE>
+        --cluster-color-map <FILE> [--stats <FILE>]
 
 =head2 DESCRIPTION
 
@@ -132,6 +139,10 @@ with the columns being seq-cluster-num, seq-cluster-size, node-cluster-num, node
 
 Path to a file that maps cluster number based on sequence count to the color
 as determined by the pipeline upstream
+
+=item C<--stats>
+
+Optional path to a file to write statistics (e.g. number of nodes, edges) to.
 
 =back
 
