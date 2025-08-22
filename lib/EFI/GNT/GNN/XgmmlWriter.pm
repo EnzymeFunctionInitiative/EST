@@ -8,7 +8,7 @@ use XML::Writer;
 use IO::File;
 
 use Cwd qw(abs_path);
-use File::Basename qw(dirname);
+use File::Basename;
 use lib dirname(abs_path(__FILE__)) . "/../../../";
 
 use EFI::Annotations;

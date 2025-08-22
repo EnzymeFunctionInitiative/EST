@@ -4,6 +4,8 @@ package EFI::Util::FileStats;
 use strict;
 use warnings;
 
+use JSON;
+
 use Exporter qw(import);
 our @EXPORT = qw(save_stats);
 
