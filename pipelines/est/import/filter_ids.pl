@@ -19,8 +19,8 @@ use EFI::Options;
 use EFI::Sequence::Collection;
 
 
-my $defaultPredefTaxFiltFileName = "assets/predefined_taxonomy_filters.yml";
-my $defaultPredefTaxFiltFile = "$FindBin::Bin/../../../$defaultPredefTaxFiltFileName";
+my $defaultPredefTaxFiltFileName = "predefined_taxonomy_filters.yml";
+my $defaultPredefTaxFiltFile = "$FindBin::Bin/../../shared/assets/$defaultPredefTaxFiltFileName";
 
 
 my $optionParser = new EFI::Import::Config::Filter(predef_filter_file => $defaultPredefTaxFiltFile);
