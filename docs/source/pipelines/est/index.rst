@@ -99,7 +99,7 @@ EST pipeline-specific arguments for the various modes are:
       or **accessions**, then only UniRef sequences are retrieved for the
       specified families.
 
-  * ``--exclude-fragments``: include only complete sequences in the computation;
+  * ``--filter fragments``: include only complete sequences in the computation;
     i.e. exclude the UniProt database.
 
 See :doc:`../../reference/common_args` for information on the other, required
