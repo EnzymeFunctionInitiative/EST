@@ -28,6 +28,8 @@ sub new {
     #$self->{colors} is created by the parent class
     $self->{cooc_threshold} = DEFAULT_COOCCURRENCE_THRESHOLD;
 
+    $self->{network_type} = "cluster_hub";
+
     return $self;
 }
 

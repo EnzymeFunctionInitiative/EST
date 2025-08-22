@@ -18,6 +18,7 @@ use EFI::GNT::GNN::XgmmlWriter::PfamHub;
 use EFI::GNT::GNN::XgmmlWriter::ClusterHub;
 use EFI::Options;
 use EFI::SSN::Util::ID qw(parse_cluster_map_file);
+use EFI::Util::FileStats qw(save_stats);
 
 
 use constant DEFAULT_NEIGHBORHOOD_SIZE => 20;
@@ -79,6 +80,25 @@ if ($opts->{gnd}) {
     }
 }
 
+my $pfamHubStats = $pfamHubWriter->getStats();
+my $clusterHubStats = $clusterHubWriter->getStats();
+
+my %stats = (%$pfamHubStats, %$clusterHubStats);
+save_stats($opts->{stats}, \%stats) if $opts->{stats};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -101,6 +121,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
     $optParser->addOption("title=s", 0, "title of the GNN and GND for display purposes");
+    $optParser->addOption("stats=s", 0, "path to file to output SSN statistics to");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -125,6 +146,7 @@ C<create_gnns.pl> - read a SSN XGMML file and write it to a new file after addin
         --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
         [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
         [--nb-size <INTEGER> --cooc-threshold <NUMBER> --title "<TITLE>"]
+        [--stats <FILE>]
 
 
 =head2 DESCRIPTION
@@ -210,6 +232,10 @@ Name of the database to use (path to file for SQLite).
 =item C<--title>
 
 Optional title to use for display purposes in the GND viewer.
+
+=item C<--stats>
+
+Optional path to a file to write statistics (e.g. number of nodes, edges) to.
 
 =back
 

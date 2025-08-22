@@ -36,7 +36,8 @@ process create_gnns {
         --nb-size ${params.nb_size} \
         --cooc-threshold ${params.cooc_threshold} \
         --config ${params.efi_config} \
-        --db-name ${params.efi_db}
+        --db-name ${params.efi_db} \
+        --stats stats.json
     """
 }
 
@@ -54,7 +55,8 @@ process color_gnt_ssn {
     """
     perl $projectDir/color_gnt_xgmml.pl --ssn $ssn_file --color-gnt-ssn color_ssn.xgmml \
         --metanode-map ${metanode_map} --gnd ${gnd} --cluster-map $cluster_id_map \
-        --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt
+        --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt \
+        --stats stats.json
     """
 }
 

@@ -14,6 +14,7 @@ use EFI::SSN::AttributeWriter::Handler::Color;
 use EFI::SSN::AttributeWriter::Handler::GNT;
 use EFI::SSN::Util::ID qw(parse_cluster_num_map parse_cluster_map_file parse_metanode_map_file);
 use EFI::Util::Colors;
+use EFI::Util::FileStats qw(save_stats);
 
 
 
@@ -46,6 +47,10 @@ $xwriter->addAttributeHandler($gntHandler);
 
 $xwriter->write();
 
+
+my $stats = $xwriter->getStats();
+
+save_stats($opts->{stats}, $stats) if $opts->{stats};
 
 
 
@@ -146,6 +151,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("cluster-color-map=s", 1, "path to input file mapping cluster number (sequence count) to a color", OPT_FILE);
     $optParser->addOption("metanode-map=s", 1, "path to input file mapping metanode (e.g. UniRef node) to members of metanode", OPT_FILE);
     $optParser->addOption("gnd=s", 1, "path to input SQLite file with GNDs; used to obtain GNT data", OPT_FILE);
+    $optParser->addOption("stats=s", 0, "path to file to output SSN statistics to");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -183,7 +189,7 @@ B<color_gnt_xgmml.pl> - read a SSN XGMML file and write it to a new file after a
 =head2 SYNOPSIS
 
     color_gnt_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
-        --cluster-color-map <FILE> --metanode-map <FILE> --gnd <FILE>
+        --cluster-color-map <FILE> --metanode-map <FILE> --gnd <FILE> [--stats <FILE>]
 
 =head2 DESCRIPTION
 
@@ -226,6 +232,10 @@ in the metanode.  The file will be empty if the input SSN is a UniProt network
 
 Path to a GND file (SQLite format) that contains genome context data; used to obtain neighbor
 families and ENA status and ID; output from a previous step
+
+=item C<--stats>
+
+Optional path to a file to write statistics (e.g. number of nodes, edges) to.
 
 =back
 

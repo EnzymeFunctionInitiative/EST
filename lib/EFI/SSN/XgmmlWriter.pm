@@ -4,10 +4,9 @@ package EFI::SSN::XgmmlWriter;
 use strict;
 use warnings;
 
+use Cwd qw(abs_path);
 use File::Basename;
-use FindBin;
-
-use lib "$FindBin::Bin/../..";
+use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations :source FIELD_CYTOSCAPE_COLOR);
