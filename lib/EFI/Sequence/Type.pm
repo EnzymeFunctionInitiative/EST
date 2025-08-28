@@ -10,18 +10,19 @@ use Exporter qw(import);
 use constant SEQ_UNIPROT => "uniprot";
 use constant SEQ_UNIREF50 => "uniref50";
 use constant SEQ_UNIREF90 => "uniref90";
+use constant SEQ_REPNODE => "repnode";
 use constant SEQ_DOMAIN => "domain";
 use constant SEQ_FULL => "full";
 
 
-our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL);
-our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90', 'SEQ_DOMAIN', 'SEQ_FULL']);
+our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL SEQ_REPNODE);
+our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90', 'SEQ_DOMAIN', 'SEQ_FULL', 'SEQ_REPNODE']);
 Exporter::export_ok_tags('types');
 
 
 sub get_sequence_version {
     my $param = lc (shift // "");
-    if ($param ne SEQ_UNIREF90 and $param ne SEQ_UNIREF50) {
+    if ($param ne SEQ_UNIREF90 and $param ne SEQ_UNIREF50 and $param ne SEQ_REPNODE) {
         return SEQ_UNIPROT;
     }
     return $param;
@@ -91,8 +92,9 @@ ID type for which to validate the UniProt version.
 
 =head4 Returns
 
-One of C<SEQ_UNIPROT>, C<SEQ_UNIREF50>, or C<SEQ_UNIREF90>.  If the input is identified as UniRef90
-or UniRef50 then C<SEQ_UNIREF90> or C<SEQ_UNIREF50> are returned, otherwise for all other values
+One of C<SEQ_UNIPROT>, C<SEQ_UNIREF50>, C<SEQ_UNIREF90>, or C<SEQ_REPNODE>.  If the input is
+identified as UniRef90 or UniRef50 then C<SEQ_UNIREF90> or C<SEQ_UNIREF50> are returned, or the
+input is identified as a RepNode then C<SEQ_REPNODE> is returned, otherwise for all other values
 C<SEQ_UNIPROT> is returned.
 
 =head4 Example Usage
@@ -146,6 +148,28 @@ For UniRef50 (C<uniref50>) ID types.
 
 For UniRef90 (C<uniref90>) ID types.
 
+For UniProt (C<uniprot>) ID types.
+
+=item C<SEQ_UNIREF50>
+
+For UniRef50 (C<uniref50>) ID types.
+
+=item C<SEQ_UNIREF90>
+
+For UniRef90 (C<uniref90>) ID types.
+
+=item C<SEQ_REPNODE>
+
+For RepNode (C<repnode>) ID types (these come from representative node networks).
+
+=item C<SEQ_FULL>
+
+For IDs that represent full sequences.
+
+=item C<SEQ_DOMAIN>
+
+For IDs that represent family domain portions of a sequence.
+
 =back
 
 
@@ -179,32 +203,6 @@ sequence.
     print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
     #prints "Sequence B0SS75 is domain"
 
-
-=head2 CONSTANTS
-
-=over
-
-=item C<SEQ_UNIPROT>
-
-For UniProt (C<uniprot>) ID types.
-
-=item C<SEQ_UNIREF50>
-
-For UniRef50 (C<uniref50>) ID types.
-
-=item C<SEQ_UNIREF90>
-
-For UniRef90 (C<uniref90>) ID types.
-
-=item C<SEQ_FULL>
-
-For IDs that represent full sequences.
-
-=item C<SEQ_DOMAIN>
-
-For IDs that represent family domain portions of a sequence.
-
-=back
 
 =cut
 

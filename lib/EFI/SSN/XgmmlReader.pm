@@ -145,10 +145,9 @@ sub processAtt {
     my $value = $reader->getAttribute("value");
     my $type = $reader->getAttribute("type") // "string";
 
-    # Only process node attributes
-    my $currentNodeId = $self->{current_node_id};
-    if ($currentNodeId) {
-        $self->processNodeAttribute($name, $value, $type);
+    # Only process node att (attributes), not att from edge or graph
+    if ($self->{current_node_id}) {
+        $self->processNodeAttribute($self->{current_node_id}, $name, $value, $type);
     }
 }
 

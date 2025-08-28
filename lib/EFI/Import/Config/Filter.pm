@@ -67,7 +67,8 @@ sub validateOptions {
 
     $opts->{sequence_version} = get_sequence_version($opts->{sequence_version});
 
-    # Parse the filter options provided on the command line
+    # Parse the filter options provided on the command line.  If no filter is given then
+    # the input is written to the output, and the retrieval IDs file is created.
     my $filter = $opts->{filter} || {};
     $opts->{fraction} = ($filter->{fraction} and $filter->{fraction} =~ m/^\d+$/) ? $filter->{fraction} : 1;
     $opts->{remove_fragments} = exists $filter->{fragments} ? 1 : 0;
