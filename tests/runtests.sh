@@ -16,7 +16,7 @@ if [[ ! -e pipelines/generatessn/generatessn.nf || ! -e pipelines/est/est.nf ]];
 fi
 
 if [[ $# -ne 1 ]]; then
-    CONFIG_FILE="docker.config"
+    CONFIG_FILE="conf/docker.config"
 else
     CONFIG_FILE=$1
 fi

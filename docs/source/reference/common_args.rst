@@ -23,8 +23,8 @@ Nextflow Executors
 
 Each type of EFI pipeline has a set of Nextflow config files used to set up a Nextflow executor,
 and these are contained in the ``conf/`` subdirectory of the EFI repository. Currently-supported
-executors include Docker (``conf/<pipeline>/docker.config``), Singularity
-(``conf/<pipeline>/singularity.config``), Slurm (``conf/<pipeline>/slurm.config``), and PBS Pro
-(``conf/<pipeline>/pbspro.config``). When creating a pipeline execution script, one of these must
+executors include Docker (``conf/docker.config``), Singularity
+(``conf/singularity.config``), Slurm (``conf/slurm.config``), and PBS Pro
+(``conf/pbspro.config``). When creating a pipeline execution script, one of these must
 be passed to the program that creates the script with the ``--nextflow-config`` argument.
 
