@@ -30,7 +30,7 @@ sub new {
     $self->{network} = $args{seq_cluster_id_map};
     $self->{gnt_anno} = $args{gnt_anno};
 
-    if ($args{neighborhood_size} and $args{neighborhood_size} > MAX_NB_SIZE) {
+    if ($args{neighborhood_size} and $args{neighborhood_size} <= MAX_NB_SIZE) {
         $self->{neighborhood_size} = $args{neighborhood_size};
     } else {
         $self->{neighborhood_size} = MAX_NB_SIZE;
