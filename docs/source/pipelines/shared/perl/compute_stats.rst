@@ -15,7 +15,7 @@ Usage
 	    --cluster-map         path to a file mapping sequence ID to cluster number
 	    --seqid-source-map    path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)
 	    --singletons          path to a file containing a list of singletons
-	    --stats               path to an output file to save statistics to
+	    --stats               path to an output file in JSON format to save statistics to
 
 Reference
 ---------
@@ -63,4 +63,5 @@ Arguments
    without any edges)
 
 ``--stats``
-   Path to an output file to put the stats in
+   Path to an output file to put the stats in. The file format will be
+   JSON

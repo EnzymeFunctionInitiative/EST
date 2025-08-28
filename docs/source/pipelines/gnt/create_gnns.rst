@@ -8,7 +8,7 @@ Usage
 	Usage: perl pipelines/gnt/create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
 	    --config <FILE> --db-name <VALUE> [--gnd <FILE>] [--cooc-table <FILE>] [--hub-count <FILE>]
 	    [--nb-pfam-list-dir <DIR_PATH>] [--no-context <FILE>] [--nb-size <VALUE>]
-	    [--cooc-threshold <VALUE>] [--title <VALUE>]
+	    [--cooc-threshold <VALUE>] [--title <VALUE>] [--stats <VALUE>]
 	
 	Description:
 	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline
@@ -27,6 +27,7 @@ Usage
 	    --config              path to the config file for database connection
 	    --db-name             name of the EFI database to connect to for retrieving UniRef sequences
 	    --title               title of the GNN and GND for display purposes
+	    --stats               path to file to output SSN statistics to
 
 Reference
 ---------
@@ -49,6 +50,7 @@ SYNOPSIS
        --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
        [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
        [--nb-size <INTEGER> --cooc-threshold <NUMBER> --title "<TITLE>"]
+       [--stats <FILE>]
 
 
 
@@ -127,3 +129,7 @@ Arguments
 
 ``--title``
    Optional title to use for display purposes in the GND viewer.
+
+``--stats``
+   Optional path to a file to write statistics (e.g. number of nodes,
+   edges) to.

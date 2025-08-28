@@ -68,16 +68,16 @@ Arguments
 ``--sequence-meta-file`` (required, default value)
    Path to the file containing sequence metadata, such as sequence
    source. Defaults to ``sequence_metadata.tab`` in the current
-   directory.
+   directory if not specified.
 
 ``--accession-table-file`` (required, default value)
    Path to the file containing the accession ID mapping table. Defaults
-   to ``accession_table.tab`` in the current directory.
+   to ``accession_table.tab`` in the current directory if not specified.
 
 ``--sunburst-data-file`` (required, default value)
    Path to the output file that will contain the JSON data necessary for
    the web UI to display sunburst diagrams. Defaults to
-   ``sunburst_tax.json`` in the current directory.
+   ``sunburst_tax.json`` in the current directory if not specified.
 
 ``--pretty-print`` (optional)
    Indicates if the JSON output should be human-readable. Defaults to
