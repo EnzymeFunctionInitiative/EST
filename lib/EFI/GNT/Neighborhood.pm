@@ -48,8 +48,6 @@ sub findNeighbors {
     my $queryId = shift;
     my $neighborhoodSize = shift;
 
-    my $neighborsWithoutFamily = {};
-
     # Get information for the query accession
     my ($error, $pos, $queryAttributes) = $self->processQueryId($queryId, $neighborhoodSize);
     my $queryIdData = {attributes => $queryAttributes, neighbors => []};

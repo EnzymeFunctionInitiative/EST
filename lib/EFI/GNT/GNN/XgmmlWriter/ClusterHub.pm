@@ -14,7 +14,7 @@ use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
 use EFI::Annotations::Fields qw(FIELD_CYTOSCAPE_COLOR);
 use EFI::GNT::GNN::XgmmlWriter::Util;
-use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE DEFAULT_COOCCURRENCE_THRESHOLD);
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE);
 
 
 sub new {
@@ -26,7 +26,6 @@ sub new {
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
     $self->{util} = new EFI::GNT::GNN::XgmmlWriter::Util(gnt_anno => $args{gnt_anno});
     #$self->{colors} is created by the parent class
-    $self->{cooc_threshold} = DEFAULT_COOCCURRENCE_THRESHOLD;
 
     $self->{network_type} = "cluster_hub";
 
@@ -58,6 +57,7 @@ sub write {
 
             my $nodeAttr = $self->getSpokeData($clusterNum, $pfamHubName, $hub->{spokes}->{$pfamHubName}, $pfamLongName);
 
+            $pfamShortName = NONE_PFAM if not $pfamShortName;
             $self->writeNode($spokeNodeId, "$pfamShortName", $nodeAttr);
             $self->writeEdge($clusterNum, $spokeNodeId);
         }

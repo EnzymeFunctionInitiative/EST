@@ -13,6 +13,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
 use EFI::Annotations::Fields qw(FIELD_CYTOSCAPE_COLOR);
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM);
 use EFI::GNT::GNN::XgmmlWriter::Util;
 
 
@@ -59,6 +60,7 @@ sub write {
         if (@clusterNums) {
             my $nodeAttr = $self->getHubData($pfamHubName, $hub);
             my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
+            $pfamShortName = NONE_PFAM if not $pfamShortName;
             $self->writeNode($pfamHubName, "$pfamShortName", $nodeAttr);
         }
     }
