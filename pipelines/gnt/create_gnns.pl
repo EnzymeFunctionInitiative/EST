@@ -17,7 +17,8 @@ use EFI::GNT::GNN::TableWriter;
 use EFI::GNT::GNN::XgmmlWriter::PfamHub;
 use EFI::GNT::GNN::XgmmlWriter::ClusterHub;
 use EFI::Options;
-use EFI::SSN::Util::ID qw(parse_cluster_map_file);
+use EFI::Sequence::Type qw(:types get_sequence_version);
+use EFI::SSN::Util::ID qw(parse_cluster_map_file parse_metanode_map_file resolve_mapping);
 use EFI::Util::FileStats qw(save_stats);
 
 
@@ -39,6 +40,17 @@ if (not $dbh) {
 
 
 my $idMap = parse_cluster_map_file($opts->{cluster_map});
+if (not $idMap) {
+    die "Input --cluster-map file was empty\n";
+}
+
+if ($opts->{metanode_map}) {
+    my ($metanodeType, $metanodeMapping) = parse_metanode_map_file($opts->{metanode_map});
+    if (get_sequence_version($metanodeType) ne SEQ_UNIPROT) {
+        $idMap = resolve_mapping($idMap, $metanodeType, $metanodeMapping);
+    }
+}
+
 
 my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno, neighborhood_size => $opts->{nb_size});
@@ -109,6 +121,7 @@ sub validateAndProcessOptions {
     my $optParser = new EFI::Options(app_name => $0, desc => "Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline");
 
     $optParser->addOption("cluster-map=s", 1, "path to a file mapping sequence ID to cluster number", OPT_FILE);
+    $optParser->addOption("metanode-map=s", 0, "path to input file mapping metanode (e.g. UniRef node) to members of metanode", OPT_FILE);
     $optParser->addOption("cluster-gnn=s", 1, "path to the output cluster hub-spoke GNN XGMML file", OPT_FILE);
     $optParser->addOption("pfam-gnn=s", 1, "path to the output Pfam hub-spoke GNN XGMML file", OPT_FILE);
     $optParser->addOption("gnd=s", 0, "path to the output GND file", OPT_FILE);
@@ -143,18 +156,18 @@ C<create_gnns.pl> - read a SSN XGMML file and write it to a new file after addin
 =head2 SYNOPSIS
 
     create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
-        --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
-        [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
-        [--nb-size <INTEGER> --cooc-threshold <NUMBER> --title "<TITLE>"]
-        [--stats <FILE>]
+        --config <FILE> --db-name <NAME> [--metanode-map <FILE> --gnd <FILE>]
+        [--cooc-table <FILE> --hub-count <FILE> --nb-pfam-list-dir <DIR>]
+        [--no-context FILE --nb-size <INTEGER> --cooc-threshold <NUMBER>]
+        [--title "<TITLE>" --stats <FILE>]
 
 
 =head2 DESCRIPTION
 
 C<create_gnns.pl> reads a list of sequences and corresponding cluster numbers and
-creates XGMML files for a cluster GNN and Pfam GNN. It optionally can create tables
-and metadata with data about the Pfams of neighbors in the input IDs and a genome
-neighborhood diagram (GND) file.
+creates XGMML files for a cluster GNN and Pfam GNN.  It optionally can create
+tables and metadata with data about the Pfams of neighbors in the input IDs and a
+genome neighborhood diagram (GND) file.  The input IDs are assumed to be UniProt.
 
 =head3 Arguments
 
@@ -166,6 +179,14 @@ Path to the input file that maps UniProt sequence ID to a cluster number, which
 can include a list of singletons (i.e. no cluster number columns).  See
 C<parse_cluster_map_file()> in B<EFI::SSN::Util::ID> for an explanation of the
 file format.
+
+=item C<--metanode-map>
+
+Path to the file that maps input nodes in the cluster-map to UniProt IDs within
+the metanode.  This is optional, in which case the input network is assumed to
+be a UniProt network, as is the case when the file is empty.  See
+C<ssn_to_id_list.pl> and C<parse_metanode_map_file()> in B<EFI::SSN::Util::ID>
+for more details.
 
 =item C<--cluster-gnn>
 

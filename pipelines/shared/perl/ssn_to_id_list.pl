@@ -31,8 +31,10 @@ my $indexSeqIdMap = $parser->getIndexSeqIdMap();
 my $nodeSizeMap = $parser->getMetanodeSizes();
 saveIndexSeqIdMapping($indexSeqIdMap, $nodeSizeMap, $opts->{index_seqid}, ["node_index", "node_seqid", "node_size"]);
 
-my $idIndexMap = $parser->getIdIndexMap();
-saveMapping($idIndexMap, $opts->{id_index}, ["node_id", "node_index"]);
+if ($opts->{id_index}) {
+    my $idIndexMap = $parser->getIdIndexMap();
+    saveMapping($idIndexMap, $opts->{id_index}, ["node_id", "node_index"]);
+}
 
 my $metanodeType = $parser->getMetanodeType();
 my $metanodeMap = $parser->getMetanodes();
@@ -204,7 +206,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("ssn=s", 1, "path to XGMML (XML) SSN file", OPT_FILE);
     $optParser->addOption("edgelist=s", 1, "path to an output edgelist file (two column space-separated file)", OPT_FILE);
     $optParser->addOption("index-seqid=s", 1, "path to an output file mapping node index to XGMML nodeseqid (and optionally node size for UniRef/repnodes)", OPT_FILE);
-    $optParser->addOption("id-index=s", 1, "path to an output file mapping XGMML node ID to node index", OPT_FILE);
+    $optParser->addOption("id-index=s", 0, "path to an output file mapping XGMML node ID to node index", OPT_FILE);
     $optParser->addOption("seqid-source-map=s", 1, "path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty", OPT_FILE);
     $optParser->addOption("ssn-sequences=s", 0, "optional path to an output FASTA file for saving sequences that were embedded in the SSN");
 
@@ -228,7 +230,7 @@ C<ssn_to_id_list.pl> - gets network information from a SSN
 =head2 SYNOPSIS
 
     ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE> --index-seqid <FILE>
-        --id-index <FILE> --seqid-source-map <FILE> [--ssn-sequences <FILE>]
+        --seqid-source-map <FILE> [--id-index <FILE> --ssn-sequences <FILE>]
 
 =head2 DESCRIPTION
 
@@ -268,9 +270,9 @@ An example file:
 
 =item C<--id-index>
 
-Path to a tab-separated output file that maps node ID (the C<id> attribute in a
-node) to node index.  The C<id> attribute may not be the same as the C<label>
-attribute; the latter is the sequence ID.  For example:
+Optional path to a tab-separated output file that maps node ID (the C<id>
+attribute in a node) to node index.  The C<id> attribute may not be the same
+as the C<label> attribute; the latter is the sequence ID.  For example:
 
     node_id node_index
     id1 1

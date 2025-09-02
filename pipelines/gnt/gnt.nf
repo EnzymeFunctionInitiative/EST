@@ -7,6 +7,7 @@ process create_gnns {
     input:
         path cluster_id_map
         path singletons
+        path metanode_map
     output:
         path "cluster_gnn.xgmml", emit: "cluster_gnn"
         path "pfam_gnn.xgmml", emit: "pfam_gnn"
@@ -26,6 +27,7 @@ process create_gnns {
     awk '{if(NR>1)print}' ${singletons} >> \$id_map_file
     perl $projectDir/create_gnns.pl \
         --cluster-map \$id_map_file \
+        --metanode-map $metanode_map \
         --cluster-gnn cluster_gnn.xgmml \
         --pfam-gnn pfam_gnn.xgmml \
         --gnd gnd.sqlite \
@@ -65,7 +67,7 @@ workflow {
     // color_and_retrieve workflow
     color_work = color_and_retrieve()
 
-    gnn_data = create_gnns(color_work.cluster_id_map, color_work.singletons)
+    gnn_data = create_gnns(color_work.cluster_id_map, color_work.singletons, color_work.metanode_map)
 
     // Color the SSN based on the computed clusters and add ENA data
     colored_ssn = color_gnt_ssn(color_work.ssn_file, color_work.cluster_id_map, color_work.cluster_num_map, color_work.cluster_colors, color_work.metanode_map, gnn_data.gnd)
