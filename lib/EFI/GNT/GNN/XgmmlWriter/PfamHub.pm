@@ -50,6 +50,7 @@ sub write {
         my $hub = $hubs->getPfamHub($pfamHubName, $filterOnCooccurrence);
         my @clusterNums = sort keys %$hub;
 
+        my $hasSpoke = 0;
         foreach my $clusterNum (@clusterNums) {
             # Skip singletons
             next if not $clusterNum;
@@ -59,10 +60,12 @@ sub write {
 
             $self->writeNode($spokeNodeId, "$clusterNum", $nodeAttr);
             $self->writeEdge($pfamHubName, $spokeNodeId);
+
+            $hasSpoke = 1;
         }
 
         # Only write a hub node if there were spoke nodes
-        if (@clusterNums) {
+        if ($hasSpoke) {
             my $nodeAttr = $self->getHubData($pfamHubName, $hub);
             my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
             $pfamShortName = NONE_PFAM if not $pfamShortName;
