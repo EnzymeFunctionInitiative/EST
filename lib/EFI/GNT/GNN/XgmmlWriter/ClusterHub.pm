@@ -205,7 +205,7 @@ B<EFI::GNT::GNN::XgmmlWriter::ClusterHub> - Perl helper module for writing clust
     my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 
     my $clusterGnnFile = "cluster_gnn.xgmml";
-    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
+    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(output_file => $clusterGnnFile, gnt_anno => $gntAnno);
     $clusterHubWriter->write($hubs);
 
 

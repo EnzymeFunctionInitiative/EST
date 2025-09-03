@@ -6,7 +6,7 @@ Usage
 ::
 
 	Usage: perl pipelines/shared/perl/ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE>
-	    --index-seqid <FILE> --id-index <FILE> --seqid-source-map <FILE> [--ssn-sequences <VALUE>]
+	    --index-seqid <FILE> --seqid-source-map <FILE> [--id-index <FILE>] [--ssn-sequences <VALUE>]
 	
 	Description:
 	    Parses an XGMML file to retrieve an edgelist and mapping info
@@ -36,7 +36,7 @@ SYNOPSIS
 ::
 
    ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE> --index-seqid <FILE>
-       --id-index <FILE> --seqid-source-map <FILE> [--ssn-sequences <FILE>]
+       --seqid-source-map <FILE> [--id-index <FILE> --ssn-sequences <FILE>]
 
 
 
@@ -81,10 +81,10 @@ Arguments
       3 B0SS75 1
 
 ``--id-index``
-   Path to a tab-separated output file that maps node ID (the ``id``
-   attribute in a node) to node index. The ``id`` attribute may not be
-   the same as the ``label`` attribute; the latter is the sequence ID.
-   For example:
+   Optional path to a tab-separated output file that maps node ID (the
+   ``id`` attribute in a node) to node index. The ``id`` attribute may
+   not be the same as the ``label`` attribute; the latter is the
+   sequence ID. For example:
 
    ::
 

@@ -185,9 +185,9 @@ B<EFI::GNT::GNN> - Perl module for creating genome neighborhood networks
     my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => 0.20);
 
     # Save the GNN xgmml files
-    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(gnn_file => $pfamGnnFile, gnt_anno => $gntAnno);
+    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(output_file => $pfamGnnFile, gnt_anno => $gntAnno);
     $pfamHubWriter->write($hubs);
-    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
+    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(output_file => $clusterGnnFile, gnt_anno => $gntAnno);
     $clusterHubWriter->write($hubs);
 
     my $tables = new EFI::GNT::GNN::TableWriter(hubs => $hubs); 

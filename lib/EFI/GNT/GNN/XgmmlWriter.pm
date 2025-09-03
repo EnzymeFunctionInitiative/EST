@@ -174,19 +174,13 @@ B<EFI::GNT::GNN::XgmmlWriter> - Perl interface for writing XGMML files for vario
 
 =head2 SYNOPSIS
 
+    # Should never be directly instantiated
     use EFI::GNT::GNN::XgmmlWriter::PfamHub; # or ClusterHub
 
-    my $xwriter = EFI::GNT::GNN::XgmmlWriter::PfamHub->new(gnn_file => $gnnFile, gnt_anno => $gntAnno);
+    my $xwriter = EFI::GNT::GNN::XgmmlWriter::PfamHub->new(output_file => $gnnFile, gnt_anno => $gntAnno);
     $xwriter->open();
 
-    $xwriter->startTag("test", "attr_name" => "value");
-    $xwriter->writeField({name => "att_field", "value" => "value", type => "string"});
-    $xwriter->endTag();
-
-    # Writes a list field
-    $xwriter->startTag("test_list", "attr_name" => "value");
     $xwriter->writeField({name => "att_name", type => "string", value => ["1", "2", "3"]});
-    $xwriter->endTag();
 
     $xwriter->writeNode("node1", "Node 1", [{name => "att_field", "value" => "value", type => "string"}]);
     $xwriter->writeNode("node2", "Node 2", [{name => "att_field", "value" => "value", type => "string"}]);
@@ -200,8 +194,9 @@ B<EFI::GNT::GNN::XgmmlWriter> - Perl interface for writing XGMML files for vario
 =head2 DESCRIPTION
 
 B<EFI::GNT::GNN::XgmmlWriter> is a Perl interface providing standard API to facilitate writing of
-various GNN files in XGMML format.  It provides low-level XML tag access as well as XGMML-specific
-writing methods.
+various GNN files in XGMML format.  It inherits from B<EFI::Xgmml::Writer> to get low-level XML tag
+access.  It also provides XGMML-specific helper functions that are responsible for performing
+low-level XML tag writing.
 
 =head2 METHODS
 
@@ -226,110 +221,15 @@ Path to a file in XGMML format that is to be created.
     my $xwriter = EFI::GNT::GNN::XgmmlWriter::ClusterHub->new(output_file => $outputFile);
 
 
-=head3 C<open()>
-
-Opens the XGMML file for writing.
-
-=head4 Returns
-
-1 on success, 0 on failure
-
-=head4 Example Usage
-
-    $xwriter->open();
-
-
-=head3 C<close()>
-
-Finishes writing the XGMML file and closes the file handle.
-
-=head4 Returns
-
-1 on success, 0 on failure
-
-=head4 Example Usage
-
-    $xwriter->close();
-
-
-=head3 C<emptyTag($tagName, %attrs)>
-
-Writes an empty tag with the specified attributes in key-value format.
-An empty tag is a tag without a termination element (e.g. C<E<lt>elem/E<gt>>).
-
-=head4 Parameters
-
-=over
-
-=item C<$name>
-
-Name of the element tag
-
-=item C<%attrs>
-
-Key-values pairs of attributes of the element
-
-=back
-
-=head4 Example Usage
-
-    %attr = (key1 => "value1", key2 => "value2");
-    $xwriter->emptyTag("elem", %attr);
-    # renders as:   <elem key1="value1" key2="value2" />
-
-
-=head3 C<startTag($tagName, %attrs)>
-
-Writes a start XML tag with the tag name and attributes to the XGMML file.
-
-=head4 Parameters
-
-=over
-
-=item C<$name>
-
-Name of the element tag
-
-=item C<%attrs>
-
-Key-values pairs of attributes of the element
-
-=back
-
-=head4 Example Usage
-
-    %attr = (key1 => "value1", key2 => "value2");
-    $xwriter->emptyTag("elem", %attr);
-    # renders as:   <elem key1="value1" key2="value2">
-
-
-=head3 C<endTag($tagName)>
-
-Writes an end XML tag with the tag name.
-
-=head4 Parameters
-
-=over
-
-=item C<$name>
-
-Name of the element tag
-
-=back
-
-=head4 Example Usage
-
-    $xwriter->endTag("elem");
-    # renders as:   </elem>
-
-
-=head3 C<writeField($fieldData)>
+=head3 C<writeField($fieldData)> B<(protected method)>
 
 Writes the given field data to the file as XML tags in the XGMML C<att> format. Field
 data is given as a hash ref with three key-value pairs: C<name>, C<value>, and C<type>.
 C<type> is one of B<string, real, integer>.  If the C<value> is an array ref then the
 output is an 'att' list field which is a nested list of 'att' tags, each corresponding
 to an element in the input list.  If the input is invalid then nothing is written.
+This documentation is given in order to understand the format of the input structures,
+and this function should never be called directly by inheriting modules.
 
 =head4 Parameters
 

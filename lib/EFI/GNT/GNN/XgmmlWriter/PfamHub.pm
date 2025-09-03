@@ -210,7 +210,7 @@ B<EFI::GNT::GNN::XgmmlWriter::PfamHub> - Perl helper module for writing Pfam hub
     my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 
     my $pfamGnnFile = "pfam_gnn.xgmml";
-    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(gnn_file => $pfamGnnFile, gnt_anno => $gntAnno);
+    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(output_file => $pfamGnnFile, gnt_anno => $gntAnno);
     $pfamHubWriter->write($hubs);
 
 
