@@ -61,9 +61,9 @@ $gnn->retrieveClusterData();
 my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => $opts->{cooc_threshold}, seq_cluster_id_map => $idMap);
 
 # Save the GNN xgmml files
-my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(gnn_file => $opts->{pfam_gnn}, gnt_anno => $gntAnno);
+my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(output_file => $opts->{pfam_gnn}, gnt_anno => $gntAnno);
 $pfamHubWriter->write($hubs);
-my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $opts->{cluster_gnn}, gnt_anno => $gntAnno);
+my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(output_file => $opts->{cluster_gnn}, gnt_anno => $gntAnno);
 $clusterHubWriter->write($hubs);
 
 # Save the various tables

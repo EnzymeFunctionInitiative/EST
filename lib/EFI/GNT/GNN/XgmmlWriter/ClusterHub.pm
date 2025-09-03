@@ -22,7 +22,6 @@ sub new {
     my %args = @_;
 
     my $self = $class->SUPER::new(%args);
-    $self->{gnn_file} = $args{gnn_file} || die "Require GNN file gnn_file output arg";
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
     $self->{util} = new EFI::GNT::GNN::XgmmlWriter::Util(gnt_anno => $args{gnt_anno});
     #$self->{colors} is created by the parent class
@@ -37,7 +36,13 @@ sub write {
     my $self = shift;
     my $hubs = shift;
 
-    $self->open() if not $self->{output};
+    # From EFI::Xgmml::Writer
+    $self->open();
+
+    # From EFI::Xgmml::Writer
+    $self->preamble();
+
+    $self->writeStarting(label => "Cluster GNN");
 
     my @clusterNums = $hubs->getClusterHubNumbers();
 
@@ -68,6 +73,8 @@ sub write {
             $self->writeNode($clusterNum, "$clusterNum", $nodeAttr);
         }
     }
+
+    $self->writeClosing();
 
     $self->close();
 }

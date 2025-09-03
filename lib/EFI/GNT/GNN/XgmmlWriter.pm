@@ -15,37 +15,46 @@ use EFI::Annotations;
 use EFI::Annotations::Fields qw(:color);
 use EFI::Util::Colors;
 
+use parent qw(EFI::Xgmml::Writer);
+
 
 sub new {
     my ($class, %args) = @_;
 
-    my $self = {};
+    my $self = $class->SUPER::new(%args);
     bless($self, $class);
 
-    $self->{output_file} = $args{gnn_file};
     $self->{colors} = $args{colors} // new EFI::Util::Colors;
-
+    $self->{title} = $args{title} // "GNN";
     $self->{stats} = { num_nodes => 0, num_edges => 0 };
 
     return $self;
 }
 
-
-sub open {
+#
+# writeStarting - protected
+#
+# Write the starting tags, e.g. graph.
+#
+sub writeStarting {
     my $self = shift;
+    my %attr = @_;
 
-    $self->{output} = IO::File->new(">" . $self->{output_file});
+    $attr{label} = "GNN" if not $attr{label};
 
-    # Disable error checking with the UNSAFE keyword; this improves performance
-    $self->{writer} = XML::Writer->new(OUTPUT => $self->{output}, UNSAFE => 1, PREFIX_MAP => '');
-    $self->{writer}->xmlDecl("UTF-8");
+    # Write SSN header info
+    $self->startTag("graph", "xmlns" => $self->xmlns(), %attr);
 }
 
 
-sub close {
+#
+# writeClosing - protected
+#
+# Write the ending tag, e.g. graph
+#
+sub writeClosing {
     my $self = shift;
-    $self->{writer}->end();
-    $self->{output}->close();
+    $self->endTag("graph");
 }
 
 
@@ -95,30 +104,6 @@ sub writeListField {
     }
 
     $self->endTag();
-}
-
-
-sub endTag {
-    my $self = shift;
-    my $tagName = shift;
-    $self->{writer}->endTag($tagName);
-    $self->{writer}->characters("\n");
-}
-
-
-sub startTag {
-    my $self = shift;
-    my $tagName = shift;
-    $self->{writer}->startTag($tagName, @_);
-    $self->{writer}->characters("\n");
-}
-
-
-sub emptyTag {
-    my $self = shift;
-    my $tagName = shift;
-    $self->{writer}->emptyTag($tagName, @_);
-    $self->{writer}->characters("\n");
 }
 
 
