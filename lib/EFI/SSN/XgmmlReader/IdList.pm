@@ -49,13 +49,13 @@ sub getMetanodeSizes {
 
 sub getMetanodeType {
     my $self = shift;
-    my $idf = $self->{id_type};
-    if ($idf ne SEQ_UNIPROT) {
-        $idf = SEQ_REPNODE if $idf eq FIELD_REPNODE_IDS;
-        $idf = SEQ_UNIREF90 if $idf eq FIELD_UNIREF90_IDS;
-        $idf = SEQ_UNIREF50 if $idf eq FIELD_UNIREF50_IDS;
+    my $idType = $self->{id_type};
+    if ($idType ne SEQ_UNIPROT) {
+        $idType = SEQ_REPNODE if $idType eq FIELD_REPNODE_IDS;
+        $idType = SEQ_UNIREF90 if $idType eq FIELD_UNIREF90_IDS;
+        $idType = SEQ_UNIREF50 if $idType eq FIELD_UNIREF50_IDS;
     }
-    return $idf;
+    return $idType;
 }
 
 

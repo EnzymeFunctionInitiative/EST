@@ -29,6 +29,9 @@ SYNOPSIS
    my $seqId = "zzzz42";
    print "Sequence $seqId is ", (is_unknown_sequence($seqId) ? "Unknown" : "UniProt-formatted"), "\n";
 
+   my $seqId = "B0SS77:1:100";
+   print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
+
 
 
 DESCRIPTION
@@ -64,10 +67,11 @@ Parameters
 Returns
 ^^^^^^^
 
-One of ``SEQ_UNIPROT``, ``SEQ_UNIREF50``, or ``SEQ_UNIREF90``. If the
-input is identified as UniRef90 or UniRef50 then ``SEQ_UNIREF90`` or
-``SEQ_UNIREF50`` are returned, otherwise for all other values
-``SEQ_UNIPROT`` is returned.
+One of ``SEQ_UNIPROT``, ``SEQ_UNIREF50``, ``SEQ_UNIREF90``, or
+``SEQ_REPNODE``. If the input is identified as UniRef90 or UniRef50 then
+``SEQ_UNIREF90`` or ``SEQ_UNIREF50`` are returned, or the input is
+identified as a RepNode then ``SEQ_REPNODE`` is returned, otherwise for
+all other values ``SEQ_UNIPROT`` is returned.
 
 
 
@@ -129,3 +133,53 @@ CONSTANTS
 
 ``SEQ_UNIREF90``
    For UniRef90 (``uniref90``) ID types.
+
+``SEQ_REPNODE``
+   For RepNode (``repnode``) ID types (these come from representative
+   node networks).
+
+``SEQ_FULL``
+   For IDs that represent full sequences.
+
+``SEQ_DOMAIN``
+   For IDs that represent family domain portions of a sequence.
+
+
+
+``get_sequence_type($id)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Indicates if a sequence is a family domain sequence (e.g. a subset that
+corresponds to the family-defined start and end position in the sequence
+string) or full sequence. Domain sequence IDs contain a colon ``:``
+character.
+
+
+
+Parameters
+^^^^^^^^^^
+
+``$id``
+   The sequence ID to check.
+
+
+
+Returns
+^^^^^^^
+
+``SEQ_DOMAIN`` if the sequence is a domain sequence ID, ``SEQ_FULL`` if
+the sequence is a full sequence.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $seqId = "B0SS77";
+   print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
+   #prints "Sequence B0SS77 is full"
+   my $seqId = "B0SS75:1:100";
+   print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
+   #prints "Sequence B0SS75 is domain"

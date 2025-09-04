@@ -1,4 +1,3 @@
-
 package EFI::Sequence::Type;
 
 use strict;
@@ -137,16 +136,6 @@ C<1> if the ID is unknown, C<0> if it is UniProt-formatted.
 =over
 
 =item C<SEQ_UNIPROT>
-
-For UniProt (C<uniprot>) ID types.
-
-=item C<SEQ_UNIREF50>
-
-For UniRef50 (C<uniref50>) ID types.
-
-=item C<SEQ_UNIREF90>
-
-For UniRef90 (C<uniref90>) ID types.
 
 For UniProt (C<uniprot>) ID types.
 

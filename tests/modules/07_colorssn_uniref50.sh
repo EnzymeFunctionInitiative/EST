@@ -2,7 +2,7 @@
 set -e
 
 if [[ ! -e "$EFI_TEST_SSN_UNIREF50" ]]; then
-    echo "Test skipped; missing $EFI_TEST_SSN_UNIREF90"
+    echo "Test skipped; missing $EFI_TEST_SSN_UNIREF50"
     exit 0
 fi
 

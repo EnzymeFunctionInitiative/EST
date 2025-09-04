@@ -7,7 +7,6 @@ Usage
 
 	Usage: perl pipelines/est/import/import_fasta.pl --uploaded-fasta <FILE> [--output-dir <DIR_PATH>]
 	    [--sequence-mapping-file <FILE>] [--sequence-meta-file <FILE>] [--output-sequence-file <FILE>]
-	    [--sequence-ids-file <FILE>]
 	
 	Description:
 	    Import user-specified FASTA sequences into a form usable by the SSN creation pipeline
@@ -18,7 +17,6 @@ Usage
 	    --sequence-mapping-file    file for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir
 	    --sequence-meta-file       file containing sequence metadata (post filtering)
 	    --output-sequence-file     path to output file to save sequences in; defaults into --output-dir
-	    --sequence-ids-file        path to output file to save sequences IDs in; defaults into --output-dir
 	
 
 Reference
