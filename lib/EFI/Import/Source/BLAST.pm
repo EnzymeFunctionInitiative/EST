@@ -4,8 +4,6 @@ package EFI::Import::Source::BLAST;
 use strict;
 use warnings;
 
-use Data::Dumper;
-
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
@@ -161,7 +159,7 @@ sub parseBlastResults {
 
     my @blastIds = keys %blastIds;
     my $sql = "SELECT accession FROM annotations WHERE accession IN (<IDS>)";
-    my $matched = $self->{util}->batchRetrieveIds(\@blastIds, $sql, "accession"); # $self->{util} comes from parent module
+    my $matched = $self->{db_util}->batchRetrieveIds(\@blastIds, $sql, "accession"); # $self->{db_util} comes from parent module
 
     # @unmatched contains the IDs that BLAST found (e.g. in the blastdb) but were not in the
     # metadata (due to version mismatch)

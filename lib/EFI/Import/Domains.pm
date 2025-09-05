@@ -4,6 +4,13 @@ package EFI::Import::Domains;
 use strict;
 use warnings;
 
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../"; # Import libs
+
+use EFI::Database::Util;
+
+
 use constant DOMAIN_NTERMINAL => "n-terminal";
 use constant DOMAIN_CTERMINAL => "c-terminal";
 use constant DOMAIN_CENTRAL => "central";
@@ -19,13 +26,13 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    die "Require import_util EFI::Import::Util argument" if ($args{domain_family} and not $args{import_util});
+    die "Require dbh (DBI database handle) argument" if ($args{domain_family} and not $args{dbh});
 
     my $self = {};
     bless $self, $class;
 
     $self->{domain_family} = $args{domain_family};
-    $self->{util} = $args{import_util};
+    $self->{db_util} = new EFI::Database::Util(dbh => $args{dbh});
 
     my $region = getRegion($args{region});
     die "Invalid region" if not $region;
@@ -101,7 +108,7 @@ sub computeDomains {
     my $sql = "SELECT PFAM.*, annotations.seq_len FROM PFAM LEFT JOIN annotations ON PFAM.accession = annotations.accession WHERE PFAM.id = '$self->{domain_family}' and PFAM.accession IN (<IDS>)";
     my $idCol = "accession";
 
-    my $matched = $self->{util}->batchRetrieveIds($ids, $sql, $idCol, 1);
+    my $matched = $self->{db_util}->batchRetrieveIds($ids, $sql, $idCol, 1);
 
     my $domains = {};
     my $seqLen = {};
@@ -169,7 +176,7 @@ protein family domains during the import phase.
 
 =head2 METHODS
 
-=head3 C<new(region =E<gt> $region, domain_family =E<gt> $domainFamily, import_util =E<gt> $importUtil)>
+=head3 C<new(region =E<gt> $region, domain_family =E<gt> $domainFamily, dbh =E<gt> $dbh)>
 
 Create a new instance of this module.
 
@@ -187,10 +194,10 @@ C<DOMAIN_CTERMINAL>.
 Optionally, specify the family to use when computing domains.  One and only one family is required,
 and this functionality is used by the B<EFI::Import::Source::Accession> import.
 
-=item C<import_util>
+=item C<dbh>
 
-Optionally, a reference to a B<EFI::Import::Util> instance.  Required if C<domain_family> is
-specified.
+Optionally, a reference to a Perl B<DBI> database handle obtained from B<EFI::Database>.  Required
+if C<domain_family> is specified.
 
 =back
 
@@ -198,8 +205,8 @@ specified.
 
     my $domUtil = new EFI::Import::Domains(region => DOMAIN_CENTRAL);
 
-    my $util = new EFI::Import::Util(...);
-    my $domUtil = new EFI::Import::Domains(region => DOMAIN_NTERMINAL, domain_family => "PF03070", import_util => $util);
+    my $util = new EFI::Database::Util(...);
+    my $domUtil = new EFI::Import::Domains(region => DOMAIN_NTERMINAL, domain_family => "PF03070", dbh => $dbh);
 
 
 =head3 C<processDomains($ids, $sequenceLengths)>
@@ -299,9 +306,9 @@ A hash ref mapping IDs to the associated domains in the input family.
 
 =head4 Example Usage
 
-    my $util = ...; # EFI::Import::Util
+    my $util = ...; # EFI::Database::Util
 
-    my $domUtil = new EFI::Import::Domains(region => DOMAIN_NTERMINAL, domain_family => "PFXXXXX", import_util => $util);
+    my $domUtil = new EFI::Import::Domains(region => DOMAIN_NTERMINAL, domain_family => "PFXXXXX", dbh => $dbh);
     my $ids = {"ID" => 1};
     my $domains = $domUtil->computeDomains($ids);
     # $ids might contain:

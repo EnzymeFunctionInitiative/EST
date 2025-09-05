@@ -8,7 +8,7 @@ use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../"; # Import libs
 
-use EFI::Import::Util;
+use EFI::Database::Util;
 
 
 sub new {
@@ -20,7 +20,7 @@ sub new {
     my $self = {};
     $self->{dbh} = $args{dbh};
     $self->{stats} = $args{stats} || DummyStats->new;
-    $self->{util} = new EFI::Import::Util(dbh => $self->{dbh});
+    $self->{db_util} = new EFI::Database::Util(dbh => $self->{dbh});
 
     bless($self, $class);
 
@@ -41,7 +41,7 @@ sub getMatchedSequences {
     my $ids = shift;
     my $sqlPattern = shift;
 
-    my $matched = $self->{util}->batchRetrieveIds($ids, $sqlPattern, "accession");
+    my $matched = $self->{db_util}->batchRetrieveIds($ids, $sqlPattern, "accession");
 
     return $matched;
 }
