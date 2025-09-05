@@ -9,6 +9,7 @@ use Getopt::Long;
 use lib "$FindBin::Bin/../../lib";
 
 use EFI::Database;
+use EFI::Database::Util;
 use EFI::GNT::Annotations;
 use EFI::GNT::GND;
 use EFI::GNT::GNN;
@@ -44,11 +45,17 @@ if (not $idMap) {
     die "Input --cluster-map file was empty\n";
 }
 
+my $sequenceVersion = SEQ_UNIPROT;
+my $uniprotMapping;
 if ($opts->{metanode_map}) {
-    my ($metanodeType, $metanodeMapping) = parse_metanode_map_file($opts->{metanode_map});
-    if (get_sequence_version($metanodeType) ne SEQ_UNIPROT) {
-        $idMap = resolve_mapping($idMap, $metanodeType, $metanodeMapping);
+    my ($seqVersion, $metaMap) = parse_metanode_map_file($opts->{metanode_map});
+    # Expand the cluster -> ID mapping from the metanodes to the UniProt IDs
+    if ($seqVersion ne SEQ_UNIPROT) {
+        $idMap = resolve_mapping($idMap, $seqVersion, $metaMap);
     }
+
+    $sequenceVersion = $seqVersion;
+    $uniprotMapping = getUniprotMapping($seqVersion, $idMap, $dbh);
 }
 
 
@@ -84,9 +91,9 @@ if ($opts->{gnd}) {
         type => "gnn",
     };
 
-    my $networkType = "uniprot";
     my $clusterNames = {};
-    my %args = (network_type => $networkType, cluster_names => $clusterNames, sort_sequence_ids => 1);
+    my %args = (network_type => $sequenceVersion, cluster_names => $clusterNames, sort_sequence_ids => 1);
+    $args{metanode_mapping} = $uniprotMapping if $uniprotMapping;
     if (not $gnd->save($opts->{gnd}, $gnn, $metadata, %args)) {
         die "Unable to save GND to '$opts->{gnd}'";
     }
@@ -110,6 +117,67 @@ save_stats($opts->{stats}, \%stats) if $opts->{stats};
 
 
 
+
+
+
+
+
+#
+# getUniprotMapping
+#
+# Creates a mapping between UniProt IDs and corresponding UniRef IDs.  If the $idType
+# is SEQ_UNIREF50, the output mapping contains both UniRef50 and UniRef90 IDs, but if the
+# $idType is SEQ_UNIREF50, then the output mapping contains only UniRef90 IDs.
+#
+# Parameters:
+#    $idType - type of the IDs in the metanode (SEQ_UNIREF50 or SEQ_UNIREF90)
+#    $idMap - hash ref mapping cluster number to list of UniProt IDs in the cluster;
+#        (output from parse_metanode_map_file)
+#    $dbh - database handle
+#
+# Returns:
+#    hash ref containing a mapping of UniProt ID to the corresponding UniRef IDs.
+#
+#    If the input type is SEQ_UNIREF90, then the output only contains UniRef90 IDs:
+#
+#        {
+#            'UNIPROT_A' => { uniref90 => 'UNIREF90_A' },
+#            'UNIPROT_B' => { uniref90 => 'UNIREF90_A' },
+#            'UNIPROT_C' => { uniref90 => 'UNIREF90_B' },
+#            ...
+#        }
+#
+#
+#    If the input type is SEQ_UNIREF50, then the output contains both UniRef50 and
+#    UniRef90 IDs:
+#
+#        {
+#            'UNIPROT_A' => { uniref90 => 'UNIREF90_A', uniref50 => 'UNIREF50_A' },
+#            'UNIPROT_B' => { uniref90 => 'UNIREF90_A', uniref50 => 'UNIREF50_A' },
+#            'UNIPROT_C' => { uniref90 => 'UNIREF90_B', uniref50 => 'UNIREF50_A' },
+#            ...
+#        }
+#
+sub getUniprotMapping {
+    my $idType = shift;
+    my $idMap = shift;
+    my $dbh = shift;
+
+    my @uniprotIds = map { @{ $idMap->{$_} } } keys %$idMap;
+
+    my $idCol = "accession";
+    my @cols = ($idCol, "uniref50_seed AS uniref50", "uniref90_seed AS uniref90");
+    my $cols = join(", ", @cols);
+    my $sqlPattern = "SELECT $cols FROM uniref WHERE accession IN (<IDS>)";
+
+    my $util = new EFI::Database::Util(dbh => $dbh);
+
+    # The output is exactly what we need to return, so we don't bother creating a new
+    # hash ref and instead return the direct output from the batch retrieval
+    my $uniprotMap = $util->batchRetrieveIds(\@uniprotIds, $sqlPattern, $idCol);
+
+    return $uniprotMap;
+}
 
 
 
