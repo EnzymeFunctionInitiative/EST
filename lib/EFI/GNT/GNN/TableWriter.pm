@@ -52,7 +52,7 @@ sub savePfamNeighborhoods {
         $writer->writeAllHubTables($pfamHubName, $hub);
 
         # Filter on cooccurrence
-        $hub = $self->{hubs}->getPfamHub($pfamHubName, FILTER_COOCCURRENCE);
+        $hub = $self->{hubs}->getPfamHub($pfamHubName, FILTER_COOCCURRENCE, SKIP_SINGLETONS);
         $writer->writeFilteredHubTables($pfamHubName, $hub);
     }
 

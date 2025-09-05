@@ -32,7 +32,6 @@ sub addImportOptions {
     $self->addOption("sequence-mapping-file=s", 0, "file for mapping UniProt and anonymous IDs in FASTA file (internal); defaults into --output-dir", OPT_FILE);
     $self->addOption("sequence-meta-file=s", 0, "file containing sequence metadata (post filtering)", OPT_FILE);
     $self->addOption("output-sequence-file=s", 0, "path to output file to save sequences in; defaults into --output-dir", OPT_FILE);
-    $self->addOption("sequence-ids-file=s", 0, "path to output file to save sequences IDs in; defaults into --output-dir", OPT_FILE);
 }
 
 
@@ -55,7 +54,6 @@ sub validateOptions {
     push @errors, "Error: invalid --sequence-meta-file path '$opts->{sequence_meta_file}'" if not -f $opts->{sequence_meta_file};
 
     $opts->{output_sequence_file} = get_default_path("all_sequences", $outputDir) if not $opts->{output_sequence_file};
-    $opts->{sequence_ids_file} = get_default_path("sequence_ids", $outputDir) if not $opts->{sequence_ids_file};
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);

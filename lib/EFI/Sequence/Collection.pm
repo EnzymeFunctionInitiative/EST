@@ -746,7 +746,7 @@ B<Example: C<load()> with C<sequence_version> = C<SEQ_UNIREF50>>
     # Metadata after removal
     #UniProt_ID      Attribute       Value
     #Q3AEU2	Sequence_Source FAMILY
-    #Q3AEU2	UniRef50_Cluster_Size   2
+    #Q3AEU2	UniRef50_Cluster_Size   1
     #Q3AEU2	UniRef50_IDs    A0A8J3V1H9
     #
     # ID list after removal

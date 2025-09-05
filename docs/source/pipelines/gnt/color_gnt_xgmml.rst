@@ -7,7 +7,7 @@ Usage
 
 	Usage: perl pipelines/gnt/color_gnt_xgmml.pl --ssn <FILE> --color-gnt-ssn <FILE>
 	    --cluster-map <FILE> --cluster-num-map <FILE> --cluster-color-map <FILE> --metanode-map <FILE>
-	    --gnd <FILE>
+	    --gnd <FILE> [--stats <VALUE>]
 	
 	Description:
 	    Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes
@@ -21,6 +21,7 @@ Usage
 	    --cluster-color-map    path to input file mapping cluster number (sequence count) to a color
 	    --metanode-map         path to input file mapping metanode (e.g. UniRef node) to members of metanode
 	    --gnd                  path to input SQLite file with GNDs; used to obtain GNT data
+	    --stats                path to file to output SSN statistics to
 
 Reference
 ---------
@@ -40,7 +41,7 @@ SYNOPSIS
 ::
 
    color_gnt_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
-       --cluster-color-map <FILE> --metanode-map <FILE> --gnd <FILE>
+       --cluster-color-map <FILE> --metanode-map <FILE> --gnd <FILE> [--stats <FILE>]
 
 
 
@@ -84,3 +85,7 @@ Arguments
    Path to a GND file (SQLite format) that contains genome context data;
    used to obtain neighbor families and ENA status and ID; output from a
    previous step
+
+``--stats``
+   Optional path to a file to write statistics (e.g. number of nodes,
+   edges) to.

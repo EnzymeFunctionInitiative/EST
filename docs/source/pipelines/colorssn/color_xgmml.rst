@@ -6,7 +6,7 @@ Usage
 ::
 
 	Usage: perl pipelines/colorssn/color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE>
-	    --cluster-num-map <FILE> --cluster-color-map <FILE>
+	    --cluster-num-map <FILE> --cluster-color-map <FILE> [--stats <VALUE>]
 	
 	Description:
 	    Parses a SSN XGMML file and writes it to a new SSN file after coloring and numbering the nodes
@@ -18,6 +18,7 @@ Usage
 	    --cluster-map          path to input file mapping node index (col 1) to cluster numbers (num by seq, num by nodes)
 	    --cluster-num-map      path to input file containing the mapping of cluster number to cluster sizes
 	    --cluster-color-map    path to input file mapping cluster number (sequence count) to a color
+	    --stats                path to file to output SSN statistics to
 
 Reference
 ---------
@@ -37,7 +38,7 @@ SYNOPSIS
 ::
 
    color_xgmml.pl --ssn <FILE> --color-ssn <FILE> --cluster-map <FILE> --cluster-num-map <FILE>
-       --cluster-color-map <FILE>
+       --cluster-color-map <FILE> [--stats <FILE>]
 
 
 
@@ -69,3 +70,7 @@ Arguments
 ``--cluster-color-map``
    Path to a file that maps cluster number based on sequence count to
    the color as determined by the pipeline upstream
+
+``--stats``
+   Optional path to a file to write statistics (e.g. number of nodes,
+   edges) to.

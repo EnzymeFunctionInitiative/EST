@@ -25,15 +25,15 @@ SYNOPSIS
 
    use EFI::Sequence;
    use EFI::Sequence::Collection;
-   use EFI::Sequence::Type;
+   use EFI::Sequence::Type qw(:types);
 
-   my $seqSource = SEQ_UNIREF50;
+   my $seqVersion = SEQ_UNIREF50;
    my $mdFile = "sequence_metadata.tab";
    my $idFile = "accession_table.tab";
 
    my $seqs = new EFI::Sequence::Collection();
 
-   $seqs->load($mdFile, $idFile, sequence_source => $seqSource);
+   $seqs->load($mdFile, $idFile, sequence_version => $seqVersion);
 
    $seqs->addSequence("B0SS77", {}, "");
 
@@ -52,6 +52,12 @@ SYNOPSIS
 
    $seqs->save($mdFile, $idFile);
    $seqs->save("$mdFile.2");
+
+   my $attrName = FIELD_SEQ_SRC_KEY;
+   my $attrs = $seqs->getSequenceAttributeMapping($attrName);
+   foreach my $id ($seqs->getSequenceIds()) {
+       print "$id $attrs->{$id}\n";
+   }
 
 
 
@@ -82,8 +88,8 @@ delimiter to use when saving list attribute values.
 
 
 
-``load($metadataFile, $idFile, sequence_source => source)``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``load($metadataFile, $idFile, sequence_version => version)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Loads metadata and ID lists from files. See ``save()`` for the file
 format.
@@ -100,8 +106,8 @@ Parameters
    Path to ID list file (e.g. "accession_table.tab"). If specified, load
    the ID mapping, otherwise only metadata is loaded.
 
-``sequence_source`` (optional)
-   If specified, used instead of sequence source defined at object
+``sequence_version`` (optional)
+   If specified, used instead of sequence version defined at object
    creation. One of ``SEQ_UNIPROT``, ``SEQ_UNIREF90``, or
    ``SEQ_UNIREF50`` from **EFI::Sequence::Type**.
 
@@ -119,8 +125,8 @@ Example Usage
 
 ::
 
-   my $seqSource = SEQ_UNIREF50;
-   my $retval = $seqs->load($mdFile, $idFile, sequence_source => $seqSource);
+   my $seqVersion = SEQ_UNIREF50;
+   my $retval = $seqs->load($mdFile, $idFile, sequence_version => $seqVersion);
    die "Unable to load $mdFile, $idFile" if not $retval;
 
 
@@ -132,7 +138,7 @@ Saves the metadata and ID lists. The metadata file contains a mapping of
 keys and values for attributes for each sequence ID. The ID list file
 contains a mapping of UniProt and UniRef IDs. The IDs in the ID list may
 be a superset of the IDs in the metadata file; this will occur when the
-input data set originates from a UniRef source, and the ID list must
+input data set originates from a UniRef version, and the ID list must
 contain a mapping of UniProt to UniRef for future steps (e.g. filtering
 and sunburst diagrams).
 
@@ -264,7 +270,7 @@ latter case, if the input dataset originates from UniRef IDs and the
 ``$sequenceId`` is a UniRef ID, then all of the members of the UniRef
 cluster are also removed. A few examples are given:
 
-**Example: ``load()`` with ``sequence_source`` = ``SEQ_UNIPROT``**
+**Example: ``load()`` with ``sequence_version`` = ``SEQ_UNIPROT``**
 
 ::
 
@@ -287,7 +293,7 @@ cluster are also removed. A few examples are given:
    #uniprot_id uniref90_id     uniref50_id
    #A0A8J3V1H9 A0A8J3V1H9      Q3AEU2
 
-**Example: ``load()`` with ``sequence_source`` = ``SEQ_UNIPROT``**
+**Example: ``load()`` with ``sequence_version`` = ``SEQ_UNIPROT``**
 
 ::
 
@@ -309,7 +315,7 @@ cluster are also removed. A few examples are given:
    #uniprot_id uniref90_id     uniref50_id
    #A0A8J3TPF4 A0A8J3V1H9      Q3AEU2
 
-**Example: ``load()`` with ``sequence_source`` = ``SEQ_UNIREF90``**
+**Example: ``load()`` with ``sequence_version`` = ``SEQ_UNIREF90``**
 
 ::
 
@@ -332,7 +338,7 @@ cluster are also removed. A few examples are given:
    #uniprot_id uniref90_id     uniref50_id
    #B0SS72     B0SS72  Q3AEU2
 
-**Example: ``load()`` with ``sequence_source`` = ``SEQ_UNIREF50``**
+**Example: ``load()`` with ``sequence_version`` = ``SEQ_UNIREF50``**
 
 ::
 
@@ -352,14 +358,14 @@ cluster are also removed. A few examples are given:
    # Metadata after removal
    #UniProt_ID      Attribute       Value
    #Q3AEU2     Sequence_Source FAMILY
-   #Q3AEU2     UniRef50_Cluster_Size   2
+   #Q3AEU2     UniRef50_Cluster_Size   1
    #Q3AEU2     UniRef50_IDs    A0A8J3V1H9
    #
    # ID list after removal
    #uniprot_id uniref90_id     uniref50_id
    #A0A8J3V1H9 A0A8J3V1H9      Q3AEU2
 
-**Example: ``load()`` with ``sequence_source`` = ``SEQ_UNIREF50``**
+**Example: ``load()`` with ``sequence_version`` = ``SEQ_UNIREF50``**
 
 ::
 
@@ -414,12 +420,79 @@ Example Usage
 
 
 
+``getAllSequenceIds()``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Get a list of all of the sequence IDs in the input ID list file. All IDs
+are UniProt.
+
+
+
+Returns
+^^^^^^^
+
+In scalar context, an array ref of a list of all of the sequence IDs. In
+list context, a list of all of the sequence IDs.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $ids = $seqs->getAllSequenceIds();
+   map { print "All IDs ID: $_\n"; } @$ids;
+
+
+
+``getSequenceAttributeMapping($attrName)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Get a mapping of ID to attribute values for the given attribute name for
+all sequences in the input dataset (not in the master ID list).
+
+
+
+Parameters
+^^^^^^^^^^
+
+``$attrName``
+   Attribute name (e.g. ``FIELD_SEQ_SRC_KEY``)
+
+
+
+Returns
+^^^^^^^
+
+A hash ref mapping ID to attribute value. If the attribute doesn't exist
+or is undefined then an empty string ``""`` is saved as the hash value.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $attrName = FIELD_SEQ_SRC_KEY;
+   my $attrs = $seqs->getSequenceAttributeMapping($attrName);
+   foreach my $id ($seqs->getSequenceIds()) {
+       if ($attrs->{$id}) {
+           print "Sequence source for $id is $attrs->{$id}\n";
+       } else {
+           print "No sequence source defined for $id\n";
+       }
+   }
+
+
+
 ``associateUnirefIds($uniprot, $uniref90, $uniref50)``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Adds a new mapping of UniProt ID to associated UniRef sequence IDs to
-the ID list/mapping. This mapping will likely be a superset of the IDs
-added with the ``addSequence()`` function in order to support sunburst
+Add a new mapping of UniProt ID to associated UniRef sequence IDs to the
+ID list/mapping. This mapping will likely be a superset of the IDs added
+with the ``addSequence()`` function in order to support sunburst
 diagrams for UniRef jobs (since all of the IDs are necessary, not just
 UniRef).
 
@@ -524,9 +597,9 @@ Example Usage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creates or updates the UniRef-related metadata fields in the sequence
-metadata file. For a UniRef90 sequence source these fields are
+metadata file. For a UniRef90 sequence version these fields are
 ``UniRef90_IDs`` and ``UniRef90_Cluster_Size``. For a UniRef50 sequence
-source these fields are ``UniRef50_IDs`` and ``UniRef50_Cluster_Size``.
+version these fields are ``UniRef50_IDs`` and ``UniRef50_Cluster_Size``.
 For both, the ``Cluster_Size`` field represents the number of UniProt
 IDs in the associated UniRef cluster. Similarly, the ``IDs`` field is a
 text string with each UniProt ID separated the field separator character

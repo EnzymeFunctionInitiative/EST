@@ -13,6 +13,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
 use EFI::Annotations::Fields qw(FIELD_CYTOSCAPE_COLOR);
+use EFI::GNT::GNN::Hubs qw(NONE_PFAM);
 use EFI::GNT::GNN::XgmmlWriter::Util;
 
 
@@ -21,7 +22,6 @@ sub new {
     my %args = @_;
 
     my $self = $class->SUPER::new(%args);
-    $self->{gnn_file} = $args{gnn_file} || die "Require GNN file gnn_file output arg";
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
     $self->{util} = new EFI::GNT::GNN::XgmmlWriter::Util(gnt_anno => $args{gnt_anno});
 
@@ -35,7 +35,13 @@ sub write {
     my $self = shift;
     my $hubs = shift;
 
-    $self->open() if not $self->{output};
+    # From EFI::Xgmml::Writer
+    $self->open();
+
+    # From EFI::Xgmml::Writer
+    $self->preamble();
+
+    $self->writeStarting(label => "Pfam GNN");
 
     my @pfamHubNames = $hubs->getPfamHubNames();
 
@@ -44,6 +50,7 @@ sub write {
         my $hub = $hubs->getPfamHub($pfamHubName, $filterOnCooccurrence);
         my @clusterNums = sort keys %$hub;
 
+        my $hasSpoke = 0;
         foreach my $clusterNum (@clusterNums) {
             # Skip singletons
             next if not $clusterNum;
@@ -53,15 +60,20 @@ sub write {
 
             $self->writeNode($spokeNodeId, "$clusterNum", $nodeAttr);
             $self->writeEdge($pfamHubName, $spokeNodeId);
+
+            $hasSpoke = 1;
         }
 
         # Only write a hub node if there were spoke nodes
-        if (@clusterNums) {
+        if ($hasSpoke) {
             my $nodeAttr = $self->getHubData($pfamHubName, $hub);
             my ($familyNames, $pfamShortName, $pfamLongName) = $self->{gnt_anno}->getFamilyNames($pfamHubName);
+            $pfamShortName = NONE_PFAM if not $pfamShortName;
             $self->writeNode($pfamHubName, "$pfamShortName", $nodeAttr);
         }
     }
+
+    $self->writeClosing();
 
     $self->close();
 }
@@ -208,7 +220,7 @@ B<EFI::GNT::GNN::XgmmlWriter::PfamHub> - Perl helper module for writing Pfam hub
     my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 
     my $pfamGnnFile = "pfam_gnn.xgmml";
-    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(gnn_file => $pfamGnnFile, gnt_anno => $gntAnno);
+    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(output_file => $pfamGnnFile, gnt_anno => $gntAnno);
     $pfamHubWriter->write($hubs);
 
 

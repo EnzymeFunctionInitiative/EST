@@ -8,29 +8,32 @@ Usage
 	Usage: perl pipelines/est/import/get_sequence_ids.pl --efi-config-file <FILE> --efi-db <VALUE>
 	    --mode <VALUE> [--output-dir <DIR_PATH>] [--output-stats-file <FILE>]
 	    [--source-meta-file <FILE>] [--source-ids-file <FILE>] [--sequence-version <VALUE>]
-	    [--family <VALUE>] [--fasta <FILE>] [--seq-mapping-file <FILE>] [--accessions <FILE>]
-	    [--unmatched-ids <FILE>] [--blast-query <FILE>] [--blast-output <FILE>]
+	    [--family <VALUE>] [--fasta <FILE>] [--sequence-mapping-file <FILE>] [--accessions <FILE>]
+	    [--unmatched-ids <FILE>] [--blast-query <FILE>] [--blast-output <FILE>] [--domain <VALUE>]
+	    [--domain-family <VALUE>]
 	
 	Description:
 	    Retrieve sequence IDs from a database or file and saves them for use by a script later in the
 	    EST import pipeline
 	
 	Options:
-	    --output-dir           path to directory to store output in; if not specified, defaults to current working directory
-	    --efi-config-file      path to EFI database configuration file
-	    --efi-db               EFI database name, or path to EFI SQLite database file
-	    --mode                 the sequence retrieval mode (one of blast, family, accession, or fasta)
-	    --output-stats-file    output file to put sequence ID statistics into (defaults into --output-dir)
-	    --source-meta-file     output file to put sequence ID and source data into (defaults into --output-dir)
-	    --source-ids-file      path to the output file to save list of UniRef and UniProt accession IDs to (defaults into --output-dir)
-	    --sequence-version     sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot
-	    --family               one or more protein families (PF#####, IPR######); required for --mode family
-	    --fasta                user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta
-	    --seq-mapping-file     file for mapping UniProt and anonymous IDs in FASTA file (internal)
-	    --accessions           user-specified file containing list of accession IDs to use for all-by-all; required for --mode accession
-	    --unmatched-ids        file containing IDs in FASTA or accession ID files that were not matched in the EFI database
-	    --blast-query          path to file containing sequence for initial BLAST; required for --mode blast
-	    --blast-output         output file to put BLAST results into; required for --mode blast
+	    --output-dir               path to directory to store output in; if not specified, defaults to current working directory
+	    --efi-config-file          path to EFI database configuration file
+	    --efi-db                   EFI database name, or path to EFI SQLite database file
+	    --mode                     the sequence retrieval mode (one of blast, family, accession, or fasta)
+	    --output-stats-file        output file to put sequence ID statistics into (defaults into --output-dir)
+	    --source-meta-file         output file to put sequence ID and source data into (defaults into --output-dir)
+	    --source-ids-file          path to the output file to save list of UniRef and UniProt accession IDs to (defaults into --output-dir)
+	    --sequence-version         sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot
+	    --family                   one or more protein families (PF#####, IPR######); required for --mode family
+	    --fasta                    user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta
+	    --sequence-mapping-file    file for mapping UniProt and anonymous IDs in FASTA file (internal)
+	    --accessions               user-specified file containing list of accession IDs to use for all-by-all; required for --mode accession
+	    --unmatched-ids            file containing IDs in FASTA or accession ID files that were not matched in the EFI database
+	    --blast-query              path to file containing sequence for initial BLAST; required for --mode blast
+	    --blast-output             output file to put BLAST results into; required for --mode blast
+	    --domain                   retrieve the family domain on each sequence; 'central' retrieves the domain of the input family, 'n-terminal' or 'c-terminal' retrieve the portion of the sequence that is n-terminal or c-terminal to the family domain
+	    --domain-family            the family to use when retrieving domains for Accession jobs only
 	
 
 Reference
@@ -205,14 +208,14 @@ Parameters
    A path to a file containing FASTA sequences. Identifiers are pulled
    from the sequence headers in the file.
 
-``--seq-mapping-file`` (optional, defaults)
+``--sequence-mapping-file`` (optional, defaults)
    This file is necessary to map UniProt or anonymous identifiers to the
    proper header line in the input FASTA file. The file is provided to
    the **``import_fasta.pl``** script which reformats the user FASTA
    file into an acceptable format with proper header IDs. If this is not
-   specified, the file is named according to the ``seq_mapping`` value
-   in the **EFI::Import::Config::Defaults** module and put in the output
-   directory.
+   specified, the file is named according to the ``sequence_mapping``
+   value in the **EFI::Import::Config::Defaults** module and put in the
+   output directory.
 
 
 

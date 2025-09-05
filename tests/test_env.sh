@@ -153,9 +153,9 @@ export EFI_TEST_FASTA_FILE="$DATA_DIR/fasta_test.fasta"
 export EFI_TEST_BLAST_SEQ="$DATA_DIR/blast_query.fa"
 export EFI_TEST_FAMILY_ID="$DATA_DIR/family_id.txt"
 export EFI_TEST_SSN_UNIPROT="$DATA_DIR/ssn.xgmml.zip"
-export EFI_TEST_SSN_UNIREF90="$DATA_DIR/ssn_uniref90.xgmml"
+export EFI_TEST_SSN_UNIREF90="$DATA_DIR/ssn_uniref90.xgmml.zip"
 export EFI_TEST_SSN_UNIREF50="$DATA_DIR/ssn_uniref50.xgmml"
-export EFI_TEST_SSN_REPNODE="$DATA_DIR/ssn_repnode70.xgmml"
+export EFI_TEST_SSN_REPNODE="$DATA_DIR/ssn_repnode70.xgmml.zip"
 export EFI_TEST_ID_LIST_FILE="$DATA_DIR/gnd_id_list.txt"
 export EFI_TEST_RESULTS_DIR=$results_dir
 

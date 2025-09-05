@@ -30,7 +30,7 @@ sub new {
     $self->{network} = $args{seq_cluster_id_map};
     $self->{gnt_anno} = $args{gnt_anno};
 
-    if ($args{neighborhood_size} and $args{neighborhood_size} > MAX_NB_SIZE) {
+    if ($args{neighborhood_size} and $args{neighborhood_size} <= MAX_NB_SIZE) {
         $self->{neighborhood_size} = $args{neighborhood_size};
     } else {
         $self->{neighborhood_size} = MAX_NB_SIZE;
@@ -185,9 +185,9 @@ B<EFI::GNT::GNN> - Perl module for creating genome neighborhood networks
     my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => 0.20);
 
     # Save the GNN xgmml files
-    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(gnn_file => $pfamGnnFile, gnt_anno => $gntAnno);
+    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(output_file => $pfamGnnFile, gnt_anno => $gntAnno);
     $pfamHubWriter->write($hubs);
-    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
+    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(output_file => $clusterGnnFile, gnt_anno => $gntAnno);
     $clusterHubWriter->write($hubs);
 
     my $tables = new EFI::GNT::GNN::TableWriter(hubs => $hubs); 

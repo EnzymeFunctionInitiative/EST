@@ -151,11 +151,11 @@ sub parse_metanode_map_file {
     }
 
     # This file can have the following column cases:
-    #     repnode   uniprot
-    #     repnode   uniref90
-    #     repnode   uniref50
-    #     uniref90  uniprot
-    #     uniref50  uniprot
+    #     repnode_id   uniprot_id
+    #     repnode_id   uniref90_id
+    #     repnode_id   uniref50_id
+    #     uniref90_id  uniprot_id
+    #     uniref50_id  uniprot_id
     my ($metaCol, $seqTypeCol, $otherCol) = split(m/\t/, $header);
 
     # $type will be uniprot if it is a repnode network because it gets expanded

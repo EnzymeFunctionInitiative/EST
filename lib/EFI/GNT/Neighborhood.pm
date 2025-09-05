@@ -28,7 +28,7 @@ sub new {
 
     $self->{col_sql} = join(", ", 
             "ena.ID AS ID", "ena.AC AS AC", "ena.NUM AS NUM", "ena.TYPE AS TYPE", "ena.DIRECTION AS DIRECTION", "ena.start AS start", "ena.stop AS stop",
-            "GROUP_CONCAT(PFAM.id) AS pfam_fam",
+            "GROUP_CONCAT(DISTINCT PFAM.id) AS pfam_fam",
             "GROUP_CONCAT(I.id) AS ipro_fam",
             "GROUP_CONCAT(I.family_type) AS ipro_type",
             #"GROUP_CONCAT(I.parent) AS ipro_parent", "GROUP_CONCAT(I.is_leaf) AS ipro_is_leaf"
@@ -47,8 +47,6 @@ sub findNeighbors {
     my $self = shift;
     my $queryId = shift;
     my $neighborhoodSize = shift;
-
-    my $neighborsWithoutFamily = {};
 
     # Get information for the query accession
     my ($error, $pos, $queryAttributes) = $self->processQueryId($queryId, $neighborhoodSize);
@@ -471,7 +469,9 @@ select
     order by
         LLL desc,
         RRR desc,
-        PCT
+        PCT,
+        NUM desc,
+        ID
     limit 1
 SQL
 ;

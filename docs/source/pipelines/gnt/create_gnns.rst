@@ -6,15 +6,16 @@ Usage
 ::
 
 	Usage: perl pipelines/gnt/create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
-	    --config <FILE> --db-name <VALUE> [--gnd <FILE>] [--cooc-table <FILE>] [--hub-count <FILE>]
-	    [--nb-pfam-list-dir <DIR_PATH>] [--no-context <FILE>] [--nb-size <VALUE>]
-	    [--cooc-threshold <VALUE>] [--title <VALUE>]
+	    --config <FILE> --db-name <VALUE> [--metanode-map <FILE>] [--gnd <FILE>] [--cooc-table <FILE>]
+	    [--hub-count <FILE>] [--nb-pfam-list-dir <DIR_PATH>] [--no-context <FILE>] [--nb-size <VALUE>]
+	    [--cooc-threshold <VALUE>] [--title <VALUE>] [--stats <VALUE>]
 	
 	Description:
 	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline
 	
 	Options:
 	    --cluster-map         path to a file mapping sequence ID to cluster number
+	    --metanode-map        path to input file mapping metanode (e.g. UniRef node) to members of metanode
 	    --cluster-gnn         path to the output cluster hub-spoke GNN XGMML file
 	    --pfam-gnn            path to the output Pfam hub-spoke GNN XGMML file
 	    --gnd                 path to the output GND file
@@ -27,6 +28,7 @@ Usage
 	    --config              path to the config file for database connection
 	    --db-name             name of the EFI database to connect to for retrieving UniRef sequences
 	    --title               title of the GNN and GND for display purposes
+	    --stats               path to file to output SSN statistics to
 
 Reference
 ---------
@@ -46,9 +48,10 @@ SYNOPSIS
 ::
 
    create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
-       --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
-       [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
-       [--nb-size <INTEGER> --cooc-threshold <NUMBER> --title "<TITLE>"]
+       --config <FILE> --db-name <NAME> [--metanode-map <FILE> --gnd <FILE>]
+       [--cooc-table <FILE> --hub-count <FILE> --nb-pfam-list-dir <DIR>]
+       [--no-context FILE --nb-size <INTEGER> --cooc-threshold <NUMBER>]
+       [--title "<TITLE>" --stats <FILE>]
 
 
 
@@ -59,6 +62,7 @@ DESCRIPTION
 numbers and creates XGMML files for a cluster GNN and Pfam GNN. It
 optionally can create tables and metadata with data about the Pfams of
 neighbors in the input IDs and a genome neighborhood diagram (GND) file.
+The input IDs are assumed to be UniProt.
 
 
 
@@ -70,6 +74,14 @@ Arguments
    number, which can include a list of singletons (i.e. no cluster
    number columns). See ``parse_cluster_map_file()`` in
    **EFI::SSN::Util::ID** for an explanation of the file format.
+
+``--metanode-map``
+   Path to the file that maps input nodes in the cluster-map to UniProt
+   IDs within the metanode. This is optional, in which case the input
+   network is assumed to be a UniProt network, as is the case when the
+   file is empty. See ``ssn_to_id_list.pl`` and
+   ``parse_metanode_map_file()`` in **EFI::SSN::Util::ID** for more
+   details.
 
 ``--cluster-gnn``
    Path to the output cluster-centric GNN in XGMML (XML) format. This
@@ -127,3 +139,7 @@ Arguments
 
 ``--title``
    Optional title to use for display purposes in the GND viewer.
+
+``--stats``
+   Optional path to a file to write statistics (e.g. number of nodes,
+   edges) to.

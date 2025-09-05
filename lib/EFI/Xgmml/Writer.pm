@@ -26,7 +26,7 @@ sub new {
 }
 
 
-# protected
+# public
 sub open {
     my $self = shift;
 
@@ -43,6 +43,7 @@ sub open {
 }
 
 
+# public
 sub close {
     my $self = shift;
 
@@ -51,27 +52,21 @@ sub close {
 }
 
 
+# public
 sub preamble {
     my $self = shift;
     $self->{writer}->xmlDecl("UTF-8");
 }
 
 
+# public
 sub xmlns {
     my $self = shift;
     return XMLNS;
 }
 
 
-#
-# endTag - private method
-#
-# Wrapper around the XML writer endTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
+# public
 sub endTag {
     my $self = shift;
     $self->{writer}->endTag(@_);
@@ -79,15 +74,7 @@ sub endTag {
 }
 
 
-#
-# startTag - private method
-#
-# Wrapper around the XML writer startTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
+# public
 sub startTag {
     my $self = shift;
     $self->{writer}->startTag(@_);
@@ -95,15 +82,7 @@ sub startTag {
 }
 
 
-#
-# emptyTag - private method
-#
-# Wrapper around the XML writer emptyTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
+# public
 sub emptyTag {
     my $self = shift;
     $self->{writer}->emptyTag(@_);
@@ -111,14 +90,6 @@ sub emptyTag {
 }
 
 
-#
-# comment - private method
-#
-# Wrapper around the XML writer comment() method so additional information can be added if needed
-#
-# Parameters:
-#    @_ - any comment parameters
-#
 sub comment {
     my $self = shift;
     $self->{writer}->comment(@_);
@@ -127,4 +98,203 @@ sub comment {
 
 
 1;
+__END__
+
+=pod
+
+=head1 EFI::Xgmml::Writer
+
+=head2 NAME
+
+B<EFI::Xgmml::Writer> - Abstract Perl interface for basic writing of XGMML files
+
+=head2 SYNOPSIS
+
+    # Use a module that implements this interface
+    use EFI::Xgmml::Writer;
+
+    my $xwriter = EFI::Xgmml::Writer->new(output_file => $outputFile);
+    $xwriter->open();
+
+    $xwriter->comment("node", "attr_name" => "value");
+    $xwriter->startTag("graph", "xmlns" => $self->xmlns());
+    # Subclass can write things here
+    $xwriter->startTag("node", "attr_name" => "value");
+    $xwriter->endTag("node");
+
+    $xwriter->close();
+
+
+=head2 DESCRIPTION
+
+B<EFI::Xgmml::Writer> is a Perl interface providing standard API to facilitate writing of
+various GNN files in XGMML format as well as the proper XML preamble.  It provides low-level
+XML tag access as well as XGMML-specific writing methods.
+
+=head2 METHODS
+
+=head3 C<new(output_file =E<gt> $outputFile)>
+
+Creates a new B<EFI::Xgmml::Writer> object.  Should only be called from sub classes.
+
+=head4 Parameters
+
+=over
+
+=item C<output_file>
+
+Path to a file in XGMML format that is to be created.
+
+=back
+
+=head4 Example Usage
+
+    my $xwriter = EFI::Xgmml::Writer->new(output_file => $outputFile);
+
+
+=head3 C<open()>
+
+Opens the XGMML file for writing.
+
+=head4 Returns
+
+1 on success, 0 on failure
+
+=head4 Example Usage
+
+    $xwriter->open();
+
+
+=head3 C<close()>
+
+Finishes writing the XGMML file and closes the file handle.
+
+=head4 Returns
+
+1 on success, 0 on failure
+
+=head4 Example Usage
+
+    $xwriter->close();
+
+
+=head3 C<preamble()>
+
+Writes the XML preamble (the XML namespace).
+
+=head4 Example Usage
+
+    $xwriter->preamble();
+
+
+=head3 C<xmlns()>
+
+Returns the XML namespace for the XGMML file.
+
+=head4 Returns
+
+XGMML XML namespace.
+
+=head4 Example Usage
+
+    my $ns = $writer->xmlns();
+    # Result is something like "http://www.cs.rpi.edu/XGMML"
+
+
+=head3 C<emptyTag($tagName, %attrs)>
+
+Writes an empty tag with the specified attributes in key-value format.  An empty tag is a tag
+without a termination element (e.g. C<E<lt>elem/E<gt>>).  Wrapper around the XML writer
+C<emptyTag()> method so that a new line can be added after the tag.
+
+=head4 Parameters
+
+=over
+
+=item C<$name>
+
+Name of the element tag
+
+=item C<%attrs>
+
+Key-values pairs of attributes of the element
+
+=back
+
+=head4 Example Usage
+
+    %attr = (key1 => "value1", key2 => "value2");
+    $xwriter->emptyTag("elem", %attr);
+    # renders as:   <elem key1="value1" key2="value2" />
+
+
+=head3 C<startTag($tagName, %attrs)>
+
+Writes a start tag with the specified attributes in key-value format.  Wrapper around the XML
+writer C<startTag()> method so that a new line can be added after the tag.
+
+=head4 Parameters
+
+=over
+
+=item C<$name>
+
+Name of the element tag
+
+=item C<%attrs>
+
+Key-values pairs of attributes of the element
+
+=back
+
+=head4 Example Usage
+
+    %attr = (key1 => "value1", key2 => "value2");
+    $xwriter->startTag("elem", %attr);
+    # renders as:   <elem key1="value1" key2="value2">
+
+
+=head3 C<endTag($tagName)>
+
+Writes an end XML tag with the tag name.  Wrapper around the XML writer C<endTag()> method so
+that a new line can be added after the tag.
+
+=head4 Parameters
+
+=over
+
+=item C<$name>
+
+Name of the element tag
+
+=back
+
+=head4 Example Usage
+
+    $xwriter->endTag("elem");
+    # renders as:   </elem>
+
+
+=head3 C<comment(@commentData)>
+
+Writes an end XML tag with the tag name.  Wrapper around the XML writer C<comment()> method so that
+a new line can be added after the comment.
+
+=head4 Parameters
+
+=over
+
+=item C<@commentData>
+
+Any comment data to be written.
+
+=back
+
+=head4 Example Usage
+
+    $xwriter->comment("comment code here");
+    # renders as:   <!-- comment code here -->
+
+
+=cut
 

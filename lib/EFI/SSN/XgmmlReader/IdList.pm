@@ -11,6 +11,7 @@ use lib "$FindBin::Bin/../../..";
 
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
+use EFI::Sequence::Type qw(:types);
 
 use parent qw(EFI::SSN::XgmmlReader);
 
@@ -25,7 +26,7 @@ sub new {
     $self->{id_list_fields} = { map { $attrDisplay->{$_} => $_ } @$attrNames };
     $self->{metadata} = {}; # any node metadata that we are to store (e.g. swissprot)
     $self->{meta_map} = undef; # Metanode -> IDs in metanode mapping
-    $self->{id_type} = "uniprot";
+    $self->{id_type} = SEQ_UNIPROT;
 
     return $self;
 }
@@ -34,7 +35,7 @@ sub new {
 sub getMetanodeSizes {
     my $self = shift;
     my $idSizeMap = {};
-    if ($self->{id_type} ne "uniprot") {
+    if ($self->{id_type} ne SEQ_UNIPROT) {
         foreach my $idx (keys %{ $self->{idx_seqid} }) {
             my $id = $self->{idx_seqid}->{$idx};
             my $meta = $self->{meta_map}->{$id};
@@ -48,20 +49,20 @@ sub getMetanodeSizes {
 
 sub getMetanodeType {
     my $self = shift;
-    my $idf = $self->{id_type};
-    if ($idf ne "uniprot") {
-        $idf = "repnode" if $idf eq FIELD_REPNODE_IDS;
-        $idf = "uniref90" if $idf eq FIELD_UNIREF90_IDS;
-        $idf = "uniref50" if $idf eq FIELD_UNIREF50_IDS;
+    my $idType = $self->{id_type};
+    if ($idType ne SEQ_UNIPROT) {
+        $idType = SEQ_REPNODE if $idType eq FIELD_REPNODE_IDS;
+        $idType = SEQ_UNIREF90 if $idType eq FIELD_UNIREF90_IDS;
+        $idType = SEQ_UNIREF50 if $idType eq FIELD_UNIREF50_IDS;
     }
-    return $idf;
+    return $idType;
 }
 
 
 sub getMetanodes {
     my $self = shift;
     my $fullIds = {};
-    if ($self->{id_type} ne "uniprot") {
+    if ($self->{id_type} ne SEQ_UNIPROT) {
         foreach my $metanode (keys %{ $self->{meta_map} }) {
             $fullIds->{$metanode} = [ keys %{ $self->{meta_map}->{$metanode} } ];
         }
@@ -163,8 +164,12 @@ information from XGMML files
     my $metanodeType = $parser->getMetanodeType();
     my $metanodeSizes = $parser->getMetanodeSizes();
     my $metanodeMap = $parser->getMetanodes();
-    print "Network ID type: $metanodeType\n"; # uniprot, uniref90, uniref50, repnode
-    if ($metanodeType ne "uniprot") {
+
+    use EFI::Sequence::Type qw(:types);
+    my $metanodeType = $parser->getMetanodeType();
+    print "Network ID type: $metanodeType\n"; # One of SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE
+
+    if ($metanodeType ne SEQ_UNIPROT) {
         foreach my $metanode (sort keys %$metanodeMap) {
             map {
                 print join("\t", $metanode,
@@ -200,8 +205,10 @@ One of C<uniprot>, C<uniref90>, C<uniref50>, C<repnode>
 
 =head4 Example Usage
 
+    use EFI::Sequence::Type qw(:types);
+
     my $metanodeType = $parser->getMetanodeType();
-    print "Network ID type: $metanodeType\n"; # uniprot, uniref90, uniref50, repnode
+    print "Network ID type: $metanodeType\n"; # One of SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE
 
 
 

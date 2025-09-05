@@ -41,14 +41,13 @@ process get_ssn_id_info {
     input:
         path ssn_file
     output:
-        path "edgelist.txt", emit: "edgelist"
-        path "index_seqid_map.txt", emit: "index_seqid_map"
-        path "id_index_map.txt", emit: "id_index_map"
-        path "seqid_source_map.txt", emit: "seqid_source_map"
-        path "ssn_sequences.fasta", emit: "ssn_sequences"
+        path "edgelist.txt", emit: "edgelist"                   // Specifies the network, i.e. the edges between node network IDs
+        path "index_seqid_map.txt", emit: "index_seqid_map"     // Maps node network ID to UniProt ID and the number of IDs in the metanode
+        path "seqid_source_map.txt", emit: "seqid_source_map"   // Maps metanode IDs to UniProt IDs
+        path "ssn_sequences.fasta", emit: "ssn_sequences"       // Custom sequences that are embedded in the SSN
     """
     perl $projectDir/../shared/perl/ssn_to_id_list.pl --ssn $ssn_file --edgelist edgelist.txt --index-seqid index_seqid_map.txt \
-        --id-index id_index_map.txt --seqid-source-map seqid_source_map.txt --ssn-sequences ssn_sequences.fasta
+        --seqid-source-map seqid_source_map.txt --ssn-sequences ssn_sequences.fasta
     """
 }
 
