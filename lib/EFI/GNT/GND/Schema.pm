@@ -59,17 +59,16 @@ sub getNeighborCols {
 # public
 sub initializeDatabase {
     my $self = shift;
-    my $networkType = shift || SEQ_UNIPROT;
 
     my @indexCols;
     push @indexCols, [QUERY_TABLE, $self->initializeTable(QUERY_TABLE, $self->getQueryIdCols())];
     push @indexCols, [NEIGHBOR_TABLE, $self->initializeTable(NEIGHBOR_TABLE, $self->getNeighborCols())];
 
     # Create UniRef90 (and UniRef50, if the version is UniRef50) tables
-    if ($networkType eq SEQ_UNIREF50) {
+    if ($self->{network_type} eq SEQ_UNIREF50) {
         push @indexCols, $self->initializeUnirefTables(UNIREF50_TABLE);
     }
-    if ($networkType eq SEQ_UNIREF50 or $networkType eq SEQ_UNIREF90) {
+    if ($self->{network_type} eq SEQ_UNIREF50 or $self->{network_type} eq SEQ_UNIREF90) {
         push @indexCols, $self->initializeUnirefTables(UNIREF90_TABLE);
     }
 
