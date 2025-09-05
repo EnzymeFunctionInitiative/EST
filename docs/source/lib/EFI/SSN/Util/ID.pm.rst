@@ -23,7 +23,7 @@ SYNOPSIS
 
 ::
 
-   use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file get_cluster_num_cols parse_metanode_map_file);
+   use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file get_cluster_num_cols parse_metanode_map_file parse_cluster_num_map);
 
    # $clusterMapFile comes from another utility, the Python `compute_clusters.py` script
    my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
@@ -35,6 +35,11 @@ SYNOPSIS
 
    # $header = "node_label      cluster_num_by_seq      cluster_num_by_node"
    my ($seqNumCol, $nodeNumCol) = get_cluster_num_cols($header);
+
+   # $clusterNumMapFile is typically output by compute_clusters.py
+   my ($clusterSizesBySequences, $clusterSizesByNodes) = parse_cluster_num_map($clusterNumMapFile);
+
+   my $ids = parse_singletons_file($singletonsFile);
 
 
 
@@ -48,7 +53,7 @@ node in the network that represents one or more sequences. For example,
 networks generated using UniRef will contain nodes that correspond to
 UniRef sequences, which in turn represent one or more UniProt sequences.
 Additionally, metanodes can represent multiple sequences that are
-grouped together in repnode networks to reduce the size of the network.
+grouped together in RepNode networks to reduce the size of the network.
 Clusters can be numbered by sequence or by node; by-sequence numbering
 takes into account all of the sequences in all of the metanodes in the
 cluster (effectively expanding the metanode), whereas by-node numbering
@@ -67,7 +72,15 @@ METHODS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Parses a file that contains a mapping of sequence IDs to cluster
-numbers.
+numbers. The file is a tab-separated file with one to three columns, and
+includes a header. For example:
+
+::
+
+   node_label  cluster_num_by_seq cluster_num_by_node
+   UNIPROT_ID  1                  1
+   UNIPROT_ID2 1                  2
+   UNIPROT_ID3 1                  1
 
 
 
@@ -75,10 +88,10 @@ Parameters
 ^^^^^^^^^^
 
 ``$clusterMapFile``
-   A file that contains three columns; the first column being the
-   sequence ID, with the second and third columns being the cluster
-   numbers (by sequence and by node). If the cluster number columns
-   don't exist then the singleton number ('0') is assigned.
+   A tab-separated file that with two or three columns; the first column
+   being the sequence ID, with the second and third columns being the
+   cluster numbers (by sequence and by node). If there are only two
+   columns then the cluster numbers are identical.
 
 
 
@@ -89,7 +102,7 @@ Returns
    A hash ref that maps cluster numbers to an array of sequence IDs
    within that cluster. The clusters that are returned are numbered by
    sequence (e.g. the ``cluster_num_seq`` column in the input file). For
-   example, a repnode network that contains cluster 1 with a metanode
+   example, a RepNode network that contains cluster 1 with a metanode
    ``"REPNODE_ID1"`` that represents ``"UNIPROT_ID1"`` and
    ``"UNIPROT_ID2"``), and cluster 2 with a metanode ``"REPNODE_ID2"``
    that represents ``"UNIPROT_ID3"`` as well as a single node
@@ -129,6 +142,48 @@ Example Usage
 
 
 
+``parse_singletons_file($singletonsFile)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Parse a list of singletons in a file, with the format being a single
+column file with a header:
+
+::
+
+   node_label
+   UNIPROT_ID
+   UNIPROT_ID2
+   UNIPROT_ID3
+
+
+
+Parameters
+^^^^^^^^^^
+
+``$singletonsFile``
+   Path to a file containing IDs.
+
+
+
+Returns
+^^^^^^^
+
+An array ref of IDs.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $ids = parse_singletons($singletonsFile);
+   foreach my $id (@$ids) {
+       print "Singleton: $id\n";
+   }
+
+
+
 ``parse_metanode_map_file($metanodeMapFile)``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -137,7 +192,10 @@ metanode. The result may be an empty hash ref in the case that the file
 is empty (which occurs when the input to the pipeline is a UniProt
 network). Metanodes are simply sequence IDs that represent multiple
 sequences. There may only be an one-to-one mapping in which case the
-metanode represents itself (equivalent to a UniProt ID).
+metanode represents itself (equivalent to a UniProt ID). In the case
+that a RepNode network is based on a UniRef network, the mapping returns
+a RepNode ID to a hash of lists, mapping RepNode to UniRef ID to UniProt
+IDs in UniRef cluster.
 
 
 
@@ -153,17 +211,34 @@ Parameters
 Returns
 ^^^^^^^
 
-A hash ref that maps metanode to a list of sequences. For example:
+``$idType``
+   One of ``SEQ_UNIREF90``, ``SEQ_UNIREF50``, ``SEQ_REPNODE``, or
+   ``SEQ_UNIPROT``, indicating the sequence type.
 
-::
+``$sourceIdMap``
+   A hash ref that maps metanode to a list of sequences. For example:
 
-   {
-       "UNIPROT_ID1" => ["UNIPROT_ID1"],
-       "METANODE_ID1" => ["UNIPROT_ID9", "UNIPROT_ID10", ...],
-       "METANODE_ID2" => ["UNIPROT_ID20", "UNIPROT_ID30", ...],
-       "METANODE_ID3" => ["UNIPROT_ID7"],
-       ...
-   }
+   ::
+
+      {
+          "UNIPROT_ID1" => ["UNIPROT_ID1"],
+          "METANODE_ID1" => ["UNIPROT_ID9", "UNIPROT_ID10", ...],
+          "METANODE_ID2" => ["UNIPROT_ID20", "UNIPROT_ID30", ...],
+          "METANODE_ID3" => ["UNIPROT_ID7"],
+          ...
+      }
+
+   If the input network is a RepNode network based on UniRef sequences,
+   then the result is more complicated:
+
+   ::
+
+      {
+          "REPNODE_ID1" => {"UNIPROT_ID" => ["UNIPROT_ID1"]},
+          "REPNODE_ID2" => {"METANODE_ID1" => ["UNIPROT_ID9", "UNIPROT_ID10", ...],
+                            "METANODE_ID2" => ["UNIPROT_ID20", "UNIPROT_ID30", ...]},
+          ...
+      }
 
 
 
@@ -174,6 +249,9 @@ Example Usage
 
    # $metanodeMapFile comes from another utility, ssn_to_id_list.pl
    my ($idType, $sourceIdMap) = parse_metanode_map_file($metanodeMapFile);
+   use Data::Dumper;
+   print "Source network type: $idType\n";
+   print Dumper($sourceIdMap);
 
 
 
@@ -210,10 +288,11 @@ Parameters
 
 ``$idType``
    A string that specifies the type of IDs in the ``$sourceIdMap``
-   parameter. It can be ``uniref90``, ``uniref50``, ``repnode``, and
-   ``uniprot``. If it is empty or undefined, the input is assumed to be
-   UniProt sequences and the output of the function will be the same as
-   the input ``$clusterToId``.
+   parameter. It can be ``SEQ_UNIREF90``, ``SEQ_UNIREF50``,
+   ``SEQ_REPNODE``, and ``SEQ_UNIPROT``. If it is empty or undefined,
+   the input is assumed to be UniProt sequences and the output of the
+   function will be the same as the input ``$clusterToId``. The
+   constants are available in **EFI::Sequence::Type**.
 
 ``$sourceIdMap``
    A hash ref that maps metanode IDs to sequence IDs in the metanode. If
@@ -257,7 +336,7 @@ Example Usage
 
    my $clusterToId = {}; # get the mapping somehow
    my $sourceIdMap = {}; # get the mapping somehow
-   my $newMapping = resolve_mapping($clusterToId, "repnode", $sourceIdMap);
+   my $newMapping = resolve_mapping($clusterToId, SEQ_REPNODE, $sourceIdMap);
 
    foreach my $clusterNum (keys %$newMapping) {
        foreach my $id (@{ $newMapping->{$clusterNum} }) {
@@ -307,3 +386,68 @@ Example Usage
    chomp(my $row = getLine());
    my @p = split(m/\t/, $row);
    my $clusterNum = $p[$seqNumCol];
+
+
+
+``parse_cluster_num_map($file)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Parse the cluster number mapping file that is output by
+**compute_clusters.py** as part of the color SSN workflow. The file a
+tab-separated file with a header giving the value in the columns,
+typically looking as follows:
+
+::
+
+   cluster_num_by_seq cluster_size_by_seq cluster_num_by_node cluster_size_by_node
+   1                  19                  1                   12
+   2                  12                  3                   7
+   3                  7                   2                   11
+
+For inputs that are UniProt the values will always be the same.
+
+
+
+Parameters
+^^^^^^^^^^
+
+``$file``
+   Path to the cluster num mapping file.
+
+
+
+Returns
+^^^^^^^
+
+Two hash refs mapping the cluster numbers to sizes:
+
+``$clusterSizesBySequences``
+   The number of sequences in each cluster (including any sequences in
+   the metanodes).
+
+``$clusterSizesByNodes``
+   The number of sequences in each cluster (metanodes only).
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   # $clusterNumMapFile contains the data specified above
+   my ($clusterSizesBySequences, $clusterSizesByNodes) = parse_cluster_num_map($clusterNumMapFile);
+
+   # $clusterSizesBySequences contains: 
+   #     {
+   #         1 => 19,
+   #         2 => 12,
+   #         3 => 7
+   #     }
+
+   # $clusterSizesByNodes contains:
+   #     {
+   #         1 => 12,
+   #         2 => 11,
+   #         3 => 7
+   #     }
