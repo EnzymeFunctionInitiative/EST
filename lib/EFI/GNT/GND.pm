@@ -11,6 +11,8 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::GNT::GND::Schema qw(:schema);
+use EFI::GNT::GND::Uniref;
+use EFI::GNT::GND::Util;
 use EFI::Sequence::Type qw(:types);
 
 
@@ -20,10 +22,6 @@ sub new {
 
     my $self = {};
     bless $self, $class;
-
-    # Queue X number of statements before committing (improves performance)
-    $self->{insert_count} = 0;
-    $self->{insert_max} = 100000;
 
     return $self;
 }
@@ -48,12 +46,14 @@ sub save {
         return 0;
     }
 
+    $self->{uniref} = new EFI::GNT::GND::Uniref(dbh => $self->{dbh}, db_util => $self->{util});
+
     my $clusterData = $gnn->getClusterData();
 
     # Add the UniRef cluster size mapping (e.g. how many UniProt IDs are in the UniRef cluster IDs)
     my ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping);
     if ($networkType ne SEQ_UNIPROT and $args{metanode_mapping}) {
-        ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping) = $self->computeUnirefMapping($args{metanode_mapping});
+        ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping) = $self->{uniref}->computeUnirefMapping($args{metanode_mapping});
     }
 
     my $sortSeqIds = $args{sort_sequence_ids} // 0;
@@ -67,7 +67,7 @@ sub save {
     $self->insertMatchedIds($matchedIds);
 
     if ($networkType ne SEQ_UNIPROT and $uniref50IdMapping and $uniref90IdMapping) {
-        $self->insertUnirefMapping($clusterData, $networkType, $uniref50IdMapping, $uniref90IdMapping, $idIndexMap, $idClusterMap);
+        $self->{uniref}->insertUnirefMapping($clusterData, $networkType, $uniref50IdMapping, $uniref90IdMapping, $idIndexMap, $idClusterMap);
     }
 
     $self->{dbh}->commit();
@@ -100,6 +100,8 @@ sub initializeDatabase {
     # Turn on transactions (e.g. don't automatically commit after every insert)
     $self->{dbh}->{AutoCommit} = 0;
 
+    $self->{util} = new EFI::GNT::GND::Util(dbh => $self->{dbh});
+
     $self->{schema} = new EFI::GNT::GND::Schema(network_type => $networkType, dbh => $self->{dbh});
     return $self->{schema}->initializeDatabase();
 }
@@ -119,7 +121,7 @@ sub initializeDatabase {
 #    $sortSequenceIds - set to true to sort the IDs inside of the cluster alphanumerically; by
 #        default IDs are ordered as they exist in the input
 #    $unirefSizeMapping - hash ref that maps ID to UniRef sizes; only UniRef IDs will be present,
-#        see computeUnirefSizeMapping() for format
+#        see EFI::GNT::GND::Uniref::computeUnirefSizeMapping() for format
 #
 # Returns:
 #    $families - array ref of list of all Pfam and InterPro families that were in the input,
@@ -156,6 +158,7 @@ sub insertClusterData {
         # Always add uniref size fields; these will be ignored later if the input network is not UniRef
         $queryData{uniref90_size} = $unirefSizeMapping->{$queryData{id}}->{uniref90} // 0;
         $queryData{uniref50_size} = $unirefSizeMapping->{$queryData{id}}->{uniref50} // 0;
+        $queryData{&COLOR_COLUMN} = $self->{util}->getColorForPfam($queryData{pfam});
         return \%queryData;
     };
 
@@ -292,303 +295,6 @@ sub insertClusterIndex {
 
 
 #
-# insertUnirefMapping - private method
-#
-# Insert the various UniRef mapping tables necessary to view UniRef organized data in the
-# GND viewer.
-#
-# Parameters:
-#    $clusterData - hash ref mapping cluster to sequences and GNN-obtained data
-#    $networkType - one of SEQ_UNIPROT, SEQ_UNIREF50, or SEQ_UNIREF90
-#    $uniref50IdMapping - hash ref mapping UniRef50 sequence IDs to UniRef90 IDs within
-#        the UniRef50 cluster
-#    $uniref90IdMapping - hash ref mapping UniRef90 sequence IDs to UniProt IDs within
-#        the UniRef90 cluster
-#    $idIndexMap - hash ref mapping sequence ID to the query_key in the network
-#    $idClusterMap - hash ref mapping sequence ID to the cluster it belongs in
-#
-# Remarks:
-#
-# The sequences are sorted in the following order for a UniRef50 network:
-#
-#     cluster_1:
-#         (ids sorted alphabetically)
-#         uniref50_a:
-#             (sorted by uniref90 cluster size)
-#             uniref90_d: [size 4]
-#                 (sorted alphabetically, or if source is BLAST, by e-value)
-#                 uniprot_a
-#                 uniprot_b
-#                 uniprot_c
-#                 uniprot_d
-#             uniref90_a: [size 2]
-#                 uniprot_e
-#                 uniprot_f
-#             uniref90_b: [size 1]
-#                 uniprot_g
-#         uniref50_b:
-#             ...
-#         uniref50_c:
-#             ...
-#     cluster_2:
-#         ...
-#     ...
-#
-# For a UniRef90 network:
-#
-#     cluster_1:
-#         (ids sorted alphabetically)
-#         uniref90_a:
-#             (sorted alphabetically, or if source is BLAST, by e-value)
-#             uniprot_e
-#             uniprot_f
-#         uniref90_d:
-#             uniprot_a
-#             uniprot_b
-#             uniprot_c
-#             uniprot_d
-#         ...
-#     cluster_2:
-#         ...
-#     ...
-#
-sub insertUnirefMapping {
-    my $self = shift;
-    my $clusterData = shift;
-    my $networkType = shift;
-    my $uniref50IdMapping = shift;
-    my $uniref90IdMapping = shift;
-    my $idIndexMap = shift;
-    my $idClusterMap = shift;
-
-    my $sortUniref50Fn = $self->makeUnirefSizeSortFunction($uniref50IdMapping);
-    my $sortUniref90Fn = $self->makeUnirefSizeSortFunction($uniref90IdMapping);
-    my $defaultIdSortFn = $self->makeIdSortFunction($clusterData);
-
-    # Insert UniRef50 tables; each UniRef50 entry points to a list of UniRef90 IDs in the
-    # UniRef50 cluster
-    if ($networkType eq SEQ_UNIREF50) {
-        # The sortUniref50Fn tells the code to sort the all of the IDs in the network first
-        # by UniRef50 cluster size (e.g. how many UniRef90 IDs are in a UniRef50 cluster).
-        # defaultIdSortFn is how UniRef50 IDs are sorted within a given network cluster.
-        # We also pass the sortUniref90Fn sort function so that the UniRef90 IDs in the
-        # UniRef50 cluster are sorted by UniRef90 cluster size.
-        $self->insertUnirefTables(SEQ_UNIREF50, $sortUniref50Fn, $defaultIdSortFn, $uniref50IdMapping, $idClusterMap, $idIndexMap, $sortUniref90Fn);
-    }
-
-    # Insert UniRef90 tables; each UniRef90 entry points to a list of UniProt IDs in the
-    # UniRef90 cluster
-    if ($networkType eq SEQ_UNIREF90 or $networkType eq SEQ_UNIREF50) {
-        # If the network is UniRef90, then sort the outer IDs (e.g. UniRef90 IDs) in the
-        # network cluster by UniRef90 ID.  If the network is UniRef50, then we sort the
-        # UniRef90 tables by the UniRef90 cluster size.
-        my $idSortFn = $networkType eq SEQ_UNIREF90 ? $defaultIdSortFn : $sortUniref90Fn;
-        $self->insertUnirefTables(SEQ_UNIREF90, $sortUniref90Fn, $idSortFn, $uniref90IdMapping, $idClusterMap, $idIndexMap);
-    }
-}
-
-
-#
-# insertUnirefTables - private method
-#
-# Insert the three tables necessary to support visualization of GND entries grouped by
-# UniRef clusters.  IDs are first grouped and sorted by UniRef cluster size, then three
-# tables are created (this is repeated for both UniRef50 and UniRef90):
-#
-#     # maps all of the UniProt IDs in the UniRef IDs to the cluster_index column in the
-#     # 'attributes' table; this is necessary so that blocks of UniRef IDs can be
-#     # retrieved--related to the unirefXX_range table
-#     unirefXX_index:
-#         member_index: sequential index ID corresponding to a UniProt ID
-#         cluster_index: cluster_index value for UniProt ID in 'attributes' table
-#
-#     # maps a UniRef ID to blocks of UniProt IDs as defined in unirefXX_index; this
-#     # allows to select a subset of IDs to asynchronously retrieve data in the UI
-#     unirefXX_range:
-#         uniref_index: sequential index ID for a UniRef ID
-#         uniref_id: UniRef accession ID
-#         start_index: start of a range of member_index values in unirefXX_index
-#         end_index: end of a range of member_index values in unirefXX_index
-#         cluster_index: cluster_index value for the UniRef ID in 'attributes' table
-#
-#     # maps a network cluster number to a range of UniRef index IDs
-#     unirefXX_cluster_index
-#         cluster_num: network cluster number
-#         start_index: the start of the block of UniRef index IDs (uniref_index) in
-#             unirefXX_range corresponding to the UniRef IDs in the cluster
-#         end_index: the end of the block of UniRef index IDs (uniref_index) in
-#             unirefXX_range corresponding to the UniRef IDs in the cluster
-#
-# Parameters:
-#    $unirefVersion - SEQ_UNIREF50 or SEQ_UNIREF90
-#    $unirefClusterSizeSortFn - function that sorts the IDs in $unirefMapping by size
-#    $idSortFn - function that sorts the IDs in each cluster
-#    $unirefMapping - mapping of UniRefXX ID to UniProt IDs in the UniRef cluster
-#    $idIndexMap - hash ref mapping sequence ID to the query_key in the network
-#    $idClusterMap - hash ref mapping sequence ID to the cluster it belongs in
-#    $sortClustersByUniref90SizeFn - if present, the IDs in each UniRefXX cluster are
-#        sorted by this function before being saved (used to save UniRef90 IDs by size
-#        in UniRef50 mapping tables)
-#
-sub insertUnirefTables {
-    my $self = shift;
-    my $unirefVersion = shift;
-    my $unirefClusterSizeSortFn = shift;
-    my $idSortFn = shift;
-    my $unirefMapping = shift;
-    my $idClusterMap = shift;
-    my $idIndexMap = shift;
-    my $sortClustersByUniref90SizeFn = shift || 0;
-
-    # Create the statement handles that allow parameterized execution of insertions
-    my $unirefBase = "uniref" . ($unirefVersion =~ s/\D//gr);
-    my $indexSth = $self->{dbh}->prepare("INSERT INTO ${unirefBase}_index (member_index, cluster_index) VALUES (?, ?)");
-    my $rangeSth = $self->{dbh}->prepare("INSERT INTO ${unirefBase}_range (uniref_index, uniref_id, start_index, end_index, cluster_index) VALUES (?, ?, ?, ?, ?)");
-    my $clusterIndexSth = $self->{dbh}->prepare("INSERT INTO ${unirefBase}_cluster_index (cluster_num, start_index, end_index) VALUES (?, ?, ?)");
-
-    # First sort all of the IDs in the input UniRefXX by the size of the UniRefXX cluster
-    my @allUnirefIds = sort $unirefClusterSizeSortFn keys %$unirefMapping;
-
-    # Now get all of the network clusters and the UniRefXX IDs in the cluster (exclude singletons)
-    my %networkClusters;
-    map { push @{ $networkClusters{ $idClusterMap->{$_} } }, $_ if $idClusterMap->{$_} } @allUnirefIds;
-
-    # This is a unique index ID for the UniRef index ID in the range table, used to map
-    # a UniRef index ID to a list of UniProt index IDs
-    my $unirefIndex = 0;
-
-    # This is a unique index ID for each UniProt ID, used to map an entry in the
-    # UniRef index ID table to the attributes UniProt table (using the cluster_index field
-    # in the attributes table)
-    my $uniprotIndex = 0;
-
-    my %clusterNumIndexMap;
-
-    # Process each network cluster, sorted in size by largest to smallest
-    foreach my $clusterNum (sort { $a <=> $b } keys %networkClusters) {
-        my @unirefIds = sort $idSortFn @{ $networkClusters{$clusterNum} };
-
-        # Use this to map a network cluster number to a list of UniRef index IDs
-        my $startUnirefIndex = $unirefIndex;
-
-        foreach my $unirefId (@unirefIds) {
-            my $unirefClusterIndex = $idIndexMap->{$unirefId};
-            # This UniRef ID was retrieved due to a reverse lookup in a previous step, but does
-            # not have ENA data associated with it, so skip
-            next if not defined $unirefClusterIndex;
-
-            # If this insertion is for UniRef50 tables, then these IDs are UniRef90 IDs
-            my @ids = @{ $unirefMapping->{$unirefId} };
-
-            # If this insertion is for UniRef50 tables, then sort the UniRef90 IDs by the
-            # number of IDs in the UniRef90 cluster
-            if ($sortClustersByUniref90SizeFn) {
-                @ids = sort $sortClustersByUniref90SizeFn @ids;
-            }
-
-            # This represents a sequential index ID into the list of @ids
-            my $offset = 0;
-
-            foreach my $id (@ids) {
-                # This maps the UniRef ID to the cluster_index column in the attributes table
-                my $clusterIndex = $idIndexMap->{$id};
-                # The UniProt ID may be in a different cluster
-                my $idClusterNum = $idClusterMap->{$id};
-
-                # This UniRef90 ID was retrieved due to a reverse lookup in a previous step,
-                # but does not have ENA data associated with it, so skip
-                next if not defined $clusterIndex;
-
-                # Save the start and end UniRef index ID for the cluster
-                $clusterNumIndexMap{$clusterNum}->{start} = $startUnirefIndex if not exists $clusterNumIndexMap{$clusterNum}->{start};
-                $clusterNumIndexMap{$clusterNum}->{end} = $unirefIndex;
-
-                # Insert the mapping of ID index to UniProt cluster_index
-                my $memberIndex = $uniprotIndex + $offset;
-                $self->insert($indexSth, [$memberIndex, $clusterIndex]);
-
-                $offset++;
-            }
-
-            # Insert the mapping of UniRef index ID
-            my $end = $uniprotIndex + $offset - 1;
-            $self->insert($rangeSth, [$unirefIndex, $unirefId, $uniprotIndex, $end, $unirefClusterIndex]);
-
-            $uniprotIndex += $offset;
-            $unirefIndex++;
-        }
-
-        # Insert the mapping of cluster number to UniRef start and end (related to the unirefXX_index table)
-        if ($clusterNumIndexMap{$clusterNum}) {
-            $self->insert($clusterIndexSth, [$clusterNum, $clusterNumIndexMap{$clusterNum}->{start}, $clusterNumIndexMap{$clusterNum}->{end}]);
-        }
-    }
-}
-
-
-#
-# makeIdSortFunction - private method
-#
-# Make a function that is used to sort IDs (that are in a cluster) by BLAST evalue (only valid
-# if the original job was from BLAST), then by accession ID.  In the future other sort criteria
-# could be added here.
-#
-# Parameters:
-#    $clusterData - hash ref mapping cluster to sequences and GNN-obtained data
-#
-# Returns:
-#    code reference that is used in a sort call
-#
-sub makeIdSortFunction {
-    my $self = shift;
-    my $clusterData = shift;
-
-    # Obtain all of the IDs and metadata so we can compare by ID without knowing anything about
-    # the cluster.  We need to do this because $clusterData organizes IDs by clusters which won't
-    # work in the sort.
-    my $allIdData = {};
-    foreach my $clusterNum (keys %$clusterData) {
-        foreach my $idData (@{ $clusterData->{$clusterNum} }) {
-            my $id = $idData->{attributes}->{id};
-            $allIdData->{$id} = { evalue => $idData->{attributes}->{evalue} // 0 };
-        }
-    }
-
-    return sub {
-        # Parameters $a and $b are accession IDs
-        my $comp = $allIdData->{$a}->{evalue} <=> $allIdData->{$b}->{evalue};
-        return $comp if $comp;
-        return $a cmp $b;
-    };
-}
-
-
-#
-# makeUnirefSizeSortFunction - private method
-#
-# Make a function that is used to sort UniRef clusters by the size of the cluster.  This
-# is used so that the contents of a UniRef cluster, when zoomed in (e.g. when a UniRef50
-# ID is clicked on), is sorted by the size of the cluster.
-#
-# Parameters:
-#    $unirefMapping - Mapping of UniRef ID to list of UniProt IDs in the cluster
-#
-# Returns:
-#    code reference that is used in a sort call
-#
-sub makeUnirefSizeSortFunction {
-    my $self = shift;
-    my $unirefMapping = shift;
-
-    return sub {
-        my $comp = scalar @{ $unirefMapping->{$b} } <=> scalar @{ $unirefMapping->{$a} };
-        return $comp if $comp;
-        return $a cmp $b;
-    };
-}
-
-
-#
 # insertFamilies - private method
 #
 # Insert a list of families into the families table.
@@ -683,10 +389,13 @@ sub insertNeighbors {
     my %families;
     foreach my $neighbor (@$neighbors) {
         my @row;
+        my $nbColor = $self->{util}->getColorForPfam($neighbor->{pfam});
         foreach my $col (@{ $self->{schema}->getNeighborCols() }) {
             next if $col->{primary_key}; # don't insert sort_key for neighbors, since it's auto increment
             if ($col->{name} eq QUERY_KEY or $col->{name} eq LEGACY_QUERY_KEY) {
                 push @row, $querySortKey;
+            } elsif ($col->{name} eq COLOR_COLUMN) {
+                push @row, $nbColor;
             } else {
                 push @row, $neighbor->{$col->{name}} // "";
             }
@@ -745,81 +454,13 @@ sub insertQueryId {
 
 
 #
-# computeUnirefMapping - private method
-#
-# Computes the mapping of UniRef ID to UniProt IDs within the UniRef cluster as well as the
-# size of the UniRef cluster.
-#
-# Parameters:
-#    $mapping - metanode map that comes from the pipeline
-#
-# Returns:
-#    sizes - hash ref mapping UniRef ID to size ($size->{id} may contain either a key for
-#        uniref90 or uniref50 that points to a numeric value
-#    uniref50Ids - hash ref mapping a UniRef50 ID to the UniRef90 IDs within the UniRef50
-#        cluster
-#    uniref90Ids - hash ref mapping a UniRef90 ID to the UniProt IDs within the cluster
-#
-sub computeUnirefMapping {
-    my $self = shift;
-    my $mapping = shift;
-
-    my %uniref90Ids;
-    my %uniref50Ids;
-    my %uniref50to90Ids;
-
-    # Compute the mapping of UniRef90 IDs to UniProt
-    foreach my $uniprotId (keys %$mapping) {
-        push @{ $uniref90Ids{ $mapping->{$uniprotId}->{uniref90} } }, $uniprotId;
-        # The mapping of the UniRef50 ID to UniRef90 IDs 
-        $uniref50to90Ids{ $mapping->{$uniprotId}->{uniref50} }->{ $mapping->{$uniprotId}->{uniref90} }++;
-    }
-
-    # Compute the mapping of UniRef50 IDs to UniRef90 IDs 
-    foreach my $uniref50Id (keys %uniref50to90Ids) {
-        foreach my $uniref90Id (keys %{ $uniref50to90Ids{$uniref50Id} }) {
-            push @{ $uniref50Ids{$uniref50Id} }, $uniref90Id;
-        }
-    }
-
-    my $sizes = {};
-
-    foreach my $uniref90Id (keys %uniref90Ids) {
-        $sizes->{$uniref90Id}->{uniref90} = @{ $uniref90Ids{$uniref90Id} };
-    }
-
-    foreach my $uniref50Id (keys %uniref50Ids) {
-        $sizes->{$uniref50Id}->{uniref50} = @{ $uniref50Ids{$uniref50Id} };
-    }
-
-    return $sizes, \%uniref50Ids, \%uniref90Ids;
-}
-
-
-#
 # insert - private method
 #
-# Inserts data into a table.  Insertions are done in a transaction
-# to improve performance.  Uses parameterized insertions to perform
-# data validation.
-#
-# Parameters:
-#    $sth - statement handle corresponding to the table that data
-#        will be inserted into; the statement handle is created once
-#        for performance reasons (so prepare isn't run every time
-#        we insert)
-#    $row - array ref of row values as database parameters
+# Wrapper around helper class.
 #
 sub insert {
     my $self = shift;
-    my $sth = shift;
-    my $row = shift;
-    # Commit the transaction if we've reached a certain number of statments
-    if (++$self->{insert_count} % $self->{insert_max} == 0) {
-        $self->{insert_count} = 0;
-        $self->{dbh}->commit();
-    }
-    $sth->execute(@$row);
+    $self->{util}->insert(@_);
 }
 
 

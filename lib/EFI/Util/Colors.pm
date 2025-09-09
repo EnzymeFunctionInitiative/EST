@@ -7,13 +7,15 @@ use warnings;
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 
+use constant DEFAULT_COLOR => "#6495ED";
+
 
 sub new {
     my ($class, %args) = @_;
 
     my $colorFile = $args{color_file};
 
-    my $self = {colors => [], default_color => "#6495ED"};
+    my $self = { colors => [], default_color => DEFAULT_COLOR };
     bless($self, $class);
 
     if ($args{color_file}) {
@@ -62,7 +64,13 @@ sub getColor {
     my $self = shift;
     my $clusterNum = shift;
     return $self->{colors}->[$clusterNum - 1] // $self->{default_color};
-    #return $self->{colors}->{$clusterNum} // $self->{default_color};
+}
+
+
+# public
+sub getDefaultColor {
+    my $self = shift;
+    return $self->{default_color};
 }
 
 
@@ -327,6 +335,20 @@ Returns an array ref containing the hex color codes.
     my $colors = $colors->getAllColors();
     my $numColors = @$colors;
     print "There are $numColors in the default color palette\n";
+
+
+=head3 C<getDefaultColor()>
+
+Returns the default color, i.e. the "unassigned value" color.
+
+=head4 Returns
+
+Returns the hex code for the "unassigned value" color.
+
+=head4 Example Usage
+
+    my $color = $colors->getDefaultColor();
+    print "The default, 'unassigned value' color is $color\n";
 
 
 =cut
