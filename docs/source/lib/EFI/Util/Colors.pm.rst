@@ -32,14 +32,18 @@ SYNOPSIS
 
    my $colors = $colors->getAllColors();
 
+   my $defaultColor = $colors->getDefaultColor();
+   my $defaultSsnNodeColor = $colors->getDefaultSsnColor();
+
 
 
 DESCRIPTION
 -----------
 
 **EFI::Util::Colors** is a Perl utility module that provides an
-interface for getting a unique color for each cluster. The default color
-is ``#6495ED``. Optionally, colors can be loaded from an external file.
+interface for getting a unique color for each cluster. The default,
+"unassigned value" color is ``#BBBBBB``. The default SSN node color is
+``#6495ED``. Optionally, colors can be loaded from an external file.
 
 
 
@@ -143,6 +147,51 @@ Example Usage
 
 
 
+``getDefaultColor()``
+~~~~~~~~~~~~~~~~~~~~~
+
+Returns the default color, i.e. the "unassigned value" color.
+
+
+
+Returns
+^^^^^^^
+
+Returns a hex code color.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $color = $colors->getDefaultColor();
+   print "The default, 'unassigned value' color is $color\n";
+
+
+
+``getDefaultSsnColor()``
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Returns the default color for SSN nodes.
+
+
+
+Returns
+^^^^^^^
+
+Returns a hex code color.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $color = $colors->getDefaultSsnColor();
+   print "The default SSN node color is $color\n";
 
 
 

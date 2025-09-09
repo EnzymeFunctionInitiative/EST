@@ -33,7 +33,7 @@ make_path($imageDir) or die "Unable to create SSN color palette directory $image
 
 my $colors = new EFI::Util::Colors;
 
-my $defaultColor = $colors->getColor(0);
+my $defaultColor = $colors->getDefaultColor();
 my $allColors = $colors->getAllColors();
 
 my $encData = getImageBase64($defaultColor);
