@@ -39,12 +39,13 @@ process create_gnns {
         --cooc-threshold ${params.cooc_threshold} \
         --config ${params.efi_config} \
         --db-name ${params.efi_db} \
-        --stats stats.json
+        --stats gnn_stats.json \
+        --ssn $ssn_file
     """
 }
 
+
 process color_gnt_ssn {
-    publishDir params.final_output_dir, mode: "copy"
     input:
         path ssn_file
         path cluster_id_map

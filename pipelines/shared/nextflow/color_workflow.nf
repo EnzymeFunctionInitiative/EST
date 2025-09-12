@@ -1,20 +1,34 @@
 
-include { unzip_ssn } from "./unzip.nf"
+include { unzip_ssn } from "./util.nf"
 
 cluster_data_dir = "cluster-data"
 
+
 process get_id_list {
-    publishDir "${params.final_output_dir}/${cluster_data_dir}/id_lists", pattern: "*.txt", mode: "copy"
     input:
         path cluster_id_map
         path singletons
         path seqid_source_map
+
     output:
         path "cluster_sizes.txt", emit: "cluster_sizes"
-        tuple val("uniprot"), path("uniprot/*.txt"), emit: "uniprot"
-        tuple val("uniref90"), path("uniref90/*.txt", arity: "0..*"), emit: "uniref90"
-        tuple val("uniref50"), path("uniref50/*.txt", arity: "0..*"), emit: "uniref50"
+
+        // Outputs for FASTA retrieval
+        tuple val("uniprot"), path("uniprot/*.txt"), emit: "uniprot_tuples"
+        tuple val("uniref90"), path("uniref90/*.txt", arity: "0..*"), emit: "uniref90_tuples"
+        tuple val("uniref50"), path("uniref50/*.txt", arity: "0..*"), emit: "uniref50_tuples"
+
+        // Output paths for zipping directories
+        path "uniprot", emit: "uniprot_dir"
+        path "uniref90", emit: "uniref90_dir"
+        path "uniref50", emit: "uniref50_dir"
+
+    script:
     """
+    # Always need to output these directories even if they're empty.  They will be excluded
+    # from the zip process later if they are empty.
+    mkdir -p uniprot uniref90 uniref50
+
     id_list_dir="."
     perl $projectDir/../shared/perl/get_id_lists.pl --cluster-map $cluster_id_map --singletons $singletons \
         --uniprot \$id_list_dir/uniprot --uniref90 \$id_list_dir/uniref90 --uniref50 \$id_list_dir/uniref50 \
