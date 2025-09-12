@@ -1,21 +1,19 @@
 
 include { get_length_histogram } from "../../shared/nextflow/sequence.nf"
+include { merge_stats } from "../../shared/nextflow/util.nf"
 
 process compute_stats {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_parquet
         path fasta_file
-        path import_stats
     output:
         path "boxplot_stats.parquet", emit: boxplot_stats
         path "evalue.tab", emit: evaluetab
-        path "stats.json", emit: final_stats
+        path "conv_ratio.json", emit: stats
     """
     # compute convergence ratio
     python $projectDir/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output conv_ratio.json
-
-    python $projectDir/statistics/merge_stats.py --import-stats $import_stats --conv-ratio-stats conv_ratio.json --output stats.json
 
     # compute boxplot stats and evalue.tab
     python $projectDir/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-temp-dir /scratch/duckdb-${params.job_id} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
@@ -68,14 +66,18 @@ workflow REPORTING {
         seq_version_ch = Channel.fromList(seq_versions)
         length_histograms = get_length_histogram(fasta_file, accession_table, seq_version_ch)
 
-        stats = compute_stats(blast_parquet, fasta_lengths_parquet, import_stats)
+        stats = compute_stats(blast_parquet, fasta_lengths_parquet)
 
         boxplot_viz = visualize_boxplot_stats(stats.boxplot_stats)
         histo_viz = visualize_length_histograms(length_histograms)
 
+        files_to_merge_stream = import_stats.mix(stats.stats)
+        files_to_merge_stream.collect().set { files_to_merge }
+        final_stats = merge_stats(files_to_merge)
+
     emit:
         evalue_tab = stats.evaluetab
-        final_stats = stats.final_stats
+        final_stats
         boxplot_json = boxplot_viz.json.collect()
         boxplot_plots = boxplot_viz.plots.collect()
         histo_json = histo_viz.json.collect()

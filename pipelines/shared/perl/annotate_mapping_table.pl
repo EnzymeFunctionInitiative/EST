@@ -180,8 +180,6 @@ sub parseColorMap {
 
     open my $fh, "<", $mapFile or die "Unable to open color mapping file '$mapFile' for reading: $!";
 
-    chomp(my $header = <$fh>);
-
     while (my $line = <$fh>) {
         chomp $line;
         my ($clusterNumBySeq, $color) = split(m/\t/, $line);

@@ -226,13 +226,13 @@ sub initializeTableOutputs {
     my $outputDir = shift;
 
     # All Pfam hubs, even those that are less than the cooccurrence threshold
-    $self->{pfam_dirs}->{&PFAM_HUB_ALL} = "$outputDir/all_pfam";
+    $self->{pfam_dirs}->{&PFAM_HUB_ALL} = "$outputDir/neighbor_pfam_all";
     # Each Pfam ID from the hub (e.g. hub is split), even those that are less than the cooccurrence threshold
-    $self->{pfam_dirs}->{&PFAM_HUB_ALL | &PFAM_SPLIT} = "$outputDir/all_pfam_split";
+    $self->{pfam_dirs}->{&PFAM_HUB_ALL | &PFAM_SPLIT} = "$outputDir/neighbor_pfam_all_split";
     # Pfam hub name, meeting cooccurrence threshold
-    $self->{pfam_dirs}->{&PFAM_HUB_COOC} = "$outputDir/pfam";
+    $self->{pfam_dirs}->{&PFAM_HUB_COOC} = "$outputDir/neighbor_pfam";
     # Each Pfam ID from the hub (e.g. hub is split), meeting cooccurrence threshold
-    $self->{pfam_dirs}->{&PFAM_HUB_COOC | &PFAM_SPLIT} = "$outputDir/pfam_split";
+    $self->{pfam_dirs}->{&PFAM_HUB_COOC | &PFAM_SPLIT} = "$outputDir/neighbor_pfam_split";
 
     foreach my $tableType (keys %{ $self->{pfam_dirs} }) {
         my $dir = $self->getOutputDir($tableType);

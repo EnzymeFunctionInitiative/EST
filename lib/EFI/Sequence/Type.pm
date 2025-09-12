@@ -14,7 +14,7 @@ use constant SEQ_DOMAIN => "domain";
 use constant SEQ_FULL => "full";
 
 
-our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL SEQ_REPNODE);
+our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type strip_domain SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL SEQ_REPNODE);
 our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90', 'SEQ_DOMAIN', 'SEQ_FULL', 'SEQ_REPNODE']);
 Exporter::export_ok_tags('types');
 
@@ -41,6 +41,13 @@ sub get_sequence_type {
     } else {
         return SEQ_FULL;
     }
+}
+
+
+sub strip_domain {
+    my $id = shift;
+    $id =~ s/^([^\:]+):\d+:\d+$/$1/;
+    return $id;
 }
 
 
@@ -191,6 +198,38 @@ sequence.
     my $seqId = "B0SS75:1:100";
     print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
     #prints "Sequence B0SS75 is domain"
+
+
+=head3 C<strip_domain($id)>
+
+Strips any domain-related regions from the sequence ID.  For example, if an ID is C<B0SS77:23:500>,
+the actual ID is C<B0SS77> and the domain data is C<23:500>.
+
+=head4 Parameters
+
+=over
+
+=item C<$id>
+
+Sequence ID, with or without domain regions.
+
+=back
+
+=head4 Returns
+
+Sequence ID without domain regions.
+
+=head4 Example Usage
+
+    my $inputSeqId = "B0SS77";
+    my $seqId = strip_domain($inputSeqId);
+    print "$inputSeqId without domain region is $seqId\n";
+    # "B0SS77 without domain region is B0SS77"
+
+    my $inputSeqId = "B0SS77:23:500";
+    my $seqId = strip_domain($inputSeqId);
+    print "$inputSeqId without domain region is $seqId\n";
+    # "B0SS77:23:500 without domain region is B0SS77"
 
 
 =cut

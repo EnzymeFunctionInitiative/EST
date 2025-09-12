@@ -24,7 +24,7 @@ sub new {
     $self->{anno} = new EFI::Annotations;
     my ($attrNames, $attrDisplay) = $self->{anno}->get_expandable_attr();
     $self->{id_list_fields} = { map { $attrDisplay->{$_} => $_ } @$attrNames };
-    $self->{metadata} = {}; # any node metadata that we are to store (e.g. swissprot)
+    $self->{id_metadata} = {}; # any node metadata that we are to store (e.g. swissprot)
     $self->{meta_map} = undef; # Metanode -> IDs in metanode mapping
     $self->{id_type} = SEQ_UNIPROT;
 
@@ -73,7 +73,7 @@ sub getMetanodes {
 
 sub getMetadata {
     my $self = shift;
-    return $self->{metadata};
+    return $self->{id_metadata};
 }
 
 
@@ -137,9 +137,9 @@ sub processNodeAttribute {
         $self->{meta_map}->{$seqId}->{$value} = 1;
     # SwissProt
     } elsif ($fieldName eq FIELD_SWISSPROT_DESC) {
-        $self->{metadata}->{$seqId}->{swissprot} = $value if $value;
+        $self->{id_metadata}->{$seqId}->{swissprot} = $value if $value;
     } elsif ($fieldName eq FIELD_SEQ_KEY) {
-        $self->{metadata}->{$seqId}->{sequence} = $value if $value;
+        $self->{id_metadata}->{$seqId}->{sequence} = $value if $value;
     }
 }
 
