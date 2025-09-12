@@ -18,6 +18,9 @@ sub new {
     $self->{idx_seqid} = {};
     $self->{node_idx} = 0;
     $self->{edgelist} = [];
+    $self->{ssn_metadata} = { ssn_title => "" };
+
+    $self->{metadata_only} = $args{metadata_only} // 0;
 
     return $self;
 }
@@ -41,13 +44,20 @@ sub getIdIndexMap {
 }
 
 
+sub getSsnMetadata {
+    my $self = shift;
+    return $self->{ssn_metadata};
+}
+
+
 sub parse {
     my $self = shift;
 
     my $reader = XML::LibXML::Reader->new(location => $self->{input}) or die "cannot read $self->{input}\n";
     $self->{current_node_id} = "";
     while ($reader->read) {
-        $self->processXmlNode($reader);
+        my $continueParsing = $self->processXmlNode($reader);
+        last if not $continueParsing;
     }
 }
 
@@ -62,12 +72,16 @@ sub parse {
 # Parameters:
 #    $reader - XML::LibXML::Reader object (points to current XML node)
 #
+# Returns:
+#    non-zero if ok to continue parsing, zero to terminate parsing
+#
 sub processXmlNode {
     my $self = shift;
     my $reader = shift;
     my $ntype = $reader->nodeType;
     my $nname = $reader->name;
-    return if $ntype == XML_READER_TYPE_WHITESPACE || $ntype == XML_READER_TYPE_SIGNIFICANT_WHITESPACE;
+
+    return 1 if $ntype == XML_READER_TYPE_WHITESPACE || $ntype == XML_READER_TYPE_SIGNIFICANT_WHITESPACE;
 
     if ($ntype == XML_READER_TYPE_ELEMENT) {
         if ($nname eq "node") {
@@ -79,8 +93,15 @@ sub processXmlNode {
             }
         } elsif ($nname eq "edge") {
             $self->processEdge($reader);
+        } elsif ($nname eq "graph") {
+            $self->processGraph($reader);
+            if ($self->{metadata_only}) {
+                return 0;
+            }
         }
     }
+
+    return 1;
 }
 
 
@@ -101,6 +122,22 @@ sub processNode {
     $self->{idx_seqid}->{$self->{node_idx}} = $seqid;
     $self->{node_idx}++;
     $self->{current_node_id} = $seqid;
+}
+
+
+#
+# processGraph - private method
+#
+# Processes a XGMML 'graph' element by extracting the attributes such as 'label'
+#
+# Parmaeters:
+#    $reader - XML::LibXML::Reader object (points to current XML node)
+#
+sub processGraph {
+    my $self = shift;
+    my $reader = shift;
+    my $label = $reader->getAttribute("label") // "";
+    $self->{ssn_metadata}->{title} = $label;
 }
 
 
@@ -196,6 +233,11 @@ EFI::SSN::XgmmlReader - Perl utility module for extracting network information f
     map { print join("\t", $_, $indexSeqIdMap->{$_}), "\n"; } keys %$indexSeqIdMap;
     map { print join("\t", $_, $idIndexMap->{$_}), "\n"; } sort keys %$idIndexMap;
 
+    my $graphLabelParser = EFI::SSN::XgmmlReader->new(xgmml_file => $ssnFile, metadata_only => 1);
+    $graphLabelParser->parse();
+
+    my $graphLabel = $graphLabelParser->getGraphLabel();
+
 
 =head2 DESCRIPTION
 
@@ -223,6 +265,11 @@ Creates a new B<EFI::SSN::XgmmlReader> object.
 
 Path to a SSN file in XGMML format (XML).
 
+=item C<metadata_only>
+
+Include this and set to non-zero value to terminate parsing after parsing the SSN metadata.
+This is useful to obtain the C<graph> tag "label" attribute.
+
 =back
 
 =head4 Returns
@@ -233,12 +280,16 @@ Returns an object.
 
     my $parser = EFI::SSN::XgmmlReader->new(xgmml_file => $ssnFile);
 
+    my $parser = EFI::SSN::XgmmlReader->new(xgmml_file => $ssnFile, metadata_only => 1);
+
 
 =head3 C<parse()>
 
 Parses the XGMML file on a per-element basis. This method doesn't create a DOM;
 rather it obtains information from each XML element as the file is being parsed and
 builds an internal representation of an SSN as a collection of arrays and hashes.
+If the C<metadata_only> flag was passed to the constructor, then this returns
+immediately after obtaining SSN metadata.
 
 =head4 Example Usage
 
@@ -289,5 +340,19 @@ A hash ref mapping node ID (string) to node index (numeric)
     map { print join("\t", $_, $idIndexMap->{$_}), "\n"; } sort keys %$idIndexMap;
 
 
+=head3 C<getSsnMetadata()>
+
+Gets the SSN metadata.  At a minimum, this will contain the SSN title (e.g. the XGMML graph label).
+
+=head4 Returns
+
+A hash ref with metadata, including a C<title> key.
+
+=head4 Example Usage
+
+    my $meta = $parser->getSsnMetadata();
+    my $title = $meta->{title}; # always contains title
+
+    
 =cut
 

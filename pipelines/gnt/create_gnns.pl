@@ -20,6 +20,7 @@ use EFI::GNT::GNN::XgmmlWriter::ClusterHub;
 use EFI::Options;
 use EFI::Sequence::Type qw(:types get_sequence_version);
 use EFI::SSN::Util::ID qw(parse_cluster_map_file parse_metanode_map_file resolve_mapping);
+use EFI::SSN::XgmmlReader;
 use EFI::Util::FileStats qw(save_stats);
 
 
@@ -84,10 +85,21 @@ $tables->saveIdsWithNoContext($opts->{no_context}) if $opts->{no_context};
 if ($opts->{gnd}) {
     my $gnd = new EFI::GNT::GND();
 
+    # Get the title from the SSN or command line to store in the GND
+    my $title;
+    if (not $opts->{title} and $opts->{ssn}) {
+        # Only parse the start of the file to get the metadata
+        my $ssnParser = new EFI::SSN::XgmmlReader(xgmml_file => $opts->{ssn}, metadata_only => 1);
+        $ssnParser->parse();
+        $title = $ssnParser->getSsnMetadata()->{title};
+    } else {
+        $title = $opts->{title};
+    }
+
     my $metadata = {
         neighborhood_size => $opts->{nb_size},
         coccurrence => $opts->{cooc_threshold},
-        title => $opts->{title} // "",
+        name => $title,
         type => "gnn",
     };
 
@@ -203,6 +215,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
     $optParser->addOption("title=s", 0, "title of the GNN and GND for display purposes");
     $optParser->addOption("stats=s", 0, "path to file to output SSN statistics to");
+    $optParser->addOption("ssn=s", 0, "path to the original SSN (used to get metadata)", OPT_FILE);
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -227,7 +240,7 @@ C<create_gnns.pl> - read a SSN XGMML file and write it to a new file after addin
         --config <FILE> --db-name <NAME> [--metanode-map <FILE> --gnd <FILE>]
         [--cooc-table <FILE> --hub-count <FILE> --nb-pfam-list-dir <DIR>]
         [--no-context FILE --nb-size <INTEGER> --cooc-threshold <NUMBER>]
-        [--title "<TITLE>" --stats <FILE>]
+        [--title "<TITLE>" --stats <FILE> --ssn <FILE>]
 
 
 =head2 DESCRIPTION
@@ -325,6 +338,11 @@ Optional title to use for display purposes in the GND viewer.
 =item C<--stats>
 
 Optional path to a file to write statistics (e.g. number of nodes, edges) to.
+
+=item C<--ssn>
+
+Optional path to the original SSN.  The metadata, i.e. SSN title, is extracted
+for usage in the GND.
 
 =back
 
