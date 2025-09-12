@@ -133,7 +133,7 @@ sub retrieveIdAnnotations {
         pdb => $metadata->{pdb} // "",
         ec => $metadata->{ec_code} // "",
         organism => $metadata->{organism} // "",
-        taxonomy_id => $metadata->{taxonomy_id} // 0,
+        taxonomy_id => ($row->{taxonomy_id} // 0),
         desc => $metadata->{description} // "",
     };
 

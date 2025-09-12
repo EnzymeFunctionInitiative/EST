@@ -4,6 +4,12 @@ package EFI::SSN::Util::ID;
 use strict;
 use warnings;
 
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../..";
+
+use EFI::Sequence::Type qw(:types get_sequence_version);
+
 use Exporter qw(import);
 
 
@@ -133,21 +139,21 @@ sub parse_singletons_file {
 #    $file - file to read: if empty, then assume the input to the script is a UniProt cluster
 #
 # Returns:
-#    type of input sequences: uniprot, uniref90, uniref50; repnodes get converted to uniprot
+#    type of input sequences: SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50; repnodes get converted to uniprot
 #    mapping of sequence IDs to UniProt IDs
 #
 sub parse_metanode_map_file {
     my $file = shift;
 
     if (not $file or not -f $file) {
-        return "uniprot", {};
+        return SEQ_UNIPROT, {};
     }
 
     open my $fh, "<", $file or die "Unable to open metanode map file '$file' for reading: $!";
 
     my $header = <$fh>;
     if (not $header) {
-        return "uniprot", {};
+        return SEQ_UNIPROT, {};
     }
 
     # This file can have the following column cases:
@@ -159,13 +165,13 @@ sub parse_metanode_map_file {
     my ($metaCol, $seqTypeCol, $otherCol) = split(m/\t/, $header);
 
     # $type will be uniprot if it is a repnode network because it gets expanded
-    my $type = "uniprot";
+    my $type = SEQ_UNIPROT;
     my $ids = {};
 
     if ($metaCol =~ m/uniref(\d+)_id/) {
-        $type = "uniref$1";
+        $type = get_sequence_version("uniref$1");
     } elsif ($metaCol eq "repnode_id") {
-        $type = "repnode";
+        $type = SEQ_REPNODE;
     }
 
     while (my $line = <$fh>) {
@@ -187,7 +193,7 @@ sub resolve_mapping {
     my $idType = shift;
     my $sourceIdMap = shift;
 
-    return $clusterToId if not $idType or $idType eq "uniprot";
+    return $clusterToId if not $idType or $idType eq SEQ_UNIPROT;
 
     my $newMap = {};
 
@@ -286,7 +292,7 @@ files and structures that contain sequence ID information such as cluster number
 and metanodes.  A metanode is a node in the network that represents one or more sequences.
 For example, networks generated using UniRef will contain nodes that correspond to
 UniRef sequences, which in turn represent one or more UniProt sequences.  Additionally,
-metanodes can represent multiple sequences that are grouped together in repnode networks
+metanodes can represent multiple sequences that are grouped together in RepNode networks
 to reduce the size of the network.  Clusters can be numbered by sequence or by node;
 by-sequence numbering takes into account all of the sequences in all of the metanodes
 in the cluster (effectively expanding the metanode), whereas by-node numbering uses only
@@ -327,7 +333,7 @@ and by node).  If there are only two columns then the cluster numbers are identi
 
 A hash ref that maps cluster numbers to an array of sequence IDs within that cluster.
 The clusters that are returned are numbered by sequence (e.g. the C<cluster_num_seq>
-column in the input file). For example, a repnode network that contains cluster 1 with
+column in the input file). For example, a RepNode network that contains cluster 1 with
 a metanode C<"REPNODE_ID1"> that represents C<"UNIPROT_ID1"> and C<"UNIPROT_ID2">),
 and cluster 2 with a metanode C<"REPNODE_ID2"> that represents C<"UNIPROT_ID3"> as
 well as a single node C<"REPNODE_ID3"> would look like:
@@ -418,8 +424,8 @@ and the second column is the sequence within the metanode.
 
 =item C<$idType>
 
-One of C<repnode>, C<uniref90>, C<uniref50>, or C<uniprot>, indicating the
-sequence type.
+One of C<SEQ_UNIREF90>, C<SEQ_UNIREF50>, C<SEQ_REPNODE>, or C<SEQ_UNIPROT>, indicating
+the sequence type.
 
 =item C<$sourceIdMap>
 
@@ -482,9 +488,10 @@ A hash ref that maps cluster number to lists of sequence IDs (which may be metan
 =item C<$idType>
 
 A string that specifies the type of IDs in the C<$sourceIdMap> parameter.  It can be
-C<uniref90>, C<uniref50>, C<repnode>, and C<uniprot>.  If it is empty or undefined,
-the input is assumed to be UniProt sequences and the output of the function
-will be the same as the input C<$clusterToId>.
+C<SEQ_UNIREF90>, C<SEQ_UNIREF50>, C<SEQ_REPNODE>, and C<SEQ_UNIPROT>.  If it is empty
+or undefined, the input is assumed to be UniProt sequences and the output of the
+function will be the same as the input C<$clusterToId>.  The constants are available
+in B<EFI::Sequence::Type>.
 
 =item C<$sourceIdMap>
 
@@ -518,7 +525,7 @@ the metanode).
 
     my $clusterToId = {}; # get the mapping somehow
     my $sourceIdMap = {}; # get the mapping somehow
-    my $newMapping = resolve_mapping($clusterToId, "repnode", $sourceIdMap);
+    my $newMapping = resolve_mapping($clusterToId, SEQ_REPNODE, $sourceIdMap);
 
     foreach my $clusterNum (keys %$newMapping) {
         foreach my $id (@{ $newMapping->{$clusterNum} }) {

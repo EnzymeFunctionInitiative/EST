@@ -11,6 +11,9 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::GNT::GND::Schema qw(:schema);
+use EFI::GNT::GND::Uniref;
+use EFI::GNT::GND::Util;
+use EFI::Sequence::Type qw(:types);
 
 
 sub new {
@@ -19,10 +22,6 @@ sub new {
 
     my $self = {};
     bless $self, $class;
-
-    # Queue X number of statements before committing (improves performance)
-    $self->{insert_count} = 0;
-    $self->{insert_max} = 100000;
 
     return $self;
 }
@@ -35,7 +34,7 @@ sub save {
     my $metadata = shift || {};
     my %args = @_;
 
-    my $networkType = $args{network_type} // "";
+    my $networkType = $args{network_type} // SEQ_UNIPROT;
 
     # Map cluster number to cluster name
     my $clusterNames = \%{ $args{cluster_names} // {} }; # make a copy then create a reference
@@ -47,15 +46,29 @@ sub save {
         return 0;
     }
 
+    $self->{uniref} = new EFI::GNT::GND::Uniref(dbh => $self->{dbh}, db_util => $self->{util});
+
     my $clusterData = $gnn->getClusterData();
 
-    my ($families, $clusterIndex) = $self->insertClusterData($clusterData, $clusterNames, $args{sort_sequence_ids});
+    # Add the UniRef cluster size mapping (e.g. how many UniProt IDs are in the UniRef cluster IDs)
+    my ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping);
+    if ($networkType ne SEQ_UNIPROT and $args{metanode_mapping}) {
+        ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping) = $self->{uniref}->computeUnirefMapping($args{metanode_mapping});
+    }
+
+    my $sortSeqIds = $args{sort_sequence_ids} // 0;
+
+    my ($families, $clusterIndex, $idIndexMap, $idClusterMap) = $self->insertClusterData($clusterData, $clusterNames, $sortSeqIds, $unirefSizeMapping);
     $self->insertMetadata($metadata);
     $self->insertFamilies($families);
     $self->insertClusterIndex($clusterIndex);
     $self->insertClusterNames($clusterNames);
     $self->insertUnmatchedIds($unmatchedIds);
     $self->insertMatchedIds($matchedIds);
+
+    if ($networkType ne SEQ_UNIPROT and $uniref50IdMapping and $uniref90IdMapping) {
+        $self->{uniref}->insertUnirefMapping($clusterData, $networkType, $uniref50IdMapping, $uniref90IdMapping, $idIndexMap, $idClusterMap);
+    }
 
     $self->{dbh}->commit();
 
@@ -87,6 +100,8 @@ sub initializeDatabase {
     # Turn on transactions (e.g. don't automatically commit after every insert)
     $self->{dbh}->{AutoCommit} = 0;
 
+    $self->{util} = new EFI::GNT::GND::Util(dbh => $self->{dbh});
+
     $self->{schema} = new EFI::GNT::GND::Schema(network_type => $networkType, dbh => $self->{dbh});
     return $self->{schema}->initializeDatabase();
 }
@@ -105,21 +120,28 @@ sub initializeDatabase {
 #        particular cluster
 #    $sortSequenceIds - set to true to sort the IDs inside of the cluster alphanumerically; by
 #        default IDs are ordered as they exist in the input
+#    $unirefSizeMapping - hash ref that maps ID to UniRef sizes; only UniRef IDs will be present,
+#        see EFI::GNT::GND::Uniref::computeUnirefSizeMapping() for format
 #
 # Returns:
 #    $families - array ref of list of all Pfam and InterPro families that were in the input,
 #        including those in neighbors
 #    $clusterIndex - hash ref mapping a cluster number to the start/end row index for IDs in the
 #        cluster as they are stored in the database
+#    $idIndexMap - hash ref mapping sequence ID to the query_key in the network, used for UniRef
+#    $idClusterMap - hash ref mapping sequence ID to the cluster it belongs in, used for UniRef
 #
 sub insertClusterData {
     my $self = shift;
     my $clusterData = shift;
     my $clusterNames = shift;
-    my $sortSequenceIds = shift || 0;
+    my $sortSequenceIds = shift;
+    my $unirefSizeMapping = shift // {};
 
     my $families = {};
+    # A unique, sequential number for each query ID
     my $sortKey = 0;
+    # Map cluster number to the start and end ID sortKey number
     my $clusterIndex = {};
     # Map sequence ID to the query_key in the network, used for UniRef
     my $idIndexMap = {};
@@ -133,6 +155,10 @@ sub insertClusterData {
         # Make a copy because we modify it later
         my %queryData = %$queryData;
         $queryData{cluster_index} = $sortKey;
+        # Always add uniref size fields; these will be ignored later if the input network is not UniRef
+        $queryData{uniref90_size} = $unirefSizeMapping->{$queryData{id}}->{uniref90} // 0;
+        $queryData{uniref50_size} = $unirefSizeMapping->{$queryData{id}}->{uniref50} // 0;
+        $queryData{&COLOR_COLUMN} = $self->{util}->getColorForPfam($queryData{pfam});
         return \%queryData;
     };
 
@@ -166,7 +192,7 @@ sub insertClusterData {
     }
 
     my @families = sort keys %$families;
-    return \@families, $clusterIndex;
+    return \@families, $clusterIndex, $idIndexMap, $idClusterMap;
 }
 
 
@@ -363,10 +389,13 @@ sub insertNeighbors {
     my %families;
     foreach my $neighbor (@$neighbors) {
         my @row;
+        my $nbColor = $self->{util}->getColorForPfam($neighbor->{pfam});
         foreach my $col (@{ $self->{schema}->getNeighborCols() }) {
             next if $col->{primary_key}; # don't insert sort_key for neighbors, since it's auto increment
             if ($col->{name} eq QUERY_KEY or $col->{name} eq LEGACY_QUERY_KEY) {
                 push @row, $querySortKey;
+            } elsif ($col->{name} eq COLOR_COLUMN) {
+                push @row, $nbColor;
             } else {
                 push @row, $neighbor->{$col->{name}} // "";
             }
@@ -427,27 +456,11 @@ sub insertQueryId {
 #
 # insert - private method
 #
-# Inserts data into a table.  Insertions are done in a transaction
-# to improve performance.  Uses parameterized insertions to perform
-# data validation.
-#
-# Parameters:
-#    $sth - statement handle corresponding to the table that data
-#        will be inserted into; the statement handle is created once
-#        for performance reasons (so prepare isn't run every time
-#        we insert)
-#    $row - array ref of row values as database parameters
+# Wrapper around helper class.
 #
 sub insert {
     my $self = shift;
-    my $sth = shift;
-    my $row = shift;
-    # Commit the transaction if we've reached a certain number of statments
-    if (++$self->{insert_count} % $self->{insert_max} == 0) {
-        $self->{insert_count} = 0;
-        $self->{dbh}->commit();
-    }
-    $sth->execute(@$row);
+    $self->{util}->insert(@_);
 }
 
 

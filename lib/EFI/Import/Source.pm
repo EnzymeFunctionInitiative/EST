@@ -11,7 +11,7 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 
 use EFI::Annotations::Fields qw(:all);
-use EFI::Import::Util;
+use EFI::Database::Util;
 use EFI::Sequence::Type qw(:types);
 
 
@@ -37,7 +37,7 @@ sub init {
 
     $self->{dbh} = $efiDbh || die "Require efi dbh argument";
     $self->{sequence_version} = $config->{sequence_version} // SEQ_UNIPROT;
-    $self->{util} = new EFI::Import::Util(dbh => $self->{dbh});
+    $self->{db_util} = new EFI::Database::Util(dbh => $self->{dbh});
 
     return 1;
 }
@@ -124,7 +124,7 @@ sub addUnirefIds {
 
     my @ids = $seqData->getSequenceIds();
 
-    my $matched = $self->{util}->batchRetrieveIds(\@ids, $sql, "accession");
+    my $matched = $self->{db_util}->batchRetrieveIds(\@ids, $sql, "accession");
     foreach my $id (sort keys %$matched) {
         $seqData->associateUnirefIds($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
     }

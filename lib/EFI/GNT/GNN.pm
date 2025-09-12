@@ -22,7 +22,7 @@ sub new {
     my $self = {};
     bless $self, $class;
 
-    die "Require dbh EFI::Database argument" if not $args{dbh};
+    die "Require dbh (DBI database handle) argument" if not $args{dbh};
     die "Require seq_cluster_id_map argument" if not $args{seq_cluster_id_map};
     die "Require gnt_anno EFI::GNT::Annotations argument" if not $args{gnt_anno};
 
@@ -230,7 +230,9 @@ key of the hash ref corresponds to a cluster number and the value is an array
 ref of sequence IDs.  The input can be clusters numbered by cluster node size
 or cluster sequence size but is typically numbered by sequence not node.
 The data for this structure should come from the B<parse_cluster_map_file>
-function in the B<EFI::SSN::Util::ID> module.
+function in the B<EFI::SSN::Util::ID> module.  If the input file originates
+from a metanode file (e.g. the input is UniRef or a RepNode network), then
+the ID mapping will contain the full set of IDs not just the metanodes.
 
 =back
 

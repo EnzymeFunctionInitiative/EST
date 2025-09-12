@@ -12,6 +12,7 @@ use parent qw(EFI::Import::Source);
 
 use EFI::Annotations::Fields qw(:source :annotations);
 use EFI::Import::Domains;
+use EFI::Import::Util;
 use EFI::Sequence::Type qw(:types);
 
 use Exporter qw(import);
@@ -51,6 +52,8 @@ sub init {
     if ($config->{domain}) {
         $self->{domain} = new EFI::Import::Domains(region => $config->{domain});
     }
+
+    $self->{import_util} = new EFI::Import::Util(dbh => $efiDbh);
 
     return 1;
 }
@@ -164,7 +167,7 @@ sub getFamilyNames {
         }
     }
 
-    push @{ $tables{PFAM} }, $self->{util}->retrieveFamiliesForClans(@clans);
+    push @{ $tables{PFAM} }, $self->{import_util}->retrieveFamiliesForClans(@clans);
 
     return \%tables;
 }
@@ -357,7 +360,7 @@ sub getUnirefIds {
         my $field = shift;
         my $idx = shift;
         my $sql = "SELECT * FROM uniref WHERE $field IN (<IDS>)";
-        my $matched = $self->{util}->batchRetrieveIds(\@ids, $sql, "accession");
+        my $matched = $self->{db_util}->batchRetrieveIds(\@ids, $sql, "accession");
         my $numMatched = 0;
         foreach my $id (@ids) {
             $ids->{$id}->[$idx] = $matched->{$id}->{$field} and $numMatched++ if $matched->{$id};

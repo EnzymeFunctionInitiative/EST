@@ -10,6 +10,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
 use parent qw(EFI::Import::Filter);
 
 use EFI::Annotations::Fields qw(:source);
+use EFI::Import::Util;
 use EFI::Sequence::Type qw(is_unknown_sequence);
 
 
@@ -22,6 +23,8 @@ sub new {
     my $self = $class->SUPER::new(%args);
 
     $self->{families} = $self->parseFamilies($args{families});
+
+    $self->{import_util} = new EFI::Import::Util(dbh => $self->{dbh});
 
     return $self;
 }
@@ -50,7 +53,7 @@ sub parseFamilies {
     }
 
     if (@clans) {
-        push @{ $fams->{PFAM} }, $self->{util}->retrieveFamiliesForClans(@clans);
+        push @{ $fams->{PFAM} }, $self->{import_util}->retrieveFamiliesForClans(@clans);
     }
 
     return $fams;

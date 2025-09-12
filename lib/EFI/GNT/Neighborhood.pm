@@ -19,7 +19,7 @@ sub new {
     my $self = {};
     bless $self, $class;
 
-    die "Require dbh parameter" if not $args{dbh};
+    die "Require dbh (DBI database handle) argument" if not $args{dbh};
 
     $self->{dbh} = $args{dbh};
     $self->{warning} = "";

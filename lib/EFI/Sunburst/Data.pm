@@ -1,19 +1,26 @@
+
 package EFI::Sunburst::Data;
 
 use strict;
 use warnings;
+
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../../"; # Import libs
+
+use EFI::Database::Util;
 
 
 sub new {
     my $class = shift;
     my %args = @_;
 
-    die "Require dbh argument" if not $args{dbh};
+    die "Require dbh (DBI database handle) argument" if not $args{dbh};
 
     my $self = {};
     bless ($self, $class);
 
-    $self->{util} = new EFI::Import::Util(dbh => $args{dbh});
+    $self->{db_util} = new EFI::Database::Util(dbh => $args{dbh});
 
     return bless($self, $class);
 }
@@ -26,7 +33,7 @@ sub getSunburstTaxonomy {
 
     my $sqlPattern = "SELECT A.accession, T.* FROM taxonomy AS T LEFT JOIN annotations AS A ON T.taxonomy_id = A.taxonomy_id WHERE A.accession IN (<IDS>)";
     my @ids = $seqData->getAllSequenceIds();
-    my $matched = $self->{util}->batchRetrieveIds(\@ids, $sqlPattern, "accession");
+    my $matched = $self->{db_util}->batchRetrieveIds(\@ids, $sqlPattern, "accession");
 
     my $taxData = {unique_test => {}, data => {}};
 

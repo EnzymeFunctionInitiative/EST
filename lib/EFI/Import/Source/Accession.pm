@@ -51,7 +51,7 @@ sub init {
     }
 
     if ($config->{domain} and $config->{domain_family}) {
-        $self->{domain} = new EFI::Import::Domains(dbh => $self->{dbh}, region => $config->{domain}, domain_family => $config->{domain_family}, import_util => $self->{util});
+        $self->{domain} = new EFI::Import::Domains(dbh => $self->{dbh}, region => $config->{domain}, domain_family => $config->{domain_family});
     }
 
     return 1;

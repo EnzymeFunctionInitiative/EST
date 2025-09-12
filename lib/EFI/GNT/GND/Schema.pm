@@ -13,6 +13,7 @@ use EFI::Sequence::Type qw(:types);
 use constant SORT_KEY => "sort_key";
 use constant QUERY_KEY => "query_key"; # links the neighbors to corresponding query sequences
 use constant LEGACY_QUERY_KEY => "gene_key"; # legacy column name, replaced in the future with QUERY_KEY
+use constant COLOR_COLUMN => "color";
 use constant QUERY_TABLE => "attributes";
 use constant NEIGHBOR_TABLE => "neighbors";
 
@@ -20,7 +21,7 @@ use constant UNIREF90_TABLE => "uniref90";
 use constant UNIREF50_TABLE => "uniref50";
 
 use Exporter qw(import);
-our %EXPORT_TAGS = (schema => ['SORT_KEY', 'QUERY_KEY', 'QUERY_TABLE', 'NEIGHBOR_TABLE', 'LEGACY_QUERY_KEY']);
+our %EXPORT_TAGS = (schema => ['SORT_KEY', 'QUERY_KEY', 'QUERY_TABLE', 'NEIGHBOR_TABLE', 'LEGACY_QUERY_KEY', 'COLOR_COLUMN']);
 Exporter::export_ok_tags('schema');
 
 
@@ -59,17 +60,16 @@ sub getNeighborCols {
 # public
 sub initializeDatabase {
     my $self = shift;
-    my $networkType = shift || SEQ_UNIPROT;
 
     my @indexCols;
     push @indexCols, [QUERY_TABLE, $self->initializeTable(QUERY_TABLE, $self->getQueryIdCols())];
     push @indexCols, [NEIGHBOR_TABLE, $self->initializeTable(NEIGHBOR_TABLE, $self->getNeighborCols())];
 
     # Create UniRef90 (and UniRef50, if the version is UniRef50) tables
-    if ($networkType eq SEQ_UNIREF50) {
+    if ($self->{network_type} eq SEQ_UNIREF50) {
         push @indexCols, $self->initializeUnirefTables(UNIREF50_TABLE);
     }
-    if ($networkType eq SEQ_UNIREF50 or $networkType eq SEQ_UNIREF90) {
+    if ($self->{network_type} eq SEQ_UNIREF50 or $self->{network_type} eq SEQ_UNIREF90) {
         push @indexCols, $self->initializeUnirefTables(UNIREF90_TABLE);
     }
 
@@ -222,7 +222,7 @@ sub getSharedSchema {
         {name => "desc", type => "TEXT"}, # SwissProt or sequence description from UniProt DB
         {name => "pfam_desc", db_name => "family_desc", type => "TEXT"}, # Pfam long name
         {name => "interpro_desc", db_name => "ipro_family_desc", type => "TEXT"}, # InterPro long name
-        {name => "color", type => "VARCHAR(255)"},
+        {name => COLOR_COLUMN, type => "VARCHAR(255)"},
     ];
 }
 

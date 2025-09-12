@@ -7,13 +7,16 @@ use warnings;
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 
+use constant DEFAULT_SSN_COLOR => "#6495ED";
+use constant DEFAULT_COLOR => "#BBBBBB";
+
 
 sub new {
     my ($class, %args) = @_;
 
     my $colorFile = $args{color_file};
 
-    my $self = {colors => [], default_color => "#6495ED"};
+    my $self = { colors => [] };
     bless($self, $class);
 
     if ($args{color_file}) {
@@ -61,8 +64,21 @@ sub parseColorFile {
 sub getColor {
     my $self = shift;
     my $clusterNum = shift;
-    return $self->{colors}->[$clusterNum - 1] // $self->{default_color};
-    #return $self->{colors}->{$clusterNum} // $self->{default_color};
+    return $self->{colors}->[$clusterNum - 1] // DEFAULT_COLOR;
+}
+
+
+# public
+sub getDefaultColor {
+    my $self = shift;
+    return DEFAULT_COLOR;
+}
+
+
+# public
+sub getDefaultSsnColor {
+    my $self = shift;
+    return DEFAULT_SSN_COLOR;
 }
 
 
@@ -249,12 +265,16 @@ B<EFI::Util::Colors> - Perl utility module for getting a unique color for each c
 
     my $colors = $colors->getAllColors();
 
+    my $defaultColor = $colors->getDefaultColor();
+    my $defaultSsnNodeColor = $colors->getDefaultSsnColor();
+
 
 =head2 DESCRIPTION
 
 B<EFI::Util::Colors> is a Perl utility module that provides an interface for getting a
-unique color for each cluster.  The default color is C<#6495ED>.  Optionally, colors can
-be loaded from an external file.
+unique color for each cluster.  The default, "unassigned value" color is C<#BBBBBB>.
+The default SSN node color is C<#6495ED>.  Optionally, colors can be loaded from an
+external file.
 
 
 =head2 METHODS
@@ -327,6 +347,34 @@ Returns an array ref containing the hex color codes.
     my $colors = $colors->getAllColors();
     my $numColors = @$colors;
     print "There are $numColors in the default color palette\n";
+
+
+=head3 C<getDefaultColor()>
+
+Returns the default color, i.e. the "unassigned value" color.
+
+=head4 Returns
+
+Returns a hex code color.
+
+=head4 Example Usage
+
+    my $color = $colors->getDefaultColor();
+    print "The default, 'unassigned value' color is $color\n";
+
+
+=head3 C<getDefaultSsnColor()>
+
+Returns the default color for SSN nodes.
+
+=head4 Returns
+
+Returns a hex code color.
+
+=head4 Example Usage
+
+    my $color = $colors->getDefaultSsnColor();
+    print "The default SSN node color is $color\n";
 
 
 =cut
