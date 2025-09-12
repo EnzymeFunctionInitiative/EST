@@ -1,20 +1,26 @@
+
 include { color_and_retrieve } from "../shared/nextflow/color_workflow.nf"
+include { merge_stats; zip_files } from "../shared/nextflow/util.nf"
 
 process color_ssn {
-    publishDir params.final_output_dir, mode: "copy"
     input:
         path ssn_file
         path cluster_id_map
         path cluster_num_map
         path cluster_colors
+
     output:
-        path "color_ssn.xgmml", emit: "ssn_output"
+        path "color_ssn.xgmml", emit: "ssn"
+        path "color_stats.json", emit: "stats"
+
+    script:
     """
     perl $projectDir/color_xgmml.pl --ssn $ssn_file --color-ssn color_ssn.xgmml \
         --cluster-map $cluster_id_map --cluster-num-map $cluster_num_map --cluster-color-map $cluster_colors \
-        --stats stats.json
+        --stats color_stats.json
     """
 }
+
 
 workflow {
     // Files are published to params.final_output_dir by the processes inside the

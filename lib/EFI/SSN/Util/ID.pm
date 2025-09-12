@@ -140,7 +140,7 @@ sub parse_singletons_file {
 #
 # Returns:
 #    type of input sequences: SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50; repnodes get converted to uniprot
-#    mapping of sequence IDs to UniProt IDs
+#    mapping of metanode (sequence) IDs to UniProt IDs
 #
 sub parse_metanode_map_file {
     my $file = shift;

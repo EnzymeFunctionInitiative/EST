@@ -77,7 +77,7 @@ $clusterHubWriter->write($hubs);
 # Save the various tables
 my $tables = new EFI::GNT::GNN::TableWriter(hubs => $hubs, gnn => $gnn); 
 $tables->savePfamNeighborhoods($opts->{nb_pfam_list_dir}) if $opts->{nb_pfam_list_dir};
-$tables->saveUnclassifiedIds("$opts->{nb_pfam_list_dir}/no_fam") if $opts->{nb_pfam_list_dir};
+$tables->saveUnclassifiedIds("$opts->{nb_pfam_list_dir}/neighbor_pfam_no_fam") if $opts->{nb_pfam_list_dir};
 $tables->saveClusterStatistics($opts->{hub_count}) if $opts->{hub_count};
 $tables->savePfamCooccurrence($opts->{cooc_table}) if $opts->{cooc_table};
 $tables->saveIdsWithNoContext($opts->{no_context}) if $opts->{no_context};
