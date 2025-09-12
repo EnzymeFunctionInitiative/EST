@@ -232,7 +232,7 @@ or cluster sequence size but is typically numbered by sequence not node.
 The data for this structure should come from the B<parse_cluster_map_file>
 function in the B<EFI::SSN::Util::ID> module.  If the input file originates
 from a metanode file (e.g. the input is UniRef or a RepNode network), then
-the ID mapping will be contain the full set of IDs not just the metanodes.
+the ID mapping will contain the full set of IDs not just the metanodes.
 
 =back
 
