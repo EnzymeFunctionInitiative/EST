@@ -459,7 +459,7 @@ select
     from ena
     inner join
         (
-            select *, max(NUM) as MAX_NUM from ena where ID in
+            select max(NUM) as MAX_NUM from ena where ID in
             (
                 select ID from ena where AC = ? and TYPE = 1 order by ID
             )
