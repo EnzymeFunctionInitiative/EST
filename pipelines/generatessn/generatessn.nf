@@ -63,7 +63,7 @@ process create_full_ssn {
         path "job.finish"
         path "stats.json"
     """
-    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output full_ssn.xgmml  --title ${params.ssn_title} --db-version ${params.db_version} --stats stats.json
+    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output full_ssn.xgmml  --title ${params.job_name} --db-version ${params.db_version} --stats stats.json
     touch job.finish
     """
 }

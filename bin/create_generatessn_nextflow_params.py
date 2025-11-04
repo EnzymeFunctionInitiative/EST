@@ -19,7 +19,7 @@ def add_args(parser):
     ssn_args_parser.add_argument("--min-length", default=0, help="Minimum required sequence length")
     ssn_args_parser.add_argument("--max-length", default=50000, help="Maximum sequence length to allow")
     ssn_args_parser.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
-    ssn_args_parser.add_argument("--ssn-title", required=True, help="Title to be included as metadata in the XGMML file")
+    ssn_args_parser.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
     ssn_args_parser.add_argument("--maxfull", default=0)
 
     # add a subparser for automatically populating from EST output dir
@@ -108,7 +108,7 @@ def create_parser():
     return parser
 
 def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter,
-        filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version,
+        filter_min_val, min_length, max_length, ssn_name, job_name, maxfull, uniref_version,
         efi_config, db_version, job_id, efi_db, mode, **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
@@ -120,7 +120,7 @@ def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_p
         "min_length": min_length,
         "max_length": max_length,
         "ssn_name": ssn_name,
-        "ssn_title": ssn_title,
+        "job_name": job_name,
         "maxfull": maxfull,
         "uniref_version": uniref_version,
         "efi_config": efi_config,
