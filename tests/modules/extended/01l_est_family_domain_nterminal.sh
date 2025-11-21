@@ -11,7 +11,7 @@ rm -rf $OUTPUT_DIR
 
 family="IPR050967"
 
-./bin/create_est_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --domain n-terminal
+./bin/create_est_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --domain --domain-region n-terminal
 bash $OUTPUT_DIR/run_nextflow.sh
 
 ./bin/create_generatessn_nextflow_params.py auto --filter-min-val 87 --ssn-name testssn --job-name test-ssn --est-output-dir $OUTPUT_DIR --nextflow-config $CONFIG_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME

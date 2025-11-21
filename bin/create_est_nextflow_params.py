@@ -26,7 +26,8 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
-    common_parser.add_argument("--domain", choices=["central", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
+    common_parser.add_argument("--domain", default=False, action="store_true", help="Should sequences be trimmed to domain boundaries?")
+    common_parser.add_argument("--domain-region", choices=["central", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
     shared_args.add_args(common_parser)
 
     # add a subparser for each import mode
@@ -123,10 +124,10 @@ def create_parser() -> argparse.ArgumentParser:
 
 def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
                   accession_shards, blast_num_matches, job_id, efi_config, fasta_db, efi_db, multiplex,
-                  blast_evalue, import_mode, sequence_version,
+                  blast_evalue, import_mode, sequence_version, domain,
                   families=None, sequence_filter=None, fasta_file=None, accessions_file=None,
                   blast_query_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
-                  import_blast_evalue=None, domain=None, domain_family=None, **kwargs: dict):
+                  import_blast_evalue=None, domain_region=None, domain_family=None, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
@@ -143,7 +144,8 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "blast_num_matches": blast_num_matches,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version,
-        "domain": None,
+        "domain": domain,
+        "domain_region": None,
         "import_blast_fasta_db": None,
         "accessions_file": None,
         "import_blast_num_matches": None,
@@ -174,9 +176,9 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
             "families": families
         }
 
-    if domain is not None:
+    if domain and domain_region is not None:
         params |= {
-            "domain": domain
+            "domain_region": domain_region
         }
         if import_mode == "accessions" and domain_family is not None:
             params |= {
