@@ -35,7 +35,6 @@ def add_args(parser):
     manual_parser.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
     manual_parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
     manual_parser.add_argument("--seq-meta-file", required=True, type=str, help="EST sequence metadata file to get basic metadata from")
-    manual_parser.add_argument("--uniref-version", default="", choices=["", "90", "50"], help="Which database to use for annotations")
     manual_parser.add_argument("--db-version", default=100, help="Indicates the version of the EFI database that was used to generate the network")
     shared_args.add_args(manual_parser)
 
@@ -62,7 +61,6 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
                 args.efi_db = params["efi_db"]
                 #TODO: figure out how to get this from the EST run
                 args.db_version = 1
-                args.uniref_version = 1
                 args.job_id = params["job_id"]
         except (FileNotFoundError, PermissionError) as e:
             print(f"Could not open parameter file '{parameter_file}': {e.strerror}")
@@ -108,7 +106,7 @@ def create_parser():
     return parser
 
 def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter,
-        filter_min_val, min_length, max_length, ssn_name, job_name, maxfull, uniref_version,
+        filter_min_val, min_length, max_length, ssn_name, job_name, maxfull,
         efi_config, db_version, job_id, efi_db, mode, **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
@@ -122,7 +120,6 @@ def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_p
         "ssn_name": ssn_name,
         "job_name": job_name,
         "maxfull": maxfull,
-        "uniref_version": uniref_version,
         "efi_config": efi_config,
         "db_version": db_version,
         "job_id": job_id,

@@ -48,7 +48,7 @@ process get_annotations {
         path "ssn_metadata.tab"
     script:
     """
-    perl $projectDir/annotations/get_annotations.pl --ssn-anno-out ssn_metadata.tab --uniref-version ${params.uniref_version} --min-len ${params.min_length} --max-len ${params.max_length} --seq-meta-in $filtered_seq_meta_file --config ${params.efi_config} --db-name ${params.efi_db}
+    perl $projectDir/annotations/get_annotations.pl --ssn-anno-out ssn_metadata.tab --min-len ${params.min_length} --max-len ${params.max_length} --seq-meta-in $filtered_seq_meta_file --config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
 
