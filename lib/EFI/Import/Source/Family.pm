@@ -50,7 +50,7 @@ sub init {
     $self->{fams} = [ split(m/,/, $config->{family}) ];
 
     if ($config->{domain}) {
-        $self->{domain} = new EFI::Import::Domains(region => $config->{domain});
+        $self->{domain} = new EFI::Import::Domains(dbh => $efiDbh, region => $config->{domain});
     }
 
     $self->{import_util} = new EFI::Import::Util(dbh => $efiDbh);
