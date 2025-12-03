@@ -19,7 +19,7 @@ def add_args(parser):
     ssn_args_parser.add_argument("--min-length", default=0, help="Minimum required sequence length")
     ssn_args_parser.add_argument("--max-length", default=50000, help="Maximum sequence length to allow")
     ssn_args_parser.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
-    ssn_args_parser.add_argument("--ssn-title", required=True, help="Title to be included as metadata in the XGMML file")
+    ssn_args_parser.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
     ssn_args_parser.add_argument("--maxfull", default=0)
 
     # add a subparser for automatically populating from EST output dir
@@ -35,7 +35,6 @@ def add_args(parser):
     manual_parser.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
     manual_parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
     manual_parser.add_argument("--seq-meta-file", required=True, type=str, help="EST sequence metadata file to get basic metadata from")
-    manual_parser.add_argument("--uniref-version", default="", choices=["", "90", "50"], help="Which database to use for annotations")
     manual_parser.add_argument("--db-version", default=100, help="Indicates the version of the EFI database that was used to generate the network")
     shared_args.add_args(manual_parser)
 
@@ -62,7 +61,6 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
                 args.efi_db = params["efi_db"]
                 #TODO: figure out how to get this from the EST run
                 args.db_version = 1
-                args.uniref_version = 1
                 args.job_id = params["job_id"]
         except (FileNotFoundError, PermissionError) as e:
             print(f"Could not open parameter file '{parameter_file}': {e.strerror}")
@@ -108,7 +106,7 @@ def create_parser():
     return parser
 
 def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter,
-        filter_min_val, min_length, max_length, ssn_name, ssn_title, maxfull, uniref_version,
+        filter_min_val, min_length, max_length, ssn_name, job_name, maxfull,
         efi_config, db_version, job_id, efi_db, mode, **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
@@ -120,9 +118,8 @@ def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_p
         "min_length": min_length,
         "max_length": max_length,
         "ssn_name": ssn_name,
-        "ssn_title": ssn_title,
+        "job_name": job_name,
         "maxfull": maxfull,
-        "uniref_version": uniref_version,
         "efi_config": efi_config,
         "db_version": db_version,
         "job_id": job_id,

@@ -18,14 +18,13 @@ use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
 use EFI::IdMapping::Util qw(:ids);
 use EFI::Sequence::Collection;
-use EFI::Sequence::Type qw(is_unknown_sequence);
+use EFI::Sequence::Type qw(is_unknown_sequence :types);
 
 
-my ($annoOut, $metaFileIn, $unirefVersion, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
+my ($annoOut, $metaFileIn, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
 my $result = GetOptions(
     "ssn-anno-out=s"        => \$annoOut,
     "seq-meta-in=s"         => \$metaFileIn,
-    "uniref-version=s"      => \$unirefVersion,    # if this is a uniref job then we need to filter out uniref cluster members by fragments
     "config=s"              => \$configFile,
     "db-name=s"             => \$dbName,
     "min-len=i"             => \$minLen,
@@ -54,7 +53,6 @@ if (not $dbh) {
 
 
 
-$unirefVersion = "" if not defined $unirefVersion or ($unirefVersion ne "90" and $unirefVersion ne "50");
 $minLen = 0 if not $minLen or $minLen =~ m/\D/;
 $maxLen = 0 if not $maxLen or $maxLen =~ m/\D/;
 
@@ -65,17 +63,6 @@ $idTypes{&GI} = uc GI;
 $idTypes{&NCBI} = uc NCBI;
 
 
-my $clusterField = "";
-my $clusterSizeField = "";
-if ($unirefVersion) {
-    if ($unirefVersion == 50) {
-        $clusterField = FIELD_UNIREF50_IDS;
-        $clusterSizeField = FIELD_UNIREF50_CLUSTER_SIZE;
-    } else {
-        $clusterField = FIELD_UNIREF90_IDS;
-        $clusterSizeField = FIELD_UNIREF90_CLUSTER_SIZE;
-    }
-}
 
 
 my $inputIds = new EFI::Sequence::Collection();
@@ -84,6 +71,21 @@ my $outputIds = new EFI::Sequence::Collection();
 $inputIds->load($metaFileIn);
 my $accessions = $inputIds->getSequenceIds();
 my $metaAttrs = $inputIds->getFields();
+
+
+my $unirefVersion = "";
+my $clusterField = "";
+my $clusterSizeField = "";
+if (grep { $_ eq FIELD_UNIREF90_IDS } @{ $metaAttrs }) {
+    $unirefVersion = SEQ_UNIREF90;
+    $clusterField = FIELD_UNIREF90_IDS;
+    $clusterSizeField = FIELD_UNIREF90_CLUSTER_SIZE;
+} elsif (grep { $_ eq FIELD_UNIREF50_IDS } @{ $metaAttrs }) {
+    $unirefVersion = SEQ_UNIREF50;
+    $clusterField = FIELD_UNIREF50_IDS;
+    $clusterSizeField = FIELD_UNIREF50_CLUSTER_SIZE;
+}
+
 
 my $unirefLenFiltWhere = getUnirefLenFiltWhere();
 my $annoSpec = readAnnoSpec($annoSpecFile);
@@ -100,7 +102,7 @@ foreach my $accession (sort @$accessions){
 
     # If we are using UniRef, get the attributes for all of the IDs in the UniRef cluster
     my @unirefSql;
-    if ($unirefVersion and $clusterField) {
+    if ($unirefVersion) {
         @unirefSql = getUnirefQuerySql($accession);
     }
 
