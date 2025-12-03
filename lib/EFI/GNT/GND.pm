@@ -50,6 +50,9 @@ sub save {
 
     my $clusterData = $gnn->getClusterData();
 
+    use Data::Dumper;
+    print Dumper($clusterData);
+
     # Add the UniRef cluster size mapping (e.g. how many UniProt IDs are in the UniRef cluster IDs)
     my ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping);
     if ($networkType ne SEQ_UNIPROT and $args{metanode_mapping}) {
@@ -151,6 +154,7 @@ sub insertClusterData {
     # Create a closure for code clarity
     my $getQueryData = sub {
         my $idData = shift;
+        my $clusterNum = shift;
         my $queryData = $idData->{attributes};
         # Make a copy because we modify it later
         my %queryData = %$queryData;
@@ -158,7 +162,8 @@ sub insertClusterData {
         # Always add uniref size fields; these will be ignored later if the input network is not UniRef
         $queryData{uniref90_size} = $unirefSizeMapping->{$queryData{id}}->{uniref90} // 0;
         $queryData{uniref50_size} = $unirefSizeMapping->{$queryData{id}}->{uniref50} // 0;
-        $queryData{&COLOR_COLUMN} = $self->{util}->getColorForPfam($queryData{pfam});
+        $queryData{&COLOR_COLUMN} = $self->{util}->getColorForPfam($queryData{pfam}, assign_query_gene_color => 1);
+        $queryData{cluster_num} = $clusterNum;
         return \%queryData;
     };
 
@@ -174,7 +179,7 @@ sub insertClusterData {
         @idData = sort $sortIdFn @idData if $sortSequenceIds;
 
         foreach my $idData (@idData) {
-            my $queryData = $getQueryData->($idData);
+            my $queryData = $getQueryData->($idData, $clusterNum);
 
             $self->insertQueryId($sortKey, $queryData);
 

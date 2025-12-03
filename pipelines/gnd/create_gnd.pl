@@ -33,7 +33,7 @@ if (not $dbh) {
 
 
 
-my $idMap = parse_cluster_map_file($opts->{cluster_map});
+my $idMap = parse_cluster_map_file($opts->{cluster_map}, default_cluster_num => 1);
 
 my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 my $gnn = new EFI::GNT::GNN(dbh => $dbh, seq_cluster_id_map => $idMap, gnt_anno => $gntAnno, neighborhood_size => $opts->{nb_size});
