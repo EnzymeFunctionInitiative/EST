@@ -26,9 +26,10 @@ sub new {
 
     $self->{color_util} = new EFI::Util::Colors();
     $self->{max_num_colors} = 1000;
-    $self->{pfam_color_idx} = 1;
+    $self->{pfam_color_idx} = 1; # Counter for ensuring we don't run out of colors
     $self->{pfam_colors} = {};
     $self->{no_pfam_color} = $self->{color_util}->getDefaultColor();
+    $self->{query_gene_color} = $self->{color_util}->getColor(1); # Get the first color in the list and use it for the central "query" gene
 
     return $self;
 }
@@ -42,6 +43,8 @@ sub new {
 #
 # Parameters:
 #    $pfams - dash-separated list of Pfams
+#    optional flag assign_query_gene_color - if present and true the query gene color will
+#        be assigned to all families in that query gene
 #
 # Returns:
 #    colors, a comma-separated list of a color for each Pfam in the input $pfams parameter;
@@ -50,6 +53,7 @@ sub new {
 sub getColorForPfam {
     my $self = shift;
     my $pfams = shift;
+    my %args = @_;
 
     if (not $pfams) {
         return $self->{no_pfam_color};
@@ -57,16 +61,24 @@ sub getColorForPfam {
 
     my @colors;
     foreach my $pfam (split(m/\-/, $pfams)) {
-        my $color = $self->{pfam_colors}->{$pfam};
-        if (not $color) {
+        my $assignedColor = $self->{pfam_colors}->{$pfam};
+        if (not $assignedColor) {
             if ($self->{pfam_color_idx} > $self->{max_num_colors}) {
                 $self->{pfam_color_idx} = 1;
             }
-            $color = $self->{pfam_colors}->{$pfam} = $self->{color_util}->getColor($self->{pfam_color_idx});
+
+            my $color = "";
+            if ($args{assign_query_gene_color}) {
+                $color = $self->{query_gene_color};
+            } else {
+                $color = $self->{color_util}->getColor($self->{pfam_color_idx});
+            }
+            $assignedColor = $self->{pfam_colors}->{$pfam} = $color;
+
             $self->{pfam_color_idx}++;
         }
 
-        push @colors, $color;
+        push @colors, $assignedColor;
     }
 
     return join(",", @colors);

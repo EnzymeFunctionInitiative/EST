@@ -65,12 +65,16 @@ sub get_cluster_num_cols {
 #
 # Parameters:
 #    $file - file containing a map of cluster numbers to IDs (one-three columns, with header)
+#    %opts - optional arguments (e.g. default_cluster_num)
 #
 # Returns:
 #    hash ref mapping cluster number to IDs in cluster
 #
 sub parse_cluster_map_file {
     my $file = shift;
+    my %opts = @_;
+
+    my $defaultClusterNum = $opts{default_cluster_num} // 0;
 
     open my $fh, "<", $file or die "Unable to open cluster map file '$file' for reading: $!";
 
@@ -87,8 +91,8 @@ sub parse_cluster_map_file {
     while (my $line = <$fh>) {
         chomp $line;
         my @p = split(m/\t/, $line);
-        my $seqNum = $p[$seqNumCol] || 0;
-        my $nodeNum = $p[$nodeNumCol] || 0;
+        my $seqNum = $p[$seqNumCol] || $defaultClusterNum;
+        my $nodeNum = $p[$nodeNumCol] || $defaultClusterNum;
         push @{ $seqClusterToId->{$seqNum} }, $p[0];
         push @{ $nodeClusterToId->{$nodeNum} }, $p[0];
     }
@@ -323,6 +327,11 @@ A tab-separated file that with two or three columns; the first column being the
 sequence ID, with the second and third columns being the cluster numbers (by sequence
 and by node).  If there are only two columns then the cluster numbers are identical.
 
+=item C<default_cluster_num>
+
+Optional parameter, that if true, assigns the default cluster number (otherwise the
+default cluster number will be zero if there is no cluster number specified in the file).
+
 =back
 
 =head4 Returns
@@ -362,6 +371,8 @@ C<cluster_num_node> column in the input file).  In the example given above
 =head4 Example Usage
 
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
+
+    my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile, default_cluster_num => 1);
 
 
 =head3 C<parse_singletons_file($singletonsFile)>
