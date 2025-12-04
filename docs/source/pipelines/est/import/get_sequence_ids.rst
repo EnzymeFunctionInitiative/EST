@@ -32,7 +32,7 @@ Usage
 	    --unmatched-ids            file containing IDs in FASTA or accession ID files that were not matched in the EFI database
 	    --blast-query              path to file containing sequence for initial BLAST; required for --mode blast
 	    --blast-output             output file to put BLAST results into; required for --mode blast
-	    --domain                   retrieve the family domain on each sequence; 'central' retrieves the domain of the input family, 'n-terminal' or 'c-terminal' retrieve the portion of the sequence that is n-terminal or c-terminal to the family domain
+	    --domain                   retrieve the family domain on each sequence; 'domain' retrieves the domain of the input family, 'n-terminal' or 'c-terminal' retrieve the portion of the sequence that is n-terminal or c-terminal to the family domain
 	    --domain-family            the family to use when retrieving domains for Accession jobs only
 	
 
