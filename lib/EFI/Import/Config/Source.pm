@@ -42,7 +42,7 @@ sub addImportOptions {
     $self->addOption("unmatched-ids=s", 0, "file containing IDs in FASTA or accession ID files that were not matched in the EFI database", OPT_FILE);
     $self->addOption("blast-query=s", 0, "path to file containing sequence for initial BLAST; required for --mode blast", OPT_FILE);
     $self->addOption("blast-output=s", 0, "output file to put BLAST results into; required for --mode blast", OPT_FILE);
-    $self->addOption("domain=s", 0, "retrieve the family domain on each sequence; 'central' retrieves the domain of the input family, 'n-terminal' or 'c-terminal' retrieve the portion of the sequence that is n-terminal or c-terminal to the family domain");
+    $self->addOption("domain=s", 0, "retrieve the family domain on each sequence; 'domain' retrieves the domain of the input family, 'n-terminal' or 'c-terminal' retrieve the portion of the sequence that is n-terminal or c-terminal to the family domain");
     $self->addOption("domain-family=s", 0, "the family to use when retrieving domains for Accession jobs only");
 }
 

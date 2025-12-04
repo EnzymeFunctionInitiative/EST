@@ -27,7 +27,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
     common_parser.add_argument("--domain", default=False, action="store_true", help="Should sequences be trimmed to domain boundaries?")
-    common_parser.add_argument("--domain-region", choices=["central", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
+    common_parser.add_argument("--domain-region", choices=["domain", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
     shared_args.add_args(common_parser)
 
     # add a subparser for each import mode

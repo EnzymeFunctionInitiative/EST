@@ -13,7 +13,7 @@ use EFI::Database::Util;
 
 use constant DOMAIN_NTERMINAL => "n-terminal";
 use constant DOMAIN_CTERMINAL => "c-terminal";
-use constant DOMAIN_CENTRAL => "central";
+use constant DOMAIN_CENTRAL => "domain";
 
 use Exporter qw(import);
 our %EXPORT_TAGS = (
@@ -134,7 +134,7 @@ sub computeDomains {
 # Converts the user-specified string into an internal flag
 #
 # Parameters:
-#    $region - "n-terminal", "c-terminal", "central"
+#    $region - "n-terminal", "c-terminal", "domain"
 #
 # Returns:
 #    DOMAIN_NTERMINAL, DOMAIN_CTERMINAL, DOMAIN_CENTRAL
