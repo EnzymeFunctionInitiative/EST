@@ -15,7 +15,6 @@ process import_data {
 }
 
 process filter_blast {
-    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_parquet
     output:
@@ -27,7 +26,6 @@ process filter_blast {
 }
 
 process filter_fasta {
-    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta
         path seq_meta_file
@@ -41,7 +39,6 @@ process filter_fasta {
 }
 
 process get_annotations {
-    publishDir params.final_output_dir, mode: 'copy'
     input:
         path filtered_seq_meta_file
     output:
@@ -59,11 +56,13 @@ process create_full_ssn {
         path filtered_fasta
         path ssn_meta_file
     output:
-        path "full_ssn.xgmml"
+        path "full_ssn.xgmml.zip"
         path "job.finish"
         path "stats.json"
     """
     perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output full_ssn.xgmml  --title ${params.job_name} --db-version ${params.db_version} --stats stats.json
+    zip full_ssn.xgmml.zip full_ssn.xgmml
+    rm full_ssn.xgmml
     touch job.finish
     """
 }
