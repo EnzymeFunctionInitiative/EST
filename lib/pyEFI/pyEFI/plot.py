@@ -90,6 +90,12 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
 
     Parameters
     ----------
+        fig
+            matplotlib.figure.Figure object
+        axs
+            matplotlib.axes.Axes object
+        pos
+            pandas.dataframe (shape: 1xN columns)
         title
             plot title
         xlabel
@@ -110,14 +116,21 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
     axs.set_ylabel(ylabel)
     axs.spines[["right", "top"]].set_visible(False)
 
-    # let's aim for about 30 xticks at 96dpi and interoplate using that
+    # let's aim for about 30 major xticks at 96dpi and interoplate using that
+    # following this, there will be about 60 minor xticks
     # this number is in line with default min groups
     pos = list(pos)
-    spacing = max(math.ceil((pos[-1] - pos[0]) / 30), 1)
-    new_ticks = range(pos[0], pos[-1], spacing)
-    axs.set_xticks(ticks=new_ticks, labels=new_ticks)
-    axs.set_xlim(max(0, pos[0] - spacing), pos[-1] + 1)
-    fig.savefig(f"{output_filename}.{output_filetype}", bbox_inches="tight", dpi=96)
+    minor_spacing = max(math.ceil((pos[-1] - pos[0]) / 60), 1)
+    minor_ticks = range(pos[0], pos[-1], minor_spacing)
+    axs.set_xticks(minor = True,  ticks=range(pos[0],pos[-1]+1), labels=[])
+    major_spacing = max(math.ceil((pos[-1] - pos[0]) / 30), 1)
+    major_ticks = range(pos[0], pos[-1], major_spacing)
+    axs.set_xticks(minor = False, ticks=major_ticks, labels=major_ticks)
+    axs.set_xlim(max(0, pos[0] - major_spacing), pos[-1] + 1)
+    fig.savefig(f"{output_filename}.{output_filetype}", bbox_inches="tight", dpi=300)
+
+    # remove minor ticks from the proxies
+    axs.set_xticks(minor = True, ticks = [], labels = [])
 
     if isinstance(dpis, dict):
         for name, dpi in dpis.items():
@@ -128,3 +141,4 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
             new_ticks = range(pos[0], pos[-1], spacing)
             axs.set_xticks(ticks=new_ticks, labels=new_ticks)
             fig.savefig(f"{output_filename}_{name}.{output_filetype}", bbox_inches="tight", dpi=dpi)
+
