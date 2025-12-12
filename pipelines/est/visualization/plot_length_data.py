@@ -80,6 +80,7 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
         output_filetype,
         dpis=proxies,
     )
+    plt.close(fig)
 
 
 if __name__ == "__main__":

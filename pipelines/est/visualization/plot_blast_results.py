@@ -82,6 +82,7 @@ def main(
     # compute groups and trim outliers
     print("Loading output data")
     df = pd.read_parquet(boxplot_stats)
+    df["_label"] = ""
 
     print("Computing groups to discard")
     groups_to_delete = compute_outlying_groups(df[["alignment_score", "edge_count"]], min_edges, min_groups)
@@ -91,7 +92,7 @@ def main(
 
     # plot alignment_length
     print("Plotting alignment length")
-    length_dd = df[["al_whislo", "al_q1", "al_med", "al_q3", "al_whishi"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
+    length_dd = df[["al_whislo", "al_q1", "al_med", "al_q3", "al_whishi","_label"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
     length_xpos = sorted(df["alignment_score"])
     draw_boxplot(
         length_dd,
