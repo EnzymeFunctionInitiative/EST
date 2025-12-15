@@ -135,7 +135,8 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
     major_labels = [int(tick_pos) for tick_pos in major_ticks]
     axs.set_xticks(ticks = major_ticks, labels = major_labels)
     # set the minor ticks
-    axs.xaxis.set_minor_locator(MultipleLocator(1))
+    #axs.xaxis.set_minor_locator(MultipleLocator(1))
+    axs.xaxis.set_minor_locator(AutoMinorLocator())
 
     # set the y-axis ticks via the AutoLocator classes
     axs.yaxis.set_major_locator(AutoLocator())
