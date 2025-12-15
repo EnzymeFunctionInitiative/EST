@@ -151,6 +151,6 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
 
     if isinstance(dpis, dict):
         for name, dpi in dpis.items():
-            fig.savefig(f"new_{output_filename}_{name}.{output_filetype}", bbox_inches="tight", dpi=dpi)
+            fig.savefig(f"{output_filename}_{name}.{output_filetype}", bbox_inches="tight", dpi=dpi)
 
 
