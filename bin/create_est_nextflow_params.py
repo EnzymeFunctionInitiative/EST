@@ -15,13 +15,13 @@ def add_args(parser: argparse.ArgumentParser):
     """
     # general parameters
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
-    common_parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
-    common_parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
-    common_parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
+    #common_parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
+    #common_parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
+    #common_parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
+    #common_parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
-    common_parser.add_argument("--blast-num-matches", default=250, type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
+    #common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
+    #common_parser.add_argument("--blast-num-matches", default=250, type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
     common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
     common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
@@ -122,26 +122,27 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
-                  accession_shards, blast_num_matches, job_id, efi_config, fasta_db, efi_db, multiplex,
+def render_params(output_dir, #duckdb_memory_limit, duckdb_threads, fasta_shards,
+                  #accession_shards, blast_num_matches, 
+                  job_id, efi_config, fasta_db, efi_db, #multiplex,
                   blast_evalue, import_mode, sequence_version, domain,
                   families=None, sequence_filter=None, fasta_file=None, accessions_file=None,
                   blast_query_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
                   import_blast_evalue=None, domain_region=None, domain_family=None, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
-        "duckdb_memory_limit": duckdb_memory_limit,
-        "duckdb_threads": duckdb_threads,
-        "num_fasta_shards": fasta_shards,
-        "num_accession_shards": accession_shards,
+        #"duckdb_memory_limit": duckdb_memory_limit,
+        #"duckdb_threads": duckdb_threads,
+        #"num_fasta_shards": fasta_shards,
+        #"num_accession_shards": accession_shards,
         "job_id": job_id,
         "efi_config": efi_config,
         "fasta_db": fasta_db,
         "efi_db": efi_db,
         "import_mode": import_mode,
         "filter": sequence_filter,
-        "multiplex": multiplex,
-        "blast_num_matches": blast_num_matches,
+        #"multiplex": multiplex,
+        #"blast_num_matches": blast_num_matches,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version,
         "domain": domain,
