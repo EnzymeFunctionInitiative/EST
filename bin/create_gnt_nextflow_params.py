@@ -75,6 +75,12 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_thresho
         "nb_size": nb_size,
         "cooc_threshold": cooc_threshold
     }
+    
+    # remove parameter keys with None values
+    for key, value in params.items():
+        if value == None:
+            params.pop(key)
+
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)

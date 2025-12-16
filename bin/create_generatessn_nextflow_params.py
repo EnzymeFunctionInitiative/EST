@@ -125,6 +125,12 @@ def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_p
         "job_id": job_id,
         "efi_db": efi_db
     }
+    
+    # remove parameter keys with None values
+    for key, value in params.items():
+        if value == None:
+            params.pop(key)
+
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)
