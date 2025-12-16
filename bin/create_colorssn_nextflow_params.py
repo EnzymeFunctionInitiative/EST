@@ -64,9 +64,7 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir, **kwargs:
     }
 
     # remove parameter keys with None values
-    for key, value in params.items():
-        if value == None:
-            params.pop(key)
+    params = {key: value for key, value in params.items() if value != None}
 
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
