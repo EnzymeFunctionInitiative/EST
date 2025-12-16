@@ -105,8 +105,8 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter,
-        filter_min_val, min_length, max_length, ssn_name, job_name, maxfull,
+def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter=None,
+        filter_min_val, min_length=None, max_length=None, ssn_name, job_name, maxfull,
         efi_config, db_version, job_id, efi_db, mode, **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
@@ -126,6 +126,9 @@ def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_p
         "efi_db": efi_db
     }
     
+    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
+
     # remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}
 

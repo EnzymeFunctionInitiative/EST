@@ -64,7 +64,7 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_threshold, output_dir,
+def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size=None, cooc_threshold=None, output_dir,
         **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
@@ -76,6 +76,9 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size, cooc_thresho
         "cooc_threshold": cooc_threshold
     }
     
+    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
+
     # remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}
 

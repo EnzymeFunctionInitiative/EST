@@ -63,6 +63,9 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir, **kwargs:
         "efi_db": efi_db
     }
 
+    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
+
     # remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}
 

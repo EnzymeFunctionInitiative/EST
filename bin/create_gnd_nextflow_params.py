@@ -53,7 +53,7 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(cluster_id_map, efi_config, efi_db, nb_size, output_dir, **kwargs: dict):
+def render_params(cluster_id_map, efi_config, efi_db, nb_size=None, output_dir, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "cluster_id_map": cluster_id_map,
@@ -61,6 +61,9 @@ def render_params(cluster_id_map, efi_config, efi_db, nb_size, output_dir, **kwa
         "efi_db": efi_db,
         "nb_size": nb_size
     }
+
+    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
 
     # remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}

@@ -122,39 +122,31 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, #duckdb_memory_limit, duckdb_threads, fasta_shards,
-                  #accession_shards, blast_num_matches, 
-                  job_id, efi_config, fasta_db, efi_db, #multiplex,
-                  blast_evalue, import_mode, sequence_version, domain,
-                  families=None, sequence_filter=None, fasta_file=None, accessions_file=None,
-                  blast_query_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
-                  import_blast_evalue=None, domain_region=None, domain_family=None, **kwargs: dict):
+def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, fasta_db, efi_db,
+                  duckdb_memory_limit=None, duckdb_threads=None, fasta_shards=None,
+                  accession_shards=None, blast_num_matches=None, multiplex=None,
+                  blast_evalue=None, domain=None, families=None, sequence_filter=None,
+                  fasta_file=None, accessions_file=None, blast_query_file=None, 
+                  import_blast_fasta_db=None, import_blast_num_matches=None,
+                  import_blast_evalue=None, domain_region=None, domain_family=None,
+                  **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
-        #"duckdb_memory_limit": duckdb_memory_limit,
-        #"duckdb_threads": duckdb_threads,
-        #"num_fasta_shards": fasta_shards,
-        #"num_accession_shards": accession_shards,
+        "duckdb_memory_limit": duckdb_memory_limit,
+        "duckdb_threads": duckdb_threads,
+        "num_fasta_shards": fasta_shards,
+        "num_accession_shards": accession_shards,
         "job_id": job_id,
         "efi_config": efi_config,
         "fasta_db": fasta_db,
         "efi_db": efi_db,
         "import_mode": import_mode,
         "filter": sequence_filter,
-        #"multiplex": multiplex,
-        #"blast_num_matches": blast_num_matches,
+        "multiplex": multiplex,
+        "blast_num_matches": blast_num_matches,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version,
         "domain": domain,
-        "domain_region": None,
-        "import_blast_fasta_db": None,
-        "accessions_file": None,
-        "import_blast_num_matches": None,
-        "import_blast_evalue": None,
-        "uploaded_fasta_file": None,
-        "blast_query_file": None,
-        "domain_family": None,
-        "families": None,
     }
     if import_mode == "blast":
         params |= {
@@ -185,6 +177,9 @@ def render_params(output_dir, #duckdb_memory_limit, duckdb_threads, fasta_shards
             params |= {
                 "domain_family": domain_family
             }
+
+    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
 
     # remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}
