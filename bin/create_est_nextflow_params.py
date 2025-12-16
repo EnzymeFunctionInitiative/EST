@@ -15,18 +15,18 @@ def add_args(parser: argparse.ArgumentParser):
     """
     # general parameters
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
-    common_parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
-    common_parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
-    common_parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
+    common_parser.add_argument("--duckdb-memory-limit", type=str, help="Soft limit on DuckDB memory usage")
+    common_parser.add_argument("--duckdb-threads", type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
+    common_parser.add_argument("--fasta-shards", type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
+    common_parser.add_argument("--accession-shards", type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
-    common_parser.add_argument("--blast-num-matches", default=250, type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
-    common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
-    common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
+    common_parser.add_argument("--blast-num-matches", type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
+    common_parser.add_argument("--blast-evalue", help="Cutoff E value to use in all-by-all BLAST")
+    common_parser.add_argument("--sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
-    common_parser.add_argument("--domain", default=False, action="store_true", help="Should sequences be trimmed to domain boundaries?")
+    common_parser.add_argument("--domain", action="store_true", help="Should sequences be trimmed to domain boundaries?")
     common_parser.add_argument("--domain-region", choices=["domain", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
     shared_args.add_args(common_parser)
 
@@ -37,8 +37,8 @@ def add_args(parser: argparse.ArgumentParser):
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
     blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
     blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
-    blast_parser.add_argument("--import-blast-num-matches", default=1000, type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
-    blast_parser.add_argument("--import-blast-evalue", default="1e-5", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
+    blast_parser.add_argument("--import-blast-num-matches", type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
+    blast_parser.add_argument("--import-blast-evalue", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
 
     # option B: Family
     family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group("Family Options")

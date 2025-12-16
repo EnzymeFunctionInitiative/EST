@@ -14,10 +14,10 @@ def add_args(parser):
     """
     # SSN creation parameters
     ssn_args_parser = argparse.ArgumentParser(add_help=False).add_argument_group("SSN Creation Options")
-    ssn_args_parser.add_argument("--filter-parameter", default="alignment_score", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], help="Parameter to filter edges on")
+    ssn_args_parser.add_argument("--filter-parameter", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], help="Parameter to filter edges on")
     ssn_args_parser.add_argument("--filter-min-val", required=True, type=float, help="Retain rows where filter-parameter >= this value")
-    ssn_args_parser.add_argument("--min-length", default=0, help="Minimum required sequence length")
-    ssn_args_parser.add_argument("--max-length", default=50000, help="Maximum sequence length to allow")
+    ssn_args_parser.add_argument("--min-length", help="Minimum required sequence length")
+    ssn_args_parser.add_argument("--max-length", help="Maximum sequence length to allow")
     ssn_args_parser.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
     ssn_args_parser.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
     ssn_args_parser.add_argument("--maxfull", default=0)

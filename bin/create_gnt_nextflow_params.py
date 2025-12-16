@@ -15,8 +15,8 @@ def add_args(parser: argparse.ArgumentParser):
     """
     parser.add_argument("--ssn-input", required=True, type=str, help="The SSN file to color and compute GNNs for, XGMML or zipped XGMML")
     parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    parser.add_argument("--nb-size", type=int, required=False, default=20, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20.")
-    parser.add_argument("--cooc-threshold", type=float, required=False, default=0.20, help="Optional co-occurrence threshold to use for computing the Pfam hubs, a real number >= 0 and <= 1.")
+    parser.add_argument("--nb-size", type=int, required=False, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20.")
+    parser.add_argument("--cooc-threshold", type=float, required=False, help="Optional co-occurrence threshold to use for computing the Pfam hubs, a real number >= 0 and <= 1.")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
