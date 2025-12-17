@@ -5,7 +5,7 @@ Functions to construct and style plots
 import math
 
 import matplotlib.pyplot as plt
-
+from matplotlib.ticker import MaxNLocator, MultipleLocator, AutoLocator, AutoMinorLocator
 
 def draw_boxplot(dd, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis=None):
     """
@@ -46,6 +46,7 @@ def draw_boxplot(dd, pos, title, xlabel, ylabel, output_filename, output_filetyp
     )
 
     label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis)
+    plt.close(fig)
 
 
 def draw_histogram(xpos, heights, title, xlabel, ylabel, output_filename, output_filetype, dpis=None):
@@ -79,6 +80,7 @@ def draw_histogram(xpos, heights, title, xlabel, ylabel, output_filename, output
     axs.bar(x=xpos, height=heights, edgecolor="blue", facecolor="red", linewidth=0.5, width=0.8)
 
     label_and_render_plot(fig, axs, xpos, title, xlabel, ylabel, output_filename, output_filetype, dpis)
+    plt.close(fig)
 
 
 def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename, output_filetype, dpis=None):
@@ -90,6 +92,12 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
 
     Parameters
     ----------
+        fig
+            matplotlib.figure.Figure object
+        axs
+            matplotlib.axes.Axes object
+        pos
+            pandas.dataframe (shape: 1xN columns)
         title
             plot title
         xlabel
@@ -105,26 +113,43 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
             if provided, a dict image suffixes and DPI values at which to render
             images. These are in addition to the default 96dpi image
     """
+    pos = list(pos)
+
     axs.set_title(title)
     axs.set_xlabel(xlabel)
     axs.set_ylabel(ylabel)
     axs.spines[["right", "top"]].set_visible(False)
 
-    # let's aim for about 30 xticks at 96dpi and interoplate using that
-    # this number is in line with default min groups
-    pos = list(pos)
-    spacing = max(math.ceil((pos[-1] - pos[0]) / 30), 1)
-    new_ticks = range(pos[0], pos[-1], spacing)
-    axs.set_xticks(ticks=new_ticks, labels=new_ticks)
-    axs.set_xlim(max(0, pos[0] - spacing), pos[-1] + 1)
-    fig.savefig(f"{output_filename}.{output_filetype}", bbox_inches="tight", dpi=96)
+    # Set the approx 30 major ticks
+    axs.xaxis.set_major_locator(
+        MaxNLocator(
+            nbins = 29,
+            steps = [1,2,2.5,5,10],
+            integer = True,
+            min_n_ticks = 2
+        )
+    )
+
+    # Get the tick positions to set the labels
+    major_ticks = axs.get_xticks()
+    major_labels = [int(tick_pos) for tick_pos in major_ticks]
+    axs.set_xticks(ticks = major_ticks, labels = major_labels)
+    # Set the minor ticks
+    axs.xaxis.set_minor_locator(AutoMinorLocator())
+
+    # Set the y-axis ticks via the AutoLocator classes
+    axs.yaxis.set_major_locator(AutoLocator())
+    axs.yaxis.set_minor_locator(AutoMinorLocator())
+
+    axs.set_xlim(pos[0] - 1, pos[-1] + 1)
+
+    # Add grid lines for both axes' major ticks
+    axs.grid(which = "major", axis = "both", color = "xkcd:light grey", linestyle = "--", alpha = 0.5) 
+    fig.savefig(f"{output_filename}.{output_filetype}", bbox_inches="tight", dpi=300)
+    axs.grid(False)
 
     if isinstance(dpis, dict):
         for name, dpi in dpis.items():
-            # scale x ticks based on resolution, since this part is intended
-            # for rendering previews, cap number of labels at 30
-            # (this means all resolutions passed in should be < 96)
-            spacing = max(math.ceil((pos[-1] - pos[0]) / 30), 1)
-            new_ticks = range(pos[0], pos[-1], spacing)
-            axs.set_xticks(ticks=new_ticks, labels=new_ticks)
             fig.savefig(f"{output_filename}_{name}.{output_filetype}", bbox_inches="tight", dpi=dpi)
+
+

@@ -40,7 +40,7 @@ def parse_args(parser):
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
 
-    # validate input filepaths
+    # Validate input filepaths
     fail = False
     if not os.path.exists(args.lengths):
         print(f"Lengths file {args.lengths} does not exist")
@@ -80,6 +80,7 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
         output_filetype,
         dpis=proxies,
     )
+    plt.close(fig)
 
 
 if __name__ == "__main__":

@@ -57,7 +57,7 @@ def parse_args(parser):
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
 
-    # validate input filepaths
+    # Validate input filepaths
     fail = False
     if not os.path.exists(args.boxplot_stats):
         print(f"BLAST output '{args.boxplot_stats}' does not exist")
@@ -79,9 +79,10 @@ def main(
     output_format,
     proxies,
 ):
-    # compute groups and trim outliers
+    # Compute groups and trim outliers
     print("Loading output data")
     df = pd.read_parquet(boxplot_stats)
+    df["_label"] = ""
 
     print("Computing groups to discard")
     groups_to_delete = compute_outlying_groups(df[["alignment_score", "edge_count"]], min_edges, min_groups)
@@ -89,9 +90,9 @@ def main(
     print(f"Removing {len(groups_to_delete)} groups")
     df = delete_outlying_groups(df, groups_to_delete)
 
-    # plot alignment_length
+    # Plot alignment_length
     print("Plotting alignment length")
-    length_dd = df[["al_whislo", "al_q1", "al_med", "al_q3", "al_whishi"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
+    length_dd = df[["al_whislo", "al_q1", "al_med", "al_q3", "al_whishi","_label"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
     length_xpos = sorted(df["alignment_score"])
     draw_boxplot(
         length_dd,
@@ -104,7 +105,7 @@ def main(
         dpis=proxies,
     )
 
-    # percent identical box plot data
+    # Percent identical box plot data
     print("Plotting percent identical")
     pident_dd = df[["pident_whislo", "pident_q1", "pident_med", "pident_q3", "pident_whishi"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
     pident_xpos = sorted(df["alignment_score"])
@@ -119,7 +120,7 @@ def main(
         dpis=proxies,
     )
 
-    # draw edge length histogram
+    # Draw edge length histogram
     print("Extracting histogram data")
     xpos, heights = df["alignment_score"], df["edge_count"]
     draw_histogram(
