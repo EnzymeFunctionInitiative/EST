@@ -13,42 +13,42 @@ def add_args(parser: argparse.ArgumentParser):
     """
     Add global arguments and subparsers to ``parser``
     """
-    # general parameters
+    # General parameters
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("--duckdb-memory-limit", default="8GB", type=str, help="Soft limit on DuckDB memory usage")
-    common_parser.add_argument("--duckdb-threads", default=1, type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
-    common_parser.add_argument("--fasta-shards", default=128, type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
-    common_parser.add_argument("--accession-shards", default=16, type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
+    common_parser.add_argument("--duckdb-memory-limit", type=str, help="Soft limit on DuckDB memory usage")
+    common_parser.add_argument("--duckdb-threads", type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
+    common_parser.add_argument("--fasta-shards", type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
+    common_parser.add_argument("--accession-shards", type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
     common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
-    common_parser.add_argument("--blast-num-matches", default=250, type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
-    common_parser.add_argument("--blast-evalue", default="1e-5", help="Cutoff E value to use in all-by-all BLAST")
-    common_parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"])
+    common_parser.add_argument("--blast-num-matches", type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
+    common_parser.add_argument("--blast-evalue", help="Cutoff E value to use in all-by-all BLAST")
+    common_parser.add_argument("--sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
-    common_parser.add_argument("--domain", default=False, action="store_true", help="Should sequences be trimmed to domain boundaries?")
+    common_parser.add_argument("--domain", action="store_true", help="Should sequences be trimmed to domain boundaries?")
     common_parser.add_argument("--domain-region", choices=["domain", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
     shared_args.add_args(common_parser)
 
-    # add a subparser for each import mode
+    # Add a subparser for each import mode
     subparsers = parser.add_subparsers(dest="import_mode", required=True)
     
-    # option A: Sequence BLAST
+    # Option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
     blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
     blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
-    blast_parser.add_argument("--import-blast-num-matches", default=1000, type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
-    blast_parser.add_argument("--import-blast-evalue", default="1e-5", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
+    blast_parser.add_argument("--import-blast-num-matches", type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
+    blast_parser.add_argument("--import-blast-evalue", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
 
-    # option B: Family
+    # Option B: Family
     family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group("Family Options")
     # Can add families to every job type
 
-    # option C: FASTA
+    # Option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
     fasta_parser.add_argument("--fasta-file", required=True, type=str, help="The FASTA file to read sequences from")
 
-    # option D: Accession IDs
+    # Option D: Accession IDs
     accession_parser = subparsers.add_parser("accessions", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
     accession_parser.add_argument("--accessions-file", required=True, type=str, help="The list of Accession IDs to pull sequences for, one per line")
     accession_parser.add_argument("--domain-family", type=str, help="Family to use when trimming sequences to domain boundaries")
@@ -60,7 +60,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
     fail = False
 
-    # check for shared args validity
+    # Check for shared args validity
     validated_args = shared_args.check_args(args)
     if validated_args is None:
         fail = True
@@ -71,7 +71,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"FASTA database '{args.fasta_db}' not found")
         fail = True
 
-    # import mode-specific tests
+    # Import mode-specific tests
     if args.import_mode == "blast":
         if not os.path.exists(args.blast_query_file):
             print(f"BLAST query file '{args.blast_query_file}' does not exist")
@@ -122,12 +122,14 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
-                  accession_shards, blast_num_matches, job_id, efi_config, fasta_db, efi_db, multiplex,
-                  blast_evalue, import_mode, sequence_version, domain,
-                  families=None, sequence_filter=None, fasta_file=None, accessions_file=None,
-                  blast_query_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
-                  import_blast_evalue=None, domain_region=None, domain_family=None, **kwargs: dict):
+def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, fasta_db, efi_db,
+                  duckdb_memory_limit=None, duckdb_threads=None, fasta_shards=None,
+                  accession_shards=None, blast_num_matches=None, multiplex=None,
+                  blast_evalue=None, domain=None, families=None, sequence_filter=None,
+                  fasta_file=None, accessions_file=None, blast_query_file=None, 
+                  import_blast_fasta_db=None, import_blast_num_matches=None,
+                  import_blast_evalue=None, domain_region=None, domain_family=None,
+                  **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "duckdb_memory_limit": duckdb_memory_limit,
@@ -145,15 +147,6 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version,
         "domain": domain,
-        "domain_region": None,
-        "import_blast_fasta_db": None,
-        "accessions_file": None,
-        "import_blast_num_matches": None,
-        "import_blast_evalue": None,
-        "uploaded_fasta_file": None,
-        "blast_query_file": None,
-        "domain_family": None,
-        "families": None,
     }
     if import_mode == "blast":
         params |= {
@@ -184,6 +177,12 @@ def render_params(output_dir, duckdb_memory_limit, duckdb_threads, fasta_shards,
             params |= {
                 "domain_family": domain_family
             }
+
+    # Handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
+
+    # Remove parameter keys with None values
+    params = {key: value for key, value in params.items() if value != None}
 
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:

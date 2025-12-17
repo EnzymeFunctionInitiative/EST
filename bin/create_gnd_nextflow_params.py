@@ -14,7 +14,7 @@ def add_args(parser: argparse.ArgumentParser):
     Add arguments for GND pipeline to ``parser``
     """
     parser.add_argument("--cluster-id-map", required=True, type=str, help="The mapping of cluster numbers to IDs in the cluster for the GNDs")
-    parser.add_argument("--nb-size", type=int, required=False, default=20, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20.")
+    parser.add_argument("--nb-size", type=int, required=False, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20.")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -23,7 +23,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
     fail = False
 
-    # check for shared args validity
+    # Check for shared args validity
     validated_args = shared_args.check_args(args)
     if validated_args is None:
         fail = True
@@ -34,7 +34,9 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"SSN Input file '{args.cluster_id_map}' does not exist")
         fail = True
     
-    if args.nb_size < 1 or args.nb_size > 20:
+    if args.nb_size and (
+        args.nb_size < 1 or args.nb_size > 20
+    ):
         print(f"Invalid value for --nb-size ({args.nb_size}).")
         fail = True
 
@@ -53,7 +55,8 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(cluster_id_map, efi_config, efi_db, nb_size, output_dir, **kwargs: dict):
+def render_params(cluster_id_map, efi_config, efi_db, output_dir,
+        nb_size=None, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "cluster_id_map": cluster_id_map,
@@ -61,6 +64,13 @@ def render_params(cluster_id_map, efi_config, efi_db, nb_size, output_dir, **kwa
         "efi_db": efi_db,
         "nb_size": nb_size
     }
+
+    # Handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
+
+    # Remove parameter keys with None values
+    params = {key: value for key, value in params.items() if value != None}
+
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)

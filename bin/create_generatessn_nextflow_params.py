@@ -14,15 +14,15 @@ def add_args(parser):
     """
     # SSN creation parameters
     ssn_args_parser = argparse.ArgumentParser(add_help=False).add_argument_group("SSN Creation Options")
-    ssn_args_parser.add_argument("--filter-parameter", default="alignment_score", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], help="Parameter to filter edges on")
+    ssn_args_parser.add_argument("--filter-parameter", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], help="Parameter to filter edges on")
     ssn_args_parser.add_argument("--filter-min-val", required=True, type=float, help="Retain rows where filter-parameter >= this value")
-    ssn_args_parser.add_argument("--min-length", default=0, help="Minimum required sequence length")
-    ssn_args_parser.add_argument("--max-length", default=50000, help="Maximum sequence length to allow")
+    ssn_args_parser.add_argument("--min-length", help="Minimum required sequence length")
+    ssn_args_parser.add_argument("--max-length", help="Maximum sequence length to allow")
     ssn_args_parser.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
     ssn_args_parser.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
     ssn_args_parser.add_argument("--maxfull", default=0)
 
-    # add a subparser for automatically populating from EST output dir
+    # Add a subparser for automatically populating from EST output dir
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
     # automatically pull parameters from EST results and params file
@@ -30,7 +30,7 @@ def add_args(parser):
     autoparam_parser.add_argument("--est-output-dir", type=str, required=True, help="The EST output directory to use for parameter autopopulation")
     shared_args.add_args(autoparam_parser, use_output_dir=False)
 
-    # if not in auto mode, manually specify the location of the results files
+    # If not in auto mode, manually specify the location of the results files
     manual_parser = subparsers.add_parser("manual", help="Manually specify parameters related to EST output", parents=[ssn_args_parser]).add_argument_group("EST-related parameters")
     manual_parser.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
     manual_parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
@@ -81,7 +81,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"Sequence metadata file '{args.seq_meta_file}' does not exist")
         fail = True
 
-    # check for shared args validity
+    # Check for shared args validity
     validated_args = shared_args.check_args(args)
     if validated_args is None:
         fail = True
@@ -105,9 +105,10 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_parameter,
-        filter_min_val, min_length, max_length, ssn_name, job_name, maxfull,
-        efi_config, db_version, job_id, efi_db, mode, **kwargs: dict):
+def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, efi_config,
+        db_version, job_id, efi_db, mode, ssn_name, job_name, maxfull,
+        filter_parameter=None, filter_min_val, min_length=None, max_length=None,
+        **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
@@ -125,6 +126,13 @@ def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, filter_p
         "job_id": job_id,
         "efi_db": efi_db
     }
+    
+    # Handle kwargs dict, assuming each entry is a parameter to be added to params
+    params.update(kwargs)
+
+    # Remove parameter keys with None values
+    params = {key: value for key, value in params.items() if value != None}
+
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
     with open(params_file, "w") as f:
         json.dump(params, f, indent=4)
