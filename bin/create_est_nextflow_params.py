@@ -33,7 +33,7 @@ def add_args(parser: argparse.ArgumentParser):
 
     # Add a subparser for each import mode
     subparsers = parser.add_subparsers(dest="import_mode", required=True)
-    
+
     # Option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
     blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
@@ -77,8 +77,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         else:
             # Use the main database for the BLAST
             args.import_blast_fasta_db = os.path.abspath(args.fasta_db)
-    
-    # handle a sequence-specifying input file for BLAST, ACCESSION, and FASTA input modes
+
+    # Handle a sequence-specifying input file for BLAST, ACCESSION, and FASTA input modes
     if args.input_file and not os.path.exists(args.input_file):
         print(f"Input file for sequence importing '{args.input_file}' does not exist")
         fail = True
