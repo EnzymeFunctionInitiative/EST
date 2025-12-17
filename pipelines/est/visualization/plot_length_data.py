@@ -40,7 +40,7 @@ def parse_args(parser):
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
 
-    # validate input filepaths
+    # Validate input filepaths
     fail = False
     if not os.path.exists(args.lengths):
         print(f"Lengths file {args.lengths} does not exist")

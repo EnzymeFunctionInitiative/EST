@@ -120,7 +120,7 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
     axs.set_ylabel(ylabel)
     axs.spines[["right", "top"]].set_visible(False)
 
-    # set the approx 30 major ticks
+    # Set the approx 30 major ticks
     axs.xaxis.set_major_locator(
         MaxNLocator(
             nbins = 29,
@@ -130,21 +130,20 @@ def label_and_render_plot(fig, axs, pos, title, xlabel, ylabel, output_filename,
         )
     )
 
-    # get the tick positions to set the labels
+    # Get the tick positions to set the labels
     major_ticks = axs.get_xticks()
     major_labels = [int(tick_pos) for tick_pos in major_ticks]
     axs.set_xticks(ticks = major_ticks, labels = major_labels)
-    # set the minor ticks
-    #axs.xaxis.set_minor_locator(MultipleLocator(1))
+    # Set the minor ticks
     axs.xaxis.set_minor_locator(AutoMinorLocator())
 
-    # set the y-axis ticks via the AutoLocator classes
+    # Set the y-axis ticks via the AutoLocator classes
     axs.yaxis.set_major_locator(AutoLocator())
     axs.yaxis.set_minor_locator(AutoMinorLocator())
 
     axs.set_xlim(pos[0] - 1, pos[-1] + 1)
 
-    # add grid lines for both axes' major ticks
+    # Add grid lines for both axes' major ticks
     axs.grid(which = "major", axis = "both", color = "xkcd:light grey", linestyle = "--", alpha = 0.5) 
     fig.savefig(f"{output_filename}.{output_filetype}", bbox_inches="tight", dpi=300)
     axs.grid(False)
