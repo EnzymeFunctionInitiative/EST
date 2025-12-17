@@ -25,7 +25,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
     fail = False
 
-    # check for shared args validity
+    # Check for shared args validity
     validated_args = shared_args.check_args(args)
     if validated_args is None:
         fail = True
@@ -40,11 +40,15 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"FASTA database '{args.fasta_db}' not found")
         fail = True
 
-    if args.nb_size < 1 or args.nb_size > 20:
+    if args.nb_size and (
+        args.nb_size < 1 or args.nb_size > 20
+    ):
         print(f"Invalid value for --nb-size ({args.nb_size}).")
         fail = True
 
-    if args.cooc_threshold < 0 or args.cooc_threshold > 1:
+    if args.cooc_threshold and (
+        args.cooc_threshold < 0 or args.cooc_threshold > 1
+    ):
         print(f"Invalid value for --cooc-threshold ({args.cooc_threshold}).")
         fail = True
 
@@ -64,7 +68,8 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size=None, cooc_threshold=None, output_dir,
+def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir,
+        nb_size=None, cooc_threshold=None,
         **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
@@ -76,10 +81,10 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, nb_size=None, cooc_th
         "cooc_threshold": cooc_threshold
     }
     
-    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    # Handle kwargs dict, assuming each entry is a parameter to be added to params
     params.update(kwargs)
 
-    # remove parameter keys with None values
+    # Remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}
 
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
