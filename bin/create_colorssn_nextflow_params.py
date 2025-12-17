@@ -23,7 +23,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
     fail = False
 
-    # check for shared args validity
+    # Check for shared args validity
     validated_args = shared_args.check_args(args)
     if validated_args is None:
         fail = True
@@ -63,10 +63,10 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir, **kwargs:
         "efi_db": efi_db
     }
 
-    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    # Handle kwargs dict, assuming each entry is a parameter to be added to params
     params.update(kwargs)
 
-    # remove parameter keys with None values
+    # Remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}
 
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)

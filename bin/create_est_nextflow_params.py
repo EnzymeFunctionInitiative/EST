@@ -13,7 +13,7 @@ def add_args(parser: argparse.ArgumentParser):
     """
     Add global arguments and subparsers to ``parser``
     """
-    # general parameters
+    # General parameters
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument("--duckdb-memory-limit", type=str, help="Soft limit on DuckDB memory usage")
     common_parser.add_argument("--duckdb-threads", type=int, help="Number of threads DuckDB can use. More threads means higher memory usage")
@@ -30,25 +30,25 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--domain-region", choices=["domain", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
     shared_args.add_args(common_parser)
 
-    # add a subparser for each import mode
+    # Add a subparser for each import mode
     subparsers = parser.add_subparsers(dest="import_mode", required=True)
     
-    # option A: Sequence BLAST
+    # Option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
     blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
     blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
     blast_parser.add_argument("--import-blast-num-matches", type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
     blast_parser.add_argument("--import-blast-evalue", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
 
-    # option B: Family
+    # Option B: Family
     family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group("Family Options")
     # Can add families to every job type
 
-    # option C: FASTA
+    # Option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
     fasta_parser.add_argument("--fasta-file", required=True, type=str, help="The FASTA file to read sequences from")
 
-    # option D: Accession IDs
+    # Option D: Accession IDs
     accession_parser = subparsers.add_parser("accessions", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
     accession_parser.add_argument("--accessions-file", required=True, type=str, help="The list of Accession IDs to pull sequences for, one per line")
     accession_parser.add_argument("--domain-family", type=str, help="Family to use when trimming sequences to domain boundaries")
@@ -60,7 +60,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     """
     fail = False
 
-    # check for shared args validity
+    # Check for shared args validity
     validated_args = shared_args.check_args(args)
     if validated_args is None:
         fail = True
@@ -71,7 +71,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"FASTA database '{args.fasta_db}' not found")
         fail = True
 
-    # import mode-specific tests
+    # Import mode-specific tests
     if args.import_mode == "blast":
         if not os.path.exists(args.blast_query_file):
             print(f"BLAST query file '{args.blast_query_file}' does not exist")
@@ -178,10 +178,10 @@ def render_params(output_dir, import_mode, sequence_version, job_id, efi_config,
                 "domain_family": domain_family
             }
 
-    # handle kwargs dict, assuming each entry is a parameter to be added to params
+    # Handle kwargs dict, assuming each entry is a parameter to be added to params
     params.update(kwargs)
 
-    # remove parameter keys with None values
+    # Remove parameter keys with None values
     params = {key: value for key, value in params.items() if value != None}
 
     params_file = os.path.join(output_dir, shared_args.PARAMS_NAME)
