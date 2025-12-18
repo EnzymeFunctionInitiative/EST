@@ -106,8 +106,8 @@ def create_parser():
     return parser
 
 def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, efi_config,
-        db_version, job_id, efi_db, mode, ssn_name, job_name, maxfull,
-        filter_parameter=None, filter_min_val, min_length=None, max_length=None,
+        db_version, job_id, efi_db, mode, ssn_name, job_name, maxfull, filter_min_val,
+        filter_parameter=None, min_length=None, max_length=None,
         **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
