@@ -28,14 +28,14 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--families", type=str, help="Comma-separated list of families to add")
     common_parser.add_argument("--domain", action="store_true", help="Should sequences be trimmed to domain boundaries?")
     common_parser.add_argument("--domain-region", choices=["domain", "n-terminal", "c-terminal"], type=str, help="Trim sequences to domain boundaries")
+    common_parser.add_argument("--input-file", type=str, help="Input file containing the information needed to gather sequences. Used in ACCESSIONS, BLAST, and FASTA import modes.")
     shared_args.add_args(common_parser)
 
     # Add a subparser for each import mode
     subparsers = parser.add_subparsers(dest="import_mode", required=True)
-    
+
     # Option A: Sequence BLAST
     blast_parser = subparsers.add_parser("blast", help="Import sequences using the single sequence BLAST option", parents=[common_parser]).add_argument_group("Sequence BLAST Options")
-    blast_parser.add_argument("--blast-query-file", required=True, type=str, help="The file containing a single sequence to use for the initial BLAST to obtain sequences")
     blast_parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
     blast_parser.add_argument("--import-blast-num-matches", type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
     blast_parser.add_argument("--import-blast-evalue", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
@@ -46,11 +46,9 @@ def add_args(parser: argparse.ArgumentParser):
 
     # Option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
-    fasta_parser.add_argument("--fasta-file", required=True, type=str, help="The FASTA file to read sequences from")
 
     # Option D: Accession IDs
     accession_parser = subparsers.add_parser("accessions", help="Import sequences using the Accession option", parents=[common_parser]).add_argument_group("Accession ID Options")
-    accession_parser.add_argument("--accessions-file", required=True, type=str, help="The list of Accession IDs to pull sequences for, one per line")
     accession_parser.add_argument("--domain-family", type=str, help="Family to use when trimming sequences to domain boundaries")
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -73,29 +71,19 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
 
     # Import mode-specific tests
     if args.import_mode == "blast":
-        if not os.path.exists(args.blast_query_file):
-            print(f"BLAST query file '{args.blast_query_file}' does not exist")
-            fail = True
-        else:
-            args.blast_query_file = os.path.abspath(args.blast_query_file)
         if args.import_blast_fasta_db is not None:
             # Use the UniRef database for the BLAST
             args.import_blast_fasta_db = os.path.abspath(args.import_blast_fasta_db)
         else:
             # Use the main database for the BLAST
             args.import_blast_fasta_db = os.path.abspath(args.fasta_db)
-    elif args.import_mode == "fasta":
-        if not os.path.exists(args.fasta_file):
-            print(f"FASTA import mode: FASTA file '{args.fasta_file}' does not exist")
-            fail = True
-        else:
-            args.fasta_file = os.path.abspath(args.fasta_file)
-    elif args.import_mode == "accessions":
-        if not os.path.exists(args.accessions_file):
-            print(f"Accession ID list '{args.accessions_file}' does not exist")
-            fail = True
-        else:
-            args.accessions_file = os.path.abspath(args.accessions_file)
+
+    # Handle a sequence-specifying input file for BLAST, ACCESSION, and FASTA input modes
+    if args.input_file and not os.path.exists(args.input_file):
+        print(f"Input file for sequence importing '{args.input_file}' does not exist")
+        fail = True
+    elif args.input_file:
+        args.input_file = os.path.abspath(args.input_file)
 
     if args.workflow_def is None:
         args.workflow_def = os.path.abspath(NXF_SCRIPT)
@@ -126,12 +114,12 @@ def render_params(output_dir, import_mode, sequence_version, job_id, efi_config,
                   duckdb_memory_limit=None, duckdb_threads=None, fasta_shards=None,
                   accession_shards=None, blast_num_matches=None, multiplex=None,
                   blast_evalue=None, domain=None, families=None, sequence_filter=None,
-                  fasta_file=None, accessions_file=None, blast_query_file=None, 
-                  import_blast_fasta_db=None, import_blast_num_matches=None,
+                  input_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
                   import_blast_evalue=None, domain_region=None, domain_family=None,
                   **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
+        "input_file": input_file,
         "duckdb_memory_limit": duckdb_memory_limit,
         "duckdb_threads": duckdb_threads,
         "num_fasta_shards": fasta_shards,
@@ -150,18 +138,9 @@ def render_params(output_dir, import_mode, sequence_version, job_id, efi_config,
     }
     if import_mode == "blast":
         params |= {
-            "blast_query_file": blast_query_file,
             "import_blast_fasta_db": import_blast_fasta_db,
             "import_blast_num_matches": import_blast_num_matches,
             "import_blast_evalue": import_blast_evalue
-        }
-    elif import_mode == "fasta":
-        params |= {
-            "uploaded_fasta_file": fasta_file
-        }
-    elif import_mode == "accessions":
-        params |= {
-            "accessions_file": accessions_file
         }
 
     if families is not None:

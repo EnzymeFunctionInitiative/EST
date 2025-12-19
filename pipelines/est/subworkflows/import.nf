@@ -29,22 +29,22 @@ process get_source_ids {
     if (params.import_mode == "blast") {
         // blast_hits.tab is provided as an output to the user
         """
-        blastall -p blastp -i ${params.blast_query_file} -d ${params.import_blast_fasta_db} -m 8 -e ${params.import_blast_evalue} -b ${params.import_blast_num_matches} -o init_blast.out
+        blastall -p blastp -i ${params.input_file} -d ${params.import_blast_fasta_db} -m 8 -e ${params.import_blast_evalue} -b ${params.import_blast_num_matches} -o init_blast.out
         if [[ -s init_blast.out ]]; then
             awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
         else
             echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
             exit 1
         fi
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --blast-output init_blast.out --blast-query ${params.blast_query_file}
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --blast-output init_blast.out --blast-query ${params.input_file}
         """
     } else if (params.import_mode == "accessions") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --accessions ${params.accessions_file}
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --accessions ${params.input_file}
         """
     } else if (params.import_mode == "fasta") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --fasta ${params.uploaded_fasta_file} --sequence-mapping-file seq_mapping.tab
+        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --fasta ${params.input_file} --sequence-mapping-file seq_mapping.tab
         """
     } else if (params.import_mode == "family") {
         """
@@ -101,7 +101,7 @@ process cat_fasta_files {
     if (params.import_mode == "blast") {
         """
         $cat_cmd
-        perl $projectDir/import/append_blast_query.pl --blast-query-file ${params.blast_query_file} --output-sequence-file all_sequences.fasta
+        perl $projectDir/import/append_blast_query.pl --blast-query-file ${params.input_file} --output-sequence-file all_sequences.fasta
         """
     } else {
         cat_cmd
@@ -116,7 +116,7 @@ process import_fasta {
     output:
         path "imported_sequences.fasta", emit: "fasta_file"
     """
-    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.uploaded_fasta_file} --sequence-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
+    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.input_file} --sequence-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
     """
 }
 
