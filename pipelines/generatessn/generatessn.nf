@@ -59,10 +59,18 @@ process create_full_ssn {
         path "full_ssn.xgmml.zip"
         path "job.finish"
         path "stats.json"
+
+    def clean_job_name = params.job_name
+        .replaceAll(/[^\p{ASCII}]/, "")
+        .replaceAll(/[^a-zA-Z0-9_.]/, "-")
+        .replaceAll(/^-+|-+$/, "")
+        .toLowerCase()
+    def file_name = "${clean_job_name}.xgmml"
+
     """
-    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output full_ssn.xgmml  --title ${params.job_name} --db-version ${params.db_version} --stats stats.json
-    zip full_ssn.xgmml.zip full_ssn.xgmml
-    rm full_ssn.xgmml
+    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output ${file_name} --title "${params.job_name}" --db-version ${params.db_version} --stats stats.json
+    zip full_ssn.xgmml.zip ${file_name}
+    rm ${file_name}
     touch job.finish
     """
 }
