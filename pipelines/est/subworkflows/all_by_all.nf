@@ -54,7 +54,7 @@ process split_fasta {
 }
 
 process blastreduce {
-    publishDir params.final_output_dir, mode: 'copy'
+    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
     input:
         path blast_files
         path fasta_length_parquet
@@ -71,7 +71,7 @@ process blastreduce {
 process demultiplex {
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
     input:
-        path blast_parquet
+        path blast_parquet, stageAs: 'reduced.parquet'
         path clusters
     output:
         path '1.out.parquet'
