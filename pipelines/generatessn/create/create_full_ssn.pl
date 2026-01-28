@@ -54,7 +54,8 @@ my $writer = new EFI::SSN::XgmmlWriter(output_file => $opts->{output}, use_min_e
 $writer->write($inputIds, $sequences, $connectivity, $title, $edges);
 
 
-save_stats($opts->{stats}, $writer->getStats()) if $opts->{stats};
+my $stats = { file_stats => $writer->getStats() };
+save_stats($opts->{stats}, $stats) if $opts->{stats};
 
 
 
