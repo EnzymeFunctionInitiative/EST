@@ -100,6 +100,8 @@ sub write {
         }
     }
 
+    $self->{stats} = $stats;
+
     $self->close();
 }
 
