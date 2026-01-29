@@ -28,7 +28,7 @@ def csv_to_parquet(filename: str, read_options: csv.ReadOptions, parse_options: 
     -------
         The name of the parquet file created
     """
-    schema = pa.schema({k: convert_options.column_types[k] for k in read_options.column_names})
+    schema = pa.schema({k: convert_options.column_types[k] for k in convert_options.include_columns})
     output = f"{os.path.basename(filename)}.parquet"
     writer = pq.ParquetWriter(output, schema)
     try:

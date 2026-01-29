@@ -46,7 +46,8 @@ convert_options = csv.ConvertOptions(
         "query_length": pa.uint32(),
         "subject_length": pa.uint32(),
         "alignment_score": pa.uint32()
-    }
+    },
+    include_columns=["qseqid", "sseqid", "pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"]
 )
 
 if __name__ == "__main__":
