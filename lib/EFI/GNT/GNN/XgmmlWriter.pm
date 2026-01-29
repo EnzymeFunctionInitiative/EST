@@ -137,12 +137,11 @@ sub writeNode {
 # public
 sub getStats {
     my $self = shift;
-    my $fileName = fileparse($self->{output_file});
     my $fileSize = -s $self->{output_file};
-    my $info = { num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize };
+    my $filename = fileparse($self->{output_file});
+    my $info = { num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize, file_name => $filename };
     $info->{type} = $self->{network_type} if $self->{network_type};
-    my $stats = { $fileName => $info };
-    return $stats;
+    return $info;
 }
 
 
@@ -326,11 +325,11 @@ Hash ref containing a single key-value, with the key being the output file name 
 being the statistics that will be written.
 
     # {
-    #     "file_name.xgmml" => {
-    #         num_nodes => 100,
-    #         num_edges => 1000,
-    #         size => 10000
-    #     }
+    #     file_name => "file_name.xgmml",
+    #     num_nodes => 100,
+    #     num_edges => 1000,
+    #     size => 10000,
+    #     type => "optional_type"
     # }
 
 =head4 Example Usage

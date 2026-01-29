@@ -40,8 +40,12 @@ $xwriter->write();
 
 
 my $stats = $xwriter->getStats();
+my ($filename) = keys %$stats;
 
-save_stats($opts->{stats}, $stats) if $opts->{stats};
+if ($filename) {
+    my %stats = ( file_stats => { color_ssn => $stats->{$filename} } );
+    save_stats($opts->{stats}, \%stats) if $opts->{stats};
+}
 
 
 

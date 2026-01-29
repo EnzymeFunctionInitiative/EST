@@ -114,7 +114,7 @@ if ($opts->{gnd}) {
 my $pfamHubStats = $pfamHubWriter->getStats();
 my $clusterHubStats = $clusterHubWriter->getStats();
 
-my %stats = (%$pfamHubStats, %$clusterHubStats);
+my %stats = ( file_stats => { pfam_hub => $pfamHubStats, cluster_hub => $clusterHubStats } );
 save_stats($opts->{stats}, \%stats) if $opts->{stats};
 
 
