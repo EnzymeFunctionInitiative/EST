@@ -134,7 +134,7 @@ swapping results to disk if it is memory constrained but some operations
 require some minimum amount of memory.  If these solutions did not solve the
 problem, try using the newest version of DuckDB (which may require manually
 building the docker image) or decreasing the number of ``--blast-num-matches``
-which will reduce the total number of edges processed.  Multiplexing will also
+which will reduce the total number of edges processed.  Collapsing redundancy will also
 reduce the number of sequences analyzed and can help solve these errors.
 
 Execution Details
@@ -157,13 +157,13 @@ chronological order:
    identified so that taxonomy information can be associated with the sequences.
    The ID headers in the file may be rewritten internally.
 
-   If multiplexing is enabled, CD-HIT will be used to reduce the set of imported
+   If collapse-redundancy is enabled, CD-HIT will be used to reduce the set of imported
    sequences to a representative subset.  A smaller number of sequences will be
    used in the all-by-all BLAST, meaning it should execute more quickly and
    return a smaller number of edges.  The alignment score and other values from
    each representative sequence is then assigned to each of the sequences for
-   which it acted as a proxy in the demultiplexing stage (see
-   ``src/est/mux/demux.pl``).
+   which it acted as a proxy in the expand-redundancy stage (see
+   ``src/est/sequence/expand_redundancy.py``).
 
 2. **Create BLAST Database and split FASTA**.  The FASTA files from the previous
    stage are combined into a single file and are then used to created a BLAST
@@ -186,7 +186,7 @@ chronological order:
    the edges that best represent the similarity between two sequences.  This
    stage may be computationally intensive if the number of edges is high.
 
-   If mulitplexing was used, demultiplexing occurs after BLASTreduce.
+   If redundancy collapse was used, redundancy expansion occurs after BLASTreduce.
 
 5. **Compute Statistics**.  One of the primary outputs of the EST pipeline is a
    set of plots which show the distribution of percent identity and sequence
@@ -209,11 +209,11 @@ Stages
    :maxdepth: 1
 
    import/index.rst
-   mux/index.rst
+   sequence/index.rst
    split_fasta/index.rst
    axa_blast/index.rst
    blastreduce/index.rst
-   demux/index.rst
-   statistics/index/.rst
+   sequence/expansion.rst
+   statistics/index.rst
    visualization/index.rst
 
