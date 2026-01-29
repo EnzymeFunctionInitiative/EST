@@ -7,7 +7,7 @@ import pyarrow as pa
 from pyEFI.transcode import csv_to_parquet
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Transcode demultiplexed BLAST output files to Parquet")
+    parser = argparse.ArgumentParser(description="Transcode expanded (from non-redundant) BLAST output files to Parquet")
     parser.add_argument("--blast-output", type=str, nargs="+", help="BLAST output files")
 
     return parser

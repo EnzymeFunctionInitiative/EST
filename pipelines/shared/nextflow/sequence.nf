@@ -29,14 +29,15 @@ process get_sequences {
     """
 }
 
-process multiplex {
+// Formerly known as multiplex
+process collapse_redundancy {
     input:
         path fasta_file
     output:
         path "sequences.fasta", emit: "fasta_file"
         path "sequences.fasta.clstr", emit: "clusters"
     """
-    cd-hit -d 0  -c 1 -s 1 -i $fasta_file -o sequences.fasta -M 10000
+    cd-hit -d 0  -c 1 -s 1 -i ${fasta_file} -o sequences.fasta -M 10000
     """
 }
 
