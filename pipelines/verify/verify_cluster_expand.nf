@@ -5,10 +5,10 @@ params.cdhit_input = null
 
 // Validate inputs immediately
 if (!params.blast_input) {
-    error "❌ Error: --blast_input parameter is missing.\nUsage: nextflow run verify_collapse_expand_mux.nf --blast_input <BLAST_FILE> --cdhit_input <CDHIT_CLUSTER_FILE>"
+    error "❌ Error: --blast_input parameter is missing.\nUsage: nextflow run verify_cluster_expand_mux.nf --blast_input <BLAST_FILE> --cdhit_input <CDHIT_CLUSTER_FILE>"
 }
 if (!params.cdhit_input) {
-    error "❌ Error: --cdhit_input parameter is missing.\nUsage: nextflow run verify_collapse_expand_mux.nf --blast_input <BLAST_FILE> --cdhit_input <CDHIT_CLUSTER_FILE>"
+    error "❌ Error: --cdhit_input parameter is missing.\nUsage: nextflow run verify_cluster_expand_mux.nf --blast_input <BLAST_FILE> --cdhit_input <CDHIT_CLUSTER_FILE>"
 }
 
 old_scripts = "${projectDir}/../../legacy_est"
@@ -33,7 +33,7 @@ process run_python_expand {
         path "python_output.tsv"
     
     """
-    python ${projectDir}/../est/sequence/expand_redundancy.py --collapsed-blast $blastin --expanded-blast python_output.tsv --cd-hit-cluster $clusters
+    python ${projectDir}/../est/cluster/expand_clusters.py --clustered-blast $blastin --expanded-blast python_output.tsv --cd-hit-cluster $clusters
     """
 }
 

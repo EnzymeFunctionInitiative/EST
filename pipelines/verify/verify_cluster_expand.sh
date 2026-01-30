@@ -16,14 +16,14 @@ ensure_test_data "$DATA_URL" "$ARCHIVE_NAME" "$EXPECTED_DIR"
 BLAST_INPUT="${TEST_DATA_DIR}/${EXPECTED_DIR}/blast_demux.mux.out"
 CLUSTER_FILE="${TEST_DATA_DIR}/${EXPECTED_DIR}/sequences.fasta.clstr"
 
-echo "🚀 Starting Verification Workflow..."
+echo "Starting Verification Workflow..."
 echo "   Input: $BLAST_INPUT"
 echo "   Clusters: $CLUSTER_FILE"
 
 # Note: using $SCRIPT_DIR (from common.sh) to find the .nf file relative to this script
-nextflow run "${SCRIPT_DIR}/verify_collapse_expand.nf" \
+nextflow run "${SCRIPT_DIR}/verify_cluster_expand.nf" \
     --blast_input "$BLAST_INPUT" \
     --cdhit_input "$CLUSTER_FILE"
 
-echo "🎉 Verification finished successfully!"
+echo "Verification finished successfully"
 
