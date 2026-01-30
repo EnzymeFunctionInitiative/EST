@@ -30,7 +30,7 @@ process get_sequences {
 }
 
 // Formerly known as multiplex
-process collapse_redundancy {
+process cluster {
     input:
         path fasta_file
     output:

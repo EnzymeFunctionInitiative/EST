@@ -92,7 +92,7 @@ def expand_edges(blastin_path, blastout_path, clusters):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Expand BLAST results based on CD-HIT clusters.")
     parser.add_argument("--cd-hit-cluster", required=True, help="CD-HIT .clstr file")
-    parser.add_argument("--collapsed-blast", required=True, help="Input collapsed BLAST file")
+    parser.add_argument("--clustered-blast", required=True, help="Input BLAST file with results using clustered IDs")
     parser.add_argument("--expanded-blast", required=True, help="Output expanded BLAST file")
     
     args = parser.parse_args()
@@ -101,5 +101,5 @@ if __name__ == "__main__":
     cluster_map = parse_cdhit_clstr(args.cd_hit_cluster)
     
     print("Expanding edges...")
-    expand_edges(args.collapsed_blast, args.expanded_blast, cluster_map)
+    expand_edges(args.clustered_blast, args.expanded_blast, cluster_map)
     print("Done.")

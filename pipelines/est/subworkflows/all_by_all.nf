@@ -1,5 +1,5 @@
 
-include { collapse_redundancy } from "../../shared/nextflow/sequence.nf"
+include { cluster } from "../../shared/nextflow/sequence.nf"
 
 process create_blast_db {
     input:
@@ -69,7 +69,7 @@ process blastreduce {
 }
 
 // Formerly known as demultiplex
-process expand_redundancy {
+process expand {
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
     input:
         path blast_parquet, stageAs: 'reduced.parquet'
@@ -77,9 +77,9 @@ process expand_redundancy {
     output:
         path '1.out.parquet'
     """
-    echo "COPY (SELECT * FROM read_parquet('${blast_parquet}')) TO 'collapsed.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
-    python $projectDir/sequence/expand_redundancy.py --collapsed-blast collapsed.out --expanded-blast 1.out --cd-hit-cluster $clusters
-    python $projectDir/sequence/transcode_expanded_blast.py --blast-output 1.out
+    echo "COPY (SELECT * FROM read_parquet('${blast_parquet}')) TO 'clustered.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
+    python $projectDir/cluster/expand_clusters.py --clustered-blast clustered.out --expanded-blast 1.out --cd-hit-cluster $clusters
+    python $projectDir/cluster/transcode_expanded_blast.py --blast-output 1.out
     """
 }
 
@@ -88,11 +88,11 @@ workflow ALL_BY_ALL {
         original_fasta
 
     main:
-        // Collapse redundant sequences for BLAST computation (formerly known as multiplex)
+        // Cluster redundant sequences for BLAST computation (formerly known as multiplex)
         if (params.multiplex) {
-            collapsed_files = collapse_redundancy(original_fasta)
-            blast_input_fasta = collapsed_files.fasta_file
-            clusters = collapsed_files.clusters
+            clustered_files = cluster(original_fasta)
+            blast_input_fasta = clustered_files.fasta_file
+            clusters = clustered_files.clusters
         } else {
             blast_input_fasta = original_fasta
             clusters = Channel.empty()
@@ -117,7 +117,7 @@ workflow ALL_BY_ALL {
 
         // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
         if (params.multiplex) {
-            reduced_blast_parquet = expand_redundancy(reduced_blast_parquet, clusters)
+            reduced_blast_parquet = expand(reduced_blast_parquet, clusters)
         }
 
     emit:
