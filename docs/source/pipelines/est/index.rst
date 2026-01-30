@@ -157,13 +157,13 @@ chronological order:
    identified so that taxonomy information can be associated with the sequences.
    The ID headers in the file may be rewritten internally.
 
-   If collapse-redundancy is enabled, CD-HIT will be used to reduce the set of imported
+   If clustering is enabled, CD-HIT will be used to reduce the set of imported
    sequences to a representative subset.  A smaller number of sequences will be
    used in the all-by-all BLAST, meaning it should execute more quickly and
    return a smaller number of edges.  The alignment score and other values from
    each representative sequence is then assigned to each of the sequences for
-   which it acted as a proxy in the expand-redundancy stage (see
-   ``src/est/sequence/expand_redundancy.py``).
+   which it acted as a proxy in the expansion stage (see
+   ``src/est/cluster/expansion.py``).
 
 2. **Create BLAST Database and split FASTA**.  The FASTA files from the previous
    stage are combined into a single file and are then used to created a BLAST
@@ -186,7 +186,7 @@ chronological order:
    the edges that best represent the similarity between two sequences.  This
    stage may be computationally intensive if the number of edges is high.
 
-   If redundancy collapse was used, redundancy expansion occurs after BLASTreduce.
+   If clustering was used, redundancy expansion occurs after BLASTreduce.
 
 5. **Compute Statistics**.  One of the primary outputs of the EST pipeline is a
    set of plots which show the distribution of percent identity and sequence
