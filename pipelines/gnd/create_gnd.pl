@@ -14,6 +14,7 @@ use EFI::GNT::GND;
 use EFI::GNT::GNN;
 use EFI::Options;
 use EFI::SSN::Util::ID qw(parse_cluster_map_file);
+use EFI::Util::FileStats qw(save_stats);
 
 
 use constant DEFAULT_NEIGHBORHOOD_SIZE => 20;
@@ -54,9 +55,13 @@ my $metadata = {
 };
 
 my %args = (network_type => $networkType, cluster_names => $clusterNames, matched_ids => $matchedIds, unmatched_ids => $unmatchedIds);
-if (not $gnd->save($opts->{gnd}, $gnn, $metadata, %args)) {
+my $numIdsSaved = $gnd->save($opts->{gnd}, $gnn, $metadata, %args);
+if (not $numIdsSaved) {
     die "Unable to save GND to '$opts->{gnd}'";
 }
+
+my $stats = { num_diagrams => $numIdsSaved };
+save_stats($opts->{stats}, $stats) if $opts->{stats};
 
 
 
@@ -74,6 +79,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("title=s", 0, "title of the GND, metadata");
     $optParser->addOption("source-type=s", 0, "the source of the data provided, e.g. BLAST, FASTA, ID list");
     $optParser->addOption("source-sequence-file=s", 0, "path to a file containing the sequence used to generate the results, only valid for BLAST sources");
+    $optParser->addOption("stats=s", 0, "path to file to output GND statistics to");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
