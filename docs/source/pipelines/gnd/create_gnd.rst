@@ -7,7 +7,7 @@ Usage
 
 	Usage: perl pipelines/gnd/create_gnd.pl --cluster-map <FILE> --gnd <FILE> --config <FILE>
 	    --db-name <VALUE> [--nb-size <VALUE>] [--title <VALUE>] [--source-type <VALUE>]
-	    [--source-sequence-file <VALUE>]
+	    [--source-sequence-file <VALUE>] [--stats <VALUE>]
 	
 	Description:
 	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline
@@ -21,3 +21,4 @@ Usage
 	    --title                   title of the GND, metadata
 	    --source-type             the source of the data provided, e.g. BLAST, FASTA, ID list
 	    --source-sequence-file    path to a file containing the sequence used to generate the results, only valid for BLAST sources
+	    --stats                   path to file to output GND statistics to
