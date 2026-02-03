@@ -1,22 +1,144 @@
 
-process create_gnd {
-    publishDir params.final_output_dir, mode: "copy"
-    input:
-        path cluster_id_map
-    output:
-        path "gnd.sqlite", emit: "gnd"
+include { zip_files } from "../shared/nextflow/util.nf"
 
+process create_gnd {
+    publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path id_list 
+    output:
+        path "gnd.sqlite", emit: "gnd_db"
+        path "gnd.sqlite.zip", emit: "zipped_gnd_db"
+        path "stats.json", emit: "stats"
+
+    script:
     """
-    perl $projectDir/create_gnd.pl \
+    perl ${projectDir}/create_gnd.pl \
         --config ${params.efi_config} \
         --db-name ${params.efi_db} \
-        --cluster-map $cluster_id_map \
+        --cluster-map ${id_list} \
         --nb-size ${params.nb_size} \
-        --gnd gnd.sqlite
+        --gnd gnd.sqlite \
+        --stats stats.json
+    zip gnd.sqlite.zip gnd.sqlite
+    """
+}
+
+process run_blast {
+    input:
+        path sequence_file
+    output:
+        path "init_blast.out"
+
+    script:
+    def blast_num_matches_arg = params.import_blast_num_matches ? "-b ${params.import_blast_num_matches}" : ""
+    def blast_evalue_arg = params.import_blast_evalue ? "-e ${params.import_blast_evalue}" : ""
+
+    """
+    blastall -p blastp -i ${sequence_file} -d ${params.import_blast_fasta_db} -m 8 ${blast_evalue_arg} ${blast_num_matches_arg} -o init_blast.out
+    if [[ ! -s init_blast.out ]]; then
+        echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
+        exit 1
+    fi
+    """
+}
+
+process parse_blast_results_for_ids {
+    input:
+        path sequence_file
+        path blast_file
+    output:
+        path "accession_ids.tab", emit: "source_ids"
+        path "sequence_meta.tab", emit: "source_meta"
+
+    script:
+    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode blast"
+    if (params.sequence_version) {
+        common_args += " --sequence-version ${params.sequence_version}"
+    }
+
+    """
+    perl ${projectDir}/../shared/perl/get_sequence_ids.pl ${common_args} \
+        --blast-output ${blast_file} \
+        --blast-query ${sequence_file} \
+        --source-meta-file sequence_meta.tab \
+        --source-ids-file accession_ids.tab
+    """
+}
+
+process parse_fasta_for_ids {
+    input:
+        path fasta_file
+    output:
+        path "accession_ids.tab", emit: "source_ids"
+        path "sequence_meta.tab", emit: "source_meta"
+
+    script:
+    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta"
+    if (params.sequence_version) {
+        common_args += " --sequence-version ${params.sequence_version}"
+    }
+
+    """
+    perl $projectDir/../shared/perl/get_sequence_ids.pl ${common_args} \
+        --fasta ${fasta_file} \
+        --source-meta-file sequence_meta.tab \
+        --source-ids-file accession_ids.tab
+    """
+}
+
+process parse_accession_for_ids {
+    input:
+        path accession_file
+    output:
+        path "accession_ids.tab", emit: "source_ids"
+        path "sequence_meta.tab", emit: "source_meta"
+
+    script:
+    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode accessions"
+    if (params.sequence_version) {
+        common_args += " --sequence-version ${params.sequence_version}"
+    }
+
+    """
+    perl $projectDir/../shared/perl/get_sequence_ids.pl ${common_args} \
+        --accessions ${accession_file} \
+        --source-meta-file sequence_meta.tab \
+        --source-ids-file accession_ids.tab
+    """
+}
+
+process convert_to_id_list {
+    input:
+        path source_ids
+        path source_meta
+    output:
+        path "cluster_id_mapping.tab", emit: id_list
+
+    script:
+    """
+    perl $projectDir/convert_metadata_to_id_list.pl \
+        --cluster-id-mapping cluster_id_mapping.tab \
+        --source-ids-file ${source_ids} \
+        --source-meta-file ${source_meta}
     """
 }
 
 workflow {
-    gnd = create_gnd(params.cluster_id_map)
+    def input_file_ch = Channel.fromPath(params.input_file)
+
+    if (params.import_mode == "accessions") {
+        parse_data = parse_accession_for_ids(input_file_ch)
+    } else if (params.import_mode == "blast") {
+        blast_results = run_blast(input_file_ch)
+        parse_data = parse_blast_results_for_ids(input_file_ch, blast_results)
+    } else if (params.import_mode == "fasta") {
+        parse_data = parse_fasta_for_ids(input_file_ch)
+    } else {
+        error "Mode '${params.import_mode}' is invalid"
+    }
+
+    id_list = convert_to_id_list(parse_data.source_ids, parse_data.source_meta)
+
+    gnd = create_gnd(id_list)
 }
 
