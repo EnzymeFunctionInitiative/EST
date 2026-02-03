@@ -36,19 +36,19 @@ process get_source_ids {
             echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
             exit 1
         fi
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --blast-output init_blast.out --blast-query ${params.input_file}
+        perl $projectDir/../shared/perl/get_sequence_ids.pl $common_args $family_args --blast-output init_blast.out --blast-query ${params.input_file}
         """
     } else if (params.import_mode == "accessions") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --accessions ${params.input_file}
+        perl $projectDir/../shared/perl/get_sequence_ids.pl $common_args $family_args --accessions ${params.input_file}
         """
     } else if (params.import_mode == "fasta") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args --fasta ${params.input_file} --sequence-mapping-file seq_mapping.tab
+        perl $projectDir/../shared/perl/get_sequence_ids.pl $common_args $family_args --fasta ${params.input_file} --sequence-mapping-file seq_mapping.tab
         """
     } else if (params.import_mode == "family") {
         """
-        perl $projectDir/import/get_sequence_ids.pl $common_args $family_args
+        perl $projectDir/../shared/perl/get_sequence_ids.pl $common_args $family_args
         """
     } else {
         error "Mode '${params.import_mode}' not yet implemented"
