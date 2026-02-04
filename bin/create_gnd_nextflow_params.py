@@ -15,9 +15,10 @@ def add_args(parser: argparse.ArgumentParser):
     """
     parser.add_argument("--import-mode", required=True, type=str, choices=["blast", "fasta", "accessions"], help="Mode corresponding to input data type")
     parser.add_argument("--input-file", required=True, type=str, help="Input file containing the sequence ID data (accession IDs, FASTA, sequence for BLAST) required for generating the GND")
-    parser.add_argument("--nb-size", type=int, required=False, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20.")
-    parser.add_argument("--fasta-db", type=str, help="FASTA file or BLAST database to retrieve sequences from")
-    parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences; must be set if the --sequence-version is uniref50 or uniref90; defaults to the same as --fasta-db.")
+    parser.add_argument("--nb-size", type=int, required=False, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20")
+    parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"], help="Input sequence version used to generate GND; i.e. if input type is uniref50, then additional levels for uniref90 and uniprot will be generated in the GND")
+    # BLAST (blast) mode input arguments
+    parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences")
     parser.add_argument("--import-blast-num-matches", type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
     parser.add_argument("--import-blast-evalue", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
     shared_args.add_args(parser)
@@ -66,8 +67,9 @@ def create_parser():
     return parser
 
 def render_params(import_mode, input_file, efi_config, efi_db, output_dir,
-        import_blast_fasta_db = None, import_blast_num_matches = None, import_blast_evalue = None,
-        nb_size=None, **kwargs: dict):
+        nb_size=None, sequence_version=None,
+        import_blast_fasta_db=None, import_blast_num_matches=None, import_blast_evalue=None,
+        **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "import_mode": import_mode,
@@ -75,6 +77,7 @@ def render_params(import_mode, input_file, efi_config, efi_db, output_dir,
         "efi_config": efi_config,
         "efi_db": efi_db,
         "nb_size": nb_size,
+        "sequence_version": sequence_version,
         "import_blast_fasta_db": import_blast_fasta_db,
         "import_blast_num_matches": import_blast_num_matches,
         "import_blast_evalue": import_blast_evalue,

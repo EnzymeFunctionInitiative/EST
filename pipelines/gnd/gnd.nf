@@ -1,10 +1,9 @@
 
-include { zip_files } from "../shared/nextflow/util.nf"
-
 process create_gnd {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path id_list 
+        val seq_ver
     output:
         path "gnd.sqlite", emit: "gnd_db"
         path "gnd.sqlite.zip", emit: "zipped_gnd_db"
@@ -18,7 +17,8 @@ process create_gnd {
         --cluster-map ${id_list} \
         --nb-size ${params.nb_size} \
         --gnd gnd.sqlite \
-        --stats stats.json
+        --stats stats.json \
+        --sequence-version ${seq_ver}
     zip gnd.sqlite.zip gnd.sqlite
     """
 }
@@ -46,15 +46,13 @@ process parse_blast_results_for_ids {
     input:
         path sequence_file
         path blast_file
+        val seq_ver
     output:
         path "accession_ids.tab", emit: "source_ids"
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode blast"
-    if (params.sequence_version) {
-        common_args += " --sequence-version ${params.sequence_version}"
-    }
+    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode blast --sequence-version ${seq_ver}"
 
     """
     perl ${projectDir}/../shared/perl/get_sequence_ids.pl ${common_args} \
@@ -68,15 +66,13 @@ process parse_blast_results_for_ids {
 process parse_fasta_for_ids {
     input:
         path fasta_file
+        val seq_ver
     output:
         path "accession_ids.tab", emit: "source_ids"
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta"
-    if (params.sequence_version) {
-        common_args += " --sequence-version ${params.sequence_version}"
-    }
+    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta --sequence-version ${seq_ver}"
 
     """
     perl $projectDir/../shared/perl/get_sequence_ids.pl ${common_args} \
@@ -89,15 +85,13 @@ process parse_fasta_for_ids {
 process parse_accession_for_ids {
     input:
         path accession_file
+        val seq_ver
     output:
         path "accession_ids.tab", emit: "source_ids"
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode accessions"
-    if (params.sequence_version) {
-        common_args += " --sequence-version ${params.sequence_version}"
-    }
+    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode accessions --sequence-version ${seq_ver}"
 
     """
     perl $projectDir/../shared/perl/get_sequence_ids.pl ${common_args} \
@@ -126,19 +120,21 @@ process convert_to_id_list {
 workflow {
     def input_file_ch = Channel.fromPath(params.input_file)
 
+    def seq_ver = params.sequence_version ?: "uniprot"
+
     if (params.import_mode == "accessions") {
-        parse_data = parse_accession_for_ids(input_file_ch)
+        parse_data = parse_accession_for_ids(input_file_ch, seq_ver)
     } else if (params.import_mode == "blast") {
         blast_results = run_blast(input_file_ch)
-        parse_data = parse_blast_results_for_ids(input_file_ch, blast_results)
+        parse_data = parse_blast_results_for_ids(input_file_ch, blast_results, seq_ver)
     } else if (params.import_mode == "fasta") {
-        parse_data = parse_fasta_for_ids(input_file_ch)
+        parse_data = parse_fasta_for_ids(input_file_ch, seq_ver)
     } else {
         error "Mode '${params.import_mode}' is invalid"
     }
 
     id_list = convert_to_id_list(parse_data.source_ids, parse_data.source_meta)
 
-    gnd = create_gnd(id_list)
+    gnd = create_gnd(id_list, seq_ver)
 }
 
