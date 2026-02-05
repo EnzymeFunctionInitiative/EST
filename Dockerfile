@@ -2,6 +2,7 @@ FROM python:3.10-bullseye
 
 COPY requirements.txt app/
 COPY cpanfile .
+COPY lib/pyEFI /lib/pyEFI
 
 # install blastall
 RUN curl -o /opt/blast-2.2.26.tar.gz https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/blast-2.2.26-x64-linux.tar.gz; \
@@ -23,8 +24,8 @@ RUN curl -L -o /opt/cd-hit.tar.gz https://github.com/weizhongli/cdhit/releases/d
     cd /opt/cd-hit-v4.8.1-2019-0228; make; mkdir bin; mv cd-hit bin;
 ENV PATH="${PATH}:/opt/cd-hit-v4.8.1-2019-0228/bin"
 
-# set up python environment
-RUN pip3 install -r app/requirements.txt
-
 # set up Perl environment
 RUN apt update && apt install -y cpanminus libdbd-mysql-perl zip && cpanm --installdeps .
+
+# set up python environment
+RUN pip3 install -r app/requirements.txt

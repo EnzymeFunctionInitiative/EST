@@ -6,3 +6,10 @@ uses a reference file created in the :doc:`Multiplex <../mux/index>` stage to ad
 sequences not used in the analysis back to the output. A sequence which was not
 used in the analysis will get the same BLAST output values as the sequence that
 represented it.
+
+Components
+----------
+
+.. toctree::
+    transcode_demuxed_blast
+    :maxdepth: 1

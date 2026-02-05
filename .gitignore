@@ -1,9 +1,11 @@
 **/__pycache__
 efi.cfg
 efi.config
+tests/test_data/
+tests/test_results/
+.nextflow/
 tests/test.config
 tests/testEnvironment.sh
-*.bak
-.*.swp
-.*.swo
-build/
+**/build/
+**/dist/
+**/*.egg-info/

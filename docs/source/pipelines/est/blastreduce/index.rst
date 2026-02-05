@@ -13,9 +13,9 @@ This stage performs the following operations:
 1. **Deduplicate BLAST output**. Because an all-by-all BLAST is run, there may be
 multiple copies of pairs of sequence identifiers present in the output. Only one
 of these pairs is desired, so this stage removes all but the first occurrence
-(smallest when sorted lexicographically by `qseqid` and `sseqid`).
+(smallest when sorted lexicographically by ``qseqid`` and ``sseqid``).
 
-1. **Add sequence length information**. Every `qseqid` and every `sseqid`
+1. **Add sequence length information**. Every ``qseqid`` and every ``sseqid``
 represents a sequence from the input FASTA file. The lengths of these
 sequences are needed for a later alignment score calculation. This stage
 computes sequence lengths and combines this information with the concatenated
@@ -45,7 +45,7 @@ and sequence lengths.
     
     duckdb < reduce.sql
 
-This will produce a file `1.out.parquet` that contains the processed BLAST output.
+This will produce a file ``1.out.parquet`` that contains the processed BLAST output.
 
 Technical details
 -----------------
@@ -96,6 +96,7 @@ Then two additional columns are using the associated FASTA file:
 +------------+------------+--------+------------------+----------+--------------+----------------+
 
 To make this process fast, the computational steps are as follows:
+
 1. **Transcode BLAST output to Parquet**. Each BLAST output shard is transcoded to
 a Parquet file. Unused columns are dropped during the conversion.
 

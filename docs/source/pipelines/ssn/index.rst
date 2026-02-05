@@ -1,2 +1,0 @@
-Sequence Similarity Network Creation
-====================================
