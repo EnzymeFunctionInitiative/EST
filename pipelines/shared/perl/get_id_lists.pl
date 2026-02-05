@@ -10,6 +10,8 @@ use File::Path qw(make_path remove_tree);
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Database;
+use EFI::Database::Util;
+use EFI::Sequence::Type qw(:types get_sequence_type strip_domain);
 use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file);
 use EFI::Options;
 
@@ -21,31 +23,58 @@ use EFI::Options;
 my $opts = validateAndProcessOptions();
 
 my $db = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name});
+my $dbh = $db->getHandle();
+if (not $dbh) {
+    die "Error connecting to database: " . $db->getError() . "\n";
+}
 
 
 
 
-my ($clusterToId) = parse_cluster_map_file($opts->{cluster_map});
+# Parse the file that maps cluster numbers to sequence and node IDs; we use the cluster-sequence ID
+# mapping, not the cluster-node ID mapping
+my ($sourceClusterIdMap) = parse_cluster_map_file($opts->{cluster_map});
+
+# Strip any domain regions from the input IDs
+my ($clusterIdMap, $hasDomain) = stripDomainRegions($sourceClusterIdMap);
 
 # Determine if the IDs provided are UniRef and if so get the input file contents
 # that maps UniRef ID to UniProt ID
-my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});
-my $unirefMap;
+my ($idType, $metanodeMap) = parse_metanode_map_file($opts->{seqid_source_map});
 
-if ($idType =~ m/uniref(\d+)/) {
-    $unirefMap = getUniRefMapping($clusterToId, $idType, $sourceIdMap, $db);
-} elsif ($idType eq "repnode") {
-    $clusterToId = resolve_mapping($clusterToId, "repnode", $sourceIdMap);
+# If the input sequence type is not UniProt, then we expand the sequences from metanodes into the
+# list of UniProt IDs in the metanode mapping (metanodeMap)
+my $unirefMap;
+my $idMap;
+if ($idType ne SEQ_UNIPROT) {
+    $idMap = getUniprotIds($clusterIdMap, $idType, $metanodeMap);
+    if ($idType ne SEQ_REPNODE) {
+        $unirefMap = getUnirefMapping($idMap, $idType, $dbh);
+    }
+} else {
+    $idMap = $clusterIdMap;
 }
 
-my $dirs = {uniprot => $opts->{uniprot}, uniref90 => $opts->{uniref90}, uniref50 => $opts->{uniref50}};
-makeDirs($dirs, $unirefMap);
 
-saveIdLists($clusterToId, $unirefMap, $dirs);
 
-saveSingletons($opts->{singletons}, $dirs, $unirefMap);
 
-saveClusterSizes($opts->{cluster_sizes}, $clusterToId, $unirefMap);
+# Get the output directories (including domain)
+my $dirs = getIdListDirs($opts, $idType, $hasDomain);
+makeDirs($dirs, $idType);
+
+# Save the IDs to output files, grouped by sequence type and numbered by cluster
+saveIdLists($idMap, $idType, $unirefMap, $dirs);
+
+# Save the original input IDs with domain regions, if the input is a domain network
+if ($hasDomain) {
+    saveDomainIdLists($sourceClusterIdMap, $idType, $dirs);
+}
+
+# Save singleton files, grouped by sequence type
+saveSingletons($opts->{singletons}, $idType, $dirs);
+
+# Save mapping files with metadata
+saveClusterSizes($opts->{cluster_sizes}, $idMap, $unirefMap);
 
 
 
@@ -68,8 +97,8 @@ saveClusterSizes($opts->{cluster_sizes}, $clusterToId, $unirefMap);
 #
 # Parameters:
 #    $file - path to output file
-#    $clusterToId - mapping of cluster number to list of IDs
-#    $unirefMap - mapping of UniRef IDs per cluster
+#    $clusterToId - mapping of cluster number to list of UniProt IDs
+#    $unirefMap - mapping of cluster number to list of UniRef IDs
 #
 sub saveClusterSizes {
     my $file = shift;
@@ -108,165 +137,213 @@ sub saveClusterSizes {
 #
 # Parameters:
 #    $file - path to singletons file
+#    $idType - type of the input metanode mapping file, e.g. SEQ_UNIREF50 or SEQ_UNIREF50
 #    $dirs - hash ref of directories
-#    $unirefMap - hash ref of UniRef sequence IDs, used to determine which directories
-#       to copy the singletons file to
 #
 sub saveSingletons {
     my $file = shift;
+    my $idType = shift;
     my $dirs = shift;
-    my $unirefMap = shift;
 
     return if (not $file or not -f $file);
 
-    #TODO: look at UniRef implementation to see how singletons are handled
+    # Singletons are the same for all of the sequence types
     copy($file, "$dirs->{uniprot}/singleton_UniProt_All.txt");
-    if ($unirefMap->{uniref90} or $unirefMap->{uniref50}) {
+    if ($idType eq SEQ_UNIREF90 or $idType eq SEQ_UNIREF50) {
         copy($file, "$dirs->{uniref90}/singleton_UniRef90_All.txt");
     }
-    if ($unirefMap->{uniref50}) {
+    if ($idType eq SEQ_UNIREF50) {
         copy($file, "$dirs->{uniref50}/singleton_UniRef50_All.txt");
+    }
+
+    if ($dirs->{domain}) {
+        copy($file, "$dirs->{domain}/singleton_All.txt");
     }
 }
 
 
 #
-# getUniRefMapping
+# getUniprotIds
+#
+# Gets a mapping of cluster numbers to UniProt IDs, expanded from metanodes.
+#
+# Parameters:
+#    $clusterIdMap - hash ref mapping cluster number to metanode IDs in each cluster
+#    $idType - type of the input metanode mapping file, e.g. SEQ_UNIREF50 or SEQ_UNIREF50
+#    $metanodeMap - hash ref, mapping metanodes (e.g. UniRef IDs) to list of UniProt IDs in the metanode
+#
+# Returns:
+#    $idMap - mapping of cluster number to UniProt IDs
+#
+sub getUniprotIds {
+    my $clusterIdMap = shift;
+    my $idType = shift;
+    my $metanodeMap = shift;
+
+    my $idMap = resolve_mapping($clusterIdMap, $idType, $metanodeMap);
+
+    return $idMap;
+}
+
+
+#
+# stripDomainRegions
+#
+# Remove domain regions from IDs if present.
+#
+# Parameters:
+#    $clusterIdMap - hash ref mapping cluster numbers to input metanode or UniProt IDs
+#
+# Returns:
+#    $idMap - copy of input, without domain regions on IDs
+#    $hasDomain - non-zero if the IDs in the input have domain regions, zero otherwise
+#
+sub stripDomainRegions {
+    my $clusterIdMap = shift;
+
+    my $hasDomain = 0;
+    my $idMap = {};
+
+    # Remove domain information
+    foreach my $clusterNum (keys %$clusterIdMap) {
+        my @ids;
+
+        foreach my $id (@{ $clusterIdMap->{$clusterNum} }) {
+            if (get_sequence_type($id) eq SEQ_DOMAIN) {
+                $hasDomain = 1;
+                push @ids, strip_domain($id);
+            } else {
+                push @ids, $id;
+            }
+        }
+
+        $idMap->{$clusterNum} = \@ids;
+    }
+
+    return ($idMap, $hasDomain);
+}
+
+
+#
+# getUnirefMapping
 #
 # Uses data from input files to get the UniRef IDs in the clusters
 #
 # Parameters:
-#    $clusterToId - hash ref mapping cluster number to an array ref of
-#        UniRef sequence IDs
-#    $idType - uniref50 or uniref90
-#    $sourceIdMap - hash ref that maps UniRef sequences IDs to an array
-#        ref of UniProt IDs
-#    $db - EFI::Database object
+#    $idMap - hash ref mapping cluster number to UniProt IDs (expanded from UniRef clusters)
+#    $idType - type of the input metanode mapping file, e.g. SEQ_UNIREF50 or SEQ_UNIREF50
+#    $dbh - database handle from EFI::Database
 #
 # Returns:
 #    hash ref with one or two keys
-#       uniref90 => hash ref of cluster number to UniRef90 sequence IDs
+#       uniref90 => hash ref of cluster number to UniRef90 sequence IDs (if input is UniRef50 or UniRef50)
 #       uniref50 => hash ref of cluster number to UniRef50 sequence IDs (only if the input is UniRef50)
 #
-sub getUniRefMapping {
-    my $clusterToId = shift;
+sub getUnirefMapping {
+    my $idMap = shift;
     my $idType = shift;
-    my $sourceIdMap = shift;
-    my $db = shift;
+    my $dbh = shift;
 
-    my $dbh = $db->getHandle();
-
-    my $uniref90Raw = {};
-    my $uniref50Raw = {};
-
-    my $sql = "SELECT * FROM uniref WHERE accession = ?";
-    my $sth = $dbh->prepare($sql);
-
-    my @clusters = sort { $a <=> $b } keys %$clusterToId;
-    foreach my $cnum (@clusters) {
-        # Loop over every UniRef ID that was provided in the file
-        foreach my $fileUnirefId (@{ $clusterToId->{$cnum} }) {
-            # Get the list of UniProt IDs in this UniRef ID cluster
-            my $ids = $sourceIdMap->{$fileUnirefId} // [];
-            # If it is a hash ref, then it is a RepNode->UniRef mapping
-            if (ref $ids eq "HASH") {
-                foreach my $repnodeId (keys %$ids) {
-                    addUniRefIds($cnum, $ids->{$repnodeId}, $sth, $uniref90Raw, $uniref50Raw);
-                }
-            } else {
-                # UniRef->UniProt mapping
-                addUniRefIds($cnum, $ids, $sth, $uniref90Raw, $uniref50Raw);
-            }
-        }
-    }
-
-    # Convert hash to array (use hash to account for duplicate entries)
+    my $uniref50 = {};
     my $uniref90 = {};
-    foreach my $cnum (keys %$uniref90Raw) {
-        push @{ $uniref90->{$cnum} }, keys %{ $uniref90Raw->{$cnum} };
-    }
-    my $retval = {uniref90 => $uniref90};
 
-    if ($idType eq "uniref50") {
-        my $uniref50 = {};
-        foreach my $cnum (keys %$uniref50Raw) {
-            push @{ $uniref50->{$cnum} }, keys %{ $uniref50Raw->{$cnum} };
-        }
-        $retval->{uniref50} = $uniref50;
-    }
+    # Util for batch ID retrieval
+    my $util = new EFI::Database::Util(dbh => $dbh);
 
-    return $retval;
-}
+    # Prepare the SQL for batch ID retrieval
+    my $idCol = "accession";
+    my @cols = ($idCol, "uniref50_seed AS uniref50", "uniref90_seed AS uniref90");
+    my $cols = join(", ", @cols);
+    my $sqlPattern = "SELECT $cols FROM uniref WHERE accession IN (<IDS>)";
 
+    foreach my $clusterNum (keys %$idMap) {
+        my @uniprotIds = @{ $idMap->{$clusterNum} };
 
-#
-# addUniRefIds
-#
-# Retrieve the UniRef IDs corresponding to the input UniProt IDs
-#
-# Parameters:
-#    $cnum - cluster number
-#    $ids - array ref of UniProt IDs
-#    $sth - database statement handle
-#    $uniref90 - hash ref mapping cluster number to UniRef90 IDs
-#    $uniref50 - hash ref mapping cluster number to UniRef50 IDs
-#
-sub addUniRefIds {
-    my $cnum = shift;
-    my $ids = shift;
-    my $sth = shift;
-    my $uniref90 = shift;
-    my $uniref50 = shift;
-    foreach my $uniprotId (@$ids) {
-        $sth->execute($uniprotId);
-        my $row = $sth->fetchrow_hashref();
-        if ($row) {
-            # Use a hash because the unirefXX_seed value is not unique (i.e. it may occur
-            # more than once)
-            $uniref90->{$cnum}->{$row->{uniref90_seed}} = 1;
-            $uniref50->{$cnum}->{$row->{uniref50_seed}} = 1;
+        # Get the mapping of UniRef IDs to cluster number for this cluster
+        my $uniprotMap = $util->batchRetrieveIds(\@uniprotIds, $sqlPattern, $idCol);
+        foreach my $uniprotId (keys %$uniprotMap) {
+            $uniref50->{ $clusterNum }->{ $uniprotMap->{$uniprotId}->{uniref50} } = 1;
+            $uniref90->{ $clusterNum }->{ $uniprotMap->{$uniprotId}->{uniref90} } = 1;
         }
     }
+
+    my $unirefMap = {};
+
+    # Map the hash ref to a list (array ref)
+    if ($idType eq SEQ_UNIREF50) {
+        map { push @{ $unirefMap->{uniref50}->{$_} }, keys %{ $uniref50->{$_} } } keys %$uniref50;
+    }
+
+    if ($idType eq SEQ_UNIREF90 or $idType eq SEQ_UNIREF50) {
+        map { push @{ $unirefMap->{uniref90}->{$_} }, keys %{ $uniref90->{$_} } } keys %$uniref90;
+    }
+
+    return $unirefMap;
 }
 
 
 #
 # saveIdLists
 #
-# Save the UniProt (and optionally UniRef) IDs to files, with one file for each
-# cluster, plus a file for all IDs in the cluster.
+# Save the UniProt (and optionally UniRef) IDs to files, with one file for each cluster, plus a
+# file for all IDs in the cluster.
 #
 # Parameters:
-#    $clusterIds - hash ref mapping cluster to sequence IDs
-#    $unirefIds - hash ref mapping cluster to UniRef IDs
+#    $idMap - hash ref mapping cluster number to sequence IDs
+#    $idType - type of the input metanode mapping file, e.g. SEQ_UNIREF50 or SEQ_UNIREF50
+#    $unirefIds - hash ref with uniref90 and optionally uniref50 keys, which map cluster number
+#        to a list of UniRef IDs
 #    $dirs - hash ref with keys mapping sequence type to directory path (e.g. uniprot => "DIR_PATH")
 #
 sub saveIdLists {
-    my $clusterToId = shift;
+    my $idMap = shift;
+    my $idType = shift;
     my $unirefMap = shift;
     my $dirs = shift;
 
-    my $processCluster = sub {
-        my ($dirName, $cnum, $prefix, $idList) = @_;
-        my $fname = "$dirs->{$dirName}/cluster_${prefix}_Cluster_$cnum.txt";
-    };
+    my @clusters = sort { $a <=> $b } keys %$idMap;
 
-    my @clusters = sort { $a <=> $b } keys %$clusterToId;
-
+    # Save UniProt IDs, expanded from network metanodes
     my $baseName = "$dirs->{uniprot}/cluster_UniProt";
-    saveClusterIdList($clusterToId, \@clusters, $baseName);
+    saveClusterIdList($idMap, \@clusters, $baseName);
 
-    # Save UniRef90 IDs if mapping supports it
+    # Save UniRef90 IDs if input network is UniRef90 or UniRef50
     if ($unirefMap->{uniref90} or $unirefMap->{uniref50}) {
         my $baseName = "$dirs->{uniref90}/cluster_UniRef90";
         saveClusterIdList($unirefMap->{uniref90}, \@clusters, $baseName);
     }
 
-    # Save UniRef50 IDs if mapping supports it
+    # Save UniRef50 IDs if input network is UniRef50
     if ($unirefMap->{uniref50}) {
         my $baseName = "$dirs->{uniref50}/cluster_UniRef50";
         saveClusterIdList($unirefMap->{uniref50}, \@clusters, $baseName);
     }
+}
+
+
+#
+# saveDomainIdList
+#
+# Save the original input sequence IDs with domain data to files, with one file for each cluster,
+# plus a file for all IDs in the cluster.
+#
+# Parameters:
+#    $sourceIdMap - hash ref mapping cluster number to sequence IDs (as they came from the input
+#        files, not re-mapped)
+#    $idType - type of the input metanode mapping file, e.g. SEQ_UNIREF50 or SEQ_UNIREF50
+#    $dirs - hash ref with keys mapping sequence type to directory path (e.g. uniprot => "DIR_PATH")
+#
+sub saveDomainIdLists {
+    my $sourceIdMap = shift;
+    my $idType = shift;
+    my $dirs = shift;
+
+    my @clusters = sort { $a <=> $b } keys %$sourceIdMap;
+
+    my $domainType = $idType eq SEQ_UNIREF50 ? "UniRef50" : ($idType eq SEQ_UNIREF90 ? "UniRef90" : "UniProt");
+    my $baseName = "$dirs->{domain}/cluster_${domainType}_Domain";
+
+    saveClusterIdList($sourceIdMap, \@clusters, $baseName);
 }
 
 
@@ -310,11 +387,11 @@ sub saveClusterIdList {
 #
 # Parameters:
 #    $dirs - hash ref of uniprot, uniref90, uniref50 dirs
-#    $unirefMap - if uniref90 present, create uniref90 dir; if uniref50 present, create uniref50 dir
+#    $idType - type of the input metanode mapping file, e.g. SEQ_UNIREF50 or SEQ_UNIREF50
 #
 sub makeDirs {
     my $dirs = shift;
-    my $unirefMap = shift;
+    my $seqType = shift;
 
     my $makeDir = sub {
         my $dir = shift;
@@ -324,8 +401,56 @@ sub makeDirs {
     };
 
     $makeDir->($dirs->{uniprot});
-    $makeDir->($dirs->{uniref90}) if $unirefMap->{uniref90};
-    $makeDir->($dirs->{uniref50}) if $unirefMap->{uniref50};
+    $makeDir->($dirs->{uniref90}) if ($idType eq SEQ_UNIREF90 or $idType eq SEQ_UNIREF50);
+    $makeDir->($dirs->{uniref50}) if $idType eq SEQ_UNIREF50;
+
+    if ($dirs->{domain}) {
+        $makeDir->($dirs->{domain});
+    }
+}
+
+
+#
+# getIdListDirs
+#
+# Returns a hash ref with paths to the output directories for the ID list types.
+#
+# Parameters:
+#    $opts - command line options
+#    $idType - input ID type (SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50)
+#    $hasDomain - non-zero if any IDs have domain regions, zero otherwise
+#
+# Returns:
+#    hash ref with the following:
+#        uniprot => "uniprot/output/path"
+#        uniref90 => "uniref90/output/path" if input type is UniRef90 or UniRef50
+#        uniref50 => "uniref50/output/path" if input type is UniRef50
+#        domain => "domain/output/path", where path is "uniprot_domain", "uniref90_domain",
+#            or "uniref50_domain", depending on the input type, IF $hasDomain is true
+#
+sub getIdListDirs {
+    my $opts = shift;
+    my $idType = shift;
+    my $hasDomain = shift;
+
+    my $dirs = { uniprot => $opts->{uniprot} };
+    $dirs->{uniref50} = $opts->{uniref50} if $idType eq SEQ_UNIREF50;
+    $dirs->{uniref90} = $opts->{uniref90} if ($idType eq SEQ_UNIREF90 or $idType eq SEQ_UNIREF50);
+
+    if ($hasDomain) {
+        my $domainDir;
+        if ($idType eq SEQ_UNIREF50) {
+            $domainDir = $opts->{uniref50} . "_domain";
+        } elsif ($idType eq SEQ_UNIREF90) {
+            $domainDir = $opts->{uniref90} . "_domain";
+        } else {
+            $domainDir = $opts->{uniprot} . "_domain";
+        }
+
+        $dirs->{domain} = $domainDir;
+    }
+
+    return $dirs;
 }
 
 
@@ -343,16 +468,9 @@ sub validateAndProcessOptions {
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
 
-    if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
-        die "$text\n";
-        exit(1);
-    }
-
-    if ($optParser->wantHelp()) {
-        my $text = $optParser->printHelp();
-        print $text;
-        exit(0);
+    if (not $optParser->parseOptions() or $optParser->wantHelp()) {
+        print $optParser->printHelp();
+        exit(not $optParser->wantHelp());
     }
 
     return $optParser->getOptions();

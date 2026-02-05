@@ -1,5 +1,27 @@
 get_id_lists
 ============
+Usage
+-----
+
+::
+
+	Usage: perl pipelines/shared/perl/get_id_lists.pl --cluster-map <FILE> --uniprot <DIR_PATH>
+	    --cluster-sizes <FILE> --config <FILE> --db-name <VALUE> [--uniref90 <DIR_PATH>]
+	    [--uniref50 <DIR_PATH>] [--seqid-source-map <FILE>] [--singletons <FILE>]
+	
+	Description:
+	    Organizes the IDs in the input cluster map file into files by cluster
+	
+	Options:
+	    --cluster-map         path to a file mapping sequence ID to cluster number
+	    --uniprot             path to an output directory for storing IDs in
+	    --uniref90            path to an output directory for storing UniRef90 IDs in (optional)
+	    --uniref50            path to an output directory for storing UniRef50 IDs in (optional)
+	    --seqid-source-map    path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)
+	    --singletons          path to a file listing the singletons
+	    --cluster-sizes       path to an output file to save cluster sizes to
+	    --config              path to the config file for database connection
+	    --db-name             name of the EFI database to connect to for retrieving UniRef sequences
 
 Reference
 ---------

@@ -12,6 +12,7 @@ use lib dirname(abs_path(__FILE__)) . "/../../../../";
 
 use parent qw(EFI::GNT::GNN::XgmmlWriter);
 
+use EFI::Annotations::Fields qw(FIELD_CYTOSCAPE_COLOR);
 use EFI::GNT::GNN::XgmmlWriter::Util;
 use EFI::GNT::GNN::Hubs qw(NONE_PFAM FILTER_COOCCURRENCE);
 
@@ -21,11 +22,11 @@ sub new {
     my %args = @_;
 
     my $self = $class->SUPER::new(%args);
-    $self->{gnn_file} = $args{gnn_file} || die "Require GNN file gnn_file output arg";
     $self->{gnt_anno} = $args{gnt_anno} || die "Require EFI::GNT::Annotations gnt_anno arg";
     $self->{util} = new EFI::GNT::GNN::XgmmlWriter::Util(gnt_anno => $args{gnt_anno});
     #$self->{colors} is created by the parent class
-    $self->{cooc_threshold} = 0.20; #TODO: set this somewhere
+
+    $self->{network_type} = "cluster_hub";
 
     return $self;
 }
@@ -35,7 +36,13 @@ sub write {
     my $self = shift;
     my $hubs = shift;
 
-    $self->open() if not $self->{output};
+    # From EFI::Xgmml::Writer
+    $self->open();
+
+    # From EFI::Xgmml::Writer
+    $self->preamble();
+
+    $self->writeStarting(label => "Cluster GNN");
 
     my @clusterNums = $hubs->getClusterHubNumbers();
 
@@ -55,6 +62,7 @@ sub write {
 
             my $nodeAttr = $self->getSpokeData($clusterNum, $pfamHubName, $hub->{spokes}->{$pfamHubName}, $pfamLongName);
 
+            $pfamShortName = NONE_PFAM if not $pfamShortName;
             $self->writeNode($spokeNodeId, "$pfamShortName", $nodeAttr);
             $self->writeEdge($clusterNum, $spokeNodeId);
         }
@@ -65,6 +73,8 @@ sub write {
             $self->writeNode($clusterNum, "$clusterNum", $nodeAttr);
         }
     }
+
+    $self->writeClosing();
 
     $self->close();
 }
@@ -120,7 +130,7 @@ sub getSpokeData {
     push @fields, {name => "Hub Pfam Neighbors",                            value => [],                                        type => "string"};
     push @fields, {name => "Hub Average and Median Distance",               value => [],                                        type => "string"};
     push @fields, {name => "Hub Co-occurrence and Ratio",                   value => [],                                        type => "string"};
-    push @fields, {name => "node.fillColor",                                value => $color,                                    type => "string"};
+    push @fields, {name => FIELD_CYTOSCAPE_COLOR,                           value => $color,                                    type => "string"};
     push @fields, {name => "node.shape",                                    value => $shape,                                    type => "string"};
     push @fields, {name => "node.size",                                     value => $nodeSize,                                 type => "string"};
 
@@ -175,7 +185,7 @@ sub getHubData {
     push @fields, {name => "Hub Pfam Neighbors",                            value => \@pfamNeighbors,       type => "string"};
     push @fields, {name => "Hub Average and Median Distances",              value => \@distances,           type => "string"};
     push @fields, {name => "Hub Co-occurrence and Ratio",                   value => \@coocData,            type => "string"};
-    push @fields, {name => "node.fillColor",                                value => $color,                type => "string"};
+    push @fields, {name => FIELD_CYTOSCAPE_COLOR,                           value => $color,                type => "string"};
     push @fields, {name => "node.shape",                                    value => $shape,                type => "string"};
     push @fields, {name => "node.size",                                     value => $nodeSize,             type => "string"};
 
@@ -202,7 +212,7 @@ B<EFI::GNT::GNN::XgmmlWriter::ClusterHub> - Perl helper module for writing clust
     my $gntAnno = new EFI::GNT::Annotations(dbh => $dbh);
 
     my $clusterGnnFile = "cluster_gnn.xgmml";
-    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
+    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(output_file => $clusterGnnFile, gnt_anno => $gntAnno);
     $clusterHubWriter->write($hubs);
 
 

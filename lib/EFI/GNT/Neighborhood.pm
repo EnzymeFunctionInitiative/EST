@@ -10,7 +10,7 @@ use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
 
-use EFI::Annotations;
+use EFI::Annotations qw(:interpro);
 
 
 sub new {
@@ -19,7 +19,7 @@ sub new {
     my $self = {};
     bless $self, $class;
 
-    die "Require dbh parameter" if not $args{dbh};
+    die "Require dbh (DBI database handle) argument" if not $args{dbh};
 
     $self->{dbh} = $args{dbh};
     $self->{warning} = "";
@@ -28,7 +28,7 @@ sub new {
 
     $self->{col_sql} = join(", ", 
             "ena.ID AS ID", "ena.AC AS AC", "ena.NUM AS NUM", "ena.TYPE AS TYPE", "ena.DIRECTION AS DIRECTION", "ena.start AS start", "ena.stop AS stop",
-            "GROUP_CONCAT(PFAM.id) AS pfam_fam",
+            "GROUP_CONCAT(DISTINCT PFAM.id) AS pfam_fam",
             "GROUP_CONCAT(I.id) AS ipro_fam",
             "GROUP_CONCAT(I.family_type) AS ipro_type",
             #"GROUP_CONCAT(I.parent) AS ipro_parent", "GROUP_CONCAT(I.is_leaf) AS ipro_is_leaf"
@@ -47,8 +47,6 @@ sub findNeighbors {
     my $self = shift;
     my $queryId = shift;
     my $neighborhoodSize = shift;
-
-    my $neighborsWithoutFamily = {};
 
     # Get information for the query accession
     my ($error, $pos, $queryAttributes) = $self->processQueryId($queryId, $neighborhoodSize);
@@ -307,7 +305,8 @@ sub getQueryIdPositionData {
     $pos->{high_window} = $pos->{query_num} + $neighborhoodSize; # upper boundary of neighborhood search in number of sequences
 
     # Determine if the query window exceeds the genome boundary (for example,
-    # if the query position is 3 and the window is 10, this is true)
+    # if the query position is 3, the geneome has 7 sequeunces, and the
+    # window is 10, then this is 1, e.g. true)
     my $isBound = ($pos->{low_window} < 1 ? 1 : 0);
     $isBound = $isBound | ($pos->{high_window} > $max ? 2 : 0);
     $pos->{is_bound} = $isBound;
@@ -460,7 +459,7 @@ select
     from ena
     inner join
         (
-            select *, max(NUM) as MAX_NUM from ena where ID in
+            select max(NUM) as MAX_NUM from ena where ID in
             (
                 select ID from ena where AC = ? and TYPE = 1 order by ID
             )
@@ -470,7 +469,9 @@ select
     order by
         LLL desc,
         RRR desc,
-        PCT
+        PCT,
+        NUM desc,
+        ID
     limit 1
 SQL
 ;
@@ -563,7 +564,7 @@ sub parseInterpro {
         next if exists $u{$fams[$i]};
         $u{$fams[$i]} = 1;
         my $info = {family => $fams[$i], type => lc($types[$i])};
-        if ($info->{type} eq "domain" or $info->{type} eq "family" or $info->{type} eq "homologous_superfamily") {
+        if ($info->{type} eq INTERPRO_DOMAIN or $info->{type} eq INTERPRO_FAMILY or $info->{type} eq INTERPRO_HOMOLOGOUS_SUPERFAMILY) {
             push @info, $info;
         }
     }
@@ -601,14 +602,14 @@ EFI::GNT::Neighborhood - Perl module for retrieving the genome neighborhood of a
 
 =head2 DESCRIPTION
 
-EFI::GNT::Neighborhood is a Perl module for retrieving the sequences and metadata of genomes
+B<EFI::GNT::Neighborhood> is a Perl module for retrieving the sequences and metadata of genomes
 that are neighbors to a query sequence.
 
 =head2 METHODS
 
 =head3 C<new(dbh =E<gt> $dbh)>
 
-Creates a new C<EFI::GNT::Neighborhood> object.
+Creates a new B<EFI::GNT::Neighborhood> object.
 
 =head4 Parameters
 
@@ -616,7 +617,7 @@ Creates a new C<EFI::GNT::Neighborhood> object.
 
 =item C<dbh>
 
-Database handle that comes from C<EFI::Database>.
+Database handle that comes from B<EFI::Database>.
 
 =back
 

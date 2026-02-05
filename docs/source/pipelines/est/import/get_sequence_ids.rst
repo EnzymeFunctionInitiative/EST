@@ -5,35 +5,36 @@ Usage
 
 ::
 
-	Usage: perl pipelines/est/import/get_sequence_ids.pl [--output-dir <OUTPUT_DIR>]
-	    --mode blast|family|accession|fasta --efi-config-file <CONFIG_FILE>
-	    --efi-db <EFI_DB> [--output-metadata-file <FILE>]
-	    [--output-sunburst-ids-file <FILE>] [--output-stats-file <FILE>]
-	    [--sequence-ids-file <FILE>] [--sequence-version uniprot|uniref90|uniref50]
-	    [--family <ONE_OR_MORE_FAM_IDS>] [--fasta <FASTA_FILE>]
-	    [--seq-mapping-file <FILE>] [--accessions <FILE>] [--blast-query <FILE>]
-	    [--blast-output <FILE>]
+	Usage: perl pipelines/est/import/get_sequence_ids.pl --efi-config-file <FILE> --efi-db <VALUE>
+	    --mode <VALUE> [--output-dir <DIR_PATH>] [--output-stats-file <FILE>]
+	    [--source-meta-file <FILE>] [--source-ids-file <FILE>] [--sequence-version <VALUE>]
+	    [--family <VALUE>] [--fasta <FILE>] [--sequence-mapping-file <FILE>] [--accessions <FILE>]
+	    [--unmatched-ids <FILE>] [--blast-query <FILE>] [--blast-output <FILE>] [--domain <VALUE>]
+	    [--domain-family <VALUE>]
 	
 	Description:
-	    Retrieve sequence IDs from a database or file and saves them for use by a
-	    script later in the EST import pipeline
+	    Retrieve sequence IDs from a database or file and saves them for use by a script later in the
+	    EST import pipeline
 	
 	Options:
-	    --output-dir                  If not specified, defaults to current working directory
-	    --mode                        Specify the type of retrieval to use
-	    --efi-config-file             Path to EFI database configuration file
-	    --efi-db                      Path to SQLite database file, or MySQL/MariaDB database name
-	    --output-metadata-file        Output file to put metadata into (defaults into --output-dir
-	    --output-sunburst-ids-file    Output file to put sunburst data into (defaults into --output-dir)
-	    --output-stats-file           Output file to put sequence ID statistics into (defaults into --output-dir)
-	    --sequence-ids-file           Output file to put sequence IDs into (defaults into --output-dir)
-	    --sequence-version            Sequence type to retrieve; defaults to uniprot
-	    --family                      One or more protein families (PF#####, IPR######); required for --mode family
-	    --fasta                       User-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta
-	    --seq-mapping-file            File for mapping UniProt and anonymous IDs in FASTA file (internal)
-	    --accessions                  User-specified file containing list of accession IDs to use for all-by-all; required for --mode accession
-	    --blast-query                 Path to file containing sequence for initial BLAST; required for --mode blast
-	    --blast-output                Output file to put BLAST results into; required for --mode blast
+	    --output-dir               path to directory to store output in; if not specified, defaults to current working directory
+	    --efi-config-file          path to EFI database configuration file
+	    --efi-db                   EFI database name, or path to EFI SQLite database file
+	    --mode                     the sequence retrieval mode (one of blast, family, accession, or fasta)
+	    --output-stats-file        output file to put sequence ID statistics into (defaults into --output-dir)
+	    --source-meta-file         output file to put sequence ID and source data into (defaults into --output-dir)
+	    --source-ids-file          path to the output file to save list of UniRef and UniProt accession IDs to (defaults into --output-dir)
+	    --sequence-version         sequence type to retrieve (one of uniprot, uniref90, uniref50), defaults to uniprot
+	    --family                   one or more protein families (PF#####, IPR######); required for --mode family
+	    --fasta                    user-specified FASTA file containing sequences to use for all-by-all; required for --mode fasta
+	    --sequence-mapping-file    file for mapping UniProt and anonymous IDs in FASTA file (internal)
+	    --accessions               user-specified file containing list of accession IDs to use for all-by-all; required for --mode accession
+	    --unmatched-ids            file containing IDs in FASTA or accession ID files that were not matched in the EFI database
+	    --blast-query              path to file containing sequence for initial BLAST; required for --mode blast
+	    --blast-output             output file to put BLAST results into; required for --mode blast
+	    --domain                   retrieve the family domain on each sequence; 'domain' retrieves the domain of the input family, 'n-terminal' or 'c-terminal' retrieve the portion of the sequence that is n-terminal or c-terminal to the family domain
+	    --domain-family            the family to use when retrieving domains for Accession jobs only
+	
 
 Reference
 ---------
@@ -200,15 +201,6 @@ begin with the letters ``ZZ``.
 
 
 
-Example Usage
-^^^^^^^^^^^^^
-
-::
-
-   get_sequence_ids.pl --mode fasta --fasta <USER_FASTA_FILE>
-
-
-
 Parameters
 ^^^^^^^^^^
 
@@ -216,14 +208,23 @@ Parameters
    A path to a file containing FASTA sequences. Identifiers are pulled
    from the sequence headers in the file.
 
-``--seq-mapping-file`` (optional, defaults)
+``--sequence-mapping-file`` (optional, defaults)
    This file is necessary to map UniProt or anonymous identifiers to the
    proper header line in the input FASTA file. The file is provided to
    the **``import_fasta.pl``** script which reformats the user FASTA
    file into an acceptable format with proper header IDs. If this is not
-   specified, the file is named according to the ``seq_mapping`` value
-   in the **``EFI::Import::Config::Defaults``** module and put in the
+   specified, the file is named according to the ``sequence_mapping``
+   value in the **EFI::Import::Config::Defaults** module and put in the
    output directory.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   get_sequence_ids.pl --mode fasta --fasta <USER_FASTA_FILE>
 
 
 
@@ -235,9 +236,8 @@ The import options share a number of arguments.
 ``--sequence-ids-file`` (optional, defaults)
    The output file that the IDs from the sequence ID retrieval are
    stored in. If this is not specified, the file is named according to
-   the ``accession_ids`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
-   directory.
+   the ``accession_ids`` value in the **EFI::Import::Config::Defaults**
+   module and put in the output directory.
 
 ``--mode`` (required)
    Specifies the mode; supported values are ``blast``, ``family``, and
@@ -265,23 +265,22 @@ The import options share a number of arguments.
    used.
 
 ``--output-metadata-file`` (optional, defaults)
-   The script also outputs a metadata file (see
-   **``EFI::EST::Metadata``** for the format of this file). If this is
-   not specified, the file is named according to the
-   ``sequence_metadata`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
+   The script also outputs a metadata file (see **EFI::EST::Metadata**
+   for the format of this file). If this is not specified, the file is
+   named according to the ``sequence_metadata`` value in the
+   **EFI::Import::Config::Defaults** module and put in the output
    directory.
 
 ``--output-sunburst-ids-file-`` (optional, defaults)
    The EST graphical tools support the display of taxonomy in the form
    of sunburst diagrams. If this is not specified, the file is named
    according to the ``sunburst_ids`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
+   **EFI::Import::Config::Defaults** module and put in the output
    directory.
 
 ``--output-stats-file`` (optional, defaults)
    Statistics are computed for the sequences that are retrieved (e.g.
    size of family, number of sequences). If this is not specified, the
    file is named according to the ``import_stats`` value in the
-   **``EFI::Import::Config::Defaults``** module and put in the output
+   **EFI::Import::Config::Defaults** module and put in the output
    directory.

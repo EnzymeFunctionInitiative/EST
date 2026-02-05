@@ -1,5 +1,22 @@
 compute_conv_ratio
 ==================
+Usage
+-----
+
+::
+
+	Usage: perl pipelines/shared/perl/compute_conv_ratio.pl --cluster-map <FILE>
+	    --index-seqid-map <FILE> --edgelist <FILE> --conv-ratio <FILE> [--seqid-source-map <FILE>]
+	
+	Description:
+	    Outputs a file listing the convergence ratio for each cluster in the input cluster map
+	
+	Options:
+	    --cluster-map         path to a file mapping sequence ID to cluster number
+	    --index-seqid-map     path to a file mapping the node index (edgelist ID) to sequence ID
+	    --edgelist            path to a file with the edgelist
+	    --conv-ratio          path to an output file to save convergence ratios
+	    --seqid-source-map    path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)
 
 Reference
 ---------

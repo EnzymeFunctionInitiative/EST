@@ -14,8 +14,6 @@ sub new {
     my $self = {stats => {}};
     bless($self, $class);
 
-    $self->{mapping} = getMapping();
-
     return $self;
 }
 
@@ -24,7 +22,6 @@ sub addValue {
     my $self = shift;
     my $key = shift;
     my $val = shift;
-
     $self->{stats}->{$key} = $val;
 }
 
@@ -36,28 +33,38 @@ sub getValue {
 }
 
 
-sub saveToFile {
+sub save {
     my $self = shift;
     my $outputFile = shift;
-
-    $self->computeStats();
 
     my $json = JSON->new->allow_nonref->pretty->encode($self->{stats});
 
     open my $fh, ">", $outputFile or die "Unable to write to $outputFile: $!";
     $fh->print($json);
     close $fh;
-
-    #foreach my $key (sort keys %{ $self->{stats} }) {
-    #    my $name = $self->{mapping}->{$key} // $key;
-    #    $fh->print(join("\t", $name, $self->{stats}->{$key}), "\n");
-    #}
 }
 
 
-sub computeStats {
+sub load {
     my $self = shift;
-    #TODO: implement this
+    my $inputFile = shift;
+
+    if (not -f $inputFile) {
+        $self->{stats} = {};
+        return;
+    }
+
+    my $inputData = "";
+    open my $fh, "<", $inputFile or die "Unable to read statistics file '$inputFile': $!";
+    while (my $line = <$fh>) {
+        chomp $line;
+        $inputData .= $line;
+    }
+    close $fh;
+
+    my $data = JSON->new->decode($inputData);
+
+    $self->{stats} = $data;
 }
 
 
@@ -75,5 +82,7 @@ sub getMapping {
         num_blast_retr => "BlastRetrieved",
     };
 }
+
+
 1;
 

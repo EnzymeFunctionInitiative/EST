@@ -11,6 +11,7 @@ use lib "$FindBin::Bin/../../..";
 
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations);
+use EFI::Sequence::Type qw(:types);
 
 use parent qw(EFI::SSN::XgmmlReader);
 
@@ -23,10 +24,9 @@ sub new {
     $self->{anno} = new EFI::Annotations;
     my ($attrNames, $attrDisplay) = $self->{anno}->get_expandable_attr();
     $self->{id_list_fields} = { map { $attrDisplay->{$_} => $_ } @$attrNames };
-    $self->{sp_field_name} = FIELD_SWISSPROT_DESC;
-    $self->{metadata} = {}; # any node metadata that we are to store (e.g. swissprot)
+    $self->{id_metadata} = {}; # any node metadata that we are to store (e.g. swissprot)
     $self->{meta_map} = undef; # Metanode -> IDs in metanode mapping
-    $self->{id_type} = "uniprot";
+    $self->{id_type} = SEQ_UNIPROT;
 
     return $self;
 }
@@ -35,7 +35,7 @@ sub new {
 sub getMetanodeSizes {
     my $self = shift;
     my $idSizeMap = {};
-    if ($self->{id_type} ne "uniprot") {
+    if ($self->{id_type} ne SEQ_UNIPROT) {
         foreach my $idx (keys %{ $self->{idx_seqid} }) {
             my $id = $self->{idx_seqid}->{$idx};
             my $meta = $self->{meta_map}->{$id};
@@ -49,20 +49,20 @@ sub getMetanodeSizes {
 
 sub getMetanodeType {
     my $self = shift;
-    my $idf = $self->{id_type};
-    if ($idf ne "uniprot") {
-        $idf = "repnode" if $idf eq FIELD_REPNODE_IDS;
-        $idf = "uniref90" if $idf eq FIELD_UNIREF90_IDS;
-        $idf = "uniref50" if $idf eq FIELD_UNIREF50_IDS;
+    my $idType = $self->{id_type};
+    if ($idType ne SEQ_UNIPROT) {
+        $idType = SEQ_REPNODE if $idType eq FIELD_REPNODE_IDS;
+        $idType = SEQ_UNIREF90 if $idType eq FIELD_UNIREF90_IDS;
+        $idType = SEQ_UNIREF50 if $idType eq FIELD_UNIREF50_IDS;
     }
-    return $idf;
+    return $idType;
 }
 
 
 sub getMetanodes {
     my $self = shift;
     my $fullIds = {};
-    if ($self->{id_type} ne "uniprot") {
+    if ($self->{id_type} ne SEQ_UNIPROT) {
         foreach my $metanode (keys %{ $self->{meta_map} }) {
             $fullIds->{$metanode} = [ keys %{ $self->{meta_map}->{$metanode} } ];
         }
@@ -73,7 +73,7 @@ sub getMetanodes {
 
 sub getMetadata {
     my $self = shift;
-    return $self->{metadata};
+    return $self->{id_metadata};
 }
 
 
@@ -136,8 +136,10 @@ sub processNodeAttribute {
         # (in that case there will be duplicates because of the FIELD_REPNODE_IDS values)
         $self->{meta_map}->{$seqId}->{$value} = 1;
     # SwissProt
-    } elsif ($fieldName eq $self->{sp_field_name}) {
-        $self->{metadata}->{$seqId}->{swissprot} = $value if $value;
+    } elsif ($fieldName eq FIELD_SWISSPROT_DESC) {
+        $self->{id_metadata}->{$seqId}->{swissprot} = $value if $value;
+    } elsif ($fieldName eq FIELD_SEQ_KEY) {
+        $self->{id_metadata}->{$seqId}->{sequence} = $value if $value;
     }
 }
 
@@ -162,8 +164,12 @@ information from XGMML files
     my $metanodeType = $parser->getMetanodeType();
     my $metanodeSizes = $parser->getMetanodeSizes();
     my $metanodeMap = $parser->getMetanodes();
-    print "Network ID type: $metanodeType\n"; # uniprot, uniref90, uniref50, repnode
-    if ($metanodeType ne "uniprot") {
+
+    use EFI::Sequence::Type qw(:types);
+    my $metanodeType = $parser->getMetanodeType();
+    print "Network ID type: $metanodeType\n"; # One of SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE
+
+    if ($metanodeType ne SEQ_UNIPROT) {
         foreach my $metanode (sort keys %$metanodeMap) {
             map {
                 print join("\t", $metanode,
@@ -189,7 +195,7 @@ parsing and obtaining network information
 
 =head2 METHODS
 
-=head3 getMetanodeType
+=head3 C<getMetanodeType()>
 
 Gets the type of the metanodes in the network.
 
@@ -199,12 +205,14 @@ One of C<uniprot>, C<uniref90>, C<uniref50>, C<repnode>
 
 =head4 Example Usage
 
+    use EFI::Sequence::Type qw(:types);
+
     my $metanodeType = $parser->getMetanodeType();
-    print "Network ID type: $metanodeType\n"; # uniprot, uniref90, uniref50, repnode
+    print "Network ID type: $metanodeType\n"; # One of SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE
 
 
 
-=head3 getMetanodeSizes
+=head3 C<getMetanodeSizes()>
 
 Gets the sizes of the metanodes in the network.
 
@@ -219,7 +227,7 @@ the metanode.  If the network is a UniProt network then this hash is empty.
 
 
 
-=head3 getMetanodes
+=head3 C<getMetanodes()>
 
 Gets metanodes from the network.
 
@@ -238,7 +246,7 @@ network then this hash is empty.
 
 
 
-=head3 getMetadata
+=head3 C<getMetadata()>
 
 Gets the metadata (node attributes) that is saved during parsing (currently only SwissProt
 description).  This is primarily used in the case that the network is UniProt; in that
@@ -249,11 +257,18 @@ used instead of the saved node attribute.
 =head4 Returns
 
 A hash ref with keys being the sequence ID (metanode ID), with each value being another
-hash ref with each saved node attribute.  Currently only the C<swissprot> hash ref key
-is supported.  Only sequence IDs with attribute values are in the hash ref.
+hash ref with each saved node attribute.  Currently the C<swissprot> and C<sequence> hash
+ref keys are supported.  Only sequence IDs with attribute values are in the hash ref.
+The C<sequence> key will only be present if a protein sequence was included; this is used
+when unidentified sequences are included in the analysis.
 
     {
         "UNIPROT_ID" => {
+            "swissprot" => "Description",
+            "sequence" => "ABC"
+        },
+        "UNIPROT_ID2" => {},
+        "UNIPROT_ID3" => {
             "swissprot" => "Description"
         }
     }

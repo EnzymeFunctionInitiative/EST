@@ -8,42 +8,53 @@ use XML::Writer;
 use IO::File;
 
 use Cwd qw(abs_path);
-use File::Basename qw(dirname);
+use File::Basename;
 use lib dirname(abs_path(__FILE__)) . "/../../../";
 
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:color);
 use EFI::Util::Colors;
 
+use parent qw(EFI::Xgmml::Writer);
+
 
 sub new {
     my ($class, %args) = @_;
 
-    my $self = {};
+    my $self = $class->SUPER::new(%args);
     bless($self, $class);
 
-    $self->{output_file} = $args{gnn_file};
     $self->{colors} = $args{colors} // new EFI::Util::Colors;
+    $self->{title} = $args{title} // "GNN";
+    $self->{stats} = { num_nodes => 0, num_edges => 0 };
 
     return $self;
 }
 
-
-sub open {
+#
+# writeStarting - protected
+#
+# Write the starting tags, e.g. graph.
+#
+sub writeStarting {
     my $self = shift;
+    my %attr = @_;
 
-    $self->{output} = IO::File->new(">" . $self->{output_file});
+    $attr{label} = "GNN" if not $attr{label};
 
-    # Disable error checking with the UNSAFE keyword; this improves performance
-    $self->{writer} = XML::Writer->new(OUTPUT => $self->{output}, UNSAFE => 1, PREFIX_MAP => '');
-    $self->{writer}->xmlDecl("UTF-8");
+    # Write SSN header info
+    $self->startTag("graph", "xmlns" => $self->xmlns(), %attr);
 }
 
 
-sub close {
+#
+# writeClosing - protected
+#
+# Write the ending tag, e.g. graph
+#
+sub writeClosing {
     my $self = shift;
-    $self->{writer}->end();
-    $self->{output}->close();
+    $self->endTag("graph");
 }
 
 
@@ -96,35 +107,12 @@ sub writeListField {
 }
 
 
-sub endTag {
-    my $self = shift;
-    my $tagName = shift;
-    $self->{writer}->endTag($tagName);
-    $self->{writer}->characters("\n");
-}
-
-
-sub startTag {
-    my $self = shift;
-    my $tagName = shift;
-    $self->{writer}->startTag($tagName, @_);
-    $self->{writer}->characters("\n");
-}
-
-
-sub emptyTag {
-    my $self = shift;
-    my $tagName = shift;
-    $self->{writer}->emptyTag($tagName, @_);
-    $self->{writer}->characters("\n");
-}
-
-
 sub writeEdge {
     my $self = shift;
     my $source = shift;
     my $target = shift;
     $self->emptyTag("edge", label => "$source to $target", source => $source, target => $target);
+    $self->{stats}->{num_edges}++;
 }
 
 
@@ -141,6 +129,19 @@ sub writeNode {
     }
 
     $self->endTag("node");
+
+    $self->{stats}->{num_nodes}++;
+}
+
+
+# public
+sub getStats {
+    my $self = shift;
+    my $fileSize = -s $self->{output_file};
+    my $filename = fileparse($self->{output_file});
+    my $info = { num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize, file_name => $filename };
+    $info->{type} = $self->{network_type} if $self->{network_type};
+    return $info;
 }
 
 
@@ -157,19 +158,13 @@ B<EFI::GNT::GNN::XgmmlWriter> - Perl interface for writing XGMML files for vario
 
 =head2 SYNOPSIS
 
+    # Should never be directly instantiated
     use EFI::GNT::GNN::XgmmlWriter::PfamHub; # or ClusterHub
 
-    my $xwriter = EFI::GNT::GNN::XgmmlWriter::PfamHub->new(gnn_file => $gnnFile, gnt_anno => $gntAnno);
+    my $xwriter = EFI::GNT::GNN::XgmmlWriter::PfamHub->new(output_file => $gnnFile, gnt_anno => $gntAnno);
     $xwriter->open();
 
-    $xwriter->startTag("test", "attr_name" => "value");
-    $xwriter->writeField({name => "att_field", "value" => "value", type => "string"});
-    $xwriter->endTag();
-
-    # Writes a list field
-    $xwriter->startTag("test_list", "attr_name" => "value");
     $xwriter->writeField({name => "att_name", type => "string", value => ["1", "2", "3"]});
-    $xwriter->endTag();
 
     $xwriter->writeNode("node1", "Node 1", [{name => "att_field", "value" => "value", type => "string"}]);
     $xwriter->writeNode("node2", "Node 2", [{name => "att_field", "value" => "value", type => "string"}]);
@@ -177,12 +172,15 @@ B<EFI::GNT::GNN::XgmmlWriter> - Perl interface for writing XGMML files for vario
 
     $xwriter->close();
 
+    my $stats = $xwriter->getStats();
+
 
 =head2 DESCRIPTION
 
 B<EFI::GNT::GNN::XgmmlWriter> is a Perl interface providing standard API to facilitate writing of
-various GNN files in XGMML format.  It provides low-level XML tag access as well as XGMML-specific
-writing methods.
+various GNN files in XGMML format.  It inherits from B<EFI::Xgmml::Writer> to get low-level XML tag
+access.  It also provides XGMML-specific helper functions that are responsible for performing
+low-level XML tag writing.
 
 =head2 METHODS
 
@@ -207,110 +205,15 @@ Path to a file in XGMML format that is to be created.
     my $xwriter = EFI::GNT::GNN::XgmmlWriter::ClusterHub->new(output_file => $outputFile);
 
 
-=head3 C<open()>
-
-Opens the XGMML file for writing.
-
-=head4 Returns
-
-1 on success, 0 on failure
-
-=head4 Example Usage
-
-    $xwriter->open();
-
-
-=head3 C<close()>
-
-Finishes writing the XGMML file and closes the file handle.
-
-=head4 Returns
-
-1 on success, 0 on failure
-
-=head4 Example Usage
-
-    $xwriter->close();
-
-
-=head3 C<emptyTag($tagName, %attrs)>
-
-Writes an empty tag with the specified attributes in key-value format.
-An empty tag is a tag without a termination element (e.g. C<E<lt>elem/E<gt>>).
-
-=head4 Parameters
-
-=over
-
-=item C<$name>
-
-Name of the element tag
-
-=item C<%attrs>
-
-Key-values pairs of attributes of the element
-
-=back
-
-=head4 Example Usage
-
-    %attr = (key1 => "value1", key2 => "value2");
-    $xwriter->emptyTag("elem", %attr);
-    # renders as:   <elem key1="value1" key2="value2" />
-
-
-=head3 C<startTag($tagName, %attrs)>
-
-Writes a start XML tag with the tag name and attributes to the XGMML file.
-
-=head4 Parameters
-
-=over
-
-=item C<$name>
-
-Name of the element tag
-
-=item C<%attrs>
-
-Key-values pairs of attributes of the element
-
-=back
-
-=head4 Example Usage
-
-    %attr = (key1 => "value1", key2 => "value2");
-    $xwriter->emptyTag("elem", %attr);
-    # renders as:   <elem key1="value1" key2="value2">
-
-
-=head3 C<endTag($tagName)>
-
-Writes an end XML tag with the tag name.
-
-=head4 Parameters
-
-=over
-
-=item C<$name>
-
-Name of the element tag
-
-=back
-
-=head4 Example Usage
-
-    $xwriter->endTag("elem");
-    # renders as:   </elem>
-
-
-=head3 C<writeField($fieldData)>
+=head3 C<writeField($fieldData)> B<(protected method)>
 
 Writes the given field data to the file as XML tags in the XGMML C<att> format. Field
 data is given as a hash ref with three key-value pairs: C<name>, C<value>, and C<type>.
 C<type> is one of B<string, real, integer>.  If the C<value> is an array ref then the
 output is an 'att' list field which is a nested list of 'att' tags, each corresponding
 to an element in the input list.  If the input is invalid then nothing is written.
+This documentation is given in order to understand the format of the input structures,
+and this function should never be called directly by inheriting modules.
 
 =head4 Parameters
 
@@ -409,6 +312,33 @@ The target node Id
     $xwriter->writeEdge("cluster_id", "pfam_id", "cluster_id to pfam_id");
     # renders as:
     #   <edge source="cluster_id" target="pfam_id" label="cluster_id to pfam_id" />
+
+
+=head3 C<getStats()>
+
+Returns statistics, such as the number of nodes and edges, which are computed as the file is
+written.  The statistics can be written to a file for use by an external application.
+
+=head4 Returns
+
+Hash ref containing a single key-value, with the key being the output file name and the value
+being the statistics that will be written.
+
+    # {
+    #     file_name => "file_name.xgmml",
+    #     num_nodes => 100,
+    #     num_edges => 1000,
+    #     size => 10000,
+    #     type => "optional_type"
+    # }
+
+=head4 Example Usage
+
+    use EFI::Util::FileStats qw(save_stats);
+
+    my $stats = $xwriter->getStats();
+
+    save_stats("stats.json", $stats);
 
 
 =cut

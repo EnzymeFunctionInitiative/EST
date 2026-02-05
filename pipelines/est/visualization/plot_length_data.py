@@ -1,11 +1,12 @@
+
 import argparse
 import os
 
 import matplotlib.pyplot as plt
-import pandas as pd
 
 from pyEFI.cli import parse_proxies
 from pyEFI.plot import label_and_render_plot
+from pyEFI.processing import count_lengths
 
 
 def create_parser():
@@ -39,7 +40,7 @@ def parse_args(parser):
     args = parser.parse_args()
     args.proxies = parse_proxies(args.proxies)
 
-    # validate input filepaths
+    # Validate input filepaths
     fail = False
     if not os.path.exists(args.lengths):
         print(f"Lengths file {args.lengths} does not exist")
@@ -50,38 +51,13 @@ def parse_args(parser):
         return args
 
 
-def count_lengths(count_file: str, frac: float) -> pd.DataFrame:
-    """
-    Load and trim length histogram data
-
-    This function can also trim ends of the data. The method to do this
-    is borrowed from the original Perl code and it seems to include a
-    certain percentage of the total count.
-
-    Parameters
-    ----------
-        count_file
-            path to a 2 column tsv (length and count)
-        frac
-            percentage of counts to include
-
-    Returns
-    -------
-        A pandas DataFrame object with "count" and "length" columns
-    """
-    df = pd.read_csv(count_file, sep="\t", names=["length", "count"])
-    df["sequence_sum"] = df["count"].cumsum()
-    # trim values using --frac value
-    end_trim = int(df["count"].sum() * (1.0 - frac) / 2.0)
-    df = df[(df["sequence_sum"] >= end_trim) & (df["sequence_sum"] - df["count"] <= df["count"].sum() - end_trim)]
-    df = df.drop(["sequence_sum"], axis=1)
-
-    return df
-
-
 def main(lengths_file, job_id, frac, output_filename, title_extra, output_filetype, proxies):
     print(f"Reading lengths from '{lengths_file}'")
     df = count_lengths(lengths_file, frac)
+
+    if (len(df) == 0):
+        print("No data remaining after processing. No image files will be created.")
+        return
 
     print("Plotting histogram")
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(18, 9))
@@ -104,6 +80,7 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
         output_filetype,
         dpis=proxies,
     )
+    plt.close(fig)
 
 
 if __name__ == "__main__":

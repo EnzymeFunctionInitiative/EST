@@ -133,7 +133,7 @@ sub retrieveIdAnnotations {
         pdb => $metadata->{pdb} // "",
         ec => $metadata->{ec_code} // "",
         organism => $metadata->{organism} // "",
-        taxonomy_id => $metadata->{taxonomy_id} // 0,
+        taxonomy_id => ($row->{taxonomy_id} // 0),
         desc => $metadata->{description} // "",
     };
 
@@ -222,7 +222,7 @@ EFI::GNT::Annotations - Perl module for retrieving annotations from the EFI data
 
 =head2 DESCRIPTION
 
-EFI::GNT::Annotations is a Perl module for retrieving metadata annotations from
+B<EFI::GNT::Annotations> is a Perl module for retrieving metadata annotations from
 the EFI database.  Metadata retrieved are the organism, taxonomy ID, annotation
 status (e.g. TrEMBL or SwissProt), and SwissProt description.
 
@@ -230,7 +230,7 @@ status (e.g. TrEMBL or SwissProt), and SwissProt description.
 
 =head3 C<new(dbh =E<gt> $dbh)>
 
-Creates a new C<EFI::GNT::Annotations> object.
+Creates a new B<EFI::GNT::Annotations> object.
 
 =head4 Parameters
 
@@ -238,7 +238,7 @@ Creates a new C<EFI::GNT::Annotations> object.
 
 =item C<dbh>
 
-Database handle that comes from C<EFI::Database>.
+Database handle that comes from B<EFI::Database>.
 
 =back
 

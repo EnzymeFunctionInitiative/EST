@@ -15,7 +15,6 @@ process import_data {
 }
 
 process filter_blast {
-    publishDir params.final_output_dir, mode: 'copy'
     input:
         path blast_parquet
     output:
@@ -27,7 +26,6 @@ process filter_blast {
 }
 
 process filter_fasta {
-    publishDir params.final_output_dir, mode: 'copy'
     input:
         path fasta
         path seq_meta_file
@@ -41,14 +39,13 @@ process filter_fasta {
 }
 
 process get_annotations {
-    publishDir params.final_output_dir, mode: 'copy'
     input:
         path filtered_seq_meta_file
     output:
         path "ssn_metadata.tab"
     script:
     """
-    perl $projectDir/annotations/get_annotations.pl --ssn-anno-out ssn_metadata.tab --uniref-version ${params.uniref_version} --min-len ${params.min_length} --max-len ${params.max_length} --seq-meta-in $filtered_seq_meta_file --config ${params.efi_config} --db-name ${params.efi_db}
+    perl $projectDir/annotations/get_annotations.pl --ssn-anno-out ssn_metadata.tab --min-len ${params.min_length} --max-len ${params.max_length} --seq-meta-in $filtered_seq_meta_file --config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
 
@@ -59,20 +56,27 @@ process create_full_ssn {
         path filtered_fasta
         path ssn_meta_file
     output:
-        path "full_ssn.xgmml"
-    """
-    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output full_ssn.xgmml  --title ${params.ssn_title} --dbver ${params.db_version}
-    """
-}
+        path "full_ssn.xgmml.zip"
+        path "job.finish"
+        path "stats.json"
 
-process compute_stats {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path full_ssn
-    output:
-        path "stats.tab"
+    // If there was no job name specified, then assign a default
+    def final_job_name = params.job_name ?: "Full SSN"
+
+    // Create a clean job name for the file
+    def clean_file_name = final_job_name
+        .replaceAll(/[^\p{ASCII}]/, "")
+        .replaceAll(/[^a-zA-Z0-9_\-\.]/, "_")
+        .replaceAll(/^[_-]+|[_-]+$/, "")
+        .toLowerCase();
+
+    def file_name = (clean_file_name ?: "full_ssn") + ".xgmml"
+
     """
-    perl $projectDir/stats/stats.pl -run-dir . -out stats.tab
+    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output "${file_name}" --title "${final_job_name}" --db-version ${params.db_version} --stats stats.json
+    zip full_ssn.xgmml.zip "${file_name}"
+    rm "${file_name}"
+    touch job.finish
     """
 }
 
@@ -89,7 +93,4 @@ workflow {
 
     // create networks
     full_ssn = create_full_ssn(filtered_blast, fasta_filter_outputs.filtered_fasta, ssn_meta_file)
-
-    // compute stats
-    stats = compute_stats(full_ssn)
 }

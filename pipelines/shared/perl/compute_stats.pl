@@ -7,8 +7,9 @@ use FindBin;
 
 use lib "$FindBin::Bin/../../../lib";
 
-use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file);
 use EFI::Options;
+use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file parse_metanode_map_file parse_singletons_file);
+use EFI::Util::FileStats qw(save_stats);
 
 
 
@@ -27,7 +28,7 @@ my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});
 
 my $fullClusterToId = resolve_mapping($clusterToId, $idType, $sourceIdMap);
 
-my $singletons = loadSingletons($opts->{singletons});
+my $singletons = parse_singletons_file($opts->{singletons});
 
 my $stats = computeStats($opts->{stats}, $clusterToId, $fullClusterToId, $idType, $singletons);
 
@@ -85,40 +86,15 @@ sub computeStats {
         $idType = "UniProt";
     }
 
-    open my $fh, ">", $statsFile or die "Unable to write to stats file '$statsFile': $!";
-    $fh->print(join("\t", "Number of SSN clusters", $numClusters), "\n");
-    $fh->print(join("\t", "Number of SSN singletons", $numSingletons), "\n");
-    $fh->print(join("\t", "SSN sequence source", $idType), "\n");
-    $fh->print(join("\t", "Number of SSN (meta)nodes", $numNodes), "\n");
-    $fh->print(join("\t", "Number of accession IDs in SSN", $numSequences), "\n");
-    close $fh;
-}
+    my $stats = {
+        num_ssn_clusters => $numClusters,
+        num_ssn_singletons => $numSingletons,
+        num_ssn_nodes => $numNodes,
+        num_ssn_accession_ids => $numSequences,
+        ssn_sequence_source => $idType,
+    };
 
-
-#
-# loadSingletons
-#
-# Load the singletons in the SSN; the file includes a header line
-#
-# Parameters:
-#    $file - single column file to parse
-#
-sub loadSingletons {
-    my $file = shift;
-
-    open my $fh, "<", $file or die "Unable to open singletons file '$file' for reading: $!";
-
-    my @ids;
-
-    my $header = <$fh>;
-    while (my $line = <$fh>) {
-        chomp $line;
-        push @ids, $_;
-    }
-
-    close $fh;
-
-    return \@ids;
+    save_stats($statsFile, $stats);
 }
 
 
@@ -129,22 +105,16 @@ sub validateAndProcessOptions {
     $optParser->addOption("cluster-map=s", 1, "path to a file mapping sequence ID to cluster number", OPT_FILE);
     $optParser->addOption("seqid-source-map=s", 1, "path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)", OPT_FILE);
     $optParser->addOption("singletons=s", 1, "path to a file containing a list of singletons", OPT_FILE);
-    $optParser->addOption("stats=s", 1, "path to an output file to save statistics to", OPT_FILE);
+    $optParser->addOption("stats=s", 1, "path to an output file in JSON format to save statistics to", OPT_FILE);
 
-    if (not $optParser->parseOptions()) {
-        my $text = $optParser->printHelp(OPT_ERRORS);
-        die "$text\n";
-        exit(1);
-    }
-
-    if ($optParser->wantHelp()) {
-        my $text = $optParser->printHelp();
-        print $text;
-        exit(0);
+    if (not $optParser->parseOptions() or $optParser->wantHelp()) {
+        print $optParser->printHelp();
+        exit(not $optParser->wantHelp());
     }
 
     return $optParser->getOptions();
 }
+
 
 1;
 __END__
@@ -186,7 +156,7 @@ Path to a file listing the singletons in the network (e.g. nodes without any edg
 
 =item C<--stats>
 
-Path to an output file to put the stats in
+Path to an output file to put the stats in.  The file format will be JSON
 
 =back
 

@@ -11,9 +11,10 @@ use Scalar::Util qw(looks_like_number);
 use constant NONE_PFAM => "none";
 use constant FILTER_COOCCURRENCE => 1;
 use constant SKIP_SINGLETONS => 2;
+use constant DEFAULT_COOCCURRENCE_THRESHOLD => 0.20;
 
 use Exporter qw(import);
-our @EXPORT_OK = qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS);
+our @EXPORT_OK = qw(NONE_PFAM FILTER_COOCCURRENCE SKIP_SINGLETONS DEFAULT_COOCCURRENCE_THRESHOLD);
 
 
 sub new {
@@ -226,11 +227,17 @@ sub computeClusterHubs {
                 foreach my $queryId (keys %$pfamHub) {
                     map { $unclassified{$_->{id}} = 1 } @{ $pfamHub->{$queryId} };
                 }
-                next;
             }
 
             my $data = $self->makeHubData($clusterNum, $pfamHub);
             $pfams->{$pfam} = $data;
+        }
+
+        # Also add in any query IDs that do not have Pfams into the unclassified list
+        foreach my $queryData (@{ $self->{cluster_data}->{$clusterNum} }) {
+            if (not $queryData->{attributes}->{pfam}) {
+                $unclassified{ $queryData->{attributes}->{id} } = 1;
+            }
         }
 
         $self->{cluster_hubs}->{$clusterNum}->{hub} = $pfams;
@@ -322,6 +329,7 @@ sub getPfamHub {
     my $self = shift;
     my $pfam = shift;
     my $filterSpokes = shift // FILTER_COOCCURRENCE;
+    my $skipSingletons = shift;
 
     return {} if not $self->{pfam_hubs}->{$pfam};
 
@@ -333,6 +341,7 @@ sub getPfamHub {
     my $filteredSpokes = {};
 
     foreach my $clusterNum (keys %$hub) {
+        next if not $clusterNum and $skipSingletons;
         my $spoke = $hub->{$clusterNum};
         if ($spoke->{num_ids_with_neighbors} > 1 and $spoke->{cooccurrence} >= $self->{cooc_threshold}) {
             $filteredSpokes->{$clusterNum} = $spoke;
@@ -560,7 +569,7 @@ contains two keys/values containing cluster size information.
     # Results in:
     #   Pfam pfam_a is in cluster 1 and meets the cooccurrence threshold
 
-    my $data = $hubs->getClusterHub(1, 0);
+    my $data = $hubs->getClusterHub(1, not FILTER_COOCCURRENCE);
     foreach my $pfam (keys %{ $data->{spokes} }) {
         print "Pfam $pfam is in cluster 1 and may or may not meet the cooccurrence threshold\n";
     }
@@ -571,8 +580,8 @@ contains two keys/values containing cluster size information.
 
 =head3 C<getClusterUnclassified($clusterNum)>
 
-Returns the list of neighbor IDs in the given cluster that do not have a Pfam
-associated with them.
+Returns the list of neighbor IDs in the given cluster that do not have a Pfam associated
+with them.  Also includes any query IDs that do not have a Pfam.
 
 =head4 Parameters
 
@@ -586,14 +595,14 @@ The cluster number to retrieve the IDs from.
 
 =head4 Returns
 
-An array ref with neighbor accession IDs.
+An array ref with accession IDs.
 
 =head4 Example Usage
 
     my $clusterNum = 4;
     my $ids = $hubs->getClusterUnclassified($clusterNum);
     foreach my $id (@$ids) {
-        print "Neighbor ID $id is not classified with a Pfam family\n";
+        print "ID $id is not classified with a Pfam family\n";
     }
 
 
@@ -614,7 +623,7 @@ An array of Pfam hub names (family IDs, can be hyphen-separated).
     }
 
 
-=head3 C<getPfamHub($pfamHubName, $filterSpokes)>
+=head3 C<getPfamHub($pfamHubName, $filterSpokes, $skipSingletons)>
 
 Returns clusters from the given Pfam hub name, optionally filtering out
 spoke nodes (clusters) that have a cooccurrence less than the threshold
@@ -633,6 +642,10 @@ Pfam hub name that is in the GNN.
 If specified and zero, then all clusters are returned, even those not meeting
 the cooccurrence threshold.  Optional, and defaults to 1 (filter according to
 cooccurrence threshold).
+
+=item C<$skipSingletons>
+
+If specified and non-zero, then only clusters with > 1 node are returned.
 
 =back
 

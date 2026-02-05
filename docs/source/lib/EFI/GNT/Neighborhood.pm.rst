@@ -39,8 +39,8 @@ SYNOPSIS
 DESCRIPTION
 -----------
 
-EFI::GNT::Neighborhood is a Perl module for retrieving the sequences and
-metadata of genomes that are neighbors to a query sequence.
+**EFI::GNT::Neighborhood** is a Perl module for retrieving the sequences
+and metadata of genomes that are neighbors to a query sequence.
 
 
 
@@ -52,7 +52,7 @@ METHODS
 ``new(dbh => $dbh)``
 ~~~~~~~~~~~~~~~~~~~~
 
-Creates a new ``EFI::GNT::Neighborhood`` object.
+Creates a new **EFI::GNT::Neighborhood** object.
 
 
 
@@ -60,7 +60,7 @@ Parameters
 ^^^^^^^^^^
 
 ``dbh``
-   Database handle that comes from ``EFI::Database``.
+   Database handle that comes from **EFI::Database**.
 
 
 

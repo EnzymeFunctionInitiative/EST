@@ -9,48 +9,60 @@ use FindBin;
 
 use lib "$FindBin::Bin/../../../lib";
 
+use EFI::Annotations::Fields qw(:source);
 use EFI::Import::Config::FastaImport;
 use EFI::Import::Logger;
+use EFI::Sequence::Collection;
 
 
 
 
 my $logger = new EFI::Import::Logger();
 
-my $config = new EFI::Import::Config::FastaImport();
-my ($err) = $config->validateAndProcessOptions();
+my $optionParser = new EFI::Import::Config::FastaImport();
+my ($status, $help) = $optionParser->validateOptions();
 
-if ($config->wantHelp()) {
-    $config->printHelp($0);
-    exit(0);
+if ($help) {
+    print "$help\n";
+    exit(not $status); # if error, status is 0, so exit non zero to indicate to shell that there was a problem
 }
 
-if (@$err) {
-    #$logger->error(@$err);
-    $config->printHelp($0, $err);
-    die "\n";
-}
+my $config = $optionParser->getOptions();
 
 
-my $mappingFile = $config->getConfigValue("seq_mapping_file");
-my $fastaFile = $config->getConfigValue("uploaded_fasta");
-my $outputFile = $config->getConfigValue("output_sequence_file");
 
 
-my $lineMapping = loadMappingFile($mappingFile);
+# A mapping of line number in the original input FASTA file to sequence ID
+my $lineMapping = loadMappingFile($config->{sequence_mapping_file});
 
-open my $in, "<", $fastaFile or die "Unable to read input fasta file $fastaFile: $!";
-open my $out, ">", $outputFile or die "Unable to write to output fasta file $outputFile: $!";
+# All IDs come in the sequence ID list and metadata file, both those sourced from the FASTA file
+# and those IDs added by family addition
+my $seqCollection = new EFI::Sequence::Collection();
+$seqCollection->load($config->{sequence_meta_file});
+my @seqIds = $seqCollection->getSequenceIds();
+
+# filteredSeqIds is used to exclude any IDs/sequences in the FASTA file that were excluded due to
+# filtering in a prior step.
+my %filteredSeqIds = map { $_ => 1 } @seqIds;
+
+
+open my $in, "<", $config->{uploaded_fasta} or die "Unable to read input fasta file $config->{uploaded_fasta}: $!";
+open my $out, ">", $config->{output_sequence_file} or die "Unable to write to output fasta file $config->{output_sequence_file}: $!";
 
 my $lineNum = 0;
 my $isValidSeq = 0;
 while (my $line = <$in>) {
-    if ($line =~ m/^>/ and $lineMapping->{$lineNum}) {
-        $out->print(">$lineMapping->{$lineNum}\n");
-        $isValidSeq = 1;
-    } elsif ($line =~ m/^>/) {
-        $isValidSeq = 0;
+    if ($line =~ m/^>/) {
+        my $mappedId = $lineMapping->{$lineNum};
+        # If the header was valid and the ID wasn't filtered out in a previous step
+        if ($mappedId and $filteredSeqIds{$mappedId}) {
+            $out->print(">$lineMapping->{$lineNum}\n");
+            $isValidSeq = 1;
+        } else {
+            $isValidSeq = 0;
+        }
     } elsif ($isValidSeq) {
+        # Print the current line from user-specified FASTA file
         $out->print($line);
     }
     $lineNum++;
@@ -63,6 +75,25 @@ close $in;
 
 
 
+
+
+
+
+
+
+
+#
+# loadMappingFile
+#
+# Load the mapping file that maps sequence ID (UniProt or unknown) to line number in the original
+# FASTA file.
+#
+# Parameters:
+#    $file - path to mapping file
+#
+# Returns:
+#    hash ref with key being line number and value being sequence ID
+#
 sub loadMappingFile {
     my $file = shift;
 
@@ -87,24 +118,55 @@ sub loadMappingFile {
 
 
 
+1;
 __END__
 
 =head1 import_fasta.pl
 
 =head2 NAME
 
-import_fasta.pl - import user-specified FASTA sequences into a form usable by the SSN creation pipeline instead of using C<get_sequences.pl>.
+B<import_fasta.pl> - import user-specified FASTA sequences into a form usable by the EST pipeline
 
 =head2 SYNOPSIS
 
-    import_fasta.pl --uploaded-fasta-file <PATH/TO/FASTA_file>
+    import_fasta.pl --uploaded-fasta <FILE> --sequence-mapping-file <FILE> --sequence-meta-file <FILE>
+        --output-sequence-file <FILE>
 
 =head2 DESCRIPTION
 
-For all import methods but FASTA, the C<get_sequences.pl> script is used.  This script is
-a replacement for that and is designed to work with FASTA sequences that do not have a
-proper sequence ID.  It assigns anonymous sequence identifiers to the sequences and
-writes them to the standard C<all_sequences> file that is outputted from C<get_sequences.pl>.
+This script reformats a user-specified FASTA sequence file into a form that is usable by the
+EST pipeline.  Any sequence IDs from the FASTA header that were not identified are assigned a
+unique ID in the unknown ID format (see B<EFI::Sequence::Type>).
+
+An example of a user-specified input file:
+
+    >|tr|B0SS77|Leptospira biflexa
+    ABCDEFG
+
+    >B0SS75 Leptospira biflexa serovar Patoc
+    ABCDEFG
+
+    >OtherID
+    >Life-42
+    ABCDEFG
+
+    >ABZ97962.1
+    ABCDEFG
+
+Running this script with that file would result the following output file:
+
+    >B0SS77
+    ABCDEFG
+
+    >B0SS75
+    ABCDEFG
+
+    >ZZZZZ0
+    ABCDEFG
+
+    >B0SS72
+    ABCDEFG
+
 
 =head3 Arguments
 
@@ -114,28 +176,30 @@ writes them to the standard C<all_sequences> file that is outputted from C<get_s
 
 The path to the user-specified FASTA file.
 
-=item C<--output-dir> (optional, defaults)
+=item C<--sequence-mapping-file> (required, default value)
 
-The directory to read and write the input and output files from and to. Defaults to the
-current working directory if not specified.
+This file is a two column format file with a header line, where the first column is the UniProt
+or unknown ID and the second column is the line number where the corresponding sequence header
+is located in the C<--user-uploaded-file> file.
 
-=item C<--seq-mapping-file> (optional, defaults)
+This file is generated by C<get_sequence_ids.pl> in a prior step which outputs a file that maps
+line numbers in the original user-specified FASTA file to anonymous sequence identifiers.
+Defaults to C<seq_mapping.tab> in the current directory if not specified.
 
-When C<get_sequence_ids.pl> is run in the FASTA mode, it outputs a file that maps
-lines in the original user-specified FASTA file to anonymous sequence identifiers.
-If this is not specified, the file with the name corresponding to the C<seq_mapping> value
-in the B<C<EFI::Import::Config::Defaults>> module is used in the output directory.
+=item C<--sequence-meta-file> (required, default value)
 
-This file is a two column format file with a header line, where the first column
-is the UniProt or anonymous ID and the second column is the line number where the
-corresponding sequence header is located in the C<--user-uploaded-file> file.
+Path to the file containing sequence metadata (e.g. mapping sequence ID to metadata such as
+the original ID from the fasta).  If sequences are in the input FASTA (and sequence mapping file)
+but are not in this file then they are not output.  This occurs if the sequence was filtered out
+in a prior step (e.g. to remove fragments).
+Defaults to C<sequence_metadata.tab> in the current directory if not specified.
 
-=item C<--output-sequence-file> (optional, defaults)
+=item C<--output-sequence-file> (required, default value)
 
-The path to the output file containing all of the FASTA sequences that are reformatted
-and renamed based on the C<--seq-mapping-file> file.
-If this is not specified, the file with the name corresponding to the C<all_sequences> value
-in the B<C<EFI::Import::Config::Defaults>> module is used in the output directory.
+The path to an output file containing the sequences from the input FASTA file.  The sequences are
+reformatted and renumbered as necessary.  If sequences were removed by filtering in a prior step
+then they are not included in the output.
+Defaults to C<all_sequences.tab> in the current directory if not specified.
 
 =back
 

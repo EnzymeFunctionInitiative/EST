@@ -9,9 +9,10 @@ use Data::Dumper;
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../";
-use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
 
-use EFI::Annotations::Fields ':all';
+use EFI::Annotations::Fields qw(:all);
+use EFI::Database::Util;
+use EFI::Sequence::Type qw(:types);
 
 
 our $TYPE_NAME = "";
@@ -30,19 +31,13 @@ sub new {
 
 sub init {
     my $self = shift;
-    my $config = shift || die "Fatal error: unable to create source: missing config arg";
-    my $efiDb = shift;
+    my $config = shift;
+    my $efiDbh = shift;
     my %args = @_;
 
-    $self->{config} = $config;
-    $self->{efi_db} = $efiDb;
-    $self->{sunburst} = $args{sunburst};
-    $self->{stats} = $args{stats};
-
-    my $seqVer = $config->getConfigValue("sequence_version");
-    if ($seqVer =~ m/^uniref(50|90)$/) {
-        $self->{uniref_version} = $seqVer;
-    }
+    $self->{dbh} = $efiDbh || die "Require efi dbh argument";
+    $self->{sequence_version} = $config->{sequence_version} // SEQ_UNIPROT;
+    $self->{db_util} = new EFI::Database::Util(dbh => $self->{dbh});
 
     return 1;
 }
@@ -64,194 +59,83 @@ sub addError {
 }
 
 
-# Returns a hash that looks like:
-# {
-#    type => uniprot|uniref50|uniref90,
-#    ids => {
-#        UNIPROT_ACC => [
-#                {
-#                    start => x, end => x
-#                    # optionally, other things
-#                }
-#                # optionally other "pieces", e.g. for multi-domain proteins
-#            ],
-#        UNIPROT_ACC2 => ...
-#    },
-#    meta => {
-#        UNIPROT_ACC => {
-#            source => x,
-#            ...
-#        },
-#        ...
-#    }
-# }
-
-sub getSequenceIds {
+# The various Source::* classes override this.
+sub loadFromSource {
     my $self = shift;
-    return {ids => {}, type => "uniprot", meta => {}};
+    my $seqData = shift;
+    return 0;
 }
 
 
-
-
-#
-# retrieveUnirefIds - internal method
-#
-# Given an input list of UniProt IDs, returns a structure of UniRef50 and UniRef90 ID
-# mapping to clusters of UniProt IDs.
-# 
-# Parameters:
-#     $idMetadata - hash ref where the keys are UniProt IDs; the values are not used
-#     $assumeUniprot - assume IDs are UniProt not UniRef; this is used for the BLAST
-#         import option when UniRef is selected as an input option
-#
-# Returns:
-#     mapping of UniRef IDs to UniProt IDs
-#
-# Example return value:
-#
-#     {
-#         50 => {
-#             "UNIREFID" => ["UniProt", "UniProt", ...],
-#             ...
-#         },
-#         90 => {
-#             "UNIREFID" => ["UniProt", "UniProt", ...],
-#             ...
-#         }
-#     }
-#
-sub retrieveUnirefIds {
+sub hasUnmatchedIds {
     my $self = shift;
-    my $idMetadata = shift;
-    my $assumeUniprot = shift || 0;
-
-    my $unirefField = (not $assumeUniprot and $self->{uniref_version}) ? "$self->{uniref_version}_seed" : "accession";
-
-    my @ids = keys %$idMetadata;
-    my $unirefIds = {};
-
-    my $dbh = $self->{efi_db}->getHandle();
-
-    my $sql = "SELECT * FROM uniref WHERE $unirefField = ?";
-    my $sth = $dbh->prepare($sql);
-
-    foreach my $id (@ids) {
-        $sth->execute($id);
-        while (my $row = $sth->fetchrow_hashref) {
-            push @{ $unirefIds->{50}->{$row->{uniref50_seed}} }, $row->{accession};
-            push @{ $unirefIds->{90}->{$row->{uniref90_seed}} }, $row->{accession};
-        }
-    }
-
-    return $unirefIds;
+    return 0;
 }
 
 
-
-
-#
-# createMetadata - protected method
-#
-# Creates a basic metadata structure that subclasses can use as a starting point for creating metadata.
-#
-# Parameters:
-#     $source - the sequence source field (see EFI::Annotations::Fields)
-#     $ids - hash ref of IDs to data; only keys are used
-#     $unirefMapping - hash ref of UniRef ID -> array of UniProt IDs in UniRef cluster
-#     $extraMetaFn (optional) - function for adding extra information to the metadata;
-#         takes sequence ID and sequence metadata substructure as the parameters
-#
-# Returns:
-#     metadata hash ref structure with source and UniRef mapping
-#
-sub createMetadata {
+sub saveUnmatchedIds {
     my $self = shift;
-    my $source = shift;
-    my $ids = shift;
-    my $unirefMapping = shift;
-    my $extraMetaFn = shift || sub {};
-
-    my $unirefIdsKey;
-    my $unirefSizeKey;
-    if ($self->{uniref_version}) {
-        $unirefIdsKey = $self->{uniref_version} eq "uniref50" ? FIELD_UNIREF50_IDS : FIELD_UNIREF90_IDS;
-        $unirefSizeKey = $self->{uniref_version} eq "uniref50" ? FIELD_UNIREF50_CLUSTER_SIZE : FIELD_UNIREF90_CLUSTER_SIZE;
-    }
-
-    my $meta = {};
-    foreach my $id (keys %$ids) {
-        $meta->{$id} = {&FIELD_SEQ_SRC_KEY => $source};
-        if ($self->{uniref_version} and $unirefMapping->{$id}) {
-            $meta->{$id}->{$unirefIdsKey} = $unirefMapping->{$id};
-            $meta->{$id}->{$unirefSizeKey} = scalar @{ $meta->{$id}->{$unirefIdsKey} };
-        }
-        &$extraMetaFn($id, $meta->{$id});
-    }
-
-    return $meta;
+    my $file = shift;
 }
 
 
-
-
-#
-# addSunburstIds - protected method
-#
-# Add UniProt and UniRef IDs to the sunburst data structure that is saved by the import process.
-#
-# Parameters:
-#    $idMetadata - a hash ref of input IDs to metadata
-#    $unirefMapping - hash ref of ID -> UniRef cluster list mapping
-#
-# Returns:
-#    nothing
-#
-sub addSunburstIds {
-    my $self = shift;
-    my $idMetadata = shift;
-    my $unirefMapping = shift;
-
-    my %uniprotMap;
-
-    # Expand the UniRef IDs into the UniProt IDs and then reverse map them.  This is done so that the
-    # sunburst contains all UniProt IDs that are related to the input UniRef IDs.
-    my $uniprotMapFn = sub {
-        my $version = shift;
-        my $mapKey = "uniref$version";
-        foreach my $unirefId (keys %{ $unirefMapping->{$version} }) {
-            foreach my $uniprotId (@{ $unirefMapping->{$version}->{$unirefId} }) {
-                $uniprotMap{$uniprotId}->{$mapKey} = $unirefId;
-            }
-        }
-    };
-
-    &$uniprotMapFn("50");
-    &$uniprotMapFn("90");
-
-    foreach my $id (keys %uniprotMap) {
-        $self->addIdToSunburst($id, {uniref50 => $uniprotMap{$id}->{uniref50} // "", uniref90 => $uniprotMap{$id}->{uniref90} // ""});
-    }
-}
-
-
-
-
-sub addIdToSunburst {
-    my $self = shift;
-    my $uniprotId = shift;
-    my $unirefIds = shift;
-    $self->{sunburst}->addId($uniprotId, $unirefIds->{uniref50} // "", $unirefIds->{uniref90} // "") if $self->{sunburst};
-}
-
-
-
-
+# protected
 sub addStatsValue {
     my $self = shift;
     my $name = shift;
     my $value = shift;
-    $self->{stats}->addValue($name, $value) if $self->{stats};
+    $self->{stats}->{$name} = $value;
+}
+
+
+#
+# addUnirefIds - protected method
+#
+# Add UniRef IDs to the sequence collection.  The UniRef IDs and associated UniProt IDs are
+# retrieved and stored.
+#
+# Parameters:
+#    $seqData - sequence collection (EFI::Sequence::Collection)
+#    $seqVersion - input sequence version (defaults to SEQ_UNIPROT)
+#    $unirefIds - optional hash ref of manually-specified UniRef IDs (i.e. from the Family source);
+#        if this is specified, then no database lookup is made and the IDs are added from this hash
+#
+sub addUnirefIds {
+    my $self = shift;
+    my $seqData = shift;
+    my $seqVersion = shift || $self->{sequence_version};
+    my $unirefIds = shift;
+
+    if ($unirefIds) {
+        map { $seqData->associateUnirefIds($_, $unirefIds->{$_}->[0] || "", $unirefIds->{$_}->[1] || ""); } keys %$unirefIds;
+        return;
+    }
+
+    # If the IDs from the collection are already UniRef IDs, we need to retrieve the IDs from
+    # the uniref table that match those IDs.
+    my $tableKey = "accession";
+    if ($seqVersion eq SEQ_UNIREF90) {
+        $tableKey = "uniref90_seed";
+    } elsif ($seqVersion eq SEQ_UNIREF50) {
+        $tableKey = "uniref50_seed";
+    }
+
+    my $sql = "SELECT * FROM uniref WHERE $tableKey IN (<IDS>)";
+
+    my @ids = $seqData->getSequenceIds();
+
+    my $matched = $self->{db_util}->batchRetrieveIds(\@ids, $sql, "accession");
+    foreach my $id (sort keys %$matched) {
+        $seqData->associateUnirefIds($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
+    }
+}
+
+
+# public
+sub addStats {
+    my $self = shift;
+    my $stats = shift;
+    map { $stats->addValue($_, $self->{stats}->{$_}); } keys %{ $self->{stats} };
 }
 
 

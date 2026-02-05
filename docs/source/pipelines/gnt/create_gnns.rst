@@ -1,5 +1,34 @@
 create_gnns
 ===========
+Usage
+-----
+
+::
+
+	Usage: perl pipelines/gnt/create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
+	    --config <FILE> --db-name <VALUE> [--metanode-map <FILE>] [--gnd <FILE>] [--cooc-table <FILE>]
+	    [--hub-count <FILE>] [--nb-pfam-list-dir <DIR_PATH>] [--no-context <FILE>] [--nb-size <VALUE>]
+	    [--cooc-threshold <VALUE>] [--title <VALUE>] [--stats <VALUE>]
+	
+	Description:
+	    Computes the genome neighborhood network (GNN) from output from the Color SSN pipeline
+	
+	Options:
+	    --cluster-map         path to a file mapping sequence ID to cluster number
+	    --metanode-map        path to input file mapping metanode (e.g. UniRef node) to members of metanode
+	    --cluster-gnn         path to the output cluster hub-spoke GNN XGMML file
+	    --pfam-gnn            path to the output Pfam hub-spoke GNN XGMML file
+	    --gnd                 path to the output GND file
+	    --cooc-table          path to the output Pfam co-occurence table file
+	    --hub-count           path to the output hub count table file
+	    --nb-pfam-list-dir    path to an output directory containing files for each Pfam hub
+	    --no-context          path to an output file to save a list of input IDs that didn't have an ENA entry or didn't have neighbors
+	    --nb-size             neighborhood size (number of sequences) to retrieve on either side of query (> 0 and <= 20)
+	    --cooc-threshold      cooccurrence threshold (>= 0.0 and <= 1.0)
+	    --config              path to the config file for database connection
+	    --db-name             name of the EFI database to connect to for retrieving UniRef sequences
+	    --title               title of the GNN and GND for display purposes
+	    --stats               path to file to output SSN statistics to
 
 Reference
 ---------
@@ -19,9 +48,10 @@ SYNOPSIS
 ::
 
    create_gnns.pl --cluster-map <FILE> --cluster-gnn <FILE> --pfam-gnn <FILE>
-       --config <FILE> --db-name <NAME> [--gnd <FILE> --cooc-table <FILE>]
-       [--hub-count <FILE> --nb-pfam-list-dir <DIR> --no-context FILE
-       [--nb-size <INTEGER> --cooc-threshold <NUMBER>]
+       --config <FILE> --db-name <NAME> [--metanode-map <FILE> --gnd <FILE>]
+       [--cooc-table <FILE> --hub-count <FILE> --nb-pfam-list-dir <DIR>]
+       [--no-context FILE --nb-size <INTEGER> --cooc-threshold <NUMBER>]
+       [--title "<TITLE>" --stats <FILE>]
 
 
 
@@ -32,6 +62,7 @@ DESCRIPTION
 numbers and creates XGMML files for a cluster GNN and Pfam GNN. It
 optionally can create tables and metadata with data about the Pfams of
 neighbors in the input IDs and a genome neighborhood diagram (GND) file.
+The input IDs are assumed to be UniProt.
 
 
 
@@ -39,46 +70,76 @@ Arguments
 ~~~~~~~~~
 
 ``--cluster-map``
-   Path to a file that maps UniProt sequence ID to a cluster number,
-   which can include a list of singletons.
+   Path to the input file that maps UniProt sequence ID to a cluster
+   number, which can include a list of singletons (i.e. no cluster
+   number columns). See ``parse_cluster_map_file()`` in
+   **EFI::SSN::Util::ID** for an explanation of the file format.
+
+``--metanode-map``
+   Path to the file that maps input nodes in the cluster-map to UniProt
+   IDs within the metanode. This is optional, in which case the input
+   network is assumed to be a UniProt network, as is the case when the
+   file is empty. See ``ssn_to_id_list.pl`` and
+   ``parse_metanode_map_file()`` in **EFI::SSN::Util::ID** for more
+   details.
 
 ``--cluster-gnn``
-   Path to the output cluster-centric GNN in XGMML (XML) format.
+   Path to the output cluster-centric GNN in XGMML (XML) format. This
+   file can be viewed in Cytoscape.
 
 ``--pfam-gnn``
-   Path to the output Pfam-centric GNN in XGMML (XML) format.
+   Path to the output Pfam-centric GNN in XGMML (XML) format. This file
+   can be viewed in Cytoscape.
 
 ``--gnd``
-   Optional path to an output file in SQLite format that contains the
-   data necessary to visualize genome neighborhood diagrams (GNDs).
+   Optional path to an output file in SQLite format containing the data
+   necessary to visualize genome neighborhood diagrams (GNDs).
 
 ``--cooc-table``
-   Path to a file that will contain co-occurrences for every Pfam of
-   every neighbor of every ID in the input ID list.
+   Optional path to an output file containing co-occurrences for every
+   Pfam of every neighbor of every ID in the input ID list. The file is
+   a tab-separated file with the first column being a list of Pfams and
+   each successive column being a cluster number and the co-occurrence
+   of the Pfam in that cluster.
 
 ``--hub-count``
-   Path to a file that will contain the size of every cluster hub (e.g.
-   how many IDs had neighbors vs how how many IDs in the cluster).
+   Optional path to an output tab-separated file containing the size of
+   every cluster hub, with the first column being the cluster number,
+   the second column (NumQueryableSeq) containing the number of
+   sequences in the cluster that had neighbors, and the third column
+   (TotalNumSeq) containing the total number of sequences in the
+   cluster.
 
 ``--nb-pfam-list-dir``
-   Path to a directory that will contain tables for every Pfam for all
-   of the neighbors of the input IDs. Four sub-directories are created:
-   ``pfam``, ``pfam_split``, ``all_pfam``, and ``all_pfam_split``.
+   Optional path to an output directory containing tables for every Pfam
+   group for all of the neighbors of the input IDs. Four sub-directories
+   are created: ``pfam`` (Pfam groups filtered by co-occurrence),
+   ``pfam_split`` (Pfam groups split into constituent families, filtered
+   by co-occurrence), ``all_pfam`` (all Pfam groups, not filtered by
+   co-occurrence), and ``all_pfam_split`` (Pfam groups split into
+   constituent families, not filtered by co-occurrence).
 
 ``--no-context``
-   Path to a file that will contain a list of input IDs without ENA data
-   or without neighbors.
+   Optional path to an output file that contains a list of input IDs
+   without ENA data or without neighbors.
 
 ``--nb-size``
-   Number of neighbors on the left and right of the input IDs to include
-   in the analysis. This is an integer > 0.
+   Optional number of neighbors on the left and right of the input IDs
+   to include in the analysis, an integer > 0 and <= 20.
 
 ``--cooc-threshold``
-   The co-occurrence threshold to use for computing the Pfam hubs. This
-   is a real number >= 0 and <= 1.
+   Optional co-occurrence threshold to use for computing the Pfam hubs,
+   a real number >= 0 and <= 1.
 
 ``--config``
-   Path to the ``efi.config`` file used for database connection options
+   Path to the ``efi.config`` file used for database connection options.
 
 ``--db-name``
-   Name of the database to use (path to file for SQLite)
+   Name of the database to use (path to file for SQLite).
+
+``--title``
+   Optional title to use for display purposes in the GND viewer.
+
+``--stats``
+   Optional path to a file to write statistics (e.g. number of nodes,
+   edges) to.

@@ -4,403 +4,359 @@ package EFI::SSN::XgmmlWriter;
 use strict;
 use warnings;
 
-use XML::LibXML::Reader;
-use XML::Writer;
-use IO::File;
-
 use Cwd qw(abs_path);
-use File::Basename qw(dirname);
+use File::Basename;
 use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::Annotations;
-use EFI::Annotations::Fields qw(:color);
+use EFI::Annotations::Fields qw(:annotations :source FIELD_CYTOSCAPE_COLOR);
+use EFI::Sequence::Type qw(is_unknown_sequence SEQ_FULL SEQ_DOMAIN);
 
+use parent qw(EFI::Xgmml::Writer);
 
+use constant MISSING_VALUE => "None";
 
 
 sub new {
     my ($class, %args) = @_;
 
-    my $self = {};
+    my $self = $class->SUPER::new(%args);
     bless($self, $class);
 
-    $self->{ssn} = $args{ssn};
-    $self->{output_ssn} = $args{output_ssn};
+    $self->{data_indent} = $args{data_indent} // 0;
+    $self->{use_min_edge_attr} = $args{use_min_edge_attr} // 0;
+    $self->{db_version} = $args{db_version} // 0;
+    $self->{seq_type} = $args{seq_type} // SEQ_FULL;
 
-    $self->{attr_handlers} = [];
+    $self->{has_fasta_attribute} = 0;
+    $self->{fields} = [];
+
+    $self->{stats} = { num_nodes => 0, num_edges => 0 };
 
     return $self;
 }
 
 
-sub addAttributeHandler {
-    my $self = shift;
-    my $handler = shift;
-    push @{ $self->{attr_handlers} }, $handler;
-}
-
-
+# public
 sub write {
     my $self = shift;
+    my $metadata = shift;
+    my $sequences = shift;
+    my $connectivity = shift;
+    my $title = shift;
+    my $edges = shift;
 
-    my $reader = XML::LibXML::Reader->new(location => $self->{ssn}) or die "Cannot read input XGMML file '$self->{ssn}': $!";
-    my $output = IO::File->new(">" . $self->{output_ssn});
-    # Disable error checking with the UNSAFE keyword; this improves performance
-    my $writer = XML::Writer->new(OUTPUT => $output, UNSAFE => 1, PREFIX_MAP => '');
-    $self->{writer} = $writer;
-    $self->{reader} = $reader;
+    $self->{sequences} = $sequences;
+    $self->{metadata} = $metadata;
+    $self->{nb_conn} = $connectivity;
+    $self->{title} = $title;
 
-    # Skip these fields in the input SSN from being output
-    $self->getSkipAtt();
+    my @ids = sort $self->{metadata}->getSequenceIds();
 
-    foreach my $h (@{ $self->{attr_handlers} }) {
-        $h->onInit();
+    my $attrs = $self->getNodeAttributes(\@ids);
+
+    # From EFI::Xgmml::Writer
+    $self->open();
+
+    # From EFI::Xgmml::Writer
+    $self->preamble();
+
+    $self->writeStarting();
+
+    $self->writeNodes(\@ids, $attrs);
+
+    $self->writeEdges($edges);
+
+    $self->writeClosing();
+
+    # From EFI::Xgmml::Writer
+    $self->close();
+}
+
+
+# public
+sub getStats {
+    my $self = shift;
+    my $fileName = fileparse($self->{output_file});
+    my $fileSize = -s $self->{output_file};
+    my $stats = { $fileName => { type => "full", num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize } };
+    return $stats;
+}
+
+
+#
+# writeStarting - private
+#
+# Write the starting tags, e.g. graph.
+#
+sub writeStarting {
+    my $self = shift;
+
+    my %attr;
+    $attr{"sequence_type"} = "domain" if $self->{seq_type} eq SEQ_DOMAIN;
+    $attr{"db_version"} = $self->{db_version} if $self->{db_version};
+
+    # Write SSN header info
+    $self->startTag("graph", "label" => $self->{title}, "xmlns" => $self->xmlns(), %attr);
+}
+
+
+#
+# writeClosing - private
+#
+# Write the ending tag, e.g. graph
+#
+sub writeClosing {
+    my $self = shift;
+    $self->endTag("graph");
+}
+
+
+#
+# writeNodes - private
+#
+# Writes nodes and attributes for the nodes to the SSN.
+#
+# Parameters:
+#    $ids - array ref of list of sequence IDs
+#    $attrs - hash ref mapping IDs to attributes
+#
+sub writeNodes {
+    my $self = shift;
+    my $ids = shift;
+    my $attrs = shift;
+
+    foreach my $id (@$ids) {
+        my $attr = $attrs->{$id};
+        $self->writeNode($id, $attr);
+        $self->{stats}->{num_nodes}++;
     }
+}
 
-    $self->{writer}->xmlDecl("UTF-8");
 
-    # Notes:
-    #    - XML_READER_TYPE_ELEMENT = start of an XML element, both empty and non-empty
-    #    - XML_READER_TYPE_END_ELEMENT = end of a non-empty XML element
-    #    - an empty element is one without open-close tags (e.g. <att A="B" />)
-    #    - the XML reader doesn't load everything into memory, just the current XML element
-    #    - the XML writer streams directly to the output file without constructing a DOM
-    #    - a SSN node has: 1) node index (the internal numbering for the edgelist);
-    #      2) node ID (the value from the SSN 'id' attribute on a 'node' element); and
-    #      3) node label (the sequence ID)
+#
+# writeNode - private
+#
+# Saves an individual node and attributes to the SSN.
+#
+# Parameters:
+#    $id - sequence ID
+#    $attr - hash ref containing field metadata and values
+#
+sub writeNode {
+    my $self = shift;
+    my $id = shift;
+    my $attr = shift;
 
-    while ($reader->read) {
-        my $ntype = $reader->nodeType;
-        my $nname = $reader->name;
+    $self->startTag("node", "id" => $id, "label" => $id);
 
-        if ($nname eq "node") {
-            if ($ntype == XML_READER_TYPE_ELEMENT) {
-                my $seqId = $reader->getAttribute("label");
-                my $id = $reader->getAttribute("id");
-                map { $_->onNodeStart($seqId, $id); } @{ $self->{attr_handlers} };
-                my @attr = ("id" => $id, "label" => $seqId);
-                $self->startTag("node", @attr);
-            } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
-                $self->endTag("node");
-                map { $_->onNodeEnd(); } @{ $self->{attr_handlers} };
-            }
-        } elsif ($nname eq "att") {
-            if ($ntype == XML_READER_TYPE_ELEMENT) {
-                $self->processAttElement();
-            } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
-                $self->endTag("att");
-            }
-        } elsif ($nname eq "edge") {
-            $self->copyEdge();
-        } else {
-            if ($nname eq "graph") {
-                $self->copyElement($ntype);
+    foreach my $field (@{ $self->{fields} }) {
+        next if not defined $attr->{$field->{name}};
+
+        if ($field->{is_list}) {
+            $self->startTag("att", "type" => "list", "name" => $field->{display});
+
+            my $value = $attr->{$field->{name}};
+
+            my @values;
+            if (ref $value eq "ARRAY") {
+                @values = map { ref $_ eq "ARRAY" ? @$_ : $_ } @$value;
             } else {
-                $self->copyElementWithoutNamespace($ntype);
+                @values = ($value);
             }
-        }
-    }
 
-    $writer->end();
-    $output->close();
-}
+            foreach my $val (@values) {
+                $self->emptyTag("att", "type" => $field->{type}, "name" => $field->{display}, "value" => $val);
+            }
 
-
-#
-# copyElement - private method
-#
-# Copies a XML element with its attributes by creating a new element with
-# copies of the attribute values; namespace attribute is also copied
-#
-# Parameters:
-#    $ntype - node type (e.g. start of tag, end of tag)
-#
-sub copyElement {
-    my $self = shift;
-    my $ntype = shift;
-    if ($ntype == XML_READER_TYPE_ELEMENT) {
-        my @attr;
-        foreach my $attr ($self->{reader}->copyCurrentNode(0)->getAttributes()) {
-            push @attr, $attr->name, $attr->value;
-        }
-        $self->createElementWithAttr(@attr);
-    } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
-        $self->endTag($self->{reader}->name);
-    }
-}
-
-
-#
-# createElementWithAttr - private method
-#
-# Creates an element with the provided attributes, with the type of the element
-# being the same as the one the reader currently points to; e.g. if the reader
-# is at a 'node' element, a new 'node' element is created
-#
-# Parameters:
-#    key-value pairs of attribute names-values
-#
-sub createElementWithAttr {
-    my $self = shift;
-    if ($self->{reader}->isEmptyElement()) {
-        $self->emptyTag($self->{reader}->name, @_);
-    } else {
-        $self->startTag($self->{reader}->name, @_);
-    }
-}
-
-
-
-#
-# copyElementWithoutNamespace - private method
-#
-# Copies a XML element with its attributes by creating a new element with
-# copies of the attribute values; namespace attribute is not included
-#
-# Parameters:
-#    $ntype - node type (e.g. start of tag, end of tag)
-#
-sub copyElementWithoutNamespace {
-    my $self = shift;
-    my $ntype = shift;
-    if ($ntype == XML_READER_TYPE_ELEMENT) {
-        my @attr;
-        foreach my $attr ($self->{reader}->copyCurrentNode(0)->getAttributes()) {
-            next if $attr->name eq "xmlns";
-            push @attr, $attr->name, $attr->value;
-        }
-        $self->createElementWithAttr(@attr);
-    } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
-        $self->endTag($self->{reader}->name);
-    }
-}
-
-
-#
-# copyEdge - private method
-#
-# Copy the current XML element (SSN edge) from the reader to the writer
-#
-sub copyEdge {
-    my $self = shift;
-    if ($self->{reader}->nodeType == XML_READER_TYPE_ELEMENT) {
-        my @attr;
-        # Add attribute to element if it exists in the reader element
-        my $addAttr = sub { my $attrName = shift; my $attrValue = $self->{reader}->getAttribute($attrName); push @attr, $attrName => $attrValue if $attrValue; };
-        $addAttr->("id");
-        $addAttr->("label");
-        $addAttr->("source");
-        $addAttr->("target");
-        if ($self->{reader}->isEmptyElement()) {
-            $self->emptyTag("edge", @attr);
+            $self->endTag("att");
         } else {
-            $self->startTag("edge", @attr);
+            $self->emptyTag("att", "name" => $field->{display}, "type" => $field->{type}, "value" => $attr->{$field->{name}});
         }
-    } elsif ($self->{reader}->nodeType == XML_READER_TYPE_END_ELEMENT) {
+    }
+
+    $self->endTag("node");
+}
+
+
+#
+# writeEdges - private
+#
+# Writes the edges to the file.
+#
+# Parameters:
+#    $edges - array ref of edge data
+#
+sub writeEdges {
+    my $self = shift;
+    my $edges = shift;
+
+    foreach my $edge (@$edges) {
+        $self->writeEdge($edge);
+        $self->{stats}->{num_edges}++;
+    }
+}
+
+
+#
+# writeEdge - private
+#
+# Writes an individual edge to the file.
+#
+# Parameters:
+#    $edge - hash ref containing edge data (e.g. source, target, ascore, etc)
+#
+sub writeEdge {
+    my $self = shift;
+    my $edge = shift;
+
+    my $source = $edge->{source};
+    my $target = $edge->{target};
+    my @idAttr = (source => $source, target => $target, id => "$source,$target", label => "$source,$target");
+
+    if ($self->{use_min_edge_attr}) {
+        $self->emptyTag("edge", @idAttr);
+    } else {
+        $self->startTag("edge", @idAttr);
+        $self->emptyTag("att", "name" => '%id', "type" => "real", "value" => $edge->{pid});
+        $self->emptyTag("att", "name" => "alignment_score", "type"=> "real", "value" => $edge->{ascore});
+        $self->emptyTag("att", "name" => "alignment_len", "type" => "integer", "value" => $edge->{alen});
         $self->endTag("edge");
     }
 }
 
 
 #
-# endTag - private method
+# getNodeAttributes - private
 #
-# Wrapper around the XML writer endTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
-sub endTag {
-    my $self = shift;
-    $self->{writer}->endTag(@_);
-    $self->{writer}->characters("\n");
-}
-
-
-#
-# startTag - private method
-#
-# Wrapper around the XML writer startTag() method so additional information can be added if needed
+# Gets all of the attributes for the input nodes.
 #
 # Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
-sub startTag {
-    my $self = shift;
-    $self->{writer}->startTag(@_);
-    $self->{writer}->characters("\n");
-}
-
-
-#
-# emptyTag - private method
-#
-# Wrapper around the XML writer emptyTag() method so additional information can be added if needed
-#
-# Parameters:
-#    $name - name of the element tag
-#    @_ - the rest of the values passed to the method are attributes for the tag
-#
-sub emptyTag {
-    my $self = shift;
-    $self->{writer}->emptyTag(@_);
-    $self->{writer}->characters("\n");
-}
-
-
-#
-# processAttElement - private method
-#
-# Process the 'att' element that is part of a SSN node by copying the attributes and
-# inserting new ones (e.g. cluster number)
-#
-sub processAttElement {
-    my $self = shift;
-
-    my $attName = $self->{reader}->getAttribute("name");
-
-    # An 'empty' element is a leaf (e.g. no child elements; <att X="Y" /> is empty);
-    # also, skip existing color or cluster number attrs
-    if (not $self->{skip_att}->{$attName}) {
-        my @attr = $self->getAttAttr($attName);
-
-        # Write the current 'empty' element plus the cluster info if we're at the right column
-        if ($self->{reader}->isEmptyElement()) {
-            $self->emptyTag("att", @attr);
-            foreach my $h (@{ $self->{attr_handlers} }) {
-                my $newAttrs = $h->getNewAttributes($attName);
-                foreach my $info (@$newAttrs) {
-                    my @newAttr = ("name" => $info->[0], "value" => $info->[1]);
-                    push @newAttr, "type" => $info->[2] if $info->[2];
-                    $self->emptyTag("att", @newAttr);
-                }
-            }
-        # Start the tag for a nested att
-        } else {
-            $self->startTag("att", @attr);
-        }
-    }
-}
-
-
-#
-# getAttAttr - private method
-#
-# Get the attribute from the 'att' element at the current XML reader cursor
-#
-# Parameters:
-#    $attName - attribute name
+#    $ids - list of IDs in array ref
 #
 # Returns:
-#    List of attributes in the input element
+#    hash ref that maps IDs to hash refs containing attributes for the sequence
 #
-sub getAttAttr {
+sub getNodeAttributes {
     my $self = shift;
-    my $attName = shift;
-    my $value = $self->{reader}->getAttribute("value");
-    my $attType = $self->{reader}->getAttribute("type");
-    my @attr = (name => $attName);
-    push @attr, ("value" => $value) if $value;
-    push @attr, ("type" => $attType) if $attType;
-    return @attr;
+    my $ids = shift;
+
+    my $anno = new EFI::Annotations;
+
+    my $attrs = {};
+
+    my %fieldMeta;
+    foreach my $field ($self->{metadata}->getFields()) {
+        $fieldMeta{$field} = $self->getFieldMetadata($field, $anno);
+    }
+
+    foreach my $id (@$ids) {
+        my $nodeAttr = $self->makeNodeAttributes($id, \%fieldMeta);
+        $attrs->{$id} = $nodeAttr;
+    }
+
+    # If any ID has a FASTA sequence attached to it as an attribute (e.g. for Option C jobs), then
+    # we need to add the sequence field as an attribute to the SSN.  $self->{hash_fasta_attribute}
+    # is set in makeNodeAttributes if this attribute is found.
+    $fieldMeta{&FIELD_SEQ_KEY} = $self->getFieldMetadata(FIELD_SEQ_KEY, $anno) if $self->{has_fasta_attribute};
+    my @fields = $anno->sort_annotations(keys %fieldMeta);
+
+    $self->{fields} = [];
+    foreach my $field (@fields) {
+        push @{ $self->{fields} }, $fieldMeta{$field};
+    }
+
+    return $attrs;
 }
 
 
 #
-# getSkipAtt - private method
+# getFieldMetadata - private
 #
-# Gets a list of fields to skip (e.g. existing color-related fields) as well as the
-# names of the color-related fields that will be inserted into the SSN
+# Returns metadata for a field, including type, SSN name, and value structure type.
 #
-sub getSkipAtt {
+# Parameters:
+#    $field - name of attribute, from EFI::Annotations::Fields
+#    $anno - EFI::Annotations object
+#
+# Returns:
+#    hash ref containing field name ('name', same as input), value type ('type'), display name
+#        (the column name in the SSN, 'display'), and value structure type ('is_list', true if
+#        the output data is a list structure)
+#
+sub getFieldMetadata {
     my $self = shift;
-    foreach my $attrHandler (@{ $self->{attr_handlers} }) {
-        my $fields = $attrHandler->getSkipFieldInfo();
-        map { $self->{skip_att}->{$_} = 1; } @$fields;
+    my $field = shift;
+    my $anno = shift;
+
+    my $type = $anno->get_attribute_type($field);
+    my $displayName = $anno->get_display_name($field);
+    my $isList = $anno->is_list_attribute($field);
+    
+    my $meta = { name => $field, type => $type, display => $displayName, is_list => $isList };
+    return $meta;
+}
+
+
+#
+# makeNodeAttributes - private
+#
+# Creates a data structure of node attributes for a single node.  Uses the given field metadata
+# to populate a hash ref containing values to insert as attributes in the SSN.
+#
+# Parameters:
+#    $id - sequence ID
+#    $fields - hash ref of field metadata
+#
+# Returns:
+#    hash ref that maps field names to values; some values are array refs, in which case they
+#        are saved as XGMML lists by the code that writes the tags
+#
+sub makeNodeAttributes {
+    my $self = shift;
+    my $id = shift;
+    my $fields = shift;
+
+    my $source = "";
+    my $nodeAttr = {};
+
+    foreach my $field (keys %$fields) {
+        # Skip any sequence defined in the metadata file
+        next if $field eq FIELD_SEQ_KEY;
+
+        my $value = $self->{metadata}->getSequence($id)->getAttribute($field, 1);
+        $value = MISSING_VALUE if not $value;
+        $source = $value if $field eq FIELD_SEQ_SRC_KEY;
+
+        # If the value is a scalar, but the field type is a list, then split the value into pieces
+        # to force the values into a XGMML list.  This is done because database fields with
+        # multiple values are separated by commas.
+        if ($fields->{$field}->{is_list} and not ref $value) {
+            $value = [ split(m/[,\^]/, $value) ];
+        }
+
+        $nodeAttr->{$field} = $value;
     }
+
+    # Add the actual FASTA sequence if there was a user-provided one
+    if (($source eq FIELD_SEQ_SRC_VALUE_FASTA or $source eq FIELD_SEQ_SRC_VALUE_FASTA_FAMILY) and $self->{sequences}->{$id}) {
+        $nodeAttr->{&FIELD_SEQ_KEY} = $self->{sequences}->{$id};
+        $self->{has_fasta_attribute} = 1;
+    }
+
+    # Add neighborhood connectivity attributes
+    if ($self->{nb_conn}) {
+        my $nc = $self->{nb_conn}->{$id};
+        $nodeAttr->{&FIELD_NB_CONN} = $nc->{nc};
+        if ($nc->{color}) {
+            $nodeAttr->{&FIELD_NB_CONN_COLOR} = $nc->{color};
+            $nodeAttr->{&FIELD_CYTOSCAPE_COLOR} = $nc->{color};
+        }
+    }
+
+    return $nodeAttr;
 }
 
 
 1;
-__END__
-
-=pod
-
-=head1 EFI::SSN::XgmmlWriter
-
-=head2 NAME
-
-EFI::SSN::XgmmlWriter - Perl module for rewriting a XGMML file from a source to a target
-while inserting color and cluster number information
-
-=head2 SYNOPSIS
-
-    use EFI::SSN::XgmmlWriter;
-    use EFI::SSN::XgmmlWriter::AttributeHandler::Color;
-
-    my $colorHandler = EFI::SSN::XgmmlWriter::AttributeHandler::Color(cluster_map => $clusterMap, colors => $colors);
-
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
-    $xwriter->addAttributeHandler($colorHandler);
-    $xwriter->write();
-
-
-=head2 DESCRIPTION
-
-EFI::SSN::XgmmlWriter is a Perl module for stream reading XGMML files and writing
-them to a new XGMML file while including metadata for nodes (e.g. things like colors,
-cluster numbers, etc.).  The C<EFI::SSN::XgmmlWriter::AttributeHandler> and
-derived classes are used to provide metadata.
-
-=head2 METHODS
-
-=head3 new(ssn => $ssnFile, output_ssn => $outputSsn)
-
-Creates a new C<EFI::SSN::XgmmlWriter> object.
-
-=head4 Parameters
-
-=over
-
-=item C<ssn>
-
-Path to a SSN file in XGMML format (XML) that is to be parsed and rewritten.
-
-=back
-
-=head4 Example usage:
-
-    my $xwriter = EFI::SSN::XgmmlWriter->new(ssn => $inputSsn, output_ssn => $outputSsn);
-
-
-=head3 write()
-
-Parses the XGMML file on a per-element basis and writes the element to the output
-SSN. This method doesn't create a DOM; rather it obtains information from each
-XML element that is relevant to the input handlers and copies the element
-to the output file.
-
-=head4 Example usage:
-
-    $parser->write();
-
-
-=head3 addAttributeHandler($handler)
-
-Adds a handler to the list of handlers that are called for each node attribute.
-
-=head4 Parameters
-
-=over
-
-=item C<$handler>
-
-An object derived from C<EFI::SSN::XgmmlWriter::AttributeHandler>.
-
-=back
-
-
-=cut
 

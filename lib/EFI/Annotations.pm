@@ -21,8 +21,15 @@ use constant ANNO_FIELDS_BASE_SSN => 2;
 use constant ANNO_FIELDS_SSN_NUMERIC => 4;
 use constant ANNO_FIELDS_DB_USER => 8;
 use constant ANNO_FIELDS_SSN_COLOR => 16;
+use constant ANNO_FIELDS_SSN_GNT => 32;
 
-use constant ANNO_ROW_SEP => "^";
+use constant INTERPRO_DOMAIN => "domain";
+use constant INTERPRO_FAMILY => "family";
+use constant INTERPRO_HOMOLOGOUS_SUPERFAMILY => "homologous_superfamily";
+
+use Exporter qw(import);
+our %EXPORT_TAGS = (interpro => ['INTERPRO_DOMAIN', 'INTERPRO_FAMILY', 'INTERPRO_HOMOLOGOUS_SUPERFAMILY']);
+Exporter::export_ok_tags('interpro');
 
 
 sub new {
@@ -250,12 +257,11 @@ sub parse_interpro {
             my $type = $types[$i];
             my $fam = $fams[$i];
 
-            #TODO: remove hardcoded constants here
             $type = lc $type;
-            push @dom, $fam if $type eq "domain";
-            push @fam, $fam if $type eq "family";
-            push @sup, $fam if $type eq "homologous_superfamily";
-            push @other, $fam if $type ne "domain" and $type ne "family" and $type ne "homologous_superfamily";
+            push @dom, $fam if $type eq INTERPRO_DOMAIN;
+            push @fam, $fam if $type eq INTERPRO_FAMILY;
+            push @sup, $fam if $type eq INTERPRO_HOMOLOGOUS_SUPERFAMILY;
+            push @other, $fam if $type ne INTERPRO_DOMAIN and $type ne INTERPRO_FAMILY and $type ne INTERPRO_HOMOLOGOUS_SUPERFAMILY;
         }
     }
 
@@ -331,7 +337,8 @@ sub get_annotation_data {
 # Parameters:
 #     $type - a subset of field names to retrieve. One of
 #         ANNO_FIELDS_SSN_DISPLAY, ANNO_FIELDS_BASE_SSN, ANNO_FIELDS_SSN_NUMERIC, ANNO_FIELDS_DB_USER,
-#         ANNO_FIELDS_SSN_COLOR
+#         ANNO_FIELDS_SSN_COLOR, ANNO_FIELDS_SSN_GNT
+#         If not specified, returns all.
 #
 # Returns:
 #     an array of metadata, with each entry in the array being a hash ref representing a field and it's metadata
@@ -346,12 +353,12 @@ sub get_annotation_fields {
         # db_primary_col is present if it is required to be in the same table (e.g. not stored in a JSON structure, or in an external table)
         push @fields, {name => "accession",                 field_type => "db",     type_spec => "VARCHAR(10)",     display => "",                                                                                      db_primary_col => 1,index_name => "uniprot_accession_idx",                              primary_key => 1};
         push @fields, {name => FIELD_SEQ_SRC_KEY,           field_type => "ssn",                                    display => "Sequence Source"};
-        push @fields, {name => "organism",                  field_type => "db",     type_spec => "VARCHAR(150)",    display => "Organism",                      base_ssn => 1,                                                                          json_type_spec => "str",    json_name => "o"};
-        push @fields, {name => "taxonomy_id",               field_type => "db",     type_spec => "INT",             display => "Taxonomy ID",                   base_ssn => 1,                                          db_primary_col => 1,index_name => "taxonomy_id_idx"};
+        push @fields, {name => FIELD_ORGANISM_KEY,          field_type => "db",     type_spec => "VARCHAR(150)",    display => "Organism",                      base_ssn => 1,                                                                          json_type_spec => "str",    json_name => "o"};
+        push @fields, {name => "taxonomy_id",               field_type => "db",     type_spec => "INT",             display => FIELD_TAXON_ID,                  base_ssn => 1,                                          db_primary_col => 1,index_name => "taxonomy_id_idx"};
         push @fields, {name => "swissprot_status",          field_type => "db",     type_spec => "BOOL",            display => "UniProt Annotation Status",     base_ssn => 1,                                          db_primary_col => 1,index_name => "swissprot_status_idx"};
         push @fields, {name => "description",               field_type => "db",     type_spec => "VARCHAR(255)",    display => "Description",                   base_ssn => 1,                      ssn_list_type => 1,                                 json_type_spec => "str",    json_name => "d"};
         push @fields, {name => "swissprot_description",     field_type => "ssn",                                    display => "SwissProt Description",         base_ssn => 1};
-        push @fields, {name => "seq_len",                   field_type => "db",     type_spec => "INT",             display => "Sequence Length",               base_ssn => 1,  ssn_num_type => 1,                      db_primary_col => 1};
+        push @fields, {name => FIELD_SEQ_LEN_KEY,           field_type => "db",     type_spec => "INT",             display => "Sequence Length",               base_ssn => 1,  ssn_num_type => 1,                      db_primary_col => 1};
 
         push @fields, {name => FIELD_REPNODE_IDS,           field_type => "ssn",                                    display => "List of IDs in Rep Node"};
         push @fields, {name => FIELD_REPNODE_SIZE,          field_type => "ssn",                                    display => "Number of IDs in Rep Node",                     ssn_num_type => 1};
@@ -384,9 +391,9 @@ sub get_annotation_fields {
 
         push @fields, {name => "uniprot_pfam",              field_type => "db",                                                                                                                                                                         json_type_spec => "array",                      db_hidden => 1};
 
-        push @fields, {name => "IPRO_DOM",                  field_type => "ssn",                                    display => "InterPro (Domain)",             base_ssn => 1};
-        push @fields, {name => "IPRO_FAM",                  field_type => "ssn",                                    display => "InterPro (Family)",             base_ssn => 1};
-        push @fields, {name => "IPRO_SUP",                  field_type => "ssn",                                    display => "InterPro (Homologous Superfamily)", base_ssn => 1};
+        push @fields, {name => "IPRO_DOM",                  field_type => "ssn",                                    display => "InterPro (Domain)",             base_ssn => 1,                      ssn_list_type => 1};
+        push @fields, {name => "IPRO_FAM",                  field_type => "ssn",                                    display => "InterPro (Family)",             base_ssn => 1,                      ssn_list_type => 1};
+        push @fields, {name => "IPRO_SUP",                  field_type => "ssn",                                    display => "InterPro (Homologous Superfamily)", base_ssn => 1,                  ssn_list_type => 1};
         push @fields, {name => "IPRO",                      field_type => "ssn",                                    display => "InterPro (Other)",              base_ssn => 1,                      ssn_list_type => 1};
 
         push @fields, {name => "uniprot_interpro",          field_type => "db",                                                                                                                                                                         json_type_spec => "array",                      db_hidden => 1};
@@ -411,7 +418,6 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_UNIREF90_CLUSTER_SIZE, field_type => "ssn",                                    display => "UniRef90 Cluster Size",                         ssn_num_type => 1};
         push @fields, {name => FIELD_UNIREF100_IDS,         field_type => "ssn",                                    display => "UniRef100 Cluster IDs",                                             ssn_list_type => 1};
         push @fields, {name => FIELD_UNIREF100_CLUSTER_SIZE,field_type => "ssn",                                    display => "UniRef100 Cluster Size",                        ssn_num_type => 1};
-        push @fields, {name => "Sequence",                  field_type => "ssn",                                    display => "Sequence"};
         push @fields, {name => "User_IDs_in_Cluster",       field_type => "ssn",                                    display => "User IDs in Cluster",                                               ssn_list_type => 1};
 
         push @fields, {name => "is_fragment",               field_type => "db",     type_spec => "BOOL",            display => "Sequence Status",               base_ssn => 1,                                          db_primary_col => 1,index_name => "is_fragment_idx"};
@@ -419,10 +425,18 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_COLOR_SEQ_NUM,         field_type => "color",                                  display => "Sequence Count Cluster Number"};
         push @fields, {name => FIELD_COLOR_NODE_NUM,        field_type => "color",                                  display => "Node Count Cluster Number"};
         push @fields, {name => FIELD_COLOR_SINGLETON,       field_type => "color",                                  display => "Singleton Number"};
-        push @fields, {name => FIELD_COLOR_SEQ_NUM_COLOR,   field_type => "color",                                  display => "node.fillColor"};
+        push @fields, {name => FIELD_COLOR_SEQ_NUM_COLOR,   field_type => "color",                                  display => FIELD_CYTOSCAPE_COLOR};
         push @fields, {name => FIELD_COLOR_NODE_NUM_COLOR,  field_type => "color",                                  display => "Node Count Fill Color"};
         push @fields, {name => FIELD_COLOR_SEQ_COUNT,       field_type => "color",                                  display => "Cluster Sequence Count"};
         push @fields, {name => FIELD_COLOR_NODE_COUNT,      field_type => "color",                                  display => "Cluster Node Count"};
+        push @fields, {name => FIELD_GNT_PRESENT_ENA_DB,    field_type => "gnt",                                    display => "Present in ENA Database?"};
+        push @fields, {name => FIELD_GNT_NB_ENA_DB,         field_type => "gnt",                                    display => "Genome Neighbors in ENA Database?"};
+        push @fields, {name => FIELD_GNT_ENA_ID,            field_type => "gnt",                                    display => "ENA Database Genome ID"};
+        push @fields, {name => FIELD_GNT_NB_PFAM,           field_type => "gnt",                                    display => "Neighbor Pfam Families"};
+        push @fields, {name => FIELD_GNT_NB_INTERPRO,       field_type => "gnt",                                    display => "Neighbor InterPro Families"};
+
+        push @fields, {name => FIELD_SEQ_KEY,               field_type => "ssn",                                    display => "Sequence"};
+        push @fields, {name => "connectivity",              field_type => "ssn",                                    display => "Neighborhood Connectivity"};
 
         $self->{fields} = \@fields;
     }
@@ -437,6 +451,8 @@ sub get_annotation_fields {
         return grep { $_->{field_type} eq "db" and not $_->{db_primary_col} } @{ $self->{fields} };
     } elsif ($type == ANNO_FIELDS_SSN_COLOR) {
         return grep { $_->{field_type} eq "color" and not $_->{db_primary_col} } @{ $self->{fields} };
+    } elsif ($type == ANNO_FIELDS_SSN_GNT) {
+        return grep { $_->{field_type} eq "gnt" and not $_->{db_primary_col} } @{ $self->{fields} };
     } else {
         return @{ $self->{fields} };
     }
@@ -530,6 +546,18 @@ sub get_attribute_type {
 }
 
 
+sub get_display_name {
+    my $self = shift;
+    my $attrName = shift;
+    my $anno = $self->get_annotation_data();
+    if ($anno->{$attrName}) {
+        return $anno->{$attrName}->{display};
+    } else {
+        return $attrName;
+    }
+}
+
+
 sub get_attribute_info {
     my $self = shift;
     my $attrName = shift;
@@ -579,14 +607,47 @@ sub get_expandable_attr {
 
 sub get_color_fields {
     my $self = shift;
-    my $anno = $self->get_annotation_data();
     my @fields = (FIELD_COLOR_SEQ_NUM, FIELD_COLOR_NODE_NUM, FIELD_COLOR_SINGLETON, FIELD_COLOR_SEQ_NUM_COLOR, FIELD_COLOR_NODE_NUM_COLOR, FIELD_COLOR_SEQ_COUNT, FIELD_COLOR_NODE_COUNT);
+    return $self->get_anno_group_fields(@fields);
+}
+
+
+sub get_gnt_fields {
+    my $self = shift;
+    my @fields = (FIELD_GNT_PRESENT_ENA_DB, FIELD_GNT_NB_ENA_DB, FIELD_GNT_ENA_ID, FIELD_GNT_NB_PFAM, FIELD_GNT_NB_INTERPRO);
+    return $self->get_anno_group_fields(@fields);
+}
+
+
+#
+# get_anno_group_fields - internal method
+#
+# Retrieves a group of annotation field names and their display values.  The input fields names
+# are the internal format (e.g. FIELD_SEQ_SRC_KEY).
+#
+# Parameters:
+#     @fields - list of field names (internal naming, e.g. FIELD_SEQ_SRC_KEY)
+#
+# Returns:
+#     array ref of internal field names (same as input)
+#     hash ref mapping internal field name to display name (e.g. FIELD_SEQ_SRC_KEY => "Sequence Source")
+#
+sub get_anno_group_fields {
+    my $self = shift;
+    my @fields = @_;
+    my $anno = $self->get_annotation_data();
     my %display = map { $_ => $anno->{$_}->{display} } grep { exists $anno->{$_} } @fields;
     return (\@fields, \%display);
 }
 
 
 sub get_cluster_info_insert_location {
+    my $self = shift;
+    return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
+}
+
+
+sub get_gnt_info_insert_location {
     my $self = shift;
     return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
 }
@@ -637,18 +698,19 @@ SQL return data from the C<annotations> table in the EFI database.
 
 =head2 DESCRIPTION
 
-EFI::Annotations is a utility module that provides helper functions for creating SQL statements
+B<EFI::Annotations> is a utility module that provides helper functions for creating SQL statements
 that can be used to query the EFI database C<annotations> table.  In addition, methods are provided
 for processing data rows returned from database query results.  Helper methods are provided
 for determining node attribute types.
 
 =head2 METHODS
 
-=head3 new()
+=head3 C<new()>
 
 Create an instance of EFI::Annotations.
 
-=head3 build_taxid_query_string($taxId)
+
+=head3 C<build_taxid_query_string($taxId)>
 
 Creates a SQL SELECT query statement based on a taxonomic identifier
 that can be provided to a SQL connection
@@ -673,7 +735,8 @@ SQL SELECT query statement.
     my $taxId = 1000;
     my $sqlSelect = $anno->build_taxid_query_string($taxId);
 
-=head3 build_query_string($accession, $extraWhere)
+
+=head3 C<build_query_string($accession, $extraWhere)>
 
 Creates a SQL SELECT query statement based on a sequence identifier
 that can be provided to a SQL connection
@@ -709,7 +772,8 @@ SQL SELECT query statement.
     my $extraWhere = "A." . FIELD_SEQ_LEN_KEY . " <= $maxLen";
     my $sqlSelect = $anno->build_query_string($accession, $extraWhere);
 
-=head3 build_id_mapping_query_string($accession)
+
+=head3 C<build_id_mapping_query_string($accession)>
 
 Creates a SQL SELECT query statement to retrieve IDs from the EFI database C<idmapping> table.
 This can be used to convert from UniProt IDs to non-UniProt IDs (e.g. RefSeq).
@@ -733,7 +797,8 @@ SQL SELECT query statement.
     my $accession = "B0SS77";
     my $sqlSelect = $anno->build_id_mapping_query_string($accession);
 
-=head3 build_annotations($dbRow, $ncbiIds, $annoSpec)
+
+=head3 C<build_annotations($dbRow, $ncbiIds, $annoSpec)>
 
 Creates a hash ref data structure from a database result row.
 The structure contains all of the node attributes that are in the results, formatted appropriately,
@@ -799,7 +864,8 @@ and a hash ref of values from the database row, mapping display field name to th
     #     "is_fragment" => "fragment",
     # }
 
-=head3 get_annotation_data()
+
+=head3 C<get_annotation_data()>
 
 Return metadata for all of the fields that are displayed in the SSN.
 
@@ -839,7 +905,8 @@ the order in which they appear, the display name, and the node type.
     #     ...
     # }
 
-=head3 get_ssn_annotation_fields()
+
+=head3 C<get_ssn_annotation_fields()>
 
 Returns a list of field names that are included by default in the SSN output.
 
@@ -857,7 +924,7 @@ A list of field names.
     #    ...
     # )
 
-=head3 decode_meta_struct($jsonString)
+=head3 C<decode_meta_struct($jsonString)>
 
 Decodes a JSON string from the C<annotations> table metadata column into a hash representing
 the values for that accession.  The metadata column uses short 1 or 2 character keys to
@@ -891,7 +958,8 @@ A hash ref containing the values from the JSON string.
     #     "ec_code" => "code"
     # }
 
-=head3 sort_annotations(@fields)
+
+=head3 C<sort_annotations(@fields)>
 
 Sorts the fields in the order in which they should appear in the SSN.
 
@@ -916,7 +984,8 @@ The input array, sorted by the internal C<order> field as specified in the modul
     @fieldNames = $anno->sort_annotations(@fieldNames);
     # @fieldNames will be ("organism", "NCBI_IDs", "ec_code").
 
-=head3 is_list_attribute($attrName)
+
+=head3 C<is_list_attribute($attrName)>
 
 Checks if the input attribute name is a SSN list attribute.
 
@@ -944,7 +1013,7 @@ A SSN display attribute name (e.g. C<Organism>).
     my $isList = $anno->is_list_attribute($attrName);
     # $isList is 0
 
-=head3 get_attribute_type($attrName)
+=head3 C<get_attribute_type($attrName)>
 
 Returns the SSN node attribute data type for the attribute name.
 
@@ -972,7 +1041,37 @@ The string "integer" if the type is numeric, "string" otherwise.
     my $theType = $anno->get_attribute_type($attrName);
     # $theType is "integer"
 
-=head3 is_expandable_attr($attrName)
+=head3 C<get_display_name($attrName)>
+
+Returns the SSN node display name for the attribute field name.  For example, for a field name of
+C<seq_len>, returns "Sequence Length".
+
+=head4 Parameters
+
+=over
+
+=item C<$attrName>
+
+A SSN field name (e.g. ones coming from B<EFI::Annotations::Fields>).
+
+=back
+
+=head4 Returns
+
+A string containing the display name.
+
+=head4 Example Usage
+
+    my $field = "organism";
+    my $displayName = $anno->get_display_name($field);
+    # $displayName is "Organism"
+
+    my $field = "seq_len";
+    my $displayName = $anno->get_display_name($field);
+    # $displayName is "Sequence Length"
+
+
+=head3 C<is_expandable_attr($attrName)>
 
 Checks if the input attribute name (or its display/SSN column name) can be expanded into a list of IDs.
 In other words, it checks if the input name is UniRef or repnode ID list attribute name.
@@ -1006,7 +1105,8 @@ A SSN display attribute name (e.g. C<UniRef90 IDs>).
     my $isExpandable = $anno->is_expandable_attr($attrName);
     # $isExpandable is 1
 
-=head3 get_expandable_attr()
+
+=head3 C<get_expandable_attr()>
 
 Gets a mapping of ID attribute display names (such as UniRef clusters or repnodes) that can be
 expanded into multiple IDs. See C<is_expandable_attr()> for a list of the currently available ones. 
@@ -1017,7 +1117,7 @@ expanded into multiple IDs. See C<is_expandable_attr()> for a list of the curren
 
 =item C<$fields>
 
-An array ref of fields from C<EFI::Annotations::Fields> relating to expandable attributes.
+An array ref of fields from B<EFI::Annotations::Fields> relating to expandable attributes.
 
 =item C<$display>
 
@@ -1035,7 +1135,7 @@ A hash ref mapping field name to field display for each element in C<$fields>.
     }
 
 
-=head3 get_attribute_info($attrName)
+=head3 C<get_attribute_info($attrName)>
 
 Gets information about the given attribute.
 
@@ -1073,7 +1173,7 @@ set and non-zero if they are XGMML list attribute types or numerical types, resp
     }
 
 
-=head3 get_cluster_info_insert_location()
+=head3 C<get_cluster_info_insert_location()>
 
 Returns the name of the SSN column where the cluster number and color columns should be inserted.
 This is designed so that the new columns will be inserted immediately following the returned column.
@@ -1090,9 +1190,33 @@ A string representing a SSN column heading (e.g. display name).
         # Append the color and cluster number column values
     }
 
-=head3 get_color_fields()
+
+=head3 C<get_gnt_info_insert_location()>
+
+Returns the name of the SSN column where the GNT information columns (e.g. ENA status, ID,
+neighbor families) should be inserted.  This is designed so that the new columns will be
+inserted immediately following the returned column.
+
+=head4 Returns
+
+A string representing a SSN column heading (e.g. display name).
+
+=head4 Example Usage
+
+    my $name = $anno->get_gnt_info_insert_location();
+    if ($currentSsnColName eq $name) {
+        # Insert a copy of the current SSN column
+        # Append the GNT columns
+    }
+
+
+=head3 C<get_color_fields()>
 
 Gets a list of color SSN attribute display names (such as cluster number and color).
+These are (from B<EFI::Annotations::Fields):
+C<FIELD_COLOR_SEQ_NUM>, C<FIELD_COLOR_NODE_NUM>, C<FIELD_COLOR_SINGLETON>,
+C<FIELD_COLOR_SEQ_NUM_COLOR>, C<FIELD_COLOR_NODE_NUM_COLOR>, C<FIELD_COLOR_SEQ_COUNT>, and
+C<FIELD_COLOR_NODE_COUNT>
 
 =head4 Returns
 
@@ -1100,11 +1224,12 @@ Gets a list of color SSN attribute display names (such as cluster number and col
 
 =item C<$fields>
 
-An array ref of fields from C<EFI::Annotations::Fields> of the C<color> group.
+An array ref of fields from B<EFI::Annotations::Fields> of the C<color> group.
 
 =item C<$display>
 
-A hash ref of field name to field display (e.g. FIELD_COLOR_SEQ_NUM => "Sequence Count Cluster Number").
+A hash ref mapping field name to field display.  The key is a constant from
+B<EFI::Annotations::Fields> and the value is from B<EFI::Annotations>.
 
 =back
 
@@ -1116,6 +1241,41 @@ A hash ref of field name to field display (e.g. FIELD_COLOR_SEQ_NUM => "Sequence
     if (exists $attr->{$ssnField}) {
         print "The SSN field $ssnField is one of the color fields\n";
     }
+
+
+=head3 C<get_gnt_fields()>
+
+Gets a list of GNT SSN attribute display names.  These are (from B<EFI::Annotations::Fields>):
+C<FIELD_GNT_PRESENT_ENA_DB>, C<FIELD_GNT_NB_ENA_DB>, C<FIELD_GNT_ENA_ID>, C<FIELD_GNT_NB_PFAM>,
+and C<FIELD_GNT_NB_INTERPRO>.
+
+
+=head4 Returns
+
+=over
+
+=item C<$fields>
+
+An array ref of fields from B<EFI::Annotations::Fields> of the C<gnt> group.
+
+=item C<$display>
+
+A hash ref mapping field name to field display.  These are (from B<EFI::Annotations::Fields):
+A hash ref of field name to field display (e.g. FIELD_AAAA => "").
+
+=back
+
+=head4 Example Usage
+
+    my $ssnField = "Sequence Count Cluster Number";
+    my ($attrFields, $attrDisplay) = $anno->get_gnt_fields();
+    my %attr = map { $attrDisplay->{$_} => $_ } @$attrFields;
+    if (exists $attr->{$ssnField}) {
+        print "The SSN field $ssnField is one of the GNT fields\n";
+    }
+
+
+=cut
 
 
 =cut

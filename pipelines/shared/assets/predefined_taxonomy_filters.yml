@@ -1,0 +1,130 @@
+[
+    {
+        "name": "bacteria_fungi",
+        "operator": "OR",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Bacteria"
+            },
+            {
+                "field": "domain",
+                "value": "Archaea"
+            },
+            {
+                "field": "phylum",
+                "value": "Ascomycota"
+            },
+            {
+                "field": "phylum",
+                "value": "Basidiomycota"
+            },
+            {
+                "field": "phylum",
+                "value": "Fungi incertae sedis"
+            },
+            {
+                "field": "phylum",
+                "value": "unclassified Fungi"
+            }
+        ]
+    },
+    {
+        "name": "fungi",
+        "operator": "OR",
+        "conditions": [
+            {
+                "field": "phylum",
+                "value": "Ascomycota"
+            },
+            {
+                "field": "phylum",
+                "value": "Basidiomycota"
+            },
+            {
+                "field": "phylum",
+                "value": "Fungi incertae sedis"
+            },
+            {
+                "field": "phylum",
+                "value": "unclassified Fungi"
+            }
+        ]
+    },
+    {
+        "name": "eukaroyta_no_fungi",
+        "operator": "AND",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Eukaryota"
+            },
+            {
+                "field": "phylum",
+                "value": "Ascomycota",
+                "operator": "NOT"
+            },
+            {
+                "field": "phylum",
+                "value": "Basidiomycota",
+                "operator": "NOT"
+            },
+            {
+                "field": "phylum",
+                "value": "Fungi incertae sedis",
+                "operator": "NOT"
+            },
+            {
+                "field": "phylum",
+                "value": "unclassified Fungi",
+                "operator": "NOT"
+            },
+            {
+                "field": "species",
+                "value": "%metagenome%",
+                "operator": "NOT",
+                "exact": false
+            }
+        ]
+    },
+    {
+        "name": "viruses",
+        "operator": "OR",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Viruses"
+            }
+        ]
+    },
+    {
+        "name": "bacteria",
+        "operator": "OR",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Bacteria"
+            }
+        ]
+    },
+    {
+        "name": "archaea",
+        "operator": "OR",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Archaea"
+            }
+        ]
+    },
+    {
+        "name": "eukaryota",
+        "operator": "OR",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Eukaryota"
+            }
+        ]
+    }
+]

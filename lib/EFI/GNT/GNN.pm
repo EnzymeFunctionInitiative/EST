@@ -22,7 +22,7 @@ sub new {
     my $self = {};
     bless $self, $class;
 
-    die "Require dbh EFI::Database argument" if not $args{dbh};
+    die "Require dbh (DBI database handle) argument" if not $args{dbh};
     die "Require seq_cluster_id_map argument" if not $args{seq_cluster_id_map};
     die "Require gnt_anno EFI::GNT::Annotations argument" if not $args{gnt_anno};
 
@@ -30,7 +30,7 @@ sub new {
     $self->{network} = $args{seq_cluster_id_map};
     $self->{gnt_anno} = $args{gnt_anno};
 
-    if ($args{neighborhood_size} and $args{neighborhood_size} > MAX_NB_SIZE) {
+    if ($args{neighborhood_size} and $args{neighborhood_size} <= MAX_NB_SIZE) {
         $self->{neighborhood_size} = $args{neighborhood_size};
     } else {
         $self->{neighborhood_size} = MAX_NB_SIZE;
@@ -113,16 +113,16 @@ sub insertAnnotationData {
     $data->{attributes}->{taxon_id} = $anno->{taxonomy_id};
     $data->{attributes}->{anno_status} = $anno->{status};
     $data->{attributes}->{desc} = $anno->{desc};
-    $data->{attributes}->{family_desc} = $anno->{pfam_desc};
-    $data->{attributes}->{ipro_family_desc} = $anno->{interpro_desc};
+    $data->{attributes}->{pfam_desc} = $anno->{pfam_desc};
+    $data->{attributes}->{interpro_desc} = $anno->{interpro_desc};
 
     foreach my $nbObj (@{ $data->{neighbors} }) {
         my $nbAnno = $self->{gnt_anno}->getGnnIdAnnotations($nbObj);
         $nbObj->{taxon_id} = $nbAnno->{taxonomy_id};
         $nbObj->{anno_status} = $nbAnno->{status};
         $nbObj->{desc} = $nbAnno->{desc};
-        $nbObj->{family_desc} = $nbAnno->{pfam_desc};
-        $nbObj->{ipro_family_desc} = $nbAnno->{interpro_desc};
+        $nbObj->{pfam_desc} = $nbAnno->{pfam_desc};
+        $nbObj->{interpro_desc} = $nbAnno->{interpro_desc};
     }
 }
 
@@ -185,9 +185,9 @@ B<EFI::GNT::GNN> - Perl module for creating genome neighborhood networks
     my $hubs = new EFI::GNT::GNN::Hubs(gnn => $gnn, cooc_threshold => 0.20);
 
     # Save the GNN xgmml files
-    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(gnn_file => $pfamGnnFile, gnt_anno => $gntAnno);
+    my $pfamHubWriter = new EFI::GNT::GNN::XgmmlWriter::PfamHub(output_file => $pfamGnnFile, gnt_anno => $gntAnno);
     $pfamHubWriter->write($hubs);
-    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(gnn_file => $clusterGnnFile, gnt_anno => $gntAnno);
+    my $clusterHubWriter = new EFI::GNT::GNN::XgmmlWriter::ClusterHub(output_file => $clusterGnnFile, gnt_anno => $gntAnno);
     $clusterHubWriter->write($hubs);
 
     my $tables = new EFI::GNT::GNN::TableWriter(hubs => $hubs); 
@@ -230,7 +230,9 @@ key of the hash ref corresponds to a cluster number and the value is an array
 ref of sequence IDs.  The input can be clusters numbered by cluster node size
 or cluster sequence size but is typically numbered by sequence not node.
 The data for this structure should come from the B<parse_cluster_map_file>
-function in the B<EFI::SSN::Util::ID> module.
+function in the B<EFI::SSN::Util::ID> module.  If the input file originates
+from a metanode file (e.g. the input is UniRef or a RepNode network), then
+the ID mapping will contain the full set of IDs not just the metanodes.
 
 =back
 

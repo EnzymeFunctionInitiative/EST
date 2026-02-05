@@ -17,7 +17,8 @@ sub new {
     my $self = {};
     bless($self, $class);
 
-    $self->{efi_db} = $args{efi_db} // die "Require efi db argument for EFI::IdMapping";
+    $self->{dbh} = $args{efi_dbh} // die "Require efi_dbh database handle argument for EFI::IdMapping";
+    $self->{validate_uniprot} = $args{validate_uniprot} // 1;
 
     return $self;
 }
@@ -27,8 +28,6 @@ sub new {
 
 sub reverseLookup {
     my ($self, $typeHint, @ids) = @_;
-
-    $self->{dbh} = $self->{efi_db}->getHandle() if not $self->{dbh};
 
     if ($typeHint eq UNIPROT) {
         return (\@ids, \[]);
@@ -47,7 +46,7 @@ sub reverseLookup {
         my $foreignIdCol = "foreign_id";
         my $foreignIdCheck = " AND foreign_id_type = '$type'";
         if ($type eq UNIPROT) {
-            if (not $self->{uniprot_check}) {
+            if (not $self->{validate_uniprot}) {
                 (my $upId = $id) =~ s/\.\d+$//;
                 push(@uniprotIds, $upId);
                 push(@{ $uniprotRevMap{$upId} }, $id);
@@ -86,7 +85,7 @@ EFI::IdMapping - Perl module for mapping non-UniProt protein sequence IDs to Uni
     use EFI::IdMapping;
     use EFI::IdMapping::Util qw(AUTO);
 
-    my $mapper = new EFI::IdMapping(efi_db => $efiDbRef); # $efiDbRef is required and is an EFI::Database object
+    my $mapper = new EFI::IdMapping(efi_dbh => $efiDbh, validate_uniprot => 1); # $efiDbh is required and is a database handle from EFI::Database
     
     # Automatically detect ID type based on format
     my $typeHint = AUTO;
@@ -97,13 +96,16 @@ EFI::IdMapping - Perl module for mapping non-UniProt protein sequence IDs to Uni
 
 =head2 DESCRIPTION
 
-EFI::IdMapping is a utility module that maps non-UniProt IDs (usually obtained from FASTA headers) to UniProt IDs.
-It does this by using the C<idmapping> table in an EFI database, which is in turn obtained from the UniProt ID mapping dataset.
-The most frequent non-UniProt ID type that is used is B<NCBI>, but other types are supported (as defined in the C<EFI::IdMapping::Util> module).
+B<EFI::IdMapping> is a utility module that maps non-UniProt IDs (usually obtained from FASTA
+headers) to UniProt IDs.  It does this by using the C<idmapping> table in an EFI database, which
+is in turn obtained from the UniProt ID mapping dataset.  The most frequent non-UniProt ID type
+that is used is B<NCBI>, but other types are supported (as defined in the B<EFI::IdMapping::Util>
+module).
+
 
 =head2 METHODS
 
-=head3 new(efi_db => $efiDbObject)
+=head3 C<new(efi_dbh =E<gt> $efiDbh, validate_uniprot =E<gt> $flag)>
 
 Create an instance of EFI::IdMapping object.
 
@@ -111,13 +113,20 @@ Create an instance of EFI::IdMapping object.
 
 =over
 
-=item C<efi_db>
+=item C<efi_dbh>
 
-An instantiated C<EFI::Database> object.
+A database connection handle created by the B<EFI::Database> object.
+
+=item C<validate_uniprot>
+
+If true, all IDs in the UniProt ID format are checked to see if they are in the EFI database.
+By default this is enabled.  If it is disabled, then UniProt IDs in the UniProt standard format
+are returned as-is by the mapper without validation.
 
 =back
 
-=head3 reverseLookup($typeHint, @searchIds)
+
+=head3 C<reverseLookup($typeHint, @searchIds)>
 
 Try to map IDs of unknown format to UniProt IDs.
 
@@ -127,7 +136,8 @@ Try to map IDs of unknown format to UniProt IDs.
 
 =item C<$typeHint>
 
-ID format guess, a constant from C<EFI::IdMapping::Util>. Usually C<AUTO>. See C<EFI::IdMapping::Util> for all options.
+ID format guess, a constant from B<EFI::IdMapping::Util>. Usually C<AUTO>. See
+B<EFI::IdMapping::Util> for all options.
 
 =item C<@searchIds>
 
@@ -153,7 +163,7 @@ A hash ref containing a mapping of UniProt IDs to a list of source IDs.
 
 =back
 
-=head4 Example usage:
+=head4 Example Usage
 
     my @searchIds = ("B0SS77", "WP_012388845.1");
     # Return a list of UniProt IDs that were found
