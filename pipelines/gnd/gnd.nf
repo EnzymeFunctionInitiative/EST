@@ -13,9 +13,9 @@ process create_gnd {
     script:
     """
     perl ${projectDir}/create_gnd.pl \
-        --config ${params.efi_config} \
-        --db-name ${params.efi_db} \
-        --cluster-map ${id_list} \
+        --config "${params.efi_config}" \
+        --db-name "${params.efi_db}" \
+        --cluster-map "${id_list}" \
         --nb-size ${params.nb_size} \
         --gnd gnd.sqlite \
         --stats stats.json
@@ -34,9 +34,9 @@ process run_blast {
     def blast_evalue_arg = params.import_blast_evalue ? "-e ${params.import_blast_evalue}" : ""
 
     """
-    blastall -p blastp -i ${sequence_file} -d ${params.import_blast_fasta_db} -m 8 ${blast_evalue_arg} ${blast_num_matches_arg} -o init_blast.out
+    blastall -p blastp -i "${sequence_file}" -d "${params.import_blast_fasta_db}" -m 8 ${blast_evalue_arg} ${blast_num_matches_arg} -o init_blast.out
     if [[ ! -s init_blast.out ]]; then
-        echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
+        echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence." | tee /dev/stderr
         exit 1
     fi
     """
@@ -51,15 +51,14 @@ process parse_blast_results_for_ids {
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode blast"
-    if (params.sequence_version) {
-        common_args += " --sequence-version ${params.sequence_version}"
-    }
+    def seq_ver_arg = params.sequence_version ? "--sequence-version ${params.sequence_version}" : ""
 
     """
-    perl ${projectDir}/../shared/perl/get_sequence_ids.pl ${common_args} \
-        --blast-output ${blast_file} \
-        --blast-query ${sequence_file} \
+    perl ${projectDir}/../shared/perl/get_sequence_ids.pl \
+        --efi-config "${params.efi_config}" --efi-db "${params.efi_db}" ${seq_ver_arg} \
+        --mode blast \
+        --blast-output "${blast_file}" \
+        --blast-query "${sequence_file}" \
         --source-meta-file sequence_meta.tab \
         --source-ids-file accession_ids.tab
     """
@@ -73,14 +72,13 @@ process parse_fasta_for_ids {
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode fasta"
-    if (params.sequence_version) {
-        common_args += " --sequence-version ${params.sequence_version}"
-    }
+    def seq_ver_arg = params.sequence_version ? "--sequence-version ${params.sequence_version}" : ""
 
     """
-    perl $projectDir/../shared/perl/get_sequence_ids.pl ${common_args} \
-        --fasta ${fasta_file} \
+    perl $projectDir/../shared/perl/get_sequence_ids.pl \
+        --efi-config "${params.efi_config}" --efi-db "${params.efi_db}" ${seq_ver_arg} \
+        --mode fasta \
+        --fasta "${fasta_file}" \
         --source-meta-file sequence_meta.tab \
         --source-ids-file accession_ids.tab
     """
@@ -94,14 +92,13 @@ process parse_accession_for_ids {
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode accessions"
-    if (params.sequence_version) {
-        common_args += " --sequence-version ${params.sequence_version}"
-    }
+    def seq_ver_arg = params.sequence_version ? "--sequence-version ${params.sequence_version}" : ""
 
     """
-    perl $projectDir/../shared/perl/get_sequence_ids.pl ${common_args} \
-        --accessions ${accession_file} \
+    perl $projectDir/../shared/perl/get_sequence_ids.pl \
+        --efi-config "${params.efi_config}" --efi-db "${params.efi_db}" ${seq_ver_arg} \
+        --mode accessions \
+        --accessions "${accession_file}" \
         --source-meta-file sequence_meta.tab \
         --source-ids-file accession_ids.tab
     """
@@ -118,8 +115,8 @@ process convert_to_id_list {
     """
     perl $projectDir/convert_metadata_to_id_list.pl \
         --cluster-id-mapping cluster_id_mapping.tab \
-        --source-ids-file ${source_ids} \
-        --source-meta-file ${source_meta}
+        --source-ids-file "${source_ids}" \
+        --source-meta-file "${source_meta}"
     """
 }
 

@@ -36,8 +36,10 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args = validated_args
 
     if not os.path.exists(args.input_file):
-        print(f"SSN Input file '{args.input_file}' does not exist")
+        print(f"Input file '{args.input_file}' does not exist")
         fail = True
+    else:
+        args.input_file = os.path.abspath(args.input_file)
 
     if args.import_mode == "blast":
         if args.import_blast_fasta_db is None:
@@ -57,7 +59,6 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print("Failed to render params template")
         exit(1)
     else:
-        args.input_file = os.path.abspath(args.input_file)
         return args
     
 def create_parser():
