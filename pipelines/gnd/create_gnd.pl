@@ -26,9 +26,9 @@ use constant DEFAULT_NEIGHBORHOOD_SIZE => 20;
 my $opts = validateAndProcessOptions(DEFAULT_NEIGHBORHOOD_SIZE, SEQ_UNIPROT);
 
 
-my $db = new EFI::Database(config => $opts->{config}, db_name => $opts->{db_name});
+my $db = new EFI::Database(config => $opts->{efi_config}, db_name => $opts->{efi_db});
 my $dbh = $db->getHandle();
-die "Invalid database $opts->{db_name}" if not $dbh;
+die "Invalid database $opts->{efi_db}" if not $dbh;
 if (not $dbh) {
     die "Error connecting to database: " . $db->getError() . "\n";
 }
@@ -90,8 +90,8 @@ sub validateAndProcessOptions {
     $optParser->addOption("gnd=s", 1, "path to the output GND file", OPT_FILE);
     $optParser->addOption("nb-size=i", 0, "neighborhood size (number of sequences) to retrieve on either side of query (> 0 and <= 20)", OPT_VALUE, $defaultNbSize);
     $optParser->addOption("sequence-version=s", 0, "the input sequence ID type; one of uniprot, uniref90, uniref50, defaults to uniprot if not specified", OPT_VALUE, $defaultSeqVer);
-    $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
-    $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
+    $optParser->addOption("efi-config=s", 1, "path to the config file for database connection", OPT_FILE);
+    $optParser->addOption("efi-db=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
     $optParser->addOption("title=s", 0, "title of the GND, metadata");
     $optParser->addOption("source-type=s", 0, "the source of the data provided, e.g. BLAST, FASTA, ID list");
     $optParser->addOption("source-sequence-file=s", 0, "path to a file containing the sequence used to generate the results, only valid for BLAST sources");
