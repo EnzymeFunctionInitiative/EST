@@ -9,6 +9,7 @@ use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../";
 
 use EFI::IdMapping::Util qw(check_id_type :ids);
+use EFI::Database::Util;
 
 
 sub new {
@@ -70,6 +71,27 @@ sub reverseLookup {
 }
 
 
+# public
+sub getUniprotMapping {
+    my $self = shift;
+    my $idType = shift;
+    my $uniprotIds = shift;
+
+    my $idCol = "accession";
+    my @cols = ($idCol, "uniref50_seed AS uniref50", "uniref90_seed AS uniref90");
+    my $cols = join(", ", @cols);
+    my $sqlPattern = "SELECT $cols FROM uniref WHERE accession IN (<IDS>)";
+
+    my $util = new EFI::Database::Util(dbh => $self->{dbh});
+
+    # The output is exactly what we need to return, so we don't bother creating a new
+    # hash ref and instead return the direct output from the batch retrieval
+    my $uniprotMap = $util->batchRetrieveIds($uniprotIds, $sqlPattern, $idCol);
+
+    return $uniprotMap;
+}
+
+
 1;
 __END__
 
@@ -78,7 +100,7 @@ __END__
 
 =head2 NAME
 
-EFI::IdMapping - Perl module for mapping non-UniProt protein sequence IDs to UniProt IDs.
+EFI::IdMapping - Perl utility module for ID and UniRef mapping
 
 =head2 SYNOPSIS
 
@@ -94,6 +116,10 @@ EFI::IdMapping - Perl module for mapping non-UniProt protein sequence IDs to Uni
     # Return a list of UniProt IDs that were found
     my ($uniprotIds, $noMatchIds, $reverseMapping) = $mapper->reverseLookup($typeHint, @searchIds);
 
+    my $uniprotIds = ['B0S9U5', 'A0ABY2L3C9', 'N1VN18', 'B0SS77'];
+    my $uniprotMapping = $mapper->getUniprotMapping(SEQ_UNIREF50, $uniprotIds);
+
+
 =head2 DESCRIPTION
 
 B<EFI::IdMapping> is a utility module that maps non-UniProt IDs (usually obtained from FASTA
@@ -101,6 +127,9 @@ headers) to UniProt IDs.  It does this by using the C<idmapping> table in an EFI
 is in turn obtained from the UniProt ID mapping dataset.  The most frequent non-UniProt ID type
 that is used is B<NCBI>, but other types are supported (as defined in the B<EFI::IdMapping::Util>
 module).
+
+The utility also provides a method for mapping UniProt IDs to corresponding UniRef50 and UniRef90
+sequences.
 
 
 =head2 METHODS
@@ -171,6 +200,69 @@ A hash ref containing a mapping of UniProt IDs to a list of source IDs.
     # $uniProtIds contains ["B0SS77"]
     # $noMatchIds contains []
     # $reverseMapping contains {"B0SS77" => ["B0SS77", "WP_012388845.1"]}
+
+
+=head3 C<getUniprotMapping($idType, $uniprotIds)>
+
+Creates a mapping between UniProt IDs and corresponding UniRef IDs.  If the C<$idType>
+is C<SEQ_UNIREF50>, the output mapping contains both UniRef50 and UniRef90 IDs, but if the
+C<$idType> is C<SEQ_UNIREF50>, then the output mapping contains only UniRef90 IDs.
+
+If the input type is C<SEQ_UNIREF90>, then the output only contains UniRef90 IDs:
+
+    {
+        'UNIPROT_A' => { uniref90 => 'UNIREF90_A' },
+        'UNIPROT_B' => { uniref90 => 'UNIREF90_A' },
+        'UNIPROT_C' => { uniref90 => 'UNIREF90_B' },
+        ...
+    }
+
+
+If the input type is C<SEQ_UNIREF50>, then the output contains both UniRef50 and
+UniRef90 IDs:
+
+    {
+        'UNIPROT_A' => { uniref90 => 'UNIREF90_A', uniref50 => 'UNIREF50_A' },
+        'UNIPROT_B' => { uniref90 => 'UNIREF90_A', uniref50 => 'UNIREF50_A' },
+        'UNIPROT_C' => { uniref90 => 'UNIREF90_B', uniref50 => 'UNIREF50_A' },
+        ...
+    }
+
+=head4 Parameters
+
+=over
+
+=item C<$idType>
+
+Type of the IDs in the metanode (C<SEQ_UNIREF50> or C<SEQ_UNIREF90>)
+
+=item C<$uniprotIds>
+
+Array ref of UniProt IDs
+
+=back
+
+=head4 Returns
+
+Returns a hash ref containing a mapping of UniProt ID to the corresponding UniRef IDs,
+where each key points to a hash ref containing one key (C<uniref90>, for input type
+C<SEQ_UNIREF90>) or two keys (C<uniref50>, for input type C<SEQ_UNIREF50>) pointing
+to sequence IDs.
+
+=head4 Example Usage
+
+    my $uniprotIds = ['B0S9U5', 'A0ABY2L3C9', 'N1VN18', 'B0SS77'];
+    my $uniprotMapping = $mapper->getUniprotMapping(SEQ_UNIREF50, $uniprotIds);
+
+The result of this is:
+
+    {
+        'B0S9U5' => { uniref90 => 'B0SS77', uniref50 => 'B0SS77' },
+        'A0ABY2L3C9' => { uniref90 => 'A0A7I0HR15', uniref50 => 'B0SS77' },
+        'N1VN18' => { uniref90 => 'N1VN18', uniref50 => 'B0SS77' },
+        'B0SS77' => { uniref90 => 'B0SS77', uniref50 => 'B0SS77' },
+    }
+
 
 =cut
 

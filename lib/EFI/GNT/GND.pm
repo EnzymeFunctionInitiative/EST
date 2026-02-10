@@ -50,9 +50,6 @@ sub save {
 
     my $clusterData = $gnn->getClusterData();
 
-    use Data::Dumper;
-    print Dumper($clusterData);
-
     # Add the UniRef cluster size mapping (e.g. how many UniProt IDs are in the UniRef cluster IDs)
     my ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping);
     if ($networkType ne SEQ_UNIPROT and $args{metanode_mapping}) {
@@ -75,7 +72,8 @@ sub save {
 
     $self->{dbh}->commit();
 
-    return 1;
+    my $numIds = scalar keys %$idIndexMap;
+    return $numIds;
 }
 
 
@@ -487,7 +485,7 @@ B<EFI::GNT::GND> - Perl module for writing genome neighborhood diagram database 
 
     my $dbFile = "gnn_db.sqlite";
     my $gnnDb = new EFI::GNT::GND();
-    $gnnDb->save($gnn, $dbFile);
+    my $numIds = $gnnDb->save($gnn, $dbFile);
 
 
 =head2 DESCRIPTION
@@ -507,7 +505,7 @@ Creates a new B<EFI::GNT::GND> instance.
 
     my $dbFile = "gnn_db.sqlite";
     my $gnnDb = new EFI::GNT::GND();
-    $gnnDb->save($gnn, $dbFile);
+    my $numIds = $gnnDb->save($gnn, $dbFile);
     # gnn_db.sqlite will now exist in the current directory
 
 
@@ -533,11 +531,11 @@ The path to a GND file to create.
 
 =head4 Returns
 
-Returns 0 if there was an error or the file exists; 1 otherwise.
+Returns 0 if there was an error or the file exists; otherwise returns the number of IDs written.
 
 =head4 Example Usage
 
-    $gnnDb->save($gnn, $dbFile);
+    my $numIdsWritten = $gnnDb->save($gnn, $dbFile);
 
 
 =head2 SCHEMA

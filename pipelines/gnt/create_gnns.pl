@@ -17,6 +17,7 @@ use EFI::GNT::GNN::Hubs;
 use EFI::GNT::GNN::TableWriter;
 use EFI::GNT::GNN::XgmmlWriter::PfamHub;
 use EFI::GNT::GNN::XgmmlWriter::ClusterHub;
+use EFI::IdMapping;
 use EFI::Options;
 use EFI::Sequence::Type qw(:types get_sequence_version);
 use EFI::SSN::Util::ID qw(parse_cluster_map_file parse_metanode_map_file resolve_mapping);
@@ -38,6 +39,8 @@ if (not $dbh) {
     die "Error connecting to database: " . $db->getError() . "\n";
 }
 
+my $idMapping = new EFI::IdMapping(efi_dbh => $dbh);
+
 
 
 
@@ -55,8 +58,10 @@ if ($opts->{metanode_map}) {
         $idMap = resolve_mapping($idMap, $seqVersion, $metaMap);
     }
 
+    my @uniprotIds = map { @{ $idMap->{$_} } } keys %$idMap;
+    $uniprotMapping = $idMapping->getUniprotMapping($seqVersion, \@uniprotIds);
+
     $sequenceVersion = $seqVersion;
-    $uniprotMapping = getUniprotMapping($seqVersion, $idMap, $dbh);
 }
 
 
@@ -133,63 +138,6 @@ save_stats($opts->{stats}, \%stats) if $opts->{stats};
 
 
 
-
-#
-# getUniprotMapping
-#
-# Creates a mapping between UniProt IDs and corresponding UniRef IDs.  If the $idType
-# is SEQ_UNIREF50, the output mapping contains both UniRef50 and UniRef90 IDs, but if the
-# $idType is SEQ_UNIREF50, then the output mapping contains only UniRef90 IDs.
-#
-# Parameters:
-#    $idType - type of the IDs in the metanode (SEQ_UNIREF50 or SEQ_UNIREF90)
-#    $idMap - hash ref mapping cluster number to list of UniProt IDs in the cluster;
-#        (output from parse_metanode_map_file)
-#    $dbh - database handle
-#
-# Returns:
-#    hash ref containing a mapping of UniProt ID to the corresponding UniRef IDs.
-#
-#    If the input type is SEQ_UNIREF90, then the output only contains UniRef90 IDs:
-#
-#        {
-#            'UNIPROT_A' => { uniref90 => 'UNIREF90_A' },
-#            'UNIPROT_B' => { uniref90 => 'UNIREF90_A' },
-#            'UNIPROT_C' => { uniref90 => 'UNIREF90_B' },
-#            ...
-#        }
-#
-#
-#    If the input type is SEQ_UNIREF50, then the output contains both UniRef50 and
-#    UniRef90 IDs:
-#
-#        {
-#            'UNIPROT_A' => { uniref90 => 'UNIREF90_A', uniref50 => 'UNIREF50_A' },
-#            'UNIPROT_B' => { uniref90 => 'UNIREF90_A', uniref50 => 'UNIREF50_A' },
-#            'UNIPROT_C' => { uniref90 => 'UNIREF90_B', uniref50 => 'UNIREF50_A' },
-#            ...
-#        }
-#
-sub getUniprotMapping {
-    my $idType = shift;
-    my $idMap = shift;
-    my $dbh = shift;
-
-    my @uniprotIds = map { @{ $idMap->{$_} } } keys %$idMap;
-
-    my $idCol = "accession";
-    my @cols = ($idCol, "uniref50_seed AS uniref50", "uniref90_seed AS uniref90");
-    my $cols = join(", ", @cols);
-    my $sqlPattern = "SELECT $cols FROM uniref WHERE accession IN (<IDS>)";
-
-    my $util = new EFI::Database::Util(dbh => $dbh);
-
-    # The output is exactly what we need to return, so we don't bother creating a new
-    # hash ref and instead return the direct output from the batch retrieval
-    my $uniprotMap = $util->batchRetrieveIds(\@uniprotIds, $sqlPattern, $idCol);
-
-    return $uniprotMap;
-}
 
 
 

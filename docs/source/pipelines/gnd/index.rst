@@ -25,7 +25,7 @@ and extracts genome context from the EFI database to create the GNDs.
 The parameter file that configures the GND pipeline can be created using the
 ``bin/create_gnd_nextflow_params.py`` script.  An example usage of the command: ::
 
-    python bin/create_gnd_nextflow_params.py --cluster-id-map id_list.txt --output-dir results/ --efi-config efi.config --efi-db efi_db.sqlite --nextflow-config file.config
+    python bin/create_gnd_nextflow_params.py --import-mode accessions --input-file id_list.txt --output-dir results/ --efi-config efi.config --efi-db efi_db.sqlite --fasta-db db_path --nextflow-config file.config
 
 A file ``params.yml`` is generated in ``results/`` that contains the
 information needed to run the GND pipeline.  Additionally, a shell script
@@ -37,12 +37,33 @@ pipeline may then be executed using the shell script: ::
 
 GND pipeline-specific arguments are:
 
-* ``--cluster-id-map``: path to a file that contains a mapping of cluster
-  number to sequence IDs; these IDs are used to query the input ``--efi-db``
-  to find genome context. [*required*]
+* ``--import-mode``: specifies the process used to import sequence IDs from
+  the input file.  Options are ``accessions``, ``blast``, and ``fasta``
 
+* ``--input-file``: path to a file that contains data corresponding to the
+  import mode.
+
+* ``--fasta-db``: only required if the import mode is ``blast``, and is the
+  path to a FASTA or BLAST database.
+  
 See :doc:`../../reference/common_args` for information on the other, required
 arguments.
+
+Import Modes
+~~~~~~~~~~~~
+
+For import mode ``accessions`` the input file should contain a list of
+sequence IDs; if the first column is numeric then it is treated as a cluster
+number and the GND will contain multiple clusters rather than one group of
+diagrams.  For mode ``blast``, the file should contain a single sequence.
+This sequence will be used in a BLAST against the FASTA database specified
+in the input arguments to obtain a list of sequence IDs for determining
+genome context.  For import mode ``fasta``, the file should contain a list
+of FASTA sequences with headers containing recognized UniProt IDs.  The IDs
+are used to query the database to obtain genome context; the actual
+sequences are not used, so for any unrecognized IDs in the header, that
+sequence is not included in the output.  All IDs from import modes are used
+to query the input ``--efi-db`` to find genome context.
 
 Generating a Job Script
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -52,7 +73,7 @@ and computational intensity.  An additional script is provided which can
 generate a job script for SLURM as well as the parameter file.  To generate
 these files, ::
 
-    python bin/create_nextflow_job.py gnd --cluster-id-map id_list.txt --output-dir results/ --efi-config efi.config --efi-db efi_db.sqlite --nextflow-config slurm.config
+    python bin/create_nextflow_job.py gnd --import-mode accessions --input-file id_list.txt --output-dir results/ --efi-config efi.config --efi-db efi_db.sqlite --nextflow-config slurm.config
 
 In addition to the ``params.yml`` seen above, this will generate a SLURM job
 submission script called ``run_nextflow.sh`` which can be started by running

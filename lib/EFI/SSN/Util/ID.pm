@@ -13,7 +13,7 @@ use EFI::Sequence::Type qw(:types get_sequence_version);
 use Exporter qw(import);
 
 
-our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file parse_cluster_map_file parse_singletons_file get_cluster_num_cols parse_cluster_num_map);
+our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file save_cluster_map_file parse_cluster_map_file parse_singletons_file get_cluster_num_cols parse_cluster_num_map);
 
 
 
@@ -53,6 +53,35 @@ sub get_cluster_num_cols {
     } else {
         return (2, 1);
     }
+}
+
+
+#
+# save_cluster_map_file
+#
+# Save the given cluster ID->sequence ID mapping to a file.
+#
+# Parameters:
+#    $clusterIdMap - hash ref containing map of cluster number to IDs in the cluster
+#    $file - path to file to write mapping to
+#
+sub save_cluster_map_file {
+    my $clusterIdMap = shift;
+    my $file = shift;
+
+    open my $fh, ">", $file or die "Unable to write to cluster map file '$file': $!";
+
+    $fh->print(join("\t", "node_label", "cluster_num_by_seq"), "\n");
+
+    my @clusterIds = sort { $a <=> $b } keys %$clusterIdMap;
+
+    foreach my $clusterId (@clusterIds) {
+        foreach my $seqId (@{ $clusterIdMap->{$clusterId} }) {
+            $fh->print(join("\t", $seqId, $clusterId), "\n");
+        }
+    }
+
+    close $fh;
 }
 
 
@@ -270,10 +299,13 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
 
 =head2 SYNOPSIS
 
-    use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file get_cluster_num_cols parse_metanode_map_file parse_cluster_num_map);
+    use EFI::SSN::Util::ID qw(resolve_mapping parse_cluster_map_file save_cluster_map_file get_cluster_num_cols parse_metanode_map_file parse_cluster_num_map);
 
     # $clusterMapFile comes from another utility, the Python `compute_clusters.py` script
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
+
+    # Save the cluster ID -> sequence ID map to the specified file
+    save_cluster_map_file($clusterIdMap, $clusterMapFile);
 
     # $metanodeMapFile comes from another utility, ssn_to_id_list.pl
     my ($idType, $sourceIdMap) = parse_metanode_map_file($metanodeMapFile);
@@ -373,6 +405,52 @@ C<cluster_num_node> column in the input file).  In the example given above
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
 
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile, default_cluster_num => 1);
+
+
+=head3 C<save_cluster_map_file($clusterIdMap, $clusterMapFile)>
+
+Saves a cluster ID mapping to a tab-separated file containing two columns, containing
+a mapping of sequence ID to cluster number.
+
+=head4 Parameters
+
+=over
+
+=item C<$clusterIdMap>
+
+A hash ref containing a mapping of cluster ID (number) to list (array ref) of sequence
+IDs, e.g.
+
+    {
+        1 => ["UNIPROT_ID1", "UNIPROT_ID2", "REPNODE_ID1", ...],
+        2 => ["UNIPROT_ID3", "REPNODE_ID2", "REPNODE_ID3", ...],
+        ...
+    }
+
+=item C<$clusterMapFile>
+
+A path to a file to write the mapping to.
+
+=back
+
+=head4 Example Usage
+
+Given a hash ref that maps cluster numbers to an array of sequence IDs within that
+cluster looking like the following:
+
+    my $mapping = {
+        1 => ["UNIPROT_ID1", "UNIPROT_ID2"],
+        2 => ["UNIPROT_ID3"]
+    };
+
+    save_cluster_map_file($mapping, $outputFile);
+
+This produces a file with the following contents:
+
+    node_label  cluster_num_by_seq
+    UNIPROT_ID  1
+    UNIPROT_ID2 1
+    UNIPROT_ID3 2
 
 
 =head3 C<parse_singletons_file($singletonsFile)>
