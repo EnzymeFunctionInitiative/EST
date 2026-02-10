@@ -3,7 +3,6 @@ process create_gnd {
     publishDir params.final_output_dir, mode: 'copy'
     input:
         path id_list 
-        val seq_ver
     output:
         path "gnd.sqlite", emit: "gnd_db"
         path "gnd.sqlite.zip", emit: "zipped_gnd_db"
@@ -12,13 +11,13 @@ process create_gnd {
     script:
     """
     perl ${projectDir}/create_gnd.pl \
-        --config "${params.efi_config}" \
-        --db-name "${params.efi_db}" \
-        --cluster-map "${id_list}" \
+        --efi-config "${params.efi_config}" \
+        --efi-db "${params.efi_db}" \
+        --sequence-version ${params.sequence_version} \
+        --cluster-map ${id_list} \
         --nb-size ${params.nb_size} \
         --gnd gnd.sqlite \
-        --stats stats.json \
-        --sequence-version ${seq_ver}
+        --stats stats.json
     zip gnd.sqlite.zip gnd.sqlite
     """
 }
@@ -30,11 +29,14 @@ process run_blast {
         path "init_blast.out"
 
     script:
-    def blast_num_matches_arg = params.import_blast_num_matches ? "-b ${params.import_blast_num_matches}" : ""
-    def blast_evalue_arg = params.import_blast_evalue ? "-e ${params.import_blast_evalue}" : ""
-
     """
-    blastall -p blastp -i "${sequence_file}" -d "${params.import_blast_fasta_db}" -m 8 ${blast_evalue_arg} ${blast_num_matches_arg} -o init_blast.out
+    blastall -p blastp \
+        -i ${sequence_file} \
+        -d "${params.import_blast_fasta_db}" \
+        -b ${params.import_blast_num_matches} \
+        -e ${params.import_blast_evalue} \
+        -m 8 \
+        -o init_blast.out
     if [[ ! -s init_blast.out ]]; then
         echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence." | tee /dev/stderr
         exit 1
@@ -46,20 +48,19 @@ process parse_blast_results_for_ids {
     input:
         path sequence_file
         path blast_file
-        val seq_ver
     output:
         path "accession_ids.tab", emit: "source_ids"
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def seq_ver_arg = params.sequence_version ? "--sequence-version ${params.sequence_version}" : ""
-
     """
     perl ${projectDir}/../shared/perl/get_sequence_ids.pl \
-        --efi-config "${params.efi_config}" --efi-db "${params.efi_db}" ${seq_ver_arg} \
+        --efi-config "${params.efi_config}" \
+        --efi-db "${params.efi_db}" \
+        --sequence-version ${params.sequence_version} \
         --mode blast \
-        --blast-output "${blast_file}" \
-        --blast-query "${sequence_file}" \
+        --blast-output ${blast_file} \
+        --blast-query ${sequence_file} \
         --source-meta-file sequence_meta.tab \
         --source-ids-file accession_ids.tab
     """
@@ -68,19 +69,18 @@ process parse_blast_results_for_ids {
 process parse_fasta_for_ids {
     input:
         path fasta_file
-        val seq_ver
     output:
         path "accession_ids.tab", emit: "source_ids"
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def seq_ver_arg = params.sequence_version ? "--sequence-version ${params.sequence_version}" : ""
-
     """
     perl $projectDir/../shared/perl/get_sequence_ids.pl \
-        --efi-config "${params.efi_config}" --efi-db "${params.efi_db}" ${seq_ver_arg} \
+        --efi-config "${params.efi_config}" \
+        --efi-db "${params.efi_db}" \
+        --sequence-version ${params.sequence_version} \
         --mode fasta \
-        --fasta "${fasta_file}" \
+        --fasta ${fasta_file} \
         --source-meta-file sequence_meta.tab \
         --source-ids-file accession_ids.tab
     """
@@ -89,19 +89,18 @@ process parse_fasta_for_ids {
 process parse_accession_for_ids {
     input:
         path accession_file
-        val seq_ver
     output:
         path "accession_ids.tab", emit: "source_ids"
         path "sequence_meta.tab", emit: "source_meta"
 
     script:
-    def seq_ver_arg = params.sequence_version ? "--sequence-version ${params.sequence_version}" : ""
-
     """
     perl $projectDir/../shared/perl/get_sequence_ids.pl \
-        --efi-config "${params.efi_config}" --efi-db "${params.efi_db}" ${seq_ver_arg} \
+        --efi-config "${params.efi_config}" \
+        --efi-db "${params.efi_db}" \
+        --sequence-version ${params.sequence_version} \
         --mode accessions \
-        --accessions "${accession_file}" \
+        --accessions ${accession_file} \
         --source-meta-file sequence_meta.tab \
         --source-ids-file accession_ids.tab
     """
@@ -126,21 +125,19 @@ process convert_to_id_list {
 workflow {
     def input_file_ch = Channel.fromPath(params.input_file)
 
-    def seq_ver = params.sequence_version ?: "uniprot"
-
     if (params.import_mode == "accessions") {
-        parse_data = parse_accession_for_ids(input_file_ch, seq_ver)
+        parse_data = parse_accession_for_ids(input_file_ch,)
     } else if (params.import_mode == "blast") {
         blast_results = run_blast(input_file_ch)
-        parse_data = parse_blast_results_for_ids(input_file_ch, blast_results, seq_ver)
+        parse_data = parse_blast_results_for_ids(input_file_ch, blast_results)
     } else if (params.import_mode == "fasta") {
-        parse_data = parse_fasta_for_ids(input_file_ch, seq_ver)
+        parse_data = parse_fasta_for_ids(input_file_ch)
     } else {
         error "Mode '${params.import_mode}' is invalid"
     }
 
     id_list = convert_to_id_list(parse_data.source_ids, parse_data.source_meta)
 
-    gnd = create_gnd(id_list, seq_ver)
+    gnd = create_gnd(id_list)
 }
 
