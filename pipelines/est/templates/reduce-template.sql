@@ -7,7 +7,6 @@ SET preserve_insertion_order = false;
 -- against themselves.
 CREATE TABLE blast_results as (
         SELECT * FROM read_parquet($transcoded_blast_output_glob)
-        WHERE NOT qseqid = sseqid
 );
 
 --
