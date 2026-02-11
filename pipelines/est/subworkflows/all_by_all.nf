@@ -27,7 +27,7 @@ process all_by_all_blast {
     python $projectDir/axa_blast/transcode_blast.py --blast-output ${frac}.tab
 
     # in each row, ensure that qseqid < sseqid lexicographically
-    python $projectDir/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-memory-limit "${params.duckdb_memory_limit}" --duckdb-temp-dir /scratch/duckdb-"${params.job_id}"  --sql-output-file prereduce.sql
+    python $projectDir/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-memory-limit "${params.duckdb_memory_limit}" --duckdb-temp-dir /scratch/duckdb-${task.hash}  --sql-output-file prereduce.sql
     duckdb < prereduce.sql
     """
 }
