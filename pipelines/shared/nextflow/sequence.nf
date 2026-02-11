@@ -36,7 +36,7 @@ process multiplex {
         path "sequences.fasta", emit: "fasta_file"
         path "sequences.fasta.clstr", emit: "clusters"
     """
-    cd-hit -d 0  -c 1 -s 1 -i $fasta_file -o sequences.fasta -M 10000
+    cd-hit -d 0  -c 1 -s 1 -i $fasta_file -o sequences.fasta -M "${params.cdhit_memory_limit}"
     """
 }
 
