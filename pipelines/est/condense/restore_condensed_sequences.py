@@ -44,7 +44,7 @@ def parse_cdhit_clstr(clstr_path):
 
 def expand_edges(blastin_path, blastout_path, clusters):
     """
-    Reads BLAST file, looks up children for query/subject, and expands edges.
+    Reads BLAST file, looks up children for query/subject, and restores edges.
     """
     with open(blastin_path, 'r') as fin, open(blastout_path, 'w') as fout:
         for line in fin:
@@ -65,7 +65,7 @@ def expand_edges(blastin_path, blastout_path, clusters):
             query_children = clusters[query_rep]
             
             # CASE A: Self-Hit (Cluster hits itself)
-            # This creates the internal clique (A-B, A-C, B-C) but excludes self-loops (A-A).
+            # This creates the internal clique (e.g. A-B, A-C, B-C) but excludes self-loops (A-A).
             if query_rep == subject_rep:
                 n = len(query_children)
                 for i in range(n):
@@ -90,10 +90,10 @@ def expand_edges(blastin_path, blastout_path, clusters):
                         fout.write(out_line + "\n")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Expand BLAST results based on CD-HIT clusters.")
+    parser = argparse.ArgumentParser(description="Restore condensed BLAST results based on CD-HIT clusters.")
     parser.add_argument("--cd-hit-cluster", required=True, help="CD-HIT .clstr file")
-    parser.add_argument("--clustered-blast", required=True, help="Input BLAST file with results using clustered IDs")
-    parser.add_argument("--expanded-blast", required=True, help="Output expanded BLAST file")
+    parser.add_argument("--condensed-blast", required=True, help="Input BLAST file with results using condensed sequences")
+    parser.add_argument("--restored-blast", required=True, help="Output BLAST file with original sequences restored")
     
     args = parser.parse_args()
     
@@ -101,5 +101,5 @@ if __name__ == "__main__":
     cluster_map = parse_cdhit_clstr(args.cd_hit_cluster)
     
     print("Expanding edges...")
-    expand_edges(args.clustered_blast, args.expanded_blast, cluster_map)
+    expand_edges(args.condensed_blast, args.restored_blast, cluster_map)
     print("Done.")
