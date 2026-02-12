@@ -13,8 +13,14 @@ def add_args(parser: argparse.ArgumentParser):
     """
     Add arguments for GND pipeline to ``parser``
     """
-    parser.add_argument("--cluster-id-map", required=True, type=str, help="The mapping of cluster numbers to IDs in the cluster for the GNDs")
-    parser.add_argument("--nb-size", type=int, required=False, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20.")
+    parser.add_argument("--import-mode", required=True, type=str, choices=["blast", "fasta", "accessions"], help="Mode corresponding to input data type")
+    parser.add_argument("--input-file", required=True, type=str, help="Input file containing the sequence ID data (accession IDs, FASTA, sequence for BLAST) required for generating the GND")
+    parser.add_argument("--nb-size", type=int, required=False, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20")
+    parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"], help="Input sequence version used to generate GND; i.e. if input type is uniref50, then additional levels for uniref90 and uniprot will be generated in the GND")
+    # BLAST (blast) mode input arguments
+    parser.add_argument("--import-blast-fasta-db", type=str, help="FASTA file or BLAST database to use for the initial import to find sequences")
+    parser.add_argument("--import-blast-num-matches", type=int, help="Maximum number of matches returned by BLAST when retrieving sequences")
+    parser.add_argument("--import-blast-evalue", help="Cutoff e-value to use in the BLAST sequence alignment when retrieving sequences")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -30,9 +36,16 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     else:
         args = validated_args
 
-    if not os.path.exists(args.cluster_id_map):
-        print(f"SSN Input file '{args.cluster_id_map}' does not exist")
+    if not os.path.exists(args.input_file):
+        print(f"Input file '{args.input_file}' does not exist")
         fail = True
+    else:
+        args.input_file = os.path.abspath(args.input_file)
+
+    if args.import_mode == "blast":
+        if args.import_blast_fasta_db is None:
+            print(f"When --import-mode is blast, --import-blast-fasta-db must be specified")
+            fail = True
     
     if args.nb_size and (
         args.nb_size < 1 or args.nb_size > 20
@@ -47,7 +60,6 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print("Failed to render params template")
         exit(1)
     else:
-        args.cluster_id_map = os.path.abspath(args.cluster_id_map)
         return args
     
 def create_parser():
@@ -55,14 +67,21 @@ def create_parser():
     add_args(parser)
     return parser
 
-def render_params(cluster_id_map, efi_config, efi_db, output_dir,
-        nb_size=None, **kwargs: dict):
+def render_params(import_mode, input_file, efi_config, efi_db, output_dir,
+        nb_size=None, sequence_version=None,
+        import_blast_fasta_db=None, import_blast_num_matches=None, import_blast_evalue=None,
+        **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
-        "cluster_id_map": cluster_id_map,
+        "import_mode": import_mode,
+        "input_file": input_file,
         "efi_config": efi_config,
         "efi_db": efi_db,
-        "nb_size": nb_size
+        "nb_size": nb_size,
+        "sequence_version": sequence_version,
+        "import_blast_fasta_db": import_blast_fasta_db,
+        "import_blast_num_matches": import_blast_num_matches,
+        "import_blast_evalue": import_blast_evalue,
     }
 
     # Handle kwargs dict, assuming each entry is a parameter to be added to params

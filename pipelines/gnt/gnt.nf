@@ -16,8 +16,8 @@ process create_gnns {
         path ssn_file
 
     output:
-        path "cluster_gnn.xgmml", emit: "cluster_gnn"
-        path "pfam_gnn.xgmml", emit: "pfam_gnn"
+        path "ssn_cluster_gnn.xgmml", emit: "cluster_gnn"
+        path "pfam_family_gnn.xgmml", emit: "pfam_gnn"
         path "hub_count.txt", emit: "hub_count"
         path "cooc_table.txt", emit: "cooc_table"
         path "nomatches_noneighbors.txt", emit: "nomatches_noneighbors"
@@ -37,8 +37,8 @@ process create_gnns {
     perl $projectDir/create_gnns.pl \
         --cluster-map \$id_map_file \
         --metanode-map $metanode_map \
-        --cluster-gnn cluster_gnn.xgmml \
-        --pfam-gnn pfam_gnn.xgmml \
+        --cluster-gnn ssn_cluster_gnn.xgmml \
+        --pfam-gnn pfam_family_gnn.xgmml \
         --gnd gnd.sqlite \
         --cooc-table cooc_table.txt \
         --hub-count hub_count.txt \
