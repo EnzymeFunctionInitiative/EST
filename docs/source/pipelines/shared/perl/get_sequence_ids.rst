@@ -5,7 +5,7 @@ Usage
 
 ::
 
-	Usage: perl pipelines/est/import/get_sequence_ids.pl --efi-config-file <FILE> --efi-db <VALUE>
+	Usage: perl pipelines/shared/perl/get_sequence_ids.pl --efi-config-file <FILE> --efi-db <VALUE>
 	    --mode <VALUE> [--output-dir <DIR_PATH>] [--output-stats-file <FILE>]
 	    [--source-meta-file <FILE>] [--source-ids-file <FILE>] [--sequence-version <VALUE>]
 	    [--family <VALUE>] [--fasta <FILE>] [--sequence-mapping-file <FILE>] [--accessions <FILE>]
