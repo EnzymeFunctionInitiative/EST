@@ -134,8 +134,7 @@ swapping results to disk if it is memory constrained but some operations
 require some minimum amount of memory.  If these solutions did not solve the
 problem, try using the newest version of DuckDB (which may require manually
 building the docker image) or decreasing the number of ``--blast-num-matches``
-which will reduce the total number of edges processed.  Collapsing redundancy will also
-reduce the number of sequences analyzed and can help solve these errors.
+which will reduce the total number of edges processed.
 
 Execution Details
 -----------------
