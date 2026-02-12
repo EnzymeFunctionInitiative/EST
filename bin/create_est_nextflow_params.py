@@ -20,7 +20,7 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--fasta-shards", type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
     common_parser.add_argument("--accession-shards", type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    common_parser.add_argument("--condense", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis by condensing identical sequences into one before the BLAST")
+    common_parser.add_argument("--condense", action=argparse.BooleanOptionalAction, default=True, help="Use CD-HIT to reduce the number of sequences used in analysis by condensing identical sequences into one before the BLAST")
     common_parser.add_argument("--blast-num-matches", type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
     common_parser.add_argument("--blast-evalue", help="Cutoff E value to use in all-by-all BLAST")
     common_parser.add_argument("--sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"])
