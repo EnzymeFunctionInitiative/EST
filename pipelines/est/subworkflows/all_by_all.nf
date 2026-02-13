@@ -1,5 +1,5 @@
 
-include { multiplex } from "../../shared/nextflow/sequence.nf"
+include { condense_redundant } from "../../shared/nextflow/sequence.nf"
 
 process create_blast_db {
     input:
@@ -54,7 +54,7 @@ process split_fasta {
 }
 
 process blastreduce {
-    publishDir params.final_output_dir, mode: 'copy'
+    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
     input:
         path blast_files
         path fasta_length_parquet
@@ -68,47 +68,60 @@ process blastreduce {
     """
 }
 
-process demultiplex {
+// Formerly known as demultiplex
+process restore_condensed {
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
     input:
-        path blast_parquet
-        path clusters
+        path blast_parquet, stageAs: 'reduced.parquet'
+        path condensed
     output:
         path '1.out.parquet'
     """
-    echo "COPY (SELECT * FROM read_parquet('$blast_parquet')) TO 'mux.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
-    perl $projectDir/mux/demux.pl -blastin mux.out -blastout 1.out -cluster $clusters
-    python $projectDir/mux/transcode_demuxed_blast.py --blast-output 1.out
+    echo "COPY (SELECT * FROM read_parquet('${blast_parquet}')) TO 'condensed.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
+    python $projectDir/condense/restore_condensed_sequences.py --condensed-blast condensed.out --restored-blast 1.out --cd-hit-cluster ${condensed}
+    python $projectDir/condense/transcode_restored_blast.py --blast-output 1.out
     """
 }
 
 workflow ALL_BY_ALL {
     take:
-        fasta_file
+        original_fasta
 
     main:
-        // Step 2: multiplex
+        // Cluster redundant sequences for BLAST computation (formerly known as multiplex)
         if (params.multiplex) {
-            multiplex_files = multiplex(fasta_file)
-            fasta_file = multiplex_files.fasta_file
+            condensed_files = condense_redundant(original_fasta)
+            blast_input_fasta = condensed_files.fasta_file
+            condensed = condensed_files.condensed
+        } else {
+            blast_input_fasta = original_fasta
+            condensed = Channel.empty()
         }
 
-        // Step 3: create blastdb and frac seq file 
-        blastdb = create_blast_db(fasta_file)
-        fasta_lengths_parquet = blastreduce_transcode_fasta(fasta_file)
+        // Create BLAST database
+        blastdb = create_blast_db(blast_input_fasta)
 
-        // Step 4: all-by-all blast and blast reduce
-        fasta_shards = split_fasta(fasta_file)
-        blast_fractions = all_by_all_blast(blastdb.database_files, blastdb.database_name, fasta_shards.flatten()) | collect
+        // For stats computation later
+        fasta_lengths_parquet = blastreduce_transcode_fasta(original_fasta)
+
+        // All-by-all BLAST
+        fasta_shards = split_fasta(blast_input_fasta)
+        blast_fractions = all_by_all_blast(
+            blastdb.database_files,
+            blastdb.database_name,
+            fasta_shards.flatten()
+        ) | collect
+
+        // Eliminate duplicate and self-edges
         reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
 
-        // Demultiplex
+        // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
         if (params.multiplex) {
-            reduced_blast_parquet = demultiplex(reduced_blast_parquet, multiplex_files.clusters)
+            reduced_blast_parquet = restore_condensed(reduced_blast_parquet, condensed)
         }
 
     emit:
         fasta_lengths_parquet = fasta_lengths_parquet
-        blast_parquet = reduced_blast_parquet 
+        blast_parquet = reduced_blast_parquet
 }
 

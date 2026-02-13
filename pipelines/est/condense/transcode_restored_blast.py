@@ -7,7 +7,7 @@ import pyarrow as pa
 from pyEFI.transcode import csv_to_parquet
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Transcode demultiplexed BLAST output files to Parquet")
+    parser = argparse.ArgumentParser(description="Transcode expanded (from non-redundant) BLAST output files to Parquet")
     parser.add_argument("--blast-output", type=str, nargs="+", help="BLAST output files")
 
     return parser
@@ -46,7 +46,8 @@ convert_options = csv.ConvertOptions(
         "query_length": pa.uint32(),
         "subject_length": pa.uint32(),
         "alignment_score": pa.uint32()
-    }
+    },
+    include_columns=["qseqid", "sseqid", "pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"]
 )
 
 if __name__ == "__main__":
