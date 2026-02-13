@@ -78,9 +78,6 @@ process restore_condensed {
         path '1.out.parquet'
     """
     echo "SET memory_limit = '${params.duckdb_memory_limit}'; SET temp_directory = '${params.duckdb_temp_dir}-${task.hash}'; SET threads TO 1; COPY (SELECT * FROM read_parquet('$blast_parquet')) TO 'mux.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
-    perl $projectDir/mux/demux.pl -blastin mux.out -blastout 1.out -cluster $clusters
-    python $projectDir/mux/transcode_demuxed_blast.py --blast-output 1.out
-    echo "COPY (SELECT * FROM read_parquet('${blast_parquet}')) TO 'condensed.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
     python $projectDir/condense/restore_condensed_sequences.py --condensed-blast condensed.out --restored-blast 1.out --cd-hit-cluster ${condensed}
     python $projectDir/condense/transcode_restored_blast.py --blast-output 1.out
     """
