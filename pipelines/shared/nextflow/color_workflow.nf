@@ -42,6 +42,7 @@ process get_fasta {
     input:
         tuple val(version), path(id_file)
 
+    // Output a tuple with the sequence version (e.g. uniprot, uniref50, uniref90) and the fasta file
     output:
         tuple val(version), path("*.fasta", arity: "1")
 
@@ -228,7 +229,7 @@ workflow color_and_retrieve {
         // Get the list of sequence IDs from the SSN, grouped by ID type and cluster (e.g.
         // if the input SSN is UniRef50, there will be three outputs: uniprot/cluster_N.txt,
         // uniref90/cluster_N.txt, and uniref50/cluster_N.txt, with one cluster_N.txt file
-        // for each cluster in the network
+        // for each cluster in the network)
         id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map)
         id_list = id_list_data.uniprot_tuples
                               .transpose()
@@ -283,5 +284,6 @@ workflow color_and_retrieve {
         cluster_colors
         zipped_id_dirs
         zipped_fasta_dirs
+        fasta_files
 }
 
