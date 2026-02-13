@@ -77,6 +77,10 @@ process make_weblogos {
     input:
         tuple val(type), val(id), path(msa)
 
+    output:
+        path("*.png")
+        path("*.txt")
+
     script:
     """
     weblogo -D fasta -F png --resolution 300 --stacks-per-line 80 -f ${msa} -o ${id}.png
@@ -142,7 +146,7 @@ workflow align_and_analyze {
 
         build_hmms(msa_ch)
 
-        //make_weblogos(msa_ch)
+        make_weblogos(msa_ch)
 
         clustal_ch = run_clustal_omega(msa_ch)
             .groupTuple()
