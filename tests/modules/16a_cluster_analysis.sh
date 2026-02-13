@@ -21,5 +21,5 @@ rm -rf $OUTPUT_DIR
     --compute-cons-res \
     --residues C,A \
     --pid-thresholds 50,100
-#bash $OUTPUT_DIR/run_nextflow.sh
+bash $OUTPUT_DIR/run_nextflow.sh
 
