@@ -8,6 +8,8 @@ import os
 import shared_args
 
 NXF_SCRIPT = "pipelines/clusteranalysis/clusteranalysis.nf"
+DEFAULT_MAX_MSA_SEQ = 750
+DEFAULT_MIN_MSA_SEQ = 3
 
 def add_args(parser: argparse.ArgumentParser):
     """
@@ -15,8 +17,8 @@ def add_args(parser: argparse.ArgumentParser):
     """
     parser.add_argument("--ssn-input", required=True, type=str, help="The SSN file to color, XGMML or zipped XGMML")
     parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    parser.add_argument("--max-msa-seq", type=int, required=False, help="The maximum number of sequences to use when running the multiple sequence alignment; clusters larger than this number will be resampled to this value for the MSA")
-    parser.add_argument("--min-msa-seq", type=int, required=False, help="The minimum number of sequences required for running the multiple sequence alignment; clusters smaller than this number will be excluded")
+    parser.add_argument("--max-msa-seq", type=int, required=False, default=DEFAULT_MAX_MSA_SEQ, help="The maximum number of sequences to use when running the multiple sequence alignment; clusters larger than this number will be resampled to this value for the MSA")
+    parser.add_argument("--min-msa-seq", type=int, required=False, default=DEFAULT_MIN_MSA_SEQ, help="The minimum number of sequences required for running the multiple sequence alignment; clusters smaller than this number will be excluded")
     parser.add_argument("--weblogo", action=argparse.BooleanOptionalAction, default=True, help="Generate a weblogo for each cluster (on by default)")
     parser.add_argument("--hmms", action=argparse.BooleanOptionalAction, default=True, help="Generate a HMM and Skylign data for each cluster (on by default)")
     parser.add_argument("--length-histo", action=argparse.BooleanOptionalAction, default=True, help="Generate length histograms for each cluster (on by default)")
