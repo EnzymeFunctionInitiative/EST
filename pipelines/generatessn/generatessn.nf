@@ -14,14 +14,14 @@ process import_data {
     """
 }
 
-process filter_blast {
+process threshold_blast {
     input:
         path blast_parquet
     output:
         path "2.out"
     """
-    python $projectDir/filter/render_filter_blast_sql_template.py --blast-output $blast_parquet --filter-parameter ${params.threshold_metric} --filter-min-val ${params.threshold_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/filterblast-template.sql --output-file 2.out --sql-output-file filterblast.sql
-    duckdb < filterblast.sql
+    python $projectDir/threshold/render_threshold_blast_sql_template.py --blast-output $blast_parquet --threshold-metric ${params.threshold_metric} --threshold-min-val ${params.threshold_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/thresholdblast-template.sql --output-file 2.out --sql-output-file thresholded_blast.sql
+    duckdb < thresholded_blast.sql
     """
 }
 
@@ -52,7 +52,7 @@ process get_annotations {
 process create_full_ssn {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path filtered_blast
+        path thresholded_blast
         path filtered_fasta
         path ssn_meta_file
     output:
@@ -73,7 +73,7 @@ process create_full_ssn {
     def file_name = (clean_file_name ?: "full_ssn") + ".xgmml"
 
     """
-    perl $projectDir/create/create_full_ssn.pl --blast $filtered_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output "${file_name}" --title "${final_job_name}" --db-version ${params.db_version} --stats stats.json
+    perl $projectDir/create/create_full_ssn.pl --blast $thresholded_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output "${file_name}" --title "${final_job_name}" --db-version ${params.db_version} --stats stats.json
     zip full_ssn.xgmml.zip "${file_name}"
     rm "${file_name}"
     touch job.finish
@@ -81,16 +81,16 @@ process create_full_ssn {
 }
 
 workflow {
-    // import data from EST run
+    // Import data from EST run
     input_data = import_data(params.blast_parquet, params.fasta_file, params.seq_meta_file)
 
-    // filter BLAST and fasta file
-    filtered_blast = filter_blast(input_data.blast_output)
+    // Apply threshold to BLAST and fasta file
+    thresholded_blast = threshold_blast(input_data.blast_output)
     fasta_filter_outputs = filter_fasta(input_data.fasta, input_data.seq_meta_file)
 
-    // get annotations
+    // Get annotations
     ssn_meta_file = get_annotations(fasta_filter_outputs.filtered_seq_meta_file)
 
-    // create networks
-    full_ssn = create_full_ssn(filtered_blast, fasta_filter_outputs.filtered_fasta, ssn_meta_file)
+    // Create networks
+    full_ssn = create_full_ssn(thresholded_blast, fasta_filter_outputs.filtered_fasta, ssn_meta_file)
 }

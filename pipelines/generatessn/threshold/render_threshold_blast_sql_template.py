@@ -10,20 +10,20 @@ def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
         "--output-file",
         type=str,
         required=True,
-        help="The final output file the filtered BLAST output should be written to. Will be tab-separated"
+        help="The final output file the thresholded BLAST output should be written to. Will be tab-separated"
     )
     parser.add_argument(
-        "--filter-parameter",
+        "--threshold-metric",
         type=str,
         required=True,
         choices=["pident", "bitscore", "alignment_score"],
-        help="The parameter to filter on"
+        help="The threshold metric to use to separate the SSN into clusters"
     )
     parser.add_argument(
-        "--filter-min-val",
+        "--threshold-min-val",
         type=float,
         required=True,
-        help="The minimum value for the selected filter. Values below are not kept"
+        help="The minimum value for the selected threshold metric. Values below are not kept"
     )
     parser.add_argument(
         "--min-length",
@@ -39,7 +39,7 @@ def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = sql_template_render.create_sql_template_render_parser("../templates/filterblast-template.sql", "Filter reduced BLAST output on specified parameter", "filterblast.sql")
+    parser = sql_template_render.create_sql_template_render_parser("../templates/thresholdblast-template.sql", "Filter reduced BLAST output on specified parameter", "thresholdblast.sql")
     return parser
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -64,11 +64,11 @@ if __name__ == "__main__":
         "mem_limit": args.duckdb_memory_limit,
         "duckdb_temp_dir": args.duckdb_temp_dir,
         "blast_output": args.blast_output,
-        "filter_parameter": args.filter_parameter,
-        "min_val": args.filter_min_val,
+        "threshold_metric": args.threshold_metric,
+        "threshold_min_val": args.threshold_min_val,
         "min_length": args.min_length,
         "max_length": args.max_length,
-        "filtered_blast_output": args.output_file,
+        "thresholded_blast_output": args.output_file,
         "compression": "zstd",
     }
     sql_template_render.render(args.sql_template, mapping, args.sql_output_file)
