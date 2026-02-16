@@ -14,6 +14,6 @@ family=$(<$EFI_TEST_FAMILY_ID)
 ./bin/create_est_nextflow_params.py accessions --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --input-file $EFI_TEST_ACC_FILE --nextflow-config $CONFIG_FILE --families $family --filter fragments
 bash $OUTPUT_DIR/run_nextflow.sh
 
-./bin/create_generatessn_nextflow_params.py auto --filter-min-val 87 --ssn-name testssn --job-name test-ssn --est-output-dir $OUTPUT_DIR --nextflow-config $CONFIG_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME
+./bin/create_generatessn_nextflow_params.py auto --threshold-min-val 87 --ssn-name testssn --job-name test-ssn --est-output-dir $OUTPUT_DIR --nextflow-config $CONFIG_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME
 bash $OUTPUT_DIR/ssn/run_nextflow.sh
 
