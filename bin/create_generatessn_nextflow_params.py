@@ -14,12 +14,13 @@ def add_args(parser):
     """
     # SSN creation parameters
     ssn_args_parser = argparse.ArgumentParser(add_help=False).add_argument_group("SSN Creation Options")
-    ssn_args_parser.add_argument("--filter-parameter", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], help="Parameter to filter edges on")
-    ssn_args_parser.add_argument("--filter-min-val", required=True, type=float, help="Retain rows where filter-parameter >= this value")
+    ssn_args_parser.add_argument("--threshold-metric", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], help="Parameter to filter edges on")
+    ssn_args_parser.add_argument("--threshold-min-val", required=True, type=float, help="Retain rows where threshold metric >= this value")
     ssn_args_parser.add_argument("--min-length", help="Minimum required sequence length")
     ssn_args_parser.add_argument("--max-length", help="Maximum sequence length to allow")
     ssn_args_parser.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
     ssn_args_parser.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
+#    ssn_args_parser.add_argument("--
     ssn_args_parser.add_argument("--maxfull", default=0)
 
     # Add a subparser for automatically populating from EST output dir
@@ -106,16 +107,16 @@ def create_parser():
     return parser
 
 def render_params(blast_parquet, fasta_file, seq_meta_file, output_dir, efi_config,
-        db_version, job_id, efi_db, mode, ssn_name, job_name, maxfull, filter_min_val,
-        filter_parameter=None, min_length=None, max_length=None,
+        db_version, job_id, efi_db, mode, ssn_name, job_name, maxfull, threshold_min_val,
+        threshold_metric=None, min_length=None, max_length=None,
         **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
         "seq_meta_file": seq_meta_file,
         "final_output_dir": output_dir,
-        "filter_parameter": filter_parameter,
-        "filter_min_val": filter_min_val,
+        "threshold_metric": threshold_metric,
+        "threshold_min_val": threshold_min_val,
         "min_length": min_length,
         "max_length": max_length,
         "ssn_name": ssn_name,
