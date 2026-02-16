@@ -14,7 +14,7 @@ def add_args(parser):
     """
     # SSN creation parameters
     ssn_args_parser = argparse.ArgumentParser(add_help=False).add_argument_group("SSN Creation Options")
-    ssn_args_parser.add_argument("--threshold-metric", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], help="Parameter to filter edges on")
+    ssn_args_parser.add_argument("--threshold-metric", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], default="alignment_score", help="Parameter to filter edges on")
     ssn_args_parser.add_argument("--threshold-min-val", required=True, type=float, help="Retain rows where threshold metric >= this value")
     ssn_args_parser.add_argument("--min-length", help="Minimum required sequence length")
     ssn_args_parser.add_argument("--max-length", help="Maximum sequence length to allow")
