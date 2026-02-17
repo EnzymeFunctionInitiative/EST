@@ -199,7 +199,6 @@ The value to match against the specified field.
 
 =item B<negate> (string, optional)
 
-----------------------------------------------------------------------------------------------------
 If present and set to C<"true">, the condition is negated. This effectively changes the operator
 from equality to inequality (e.g., C<"="> becomes C<"!=">) or from C<"LIKE"> to C<"NOT LIKE">.
 
