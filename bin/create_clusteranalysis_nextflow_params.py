@@ -69,7 +69,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
                 fail = True
 
         if args.residues:
-            r_list = args.residues.split(',')
+            r_list = [x.strip() for x in args.residues.split(',')]
             args.residues = r_list
     else:
         args.residues = ""
