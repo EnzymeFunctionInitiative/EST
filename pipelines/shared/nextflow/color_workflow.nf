@@ -64,11 +64,13 @@ process get_ssn_id_info {
         path "index_seqid_map.txt", emit: "index_seqid_map"     // Maps node network ID to UniProt ID and the number of IDs in the metanode
         path "seqid_source_map.txt", emit: "seqid_source_map"   // Maps metanode IDs to UniProt IDs
         path "ssn_sequences.fasta", emit: "ssn_sequences"       // Custom sequences that are embedded in the SSN
+        env SEQ_TYPE, emit: sequence_type                       // Type of sequences that the SSN is based on (uniprot, uniref90, uniref50)
 
     script:
     """
     perl $projectDir/../shared/perl/ssn_to_id_list.pl --ssn $ssn_file --edgelist edgelist.txt --index-seqid index_seqid_map.txt \
-        --seqid-source-map seqid_source_map.txt --ssn-sequences ssn_sequences.fasta
+        --seqid-source-map seqid_source_map.txt --ssn-sequences ssn_sequences.fasta --sequence-type-file sequence_type.txt
+    SEQ_TYPE=\$(cat sequence_type.txt)
     """
 }
 
@@ -270,6 +272,9 @@ workflow color_and_retrieve {
             .set { grouped_fasta_ch }
         zipped_fasta_dirs = zip_fasta_directories(grouped_fasta_ch)
 
+        // Convert to value channel
+        sequence_type_val = ssn_data.sequence_type.map { it.trim() }
+
     emit:
         ssn_file
         mapping_table = anno_tables.mapping_table
@@ -285,5 +290,6 @@ workflow color_and_retrieve {
         zipped_id_dirs
         zipped_fasta_dirs
         fasta_files
+        sequence_type = sequence_type_val
 }
 
