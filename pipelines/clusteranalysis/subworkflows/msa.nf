@@ -5,10 +5,10 @@ process muscle5_align {
     publishDir "${params.final_output_dir}/data/${type}/msa", mode: "copy", pattern: "*.afa"
 
     input:
-        tuple val(type), val(id), path(fasta)
+        tuple val(type), val(id), path(fasta), val(seq_type), val(num_seq)
 
     output:
-        tuple val(type), val(id), path("*.afa"), emit: msa
+        tuple val(type), val(id), path("*.afa"), val(seq_type), val(num_seq), emit: msa
 
     script:
     """
@@ -38,10 +38,10 @@ process muscle3_align {
     }
 
     input:
-        tuple val(type), val(id), path(fasta)
+        tuple val(type), val(id), path(fasta), val(seq_type), val(num_seq)
 
     output:
-        tuple val(type), val(id), path("*.afa"), emit: msa
+        tuple val(type), val(id), path("*.afa"), val(seq_type), val(num_seq), emit: msa
 
     script:
     """
@@ -56,7 +56,7 @@ process build_hmms {
     publishDir "${params.final_output_dir}/data/${type}/hmms", mode: "copy", pattern: "*.json"
 
     input:
-        tuple val(type), val(id), path(msa)
+        tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
 
     output:
         path("*.hmm")
@@ -75,7 +75,7 @@ process make_weblogos {
     publishDir "${params.final_output_dir}/data/${type}/weblogos", mode: "copy", pattern: "*.png"
 
     input:
-        tuple val(type), val(id), path(msa)
+        tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
 
     output:
         path("*.png")
@@ -96,7 +96,7 @@ process run_clustal_omega {
     errorStrategy 'ignore'
 
     input:
-        tuple val(type), val(id), path(msa)
+        tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
 
     output:
         tuple val(type), path("*_pim.txt")
