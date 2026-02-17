@@ -54,7 +54,8 @@ RUN mkdir -p /opt/seqkit && \
 RUN mkdir -p /opt/muscle && \
     curl -L -o /opt/muscle/muscle5 https://github.com/rcedgar/muscle/releases/download/v5.3/muscle-linux-x86.v5.3 && \
     chmod +x /opt/muscle/muscle5
-COPY vendor/bin/muscle-3.8.31 /opt/muscle/muscle3
+RUN curl -L -o /opt/muscle/muscle3 https://github.com/EnzymeFunctionInitiative/MUSCLE/releases/download/v3.8.1551-drive5/muscle-3.8.31-linux && \
+    chmod +x /opt/muscle/muscle3
 
 # install USEARCH (Free 32-bit version)
 # note: 32-bit requires libc6-i386 (installed in apt-get step above)
