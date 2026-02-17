@@ -1,3 +1,5 @@
+SET memory_limit = '$mem_limit';
+SET temp_directory = '$duckdb_temp_dir';
 SET threads TO 1;
 SET preserve_insertion_order = false;
 
@@ -5,7 +7,6 @@ SET preserve_insertion_order = false;
 -- against themselves.
 CREATE TABLE blast_results as (
         SELECT * FROM read_parquet('$transcoded_blast_output_glob')
-        WHERE NOT qseqid = sseqid
 );
 
 --

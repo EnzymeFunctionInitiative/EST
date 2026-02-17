@@ -20,7 +20,8 @@ def add_args(parser: argparse.ArgumentParser):
     common_parser.add_argument("--fasta-shards", type=int, help="Number of files to split FASTA into. File is split so that BLAST can be parallelized")
     common_parser.add_argument("--accession-shards", type=int, help="Number of files to split Accessions list into. File is split so that sequence retrieval can be parallelized")
     common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
-    common_parser.add_argument("--multiplex", action="store_true", help="Use CD-HIT to reduce the number of sequences used in analysis")
+    common_parser.add_argument("--condense", action=argparse.BooleanOptionalAction, default=True, help="Use CD-HIT to reduce the number of sequences used in analysis by condensing identical sequences into one before the BLAST")
+    common_parser.add_argument("--cdhit-memory-limit", type=int, help="Hard limit to CD-HIT memory usage. Units of MB.")
     common_parser.add_argument("--blast-num-matches", type=int, help="Maximum number of matches returned by BLAST for the all-by-all computation")
     common_parser.add_argument("--blast-evalue", help="Cutoff E value to use in all-by-all BLAST")
     common_parser.add_argument("--sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"])
@@ -112,11 +113,11 @@ def create_parser() -> argparse.ArgumentParser:
 
 def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, fasta_db, efi_db,
                   duckdb_memory_limit=None, duckdb_threads=None, fasta_shards=None,
-                  accession_shards=None, blast_num_matches=None, multiplex=None,
-                  blast_evalue=None, domain=None, families=None, sequence_filter=None,
-                  input_file=None, import_blast_fasta_db=None, import_blast_num_matches=None,
-                  import_blast_evalue=None, domain_region=None, domain_family=None,
-                  **kwargs: dict):
+                  accession_shards=None, blast_num_matches=None, condense=None,
+                  cdhit_memory_limit=None, blast_evalue=None, domain=None, families=None,
+                  sequence_filter=None, input_file=None, import_blast_fasta_db=None,
+                  import_blast_num_matches=None, import_blast_evalue=None, domain_region=None,
+                  domain_family=None, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "input_file": input_file,
@@ -130,7 +131,8 @@ def render_params(output_dir, import_mode, sequence_version, job_id, efi_config,
         "efi_db": efi_db,
         "import_mode": import_mode,
         "filter": sequence_filter,
-        "multiplex": multiplex,
+        "multiplex": condense,
+        "cdhit_memory_limit": cdhit_memory_limit,
         "blast_num_matches": blast_num_matches,
         "blast_evalue": blast_evalue,
         "sequence_version": sequence_version,

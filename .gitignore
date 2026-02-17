@@ -9,3 +9,5 @@ tests/testEnvironment.sh
 **/build/
 **/dist/
 **/*.egg-info/
+pipelines/verify/test_data
+pipelines/verify/work
