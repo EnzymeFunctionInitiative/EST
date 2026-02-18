@@ -9,9 +9,9 @@ workflow {
     // color_and_retrieve workflow
     color_work = color_and_retrieve()
 
-    analysis_fasta_ch = prepare_fasta(color_work.fasta_files)
+    prepared_fasta_ch = prepare_fasta(color_work.fasta_files, color_work.sequence_type)
 
-    align_and_analyze(analysis_fasta_ch)
+    align_and_analyze(prepared_fasta_ch.analysis_fasta)
 
-    histograms = make_histograms(analysis_fasta_ch)
+    histograms = make_histograms(prepared_fasta_ch.color_fasta)
 }
