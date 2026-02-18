@@ -7,17 +7,19 @@ Usage
 
 	Usage: perl pipelines/shared/perl/ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE>
 	    --index-seqid <FILE> --seqid-source-map <FILE> [--id-index <FILE>] [--ssn-sequences <VALUE>]
+	    [--sequence-type-file <VALUE>]
 	
 	Description:
 	    Parses an XGMML file to retrieve an edgelist and mapping info
 	
 	Options:
-	    --ssn                 path to XGMML (XML) SSN file
-	    --edgelist            path to an output edgelist file (two column space-separated file)
-	    --index-seqid         path to an output file mapping node index to XGMML nodeseqid (and optionally node size for UniRef/repnodes)
-	    --id-index            path to an output file mapping XGMML node ID to node index
-	    --seqid-source-map    path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty
-	    --ssn-sequences       optional path to an output FASTA file for saving sequences that were embedded in the SSN
+	    --ssn                   path to XGMML (XML) SSN file
+	    --edgelist              path to an output edgelist file (two column space-separated file)
+	    --index-seqid           path to an output file mapping node index to XGMML nodeseqid (and optionally node size for UniRef/repnodes)
+	    --id-index              path to an output file mapping XGMML node ID to node index
+	    --seqid-source-map      path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty
+	    --ssn-sequences         optional path to an output FASTA file for saving sequences that were embedded in the SSN
+	    --sequence-type-file    optional path to an output file containing the type of sequence that the SSN is based on
 
 Reference
 ---------
@@ -37,6 +39,7 @@ SYNOPSIS
 
    ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE> --index-seqid <FILE>
        --seqid-source-map <FILE> [--id-index <FILE> --ssn-sequences <FILE>]
+       [--sequence-type-file <FILE>]
 
 
 
@@ -108,3 +111,8 @@ Arguments
 ``--ssn-sequences``
    Optional path to an output FASTA file that contains sequences that
    were embedded in the SSN.
+
+``--sequence-type-file``
+   Optional path to a file that will contain the sequence type (e.g. to
+   provide the sequence type to another process). The sequence type is
+   one of SEQ_UNIPROT, SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE.

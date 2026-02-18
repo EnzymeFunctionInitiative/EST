@@ -45,6 +45,12 @@ if ($opts->{ssn_sequences}) {
     saveSsnSequences($opts->{ssn_sequences}, $metadata);
 }
 
+if ($opts->{sequence_type_file}) {
+    open my $fh, ">", $opts->{sequence_type_file} or die "Unable to write to sequence type file '$opts->{sequence_type_file}': $!";
+    $fh->print($metanodeType);
+    close $fh;
+}
+
 
 
 
@@ -209,6 +215,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("id-index=s", 0, "path to an output file mapping XGMML node ID to node index", OPT_FILE);
     $optParser->addOption("seqid-source-map=s", 1, "path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty", OPT_FILE);
     $optParser->addOption("ssn-sequences=s", 0, "optional path to an output FASTA file for saving sequences that were embedded in the SSN");
+    $optParser->addOption("sequence-type-file=s", 0, "optional path to an output file containing the type of sequence that the SSN is based on");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -231,6 +238,7 @@ C<ssn_to_id_list.pl> - gets network information from a SSN
 
     ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE> --index-seqid <FILE>
         --seqid-source-map <FILE> [--id-index <FILE> --ssn-sequences <FILE>]
+        [--sequence-type-file <FILE>]
 
 =head2 DESCRIPTION
 
@@ -295,6 +303,11 @@ like this:
 Optional path to an output FASTA file that contains sequences that were
 embedded in the SSN.
 
-=back
+=item C<--sequence-type-file>
 
+Optional path to a file that will contain the sequence type (e.g. to provide
+the sequence type to another process).  The sequence type is one of SEQ_UNIPROT,
+SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE.
+
+=back
 
