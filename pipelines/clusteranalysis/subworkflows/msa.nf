@@ -5,10 +5,10 @@ process muscle5_align {
     publishDir "${params.final_output_dir}/data/msa", mode: "copy", pattern: "*.afa"
 
     input:
-        tuple val(type), val(id), path(fasta), val(seq_type), val(num_seq)
+        tuple val(id), path(fasta)
 
     output:
-        tuple val(type), val(id), path("*.afa"), val(seq_type), val(num_seq), emit: msa
+        tuple val(id), path("*.afa"), emit: msa
 
     script:
     """
@@ -38,10 +38,10 @@ process muscle3_align {
     }
 
     input:
-        tuple val(type), val(id), path(fasta), val(seq_type), val(num_seq)
+        tuple val(id), path(fasta)
 
     output:
-        tuple val(type), val(id), path("*.afa"), val(seq_type), val(num_seq), emit: msa
+        tuple val(id), path("*.afa"), emit: msa
 
     script:
     """
@@ -56,7 +56,7 @@ process build_hmms {
     publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.json"
 
     input:
-        tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
+        tuple val(id), path(msa)
 
     output:
         path("*.hmm")
@@ -75,7 +75,7 @@ process make_weblogos {
     publishDir "${params.final_output_dir}/data/weblogos", mode: "copy", pattern: "*.png"
 
     input:
-        tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
+        tuple val(id), path(msa)
 
     output:
         path("*.png"), emit: pngs
@@ -96,10 +96,10 @@ process run_clustal_omega {
     errorStrategy 'ignore'
 
     input:
-        tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
+        tuple val(id), path(msa)
 
     output:
-        tuple val(type), path("*_pim.txt")
+        tuple path("*_pim.txt")
 
     script:
     """
@@ -113,7 +113,7 @@ process zip_clustal_omega {
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
-        tuple val(type), path(clustal_pims) // This looks like: ['uniprot', [file1.txt, file2.txt, ...]]
+        tuple path(clustal_pims)
 
     output:
         path("*.zip")
@@ -121,10 +121,10 @@ process zip_clustal_omega {
     script:
     """
     if [ -n "${clustal_pims}" ]; then
-        dir="clustal_pims_${type}"
+        dir="clustal_pims"
         mkdir \$dir
         cp *.txt \$dir
-        zip -jr "clustal_pims_${type}.zip" \$dir
+        zip -jr "clustal_pims.zip" \$dir
         rm -rf \$dir
     fi
     """
@@ -174,11 +174,20 @@ process summarize_msa_aa {
 
 workflow align_and_analyze {
     take:
-        analysis_fasta_ch
+        prepared_fasta_ch
         id_cluster_mapping
 
     main:
-        // STEP 4: RUN MSA TO ALIGN SEQUENCES
+        // Compute the cluster size file
+        cluster_size_file = prepared_fasta_ch
+            .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
+            .collectFile(
+                name: "cluster_size.txt",
+                storeDir: params.final_output_dir,
+                keepHeader: false
+            )
+
+        analysis_fasta_ch = prepared_fasta_ch.map { type, id, fasta, seq_type, num_seq -> tuple(id, fasta) }
 
         // Perform alignment using MUSCLE
         if (params.muscle_version == 3) {
@@ -187,29 +196,27 @@ workflow align_and_analyze {
             msa_ch = muscle5_align(analysis_fasta_ch)
         }
 
-        msa_files_ch = msa_ch.map { it[2] }.collect()
-        cluster_size_file = msa_ch
-            .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
-            .collectFile(
-                name: "cluster_size.txt",
-                storeDir: params.final_output_dir,
-                keepHeader: false
-            )
-
+        // Create HMMs
         build_hmms(msa_ch)
 
+        // Create weblogo graphics and logo data file
         weblogo_ch = make_weblogos(msa_ch)
         logos_ch = weblogo_ch.logos.collect()
 
-        residue_ch = Channel.from(params.conserved_residues)
-        threshold_ch = Channel.from(params.pid_thresholds)
+        // Compute consensus residues
+        residue_ch = Channel.from(params.conserved_residues)    // Allow Nextflow to run count_msa_aa simultaneously
+        threshold_ch = Channel.from(params.pid_thresholds)      // Allow Nextflow to run count_msa_aa simultaneously
+        msa_files_ch = msa_ch.map { it[1] }.collect()
         counted_residues_ch = count_msa_aa(msa_files_ch, logos_ch, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
 
+        // groupTuple allows us to create a structure that looks like [AA, [pos_files, ...], [pct_files, ...]]
         residues_ch = counted_residues_ch
             .map { aa, threshold, pos_file, pct_file -> tuple(aa, pos_file, pct_file) }
             .groupTuple()
         summarize_msa_aa(residues_ch)
 
+        // Compute percent ID matrices using Clustal-Omega
+        // groupTuple allows us to create a structure that looks like [uniprot, [files, ...]]
         clustal_ch = run_clustal_omega(msa_ch)
             .groupTuple()
         zip_clustal_omega(clustal_ch)
