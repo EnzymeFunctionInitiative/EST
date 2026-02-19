@@ -11,7 +11,7 @@ workflow {
 
     prepared_fasta_ch = prepare_fasta(color_work.fasta_files, color_work.sequence_type)
 
-    align_and_analyze(prepared_fasta_ch.analysis_fasta)
+    align_and_analyze(prepared_fasta_ch.analysis_fasta, color_work.mapping_table)
 
     histograms = make_histograms(prepared_fasta_ch.color_fasta)
 }

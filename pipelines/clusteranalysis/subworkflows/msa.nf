@@ -1,8 +1,8 @@
 
 process muscle5_align {
-    tag "ca_muscle5_${type}_${id}"
+    tag "ca_muscle5_${id}"
 
-    publishDir "${params.final_output_dir}/data/${type}/msa", mode: "copy", pattern: "*.afa"
+    publishDir "${params.final_output_dir}/data/msa", mode: "copy", pattern: "*.afa"
 
     input:
         tuple val(type), val(id), path(fasta), val(seq_type), val(num_seq)
@@ -23,9 +23,9 @@ process muscle5_align {
 }
 
 process muscle3_align {
-    tag "ca_muscle3_${type}_${id}"
+    tag "ca_muscle3_${id}"
 
-    publishDir "${params.final_output_dir}/data/${type}/msa", mode: "copy", pattern: "*.afa"
+    publishDir "${params.final_output_dir}/data/msa", mode: "copy", pattern: "*.afa"
 
     // MUSCLE can crash due to out of memory errors, or invalid data.  If we crash due to OOM,
     // retry twice with larger amounts of RAM.  Otherwise, ignore the failure and proceed with
@@ -50,10 +50,10 @@ process muscle3_align {
 }
 
 process build_hmms {
-    tag "ca_hmms_${type}_${id}"
+    tag "ca_hmms_${id}"
 
-    publishDir "${params.final_output_dir}/data/${type}/hmms", mode: "copy", pattern: "*.hmm"
-    publishDir "${params.final_output_dir}/data/${type}/hmms", mode: "copy", pattern: "*.json"
+    publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.hmm"
+    publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.json"
 
     input:
         tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
@@ -70,16 +70,16 @@ process build_hmms {
 }
 
 process make_weblogos {
-    tag "ca_weblogos_${type}_${id}"
+    tag "ca_weblogos_${id}"
 
-    publishDir "${params.final_output_dir}/data/${type}/weblogos", mode: "copy", pattern: "*.png"
+    publishDir "${params.final_output_dir}/data/weblogos", mode: "copy", pattern: "*.png"
 
     input:
         tuple val(type), val(id), path(msa), val(seq_type), val(num_seq)
 
     output:
-        path("*.png")
-        path("*.txt")
+        path("*.png"), emit: pngs
+        path("*.txt"), emit: logos
 
     script:
     """
@@ -89,7 +89,7 @@ process make_weblogos {
 }
 
 process run_clustal_omega {
-    tag "ca_clustal_${type}_${id}"
+    tag "ca_clustal_${id}"
 
     // Ignore any clustal computations because we don't want a failure to block the pipeline.
     // This output isn't crucial.
@@ -124,19 +124,62 @@ process zip_clustal_omega {
         dir="clustal_pims_${type}"
         mkdir \$dir
         cp *.txt \$dir
-        zip -r "clustal_pims_${type}.zip" \$dir
+        zip -jr "clustal_pims_${type}.zip" \$dir
         rm -rf \$dir
     fi
+    """
+}
+
+process count_msa_aa {
+    tag "ca_count_msa_aa"
+
+    publishDir "${params.final_output_dir}/data/cons_res/consensus_residue_results_${aa}", mode: "copy", pattern: "*.txt"
+
+    input:
+        path "msa_files/*"
+        path "logo_files/*"
+        path cluster_count_file
+        path id_cluster_mapping
+        tuple val(aa), val(threshold)
+
+    output:
+        tuple val(aa), val(threshold), path("consensus_residue_${threshold}_position.txt"), path("consensus_residue_${threshold}_percentage.txt")
+
+    script:
+    def base_name = "consensus_residue_${threshold}"
+    """
+    perl $projectDir/conv_ratio/count_msa_aa.pl --msa-dir msa_files --logo-dir logo_files --aa ${aa} --count-file ${base_name}_position.txt --pct-file ${base_name}_percentage.txt --threshold ${threshold} --node-count-file ${cluster_count_file}
+    mkdir id_lists_${threshold}
+    perl $projectDir/conv_ratio/collect_aa_ids.pl --aa-count-file ${base_name}_position.txt --output-dir id_lists_${threshold} --id-mapping ${id_cluster_mapping}
+    """
+}
+
+process summarize_msa_aa {
+    tag "ca_summarize_msa_aa"
+
+    publishDir "${params.final_output_dir}/data/cons_res", mode: "copy", pattern: "*.txt"
+
+    input:
+        tuple val(aa), path(pos_files), path(pct_files)
+
+    output:
+        path("*.txt")
+
+    script:
+    def base_name = "ConsensusResidue_${aa}"
+    """
+    perl $projectDir/conv_ratio/make_summary_tables.pl --position-summary-file ${base_name}_Position_Summary_Full.txt --percentage-summary-file ${base_name}_Percentage_Summary_Full.txt --position-files ${pos_files} --percentage-files ${pct_files}
     """
 }
 
 workflow align_and_analyze {
     take:
         analysis_fasta_ch
+        id_cluster_mapping
 
     main:
         // STEP 4: RUN MSA TO ALIGN SEQUENCES
-    
+
         // Perform alignment using MUSCLE
         if (params.muscle_version == 3) {
             msa_ch = muscle3_align(analysis_fasta_ch)
@@ -144,16 +187,34 @@ workflow align_and_analyze {
             msa_ch = muscle5_align(analysis_fasta_ch)
         }
 
+        msa_files_ch = msa_ch.map { it[2] }.collect()
+        cluster_size_file = msa_ch
+            .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
+            .collectFile(
+                name: "cluster_size.txt",
+                storeDir: params.final_output_dir,
+                keepHeader: false
+            )
+
         build_hmms(msa_ch)
 
-        make_weblogos(msa_ch)
+        weblogo_ch = make_weblogos(msa_ch)
+        logos_ch = weblogo_ch.logos.collect()
+
+        residue_ch = Channel.from(params.conserved_residues)
+        threshold_ch = Channel.from(params.pid_thresholds)
+        counted_residues_ch = count_msa_aa(msa_files_ch, logos_ch, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
+
+        residues_ch = counted_residues_ch
+            .map { aa, threshold, pos_file, pct_file -> tuple(aa, pos_file, pct_file) }
+            .groupTuple()
+        summarize_msa_aa(residues_ch)
 
         clustal_ch = run_clustal_omega(msa_ch)
             .groupTuple()
         zip_clustal_omega(clustal_ch)
 
         if (params.pid_thresholds && !params.pid_thresholds.isEmpty()) {
-            //clustal_inputs = msa_ch.combine(Channel.fromList(params.pid_thresholds))
-            //clustal_inputs.view()
+            clustal_inputs = msa_ch.combine(Channel.fromList(params.pid_thresholds))
         }
 }

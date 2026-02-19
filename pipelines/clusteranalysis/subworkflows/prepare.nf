@@ -47,7 +47,7 @@ process cdhit_reduce {
 
     """
     # Using legacy parameters: -c 1 -s 1 -M 14900
-    cd-hit -c 1 -s 1 -i ${fasta} -o ${id}_cdhit.fasta -M 14900
+    cd-hit -c 1 -s 1 -i ${fasta} -o ${id}_cdhit.fasta -M ${params.cdhit_memory_limit}
     """
 }
 
