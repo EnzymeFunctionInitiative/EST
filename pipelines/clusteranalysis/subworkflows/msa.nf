@@ -99,7 +99,7 @@ process run_clustal_omega {
         tuple val(id), path(msa)
 
     output:
-        tuple path("*_pim.txt")
+        path("*_pim.txt")
 
     script:
     """
@@ -113,24 +113,22 @@ process zip_clustal_omega {
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
-        tuple path(clustal_pims)
+        path input_pims
 
     output:
-        path("*.zip")
+        path("clustal_pims.zip")
 
     script:
     """
-    if [ -n "${clustal_pims}" ]; then
-        dir="clustal_pims"
-        mkdir \$dir
-        cp *.txt \$dir
-        zip -jr "clustal_pims.zip" \$dir
-        rm -rf \$dir
-    fi
+    dir="clustal_pims"
+    mkdir \$dir
+    cp *_pim.txt \$dir
+    zip -rq "clustal_pims.zip" \$dir
+    rm -rf \$dir
     """
 }
 
-process count_msa_aa {
+process collect_aa_ids {
     tag "ca_count_msa_aa"
 
     publishDir "${params.final_output_dir}/data/cons_res/consensus_residue_results_${aa}", mode: "copy", pattern: "*.txt"
@@ -217,11 +215,7 @@ workflow ALIGN_AND_ANALYZE {
 
         // Compute percent ID matrices using Clustal-Omega
         // groupTuple allows us to create a structure that looks like [uniprot, [files, ...]]
-        clustal_ch = run_clustal_omega(msa_ch)
-            .groupTuple()
-        zip_clustal_omega(clustal_ch)
-
-        if (params.pid_thresholds && !params.pid_thresholds.isEmpty()) {
-            clustal_inputs = msa_ch.combine(Channel.fromList(params.pid_thresholds))
-        }
+        clustal_files = run_clustal_omega(msa_ch).collect()
+        clustal_files.view()
+        zip_clustal_omega(clustal_files)
 }
