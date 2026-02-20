@@ -1,8 +1,10 @@
 
-process make_histograms {
+// This process makes histograms for all sequence types that are provided, not just the SSN source
+// sequences.
+process MAKE_HISTOGRAMS {
     tag "ca_histo_${type}_${id}"
 
-    publishDir "${params.final_output_dir}/data/${type}/histo", mode: "copy"
+    publishDir "${params.final_output_dir}/data/histo/${type}", mode: "copy"
 
     input:
         tuple val(type), val(id), path(fasta), val(sequence_type)
