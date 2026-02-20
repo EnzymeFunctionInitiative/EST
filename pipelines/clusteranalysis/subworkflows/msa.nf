@@ -172,7 +172,7 @@ process summarize_msa_aa {
     """
 }
 
-workflow align_and_analyze {
+workflow ALIGN_AND_ANALYZE {
     take:
         prepared_fasta_ch
         id_cluster_mapping
@@ -204,10 +204,10 @@ workflow align_and_analyze {
         logos_ch = weblogo_ch.logos.collect()
 
         // Compute consensus residues
-        residue_ch = Channel.from(params.conserved_residues)    // Allow Nextflow to run count_msa_aa simultaneously
-        threshold_ch = Channel.from(params.pid_thresholds)      // Allow Nextflow to run count_msa_aa simultaneously
+        residue_ch = Channel.from(params.conserved_residues)    // Allow Nextflow to run collect_aa_ids simultaneously
+        threshold_ch = Channel.from(params.pid_thresholds)      // Allow Nextflow to run collect_aa_ids simultaneously
         msa_files_ch = msa_ch.map { it[1] }.collect()
-        counted_residues_ch = count_msa_aa(msa_files_ch, logos_ch, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
+        counted_residues_ch = collect_aa_ids(msa_files_ch, logos_ch, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
 
         // groupTuple allows us to create a structure that looks like [AA, [pos_files, ...], [pct_files, ...]]
         residues_ch = counted_residues_ch

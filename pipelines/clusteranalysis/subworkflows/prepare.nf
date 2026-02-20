@@ -51,7 +51,7 @@ process cdhit_reduce {
     """
 }
 
-workflow prepare_fasta {
+workflow PREPARE_FASTA {
     take:
         color_fasta_files
         sequence_type
@@ -65,17 +65,15 @@ workflow prepare_fasta {
             .filter { file_type, file -> !file.name.contains("_All.fasta") }     // Don't include the file with all sequences in the analysis
             .filter { file_type, file -> !file.name.contains("singleton") }      // Don't include singletons in the analysis
             .map { file_type, file ->
-                // Extract the filename without extension (e.g. "cluster_UniProt_Cluster_1")
-                def raw_id = file.simpleName 
-                // Clean up the ID to be just the cluster number
-                // This regex removes "cluster_UniProt_" from the front if present
-                def clean_id = raw_id.replaceAll(/^cluster_Uni(Prot|Ref90|Ref50)_/, '')
+                // Transform the file name into a cluster ID.  Removes "cluster_UniProt_" (or
+                // "cluster_UniRefXX_") from the front if present
+                def clean_id = file.simpleName.replaceAll(/^cluster_Uni(Prot|Ref90|Ref50)_/, '')
                 return tuple(file_type, clean_id, file)
             }
-            .combine(sequence_type)
+            .combine(sequence_type) // Add sequence type to the end of each tuple to allow a later step to limit files to the input SSN type
 
         // Only use the files for the sequence file_type that was provided (e.g. if the input
-        // is UniRef50 SSN, then only use UniRef50 sequences)
+        // is UniRef50 SSN, then only use UniRef50 sequences).
         color_fasta_ch.branch {
             sequence_type_files:    it[0] == it[3]
             ignored_files:          true
@@ -84,11 +82,13 @@ workflow prepare_fasta {
         // STEP 2: APPLY CD-HIT TO REDUCE REDUNDANCY
 
         seq_type_fasta_ch.sequence_type_files.branch {
-            needs_reduction:    it[0] == 'uniprot'
+            needs_reduction:    it[0] == 'uniprot' // This sends input sequences that are UniProt to CD-HIT
             skip_reduction:     true
         }.set { reduction_set_ch }
 
-        // Reduce all sequences that are uniprot by removing all sequences that are 100% identical over 100% of the length of the sequence
+        // Reduce all sequences that are uniprot by removing all sequences that are 100% identical
+        // over 100% of the length of the sequence.  Then mix them with the sequences that did not
+        // need reduction.
         condensed_ch = cdhit_reduce(reduction_set_ch.needs_reduction)
             .mix(reduction_set_ch.skip_reduction)
 
@@ -119,6 +119,6 @@ workflow prepare_fasta {
     emit:
         // This will be for length histograms because we generate length histograms for every sequence type
         color_fasta = color_fasta_ch
-        // This will be used for MSA, etc, and include the sequence type but only sequences in the input SSN (e.g. uniref)
+        // This will be used for MSA, etc, and includes the sequence type but only sequences in the input SSN (e.g. uniref)
         analysis_fasta = analysis_fasta_ch
 }
