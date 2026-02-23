@@ -20,7 +20,7 @@ process filter_blast {
     output:
         path "2.out"
     """
-    python $projectDir/filter/render_filter_blast_sql_template.py --blast-output $blast_parquet --filter-parameter ${params.filter_parameter} --filter-min-val ${params.filter_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/filterblast-template.sql --output-file 2.out --sql-output-file filterblast.sql
+    python $projectDir/filter/render_filter_blast_sql_template.py --blast-output $blast_parquet --filter-parameter ${params.filter_parameter} --filter-min-val ${params.filter_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/filterblast-template.sql --output-file 2.out --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir ${params.duckdb_temp_dir}-${task.index} --sql-output-file filterblast.sql
     duckdb < filterblast.sql
     """
 }
