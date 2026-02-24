@@ -19,7 +19,6 @@ def get_temp_dir_name() -> str:
 def create_sql_template_render_parser(
         sql_template_file_default: str,
         desc: str,
-        duckdb_temp_dir: str,
         sql_output_file: str = "statements.sql",
         duckdb_mem_limit: str = "4GB"
     ) -> argparse.ArgumentParser:
