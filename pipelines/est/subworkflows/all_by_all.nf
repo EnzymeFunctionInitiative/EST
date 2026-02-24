@@ -19,6 +19,7 @@ process all_by_all_blast {
         path frac
     output:
         path "${frac}.tab.sorted.parquet"
+    script:
     """
     # run blast to get similarity metrics
     blastall -p blastp -i $frac -d $blast_db_name -m 8 -e ${params.blast_evalue} -b ${params.blast_num_matches} -o ${frac}.tab
@@ -27,7 +28,7 @@ process all_by_all_blast {
     python $projectDir/axa_blast/transcode_blast.py --blast-output ${frac}.tab
 
     # in each row, ensure that qseqid < sseqid lexicographically
-    python $projectDir/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir ${params.duckdb_temp_dir}-${task.index} --sql-output-file prereduce.sql
+    python $projectDir/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --sql-output-file prereduce.sql
     duckdb < prereduce.sql
     """
 }
@@ -63,7 +64,7 @@ process blastreduce {
         path "1.out.parquet"
 
     """
-    python $projectDir/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir ${params.duckdb_temp_dir}-${task.index} --sql-output-file allreduce.sql
+    python $projectDir/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --sql-output-file allreduce.sql
     duckdb < allreduce.sql
     """
 }
