@@ -1,10 +1,28 @@
 import argparse
 from io import TextIOWrapper
 import string
+import tempfile
 
 from typing import Any
 
-def create_sql_template_render_parser(sql_template_file_default: str, desc: str, sql_output_file="statements.sql", duckdb_mem_limit="4GB", duckdb_temp_dir="./duckdb") -> argparse.ArgumentParser:
+def get_temp_dir_name() -> str:
+    """
+    Use tempfile.TemporaryDirectory() to create a temp directory space, gather
+    the path for that space, and automatically delete the empty directory.
+    Return the path to duckdb during sql template rendering.
+    """
+    temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors = True)
+    temp_path = temp_dir.name
+    temp_dir.cleanup()
+    return temp_path
+
+def create_sql_template_render_parser(
+        sql_template_file_default: str,
+        desc: str,
+        duckdb_temp_dir: str,
+        sql_output_file: str = "statements.sql",
+        duckdb_mem_limit: str = "4GB"
+    ) -> argparse.ArgumentParser:
     """
     Returns an `<argparse.ArgumentParser>_` that parses the following
     options:
@@ -44,7 +62,9 @@ def create_sql_template_render_parser(sql_template_file_default: str, desc: str,
     parser.add_argument(
         "--duckdb-temp-dir",
         type=str,
-        default=duckdb_temp_dir,
+        # if left undefined, will create a randomly generated directory name in
+        # the system's defined temp space
+        default = get_temp_dir_name(),
         help="Location DuckDB should use for temporary files",
     )
     return parser
