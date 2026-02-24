@@ -78,7 +78,8 @@ process restore_condensed {
     output:
         path '1.out.parquet'
     """
-    echo "SET memory_limit = '${params.duckdb_memory_limit}'; SET temp_directory = '${params.duckdb_temp_dir}-${task.index}'; SET threads TO 1; COPY (SELECT * FROM read_parquet('${blast_parquet}')) TO 'condensed.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
+    python $projectDir/condense/render_restore_sql_template.py --blast-parquet $blast_parquet --sql-template $projectDir/templates/restore-template.sql --duckdb-memory-limit ${params.duckdb_memory_limit} --sql-output-file restore.sql
+    duckdb < restore.sql
     python $projectDir/condense/restore_condensed_sequences.py --condensed-blast condensed.out --restored-blast 1.out --cd-hit-cluster ${condensed}
     python $projectDir/condense/transcode_restored_blast.py --blast-output 1.out
     """
