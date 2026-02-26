@@ -27,21 +27,24 @@ RUN pip3 install -r app/requirements.txt
 RUN cpanm --installdeps .
 
 # install blastall
-RUN curl -o /opt/blast-2.2.26.tar.gz https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/blast-2.2.26-x64-linux.tar.gz; \
-    tar xzf /opt/blast-2.2.26.tar.gz -C /opt; \
+RUN curl -o /opt/blast-2.2.26.tar.gz https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/blast-2.2.26-x64-linux.tar.gz && \
+    tar xzf /opt/blast-2.2.26.tar.gz -C /opt && \
     rm /opt/blast-2.2.26.tar.gz
 
 # install DuckDB
-RUN mkdir opt/duckdb; \
-    curl -L -o /opt/duckdb/duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip; \
-    unzip /opt/duckdb/duckdb.zip -d /opt/duckdb/; \
+RUN mkdir opt/duckdb && \
+    curl -L -o /opt/duckdb/duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip && \
+    unzip /opt/duckdb/duckdb.zip -d /opt/duckdb/ && \
     rm /opt/duckdb/duckdb.zip
 
 # install CD-HIT
-RUN curl -L -o /opt/cd-hit.tar.gz https://github.com/weizhongli/cdhit/releases/download/V4.8.1/cd-hit-v4.8.1-2019-0228.tar.gz; \
-    tar xzf /opt/cd-hit.tar.gz -C /opt; \
-    rm /opt/cd-hit.tar.gz; \
-    cd /opt/cd-hit-v4.8.1-2019-0228; make; mkdir bin; mv cd-hit bin;
+RUN curl -L -o /opt/cd-hit.tar.gz https://github.com/weizhongli/cdhit/releases/download/V4.8.1/cd-hit-v4.8.1-2019-0228.tar.gz && \
+    tar xzf /opt/cd-hit.tar.gz -C /opt && \
+    rm /opt/cd-hit.tar.gz && \
+    cd /opt/cd-hit-v4.8.1-2019-0228 && \
+    make && \
+    mkdir bin && \
+    mv cd-hit bin
 
 # install SeqKit
 ENV SEQKIT_VER=v2.12.0
@@ -54,7 +57,8 @@ RUN mkdir -p /opt/seqkit && \
 RUN mkdir -p /opt/muscle && \
     curl -L -o /opt/muscle/muscle5 https://github.com/rcedgar/muscle/releases/download/v5.3/muscle-linux-x86.v5.3 && \
     chmod +x /opt/muscle/muscle5
-COPY vendor/bin/muscle-3.8.31 /opt/muscle/muscle3
+RUN curl -L -o /opt/muscle/muscle3 https://github.com/EnzymeFunctionInitiative/MUSCLE/releases/download/v3.8.1551-drive5/muscle-3.8.31-linux && \
+    chmod +x /opt/muscle/muscle3
 
 # install USEARCH (Free 32-bit version)
 # note: 32-bit requires libc6-i386 (installed in apt-get step above)
