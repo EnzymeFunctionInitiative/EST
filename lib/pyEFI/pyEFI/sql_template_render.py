@@ -2,19 +2,17 @@ import argparse
 from io import TextIOWrapper
 import string
 import tempfile
+import uuid
 
 from typing import Any
 
-def get_temp_dir_name() -> str:
+def get_temp_dir_name(tmp_path: str = tempfile.gettempdir()) -> str:
     """
     Use tempfile.TemporaryDirectory() to create a temp directory space, gather
     the path for that space, and automatically delete the empty directory.
     Return the path to duckdb during sql template rendering.
     """
-    temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors = True)
-    temp_path = temp_dir.name
-    temp_dir.cleanup()
-    return temp_path
+    return os.path.join(tmp_path, "duckdb-" + str(uuid.uuid4())[:8])
 
 def create_sql_template_render_parser(
         sql_template_file_default: str,
