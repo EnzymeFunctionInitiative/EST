@@ -2,26 +2,9 @@ import argparse
 from io import TextIOWrapper
 import string
 
-#import tempfile
-#import uuid
-
 from typing import Any
 
-#def get_temp_dir_name(tmp_path: str = ) -> str:
-#    """
-#    Use tempfile.TemporaryDirectory() to create a temp directory space, gather
-#    the path for that space, and automatically delete the empty directory.
-#    Return the path to duckdb during sql template rendering.
-#    """
-#    return os.path.join(tmp_path, "duckdb-" + str(uuid.uuid4())[:8])
-
-def create_sql_template_render_parser(
-        sql_template_file_default: str,
-        desc: str,
-        sql_output_file: str = "statements.sql",
-        duckdb_mem_limit: str = "4GB",
-        duckdb_temp_dir: str = "./duckdb"
-    ) -> argparse.ArgumentParser:
+def create_sql_template_render_parser(sql_template_file_default: str, desc: str, sql_output_file: str = "statements.sql", duckdb_mem_limit: str = "4GB", duckdb_temp_dir: str = "./duckdb") -> argparse.ArgumentParser:
     """
     Returns an `<argparse.ArgumentParser>_` that parses the following
     options:
@@ -61,7 +44,7 @@ def create_sql_template_render_parser(
     parser.add_argument(
         "--duckdb-temp-dir",
         type=str,
-        default = duckdb_temp_dir,
+        default=duckdb_temp_dir,
         help="Location DuckDB should use for temporary files",
     )
     return parser
