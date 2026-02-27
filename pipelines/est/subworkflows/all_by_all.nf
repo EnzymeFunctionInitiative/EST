@@ -19,6 +19,7 @@ process all_by_all_blast {
         path frac
     output:
         path "${frac}.tab.sorted.parquet"
+    script:
     """
     # run blast to get similarity metrics
     blastall -p blastp -i $frac -d $blast_db_name -m 8 -e ${params.blast_evalue} -b ${params.blast_num_matches} -o ${frac}.tab
@@ -27,7 +28,8 @@ process all_by_all_blast {
     python $projectDir/axa_blast/transcode_blast.py --blast-output ${frac}.tab
 
     # in each row, ensure that qseqid < sseqid lexicographically
-    python $projectDir/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir ${params.duckdb_temp_dir}-${task.hash} --sql-output-file prereduce.sql
+    DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
+    python $projectDir/axa_blast/render_prereduce_sql_template.py --blast-output ${frac}.tab.parquet --sql-template $projectDir/templates/prereduce-template.sql --output-file ${frac}.tab.sorted.parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir \${DUCKDB_TEMP} --sql-output-file prereduce.sql
     duckdb < prereduce.sql
     """
 }
@@ -63,7 +65,8 @@ process blastreduce {
         path "1.out.parquet"
 
     """
-    python $projectDir/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir ${params.duckdb_temp_dir}-${task.hash} --sql-output-file allreduce.sql
+    DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
+    python $projectDir/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir \${DUCKDB_TEMP} --sql-output-file allreduce.sql
     duckdb < allreduce.sql
     """
 }
@@ -77,7 +80,9 @@ process restore_condensed {
     output:
         path '1.out.parquet'
     """
-    echo "SET memory_limit = '${params.duckdb_memory_limit}'; SET temp_directory = '${params.duckdb_temp_dir}-${task.hash}'; SET threads TO 1; COPY (SELECT * FROM read_parquet('${blast_parquet}')) TO 'condensed.out' (FORMAT CSV, DELIMITER '\t', HEADER false);" | duckdb
+    DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
+    python $projectDir/condense/render_restore_sql_template.py --blast-parquet $blast_parquet --sql-template $projectDir/templates/restore-template.sql --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir \${DUCKDB_TEMP} --sql-output-file restore.sql
+    duckdb < restore.sql
     python $projectDir/condense/restore_condensed_sequences.py --condensed-blast condensed.out --restored-blast 1.out --cd-hit-cluster ${condensed}
     python $projectDir/condense/transcode_restored_blast.py --blast-output 1.out
     """
