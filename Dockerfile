@@ -30,12 +30,14 @@ RUN cpanm --installdeps .
 RUN curl -o /opt/blast-2.2.26.tar.gz https://ftp.ncbi.nlm.nih.gov/blast/executables/legacy.NOTSUPPORTED/2.2.26/blast-2.2.26-x64-linux.tar.gz && \
     tar xzf /opt/blast-2.2.26.tar.gz -C /opt && \
     rm /opt/blast-2.2.26.tar.gz
+ENV PATH="${PATH}:/opt/blast-2.2.26/bin"
 
 # install DuckDB
 RUN mkdir opt/duckdb && \
     curl -L -o /opt/duckdb/duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip && \
     unzip /opt/duckdb/duckdb.zip -d /opt/duckdb/ && \
     rm /opt/duckdb/duckdb.zip
+ENV PATH="${PATH}:/opt/duckdb"
 
 # install CD-HIT
 RUN curl -L -o /opt/cd-hit.tar.gz https://github.com/weizhongli/cdhit/releases/download/V4.8.1/cd-hit-v4.8.1-2019-0228.tar.gz && \
@@ -45,13 +47,14 @@ RUN curl -L -o /opt/cd-hit.tar.gz https://github.com/weizhongli/cdhit/releases/d
     make && \
     mkdir bin && \
     mv cd-hit bin
+ENV PATH="${PATH}:/opt/cd-hit-v4.8.1-2019-0228/bin"
 
 # install SeqKit
-ENV SEQKIT_VER=v2.12.0
 RUN mkdir -p /opt/seqkit && \
-    curl -L -o /opt/seqkit/seqkit.tar.gz https://github.com/shenwei356/seqkit/releases/download/${SEQKIT_VER}/seqkit_linux_amd64.tar.gz && \
+    curl -L -o /opt/seqkit/seqkit.tar.gz https://github.com/shenwei356/seqkit/releases/download/v2.12.0/seqkit_linux_amd64.tar.gz && \
     tar -zxvf /opt/seqkit/seqkit.tar.gz -C /opt/seqkit && \
     rm /opt/seqkit/seqkit.tar.gz
+ENV PATH="${PATH}:/opt/seqkit"
 
 # install MUSCLE (v5.1)
 RUN mkdir -p /opt/muscle && \
@@ -59,17 +62,20 @@ RUN mkdir -p /opt/muscle && \
     chmod +x /opt/muscle/muscle5
 RUN curl -L -o /opt/muscle/muscle3 https://github.com/EnzymeFunctionInitiative/MUSCLE/releases/download/v3.8.1551-drive5/muscle-3.8.31-linux && \
     chmod +x /opt/muscle/muscle3
+ENV PATH="${PATH}:/opt/muscle"
 
 # install USEARCH (Free 32-bit version)
 # note: 32-bit requires libc6-i386 (installed in apt-get step above)
 RUN mkdir -p /opt/usearch && \
     curl -L -o /opt/usearch/usearch https://github.com/rcedgar/usearch12/releases/download/v12.0-beta1/usearch_linux_arch64_12.0-beta && \
     chmod +x /opt/usearch/usearch
+ENV PATH="${PATH}:/opt/usearch"
 
 # install Clustal Omega
 RUN mkdir -p /opt/clustal && \
     curl -L -o /opt/clustal/clustalo https://github.com/EnzymeFunctionInitiative/ClustalOmega/releases/download/1.2.4/clustalo-1.2.4_linux_amd64 && \
     chmod +x /opt/clustal/clustalo
+ENV PATH="${PATH}:/opt/clustal"
 
 # install HMMER (v3.4)
 RUN curl -o /opt/hmmer.tar.gz http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz && \
@@ -79,7 +85,6 @@ RUN curl -o /opt/hmmer.tar.gz http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
     ./configure --prefix=/opt/hmmer-3.4 && \
     make && \
     make install
+ENV PATH="${PATH}:/opt/hmmer-3.4/bin"
 
-# consolidating PATH at the end creates a cleaner final image layer
-ENV PATH="${PATH}:/opt/blast-2.2.26/bin:/opt/duckdb:/opt/cd-hit-v4.8.1-2019-0228/bin:/opt/seqkit:/opt/muscle:/opt/usearch:/opt/clustal:/opt/hmmer-3.4/bin"
 
