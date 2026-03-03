@@ -1,6 +1,7 @@
 
 process muscle5_align {
     tag "ca_muscle5_${id}"
+    label "muscle_align"
 
     publishDir "${params.final_output_dir}/data/msa", mode: "copy", pattern: "*.afa"
 
@@ -24,6 +25,7 @@ process muscle5_align {
 
 process muscle3_align {
     tag "ca_muscle3_${id}"
+    label "muscle_align"
 
     publishDir "${params.final_output_dir}/data/msa", mode: "copy", pattern: "*.afa"
 
