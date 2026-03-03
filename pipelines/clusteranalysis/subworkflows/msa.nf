@@ -56,6 +56,7 @@ process build_hmms {
 
     publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.hmm"
     publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.json"
+    publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.png"
 
     input:
         tuple val(id), path(msa)
@@ -67,7 +68,7 @@ process build_hmms {
     script:
     """
     hmmbuild ${id}.hmm ${msa}
-    python ${projectDir}/logo/convert_hmm_to_skylign_json.py --hmm ${id}.hmm --json ${id}.json
+    python ${projectDir}/logo/convert_hmm_to_skylign_json.py --hmm ${id}.hmm --json ${id}.json --png ${id}.png
     """
 }
 
@@ -84,8 +85,17 @@ process make_weblogos {
         path("*.txt"), emit: logos
 
     script:
+
+    def colors = ["red", "blue", "orange", "DarkGreen", "Magenta", "Gray"]
+    def color_args = ""
+    params.conserved_residues.eachWithIndex { res, i ->
+        if (i < colors.size()) {
+            color_args += "--color ${colors[i]} ${res} ${res} "
+        }
+    }
+
     """
-    weblogo -D fasta -F png --resolution 300 --stacks-per-line 80 -f ${msa} -o ${id}.png
+    weblogo -D fasta -F png --resolution 300 --stacks-per-line 80 -f ${msa} -o ${id}.png ${color_args}
     weblogo -D fasta -F logodata -f ${msa} -o ${id}.txt
     """
 }
