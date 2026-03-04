@@ -7,6 +7,15 @@ from typing import Iterator, Tuple, TextIO, Set, List
 def parse_fasta(file_handle: TextIO) -> Iterator[Tuple[str, str]]:
     """
     A simple FASTA parser that yields tuples of (header, sequence).
+
+    Parameters
+    ----------
+        file_handle
+            TextIO file object
+
+    Returns
+    -------
+        Iterator that returns one sequence at a time
     """
     header = None
     sequence = []
@@ -26,7 +35,21 @@ def parse_fasta(file_handle: TextIO) -> Iterator[Tuple[str, str]]:
 
 def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -> Set[str]:
     """
-    Parses a file and extracts IDs from the given column index. The file can have an optional header column.
+    Parse a file and extract IDs from the given column index.
+
+    Parameters
+    ----------
+        input_file
+            path to input ID list file
+        target_col
+            zero-based index of the column to obtain the IDs from (e.g. 0 for UniProt,
+            1 for UniRef90, 2 for UniRef50)
+        has_header_line
+            true if the input file has headers
+
+    Returns
+    -------
+        Set of sequence IDs (strings)
     """
     ids = set()
 
@@ -49,9 +72,20 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
 
 def parse_accession_table(accession_table: str, seq_type: str) -> Set[str]:
     """
-    Parses a standard three-column accession table file output by the 'est' pipeline, and gets
+    Parse a standard three-column accession table file output by the 'est' pipeline, and get
     the list of sequences that correspond to the given sequence type (e.g. uniprot, uniref90,
-    uniref50). The table file has a header column.
+    uniref50).  The table file has a header column.
+
+    Parameters
+    ----------
+        accession_table
+            path to the accession table file
+        seq_type
+            'uniprot', 'uniref90', or 'uniref50', depending on the desired column to retrieve
+
+    Returns
+    -------
+        Set of sequence IDs (strings)
     """
     col_map = {'uniprot': 0, 'uniref90': 1, 'uniref50': 2}
     target_col = col_map[seq_type]
@@ -60,9 +94,19 @@ def parse_accession_table(accession_table: str, seq_type: str) -> Set[str]:
 
 def compute_sequence_lengths(fasta_file: str, valid_ids: Set[str] = None) -> List[int]:
     """
-    Process the FASTA file and collect lengths. If 'valid_ids' is a Set, then only sequences
-    with IDs in the Set are included in the output. If 'valid_ids' is None, then all
-    sequences are included.
+    Process a FASTA file and collect lengths.
+
+    Parameters
+    ----------
+        fasta_file
+            path to FASTA file containing sequences
+        valid_ids
+            Set of string IDs, or None; if None, then all sequences are included in the
+            computation, otherwise only sequence IDs that are in the Set are included
+
+    Returns
+    -------
+        List of sequence lengths, ordered by occurrence of sequence in the file
     """
     sequence_lengths = []
     try:
@@ -90,8 +134,21 @@ def compute_sequence_lengths(fasta_file: str, valid_ids: Set[str] = None) -> Lis
 
 def compute_histogram(fasta_file: str, output_file: str, accession_table: str = None, seq_type: str = None):
     """
-    Computes a length histogram for sequences. If an 'accession_table' file is provided, that file
-    is parsed to obtain a list of IDs to use for generating the length histogram.
+    Compute a length histogram for sequences.  The output file contains a histogram, with each
+    line containing the length of a sequence and the number of sequences with that length,
+    ordered by sequence count.
+
+    Parameters
+    ----------
+        fasta_file
+            path to FASTA file containing sequences
+        output_file
+            path to output file containing histogram
+        accession_table
+            path to accession table, or None; if provided, then this file is parsed to obtain a
+            list of IDs to use for generating the length histogram
+        seq_type
+            sequence type to use for obtaining IDs when `accession_table` is provided
     """
 
     # For a log message
