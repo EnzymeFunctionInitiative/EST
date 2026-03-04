@@ -86,11 +86,13 @@ process make_weblogos {
 
     script:
 
+    // Assign a color to the residues that the user provided as input (e.g. first is red, second
+    // is blue, etc)
     def colors = ["red", "blue", "orange", "DarkGreen", "Magenta", "Gray"]
     def color_args = ""
     params.conserved_residues.eachWithIndex { res, i ->
         if (i < colors.size()) {
-            color_args += "--color ${colors[i]} ${res} ${res} "
+            color_args += " --color ${colors[i]} ${res} ${res}"
         }
     }
 
@@ -188,6 +190,11 @@ workflow ALIGN_AND_ANALYZE {
         id_cluster_mapping
 
     main:
+
+        //
+        // STEP 4: PERFORM MULTIPLE SEQUENCE ALIGNMENT
+        // 
+
         // Compute the cluster size file
         cluster_size_file = prepared_fasta_ch
             .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
@@ -197,6 +204,7 @@ workflow ALIGN_AND_ANALYZE {
                 keepHeader: false
             )
 
+        // We only need cluster ID and FASTA file for the MSA
         analysis_fasta_ch = prepared_fasta_ch.map { type, id, fasta, seq_type, num_seq -> tuple(id, fasta) }
 
         // Perform alignment using MUSCLE
@@ -206,12 +214,20 @@ workflow ALIGN_AND_ANALYZE {
             msa_ch = muscle5_align(analysis_fasta_ch)
         }
 
+        //
+        // STEP 5: BUILD HMMS AND COMPUTE WEBLOGOS
+        //
+
         // Create HMMs
         build_hmms(msa_ch)
 
         // Create weblogo graphics and logo data file
         weblogo_ch = make_weblogos(msa_ch)
         logos_ch = weblogo_ch.logos.collect()
+
+        //
+        // STEP 6: ANALYZE CONSERVED RESIDUES AND PID MATRICES
+        //
 
         // Compute consensus residues
         residue_ch = Channel.from(params.conserved_residues)    // Allow Nextflow to run collect_aa_ids simultaneously
@@ -226,7 +242,6 @@ workflow ALIGN_AND_ANALYZE {
         summarize_msa_aa(residues_ch)
 
         // Compute percent ID matrices using Clustal-Omega
-        // groupTuple allows us to create a structure that looks like [uniprot, [files, ...]]
         clustal_files = run_clustal_omega(msa_ch).collect()
         clustal_files.view()
         zip_clustal_omega(clustal_files)

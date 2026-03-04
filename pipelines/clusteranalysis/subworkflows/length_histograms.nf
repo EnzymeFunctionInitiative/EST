@@ -10,7 +10,7 @@ process MAKE_HISTOGRAMS {
         tuple val(type), val(id), path(fasta), val(sequence_type)
 
     output:
-        tuple val(type), val(id), path("length_histogram*.png"), val(sequence_type)
+        tuple path("length_histogram*.png")
 
     script:
     """
