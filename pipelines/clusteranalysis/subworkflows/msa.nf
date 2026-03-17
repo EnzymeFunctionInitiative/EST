@@ -62,13 +62,34 @@ process build_hmms {
         tuple val(id), path(msa)
 
     output:
-        path("*.hmm")
-        path("*.json")
+        path("*.hmm"), emit: hmms
+        path("*.json"), emit: json
 
     script:
     """
     hmmbuild ${id}.hmm ${msa}
     python ${projectDir}/logo/convert_hmm_to_skylign_json.py --hmm ${id}.hmm --json ${id}.json --png ${id}.png
+    """
+}
+
+process zip_hmms {
+    tag "ca_hmms_zip"
+    
+    publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
+
+    input:
+        path input_hmms
+
+    output:
+        path("hmms.zip")
+
+    script:
+    """
+    dir="hmms"
+    mkdir \$dir
+    cp *.hmm \$dir
+    zip -rq "hmms.zip" \$dir
+    rm -rf \$dir
     """
 }
 
@@ -99,6 +120,27 @@ process make_weblogos {
     """
     weblogo -D fasta -F png --resolution 300 --stacks-per-line 80 -f ${msa} -o ${id}.png ${color_args}
     weblogo -D fasta -F logodata -f ${msa} -o ${id}.txt
+    """
+}
+
+process zip_weblogos {
+    tag "ca_weblogos_zip"
+    
+    publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
+
+    input:
+        path input_pngs
+
+    output:
+        path("weblogos.zip")
+
+    script:
+    """
+    dir="weblogos"
+    mkdir \$dir
+    cp *.png \$dir
+    zip -rq "weblogos.zip" \$dir
+    rm -rf \$dir
     """
 }
 
@@ -198,10 +240,15 @@ workflow ALIGN_AND_ANALYZE {
         // Compute the cluster size file
         cluster_size_file = prepared_fasta_ch
             .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
+            .concat( Channel.of("cluster_id\tnum_seq\n") )
             .collectFile(
                 name: "cluster_size.txt",
                 storeDir: params.final_output_dir,
-                keepHeader: false
+                keepHeader: false,
+                sort: { item ->
+                    if (item.startsWith("cluster_id\t")) return -1
+                    return item.split('\t')[1].toInteger()
+                }
             )
 
         // We only need cluster ID and FASTA file for the MSA
@@ -219,11 +266,12 @@ workflow ALIGN_AND_ANALYZE {
         //
 
         // Create HMMs
-        build_hmms(msa_ch)
+        hmms = build_hmms(msa_ch)
+        zip_hmms(hmms.hmms.collect())
 
         // Create weblogo graphics and logo data file
         weblogo_ch = make_weblogos(msa_ch)
-        logos_ch = weblogo_ch.logos.collect()
+        zip_weblogos(weblogo_ch.pngs.collect())
 
         //
         // STEP 6: ANALYZE CONSERVED RESIDUES AND PID MATRICES
@@ -233,7 +281,7 @@ workflow ALIGN_AND_ANALYZE {
         residue_ch = Channel.from(params.conserved_residues)    // Allow Nextflow to run collect_aa_ids simultaneously
         threshold_ch = Channel.from(params.pid_thresholds)      // Allow Nextflow to run collect_aa_ids simultaneously
         msa_files_ch = msa_ch.map { it[1] }.collect()
-        counted_residues_ch = collect_aa_ids(msa_files_ch, logos_ch, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
+        counted_residues_ch = collect_aa_ids(msa_files_ch, weblogo_ch.logos.collect(), cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
 
         // groupTuple allows us to create a structure that looks like [AA, [pos_files, ...], [pct_files, ...]]
         residues_ch = counted_residues_ch
