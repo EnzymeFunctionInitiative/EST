@@ -118,7 +118,8 @@ process make_weblogos {
     }
 
     """
-    weblogo -D fasta -F png --resolution 300 --stacks-per-line 80 -f ${msa} -o ${id}.png ${color_args}
+    weblogo -D fasta -F png_print --stacks-per-line 80 -f ${msa} -o ${id}.png ${color_args}
+    weblogo -D fasta -F png --resolution 63 --stacks-per-line 80 -f ${msa} -o ${id}_sm.png ${color_args}
     weblogo -D fasta -F logodata -f ${msa} -o ${id}.txt
     """
 }
