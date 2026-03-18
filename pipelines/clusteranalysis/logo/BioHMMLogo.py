@@ -313,7 +313,7 @@ class BioHMMLogo:
 
                         try:
                             # Requires PIL and TTF installed
-                            f = ImageFont.truetype(boldfont, int(glyph_height * fudge_factor))
+                            f = ImageFont.truetype(boldfont, max(1, int(glyph_height * fudge_factor)))
                         except IOError:
                             f = ImageFont.load_default()
 
