@@ -10,12 +10,16 @@ process MAKE_HISTOGRAMS {
         tuple val(type), val(id), path(fasta), val(sequence_type)
 
     output:
-        tuple path("*.png")
+        path("${id}.png")
 
     script:
     """
     python $projectDir/../shared/python/compute_length_histogram.py --fasta-file ${fasta} --output-file histogram.txt
-    python $projectDir/../shared/python/plot_length_data.py --lengths histogram.txt --title "Number of Sequences at Each Length Full (${id}, ${sequence_type})" --frac 1 --plot-filename ${id} --output-type png --proxies sm:48
+    if [[ -f "histogram.txt" && -s "histogram.txt" ]]; then
+        python $projectDir/../shared/python/plot_length_data.py --lengths histogram.txt --title "Number of Sequences at Each Length (${id}, ${sequence_type})" --frac 1 --plot-filename ${id} --output-type png --proxies sm:48
+    else
+        echo "Data for length histogram does not exist for ${id}; skipping"
+    fi
     """
 }
 
