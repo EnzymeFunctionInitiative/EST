@@ -3,13 +3,13 @@ process muscle5_align {
     tag "ca_muscle5_${id}"
     label "muscle_align"
 
-    publishDir "${params.final_output_dir}/data/msa", mode: "copy", pattern: "*.afa"
+    publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     input:
-        tuple val(id), path(fasta)
+        tuple val(id), path(fasta), val(seq_type)
 
     output:
-        tuple val(id), path("*.afa"), emit: msa
+        tuple val(id), path("${id}.afa"), val(seq_type), emit: msa
 
     script:
     """
@@ -27,7 +27,7 @@ process muscle3_align {
     tag "ca_muscle3_${id}"
     label "muscle_align"
 
-    publishDir "${params.final_output_dir}/data/msa", mode: "copy", pattern: "*.afa"
+    publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     // MUSCLE can crash due to out of memory errors, or invalid data.  If we crash due to OOM,
     // retry twice with larger amounts of RAM.  Otherwise, ignore the failure and proceed with
@@ -40,10 +40,10 @@ process muscle3_align {
     }
 
     input:
-        tuple val(id), path(fasta)
+        tuple val(id), path(fasta), val(seq_type)
 
     output:
-        tuple val(id), path("*.afa"), emit: msa
+        tuple val(id), path("${id}.afa"), val(seq_type), emit: msa
 
     script:
     """
@@ -54,16 +54,16 @@ process muscle3_align {
 process build_hmms {
     tag "ca_hmms_${id}"
 
-    publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.hmm"
-    publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.json"
-    publishDir "${params.final_output_dir}/data/hmms", mode: "copy", pattern: "*.png"
+    publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.hmm"
+    publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.json"
+    publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.png"
 
     input:
-        tuple val(id), path(msa)
+        tuple val(id), path(msa), val(seq_type)
 
     output:
-        path("*.hmm"), emit: hmms
-        path("*.json"), emit: json
+        tuple val(seq_type), path("${id}.hmm"), emit: hmms
+        path("${id}.json"), emit: json
 
     script:
     """
@@ -78,17 +78,17 @@ process zip_hmms {
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
-        path input_hmms
+        tuple val(seq_type), path(input_hmms)
 
     output:
-        path("hmms.zip")
+        path("hmms_${seq_type}.zip")
 
     script:
     """
     dir="hmms"
     mkdir \$dir
     cp *.hmm \$dir
-    zip -rq "hmms.zip" \$dir
+    zip -rq "hmms_${seq_type}.zip" \$dir
     rm -rf \$dir
     """
 }
@@ -96,14 +96,15 @@ process zip_hmms {
 process make_weblogos {
     tag "ca_weblogos_${id}"
 
-    publishDir "${params.final_output_dir}/data/weblogos", mode: "copy", pattern: "*.png"
+    publishDir "${params.final_output_dir}/data/weblogos/${seq_type}", mode: "copy", pattern: "*.png"
 
     input:
-        tuple val(id), path(msa)
+        tuple val(id), path(msa), val(seq_type)
 
     output:
-        path("*.png"), emit: pngs
-        path("*.txt"), emit: logos
+        tuple val(seq_type), path("${id}.png"), emit: pngs
+        tuple val(seq_type), path("${id}_sm.png"), emit: sm_pngs
+        tuple val(seq_type), path("${id}.txt"), emit: logos
 
     script:
 
@@ -130,17 +131,17 @@ process zip_weblogos {
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
-        path input_pngs
+        tuple val(seq_type), path(input_pngs)
 
     output:
-        path("weblogos.zip")
+        path("weblogos_${seq_type}.zip")
 
     script:
     """
     dir="weblogos"
     mkdir \$dir
     cp *.png \$dir
-    zip -rq "weblogos.zip" \$dir
+    zip -rq "weblogos_${seq_type}.zip" \$dir
     rm -rf \$dir
     """
 }
@@ -188,17 +189,18 @@ process zip_clustal_omega {
 process collect_aa_ids {
     tag "ca_count_msa_aa"
 
-    publishDir "${params.final_output_dir}/data/cons_res/consensus_residue_results_${aa}", mode: "copy", pattern: "*.txt"
+    publishDir "${params.final_output_dir}/data/cons_res/${seq_type}/consensus_residue_results_${aa}", mode: "copy", pattern: "*.txt"
 
     input:
-        path "msa_files/*"
-        path "logo_files/*"
-        path cluster_count_file
-        path id_cluster_mapping
-        tuple val(aa), val(threshold)
+        tuple path("msas/*"), path("logos/*"), val(cluster_size_file), val(mapping_file), val(aa), val(threshold), val(type)
+//        path("msa_files/*")
+//        path("logo_files/*")
+//        path cluster_count_file
+//        path id_cluster_mapping
+//        tuple val(aa), val(threshold)
 
     output:
-        tuple val(aa), val(threshold), path("consensus_residue_${threshold}_position.txt"), path("consensus_residue_${threshold}_percentage.txt")
+        tuple val(aa), val(threshold), path("consensus_residue_${threshold}_position.txt"), path("consensus_residue_${threshold}_percentage.txt"), val(type)
 
     script:
     def base_name = "consensus_residue_${threshold}"
@@ -212,10 +214,10 @@ process collect_aa_ids {
 process summarize_msa_aa {
     tag "ca_summarize_msa_aa"
 
-    publishDir "${params.final_output_dir}/data/cons_res", mode: "copy", pattern: "*.txt"
+    publishDir "${params.final_output_dir}/data/cons_res/${seq_type}", mode: "copy", pattern: "*.txt"
 
     input:
-        tuple val(aa), path(pos_files), path(pct_files)
+        tuple val(seq_type), val(aa), path(pos_files), path(pct_files)
 
     output:
         path("*.txt")
@@ -240,6 +242,11 @@ workflow ALIGN_AND_ANALYZE {
 
         // Compute the cluster size file
         cluster_size_file = prepared_fasta_ch
+//            .branch {
+//                domain_seq: it[0] =~ /_domain/
+//                full_seq:   true
+//            }
+//            .full_seq
             .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
             .concat( Channel.of("cluster_id\tnum_seq\n") )
             .collectFile(
@@ -253,7 +260,7 @@ workflow ALIGN_AND_ANALYZE {
             )
 
         // We only need cluster ID and FASTA file for the MSA
-        analysis_fasta_ch = prepared_fasta_ch.map { type, id, fasta, seq_type, num_seq -> tuple(id, fasta) }
+        analysis_fasta_ch = prepared_fasta_ch.map { type, id, fasta, seq_type, num_seq -> tuple(id, fasta, type =~ /_domain/ ? "domain" : "full") }
 
         // Perform alignment using MUSCLE
         if (params.muscle_version == 3) {
@@ -268,30 +275,40 @@ workflow ALIGN_AND_ANALYZE {
 
         // Create HMMs
         hmms = build_hmms(msa_ch)
-        zip_hmms(hmms.hmms.collect())
+        zip_hmms(hmms.hmms.groupTuple())
 
         // Create weblogo graphics and logo data file
-        weblogo_ch = make_weblogos(msa_ch)
-        zip_weblogos(weblogo_ch.pngs.collect())
+        if (params.make_weblogos) {
+            weblogo_ch = make_weblogos(msa_ch)
+            zip_weblogos(weblogo_ch.pngs.groupTuple())
 
-        //
-        // STEP 6: ANALYZE CONSERVED RESIDUES AND PID MATRICES
-        //
+            //
+            // STEP 6: ANALYZE CONSERVED RESIDUES AND PID MATRICES
+            //
 
-        // Compute consensus residues
-        residue_ch = Channel.from(params.conserved_residues)    // Allow Nextflow to run collect_aa_ids simultaneously
-        threshold_ch = Channel.from(params.pid_thresholds)      // Allow Nextflow to run collect_aa_ids simultaneously
-        msa_files_ch = msa_ch.map { it[1] }.collect()
-        counted_residues_ch = collect_aa_ids(msa_files_ch, weblogo_ch.logos.collect(), cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
+            // Compute consensus residues
+            cr_params_ch = Channel.from(params.conserved_residues)
+                .combine(Channel.from(params.pid_thresholds))
+            msa_groups = msa_ch.map { id, file, type -> [type, file] }.groupTuple()
+            logo_groups = weblogo_ch.logos.groupTuple()
 
-        // groupTuple allows us to create a structure that looks like [AA, [pos_files, ...], [pct_files, ...]]
-        residues_ch = counted_residues_ch
-            .map { aa, threshold, pos_file, pct_file -> tuple(aa, pos_file, pct_file) }
-            .groupTuple()
-        summarize_msa_aa(residues_ch)
+            collect_aa_input = msa_groups
+                .join(logo_groups)
+                .combine(cr_params_ch)
+                .map { type, msas, logos, aa, threshold ->
+                    tuple(msas, logos, cluster_size_file, id_cluster_mapping, aa, threshold, type)
+                }
+            //counted_residues_ch = collect_aa_ids(msa_files, logo_files, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
+            counted_residues_ch = collect_aa_ids(collect_aa_input)
+
+            // groupTuple allows us to create a structure that looks like [AA, [pos_files, ...], [pct_files, ...]]
+            residues_ch = counted_residues_ch
+                .map { aa, threshold, pos_file, pct_file, seq_type -> tuple(seq_type, aa, pos_file, pct_file) }
+                .groupTuple()
+            summarize_msa_aa(residues_ch)
+        }
 
         // Compute percent ID matrices using Clustal-Omega
         clustal_files = run_clustal_omega(msa_ch).collect()
-        clustal_files.view()
         zip_clustal_omega(clustal_files)
 }

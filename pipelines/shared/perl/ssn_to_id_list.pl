@@ -46,8 +46,11 @@ if ($opts->{ssn_sequences}) {
 }
 
 if ($opts->{sequence_type_file}) {
+    my $domainMap = $parser->getDomainIndexMap();
+    my $sequenceType = $metanodeType;
+    $sequenceType .= "_domain" if keys %$domainMap;
     open my $fh, ">", $opts->{sequence_type_file} or die "Unable to write to sequence type file '$opts->{sequence_type_file}': $!";
-    $fh->print($metanodeType);
+    $fh->print($sequenceType);
     close $fh;
 }
 
@@ -105,7 +108,7 @@ sub saveMetanodeMapping {
 
     open my $mmfh, ">", $mapFile or die "Unable to write to metanode map file '$mapFile': $!";
 
-    if ($metanodeType ne "uniprot") {
+    if ($metanodeType !~ m/^uniprot/) {
         $mmfh->print(join("\t", "${metanodeType}_id", "uniprot_id"), "\n");
         foreach my $metanode (sort keys %$metanodeMap) {
             map { $mmfh->print(join("\t", $metanode, $_), "\n"); } @{ $metanodeMap->{$metanode} };
@@ -216,6 +219,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("seqid-source-map=s", 1, "path to an output file for mapping metanodes (e.g. RepNode or UniRef node) to UniProt nodes [optional]; the file is created regardless, but if the input IDs are UniProt the file is empty", OPT_FILE);
     $optParser->addOption("ssn-sequences=s", 0, "optional path to an output FASTA file for saving sequences that were embedded in the SSN");
     $optParser->addOption("sequence-type-file=s", 0, "optional path to an output file containing the type of sequence that the SSN is based on");
+    $optParser->addOption("domain-id-map=s", 0, "optional path to an output file storing the domain indices for sequences with domain indices");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -238,7 +242,7 @@ C<ssn_to_id_list.pl> - gets network information from a SSN
 
     ssn_to_id_list.pl --ssn <FILE> --edgelist <FILE> --index-seqid <FILE>
         --seqid-source-map <FILE> [--id-index <FILE> --ssn-sequences <FILE>]
-        [--sequence-type-file <FILE>]
+        [--sequence-type-file <FILE> --domain-id-map <FILE>]
 
 =head2 DESCRIPTION
 
@@ -307,7 +311,17 @@ embedded in the SSN.
 
 Optional path to a file that will contain the sequence type (e.g. to provide
 the sequence type to another process).  The sequence type is one of SEQ_UNIPROT,
-SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE.
+SEQ_UNIREF90, SEQ_UNIREF50, or SEQ_REPNODE.  If the input sequences include
+domain indices, then the sequence type will be suffixed with C<_domain>.
+
+=item C<--domain-id-map>
+
+Optional path to a file that stores the start and stop indices of sequences with
+IDs containing said indices.  For example, if the input SSN has IDs in the form
+C<B0SS77:23:42>, this file will contain a line with three columns, consisting of
+the ID, the start, and the stop.  Multiple instances of the same ID with
+different domains can be present.  If this file is provided yet no domain
+information is included in the input IDs, then this file will be empty.
 
 =back
 

@@ -67,9 +67,11 @@ workflow PREPARE_FASTA {
 
         // The input color_fasta_files is a tuple (type, file) that contains the sequence type
         // (uniprot vs unirefXX) and file path.  Add a cluster ID item and SSN sequence type to
-        // the tuple so we can associate the cluster ID with a file.  The result is a tuple (type,
-        // cluster ID, file)
+        // the tuple so we can associate the cluster ID with a file.  The result is the following
+        // tuple:
+        //     (type, cluster ID, file, sequence_type)
         color_fasta_ch = color_fasta_files
+            .filter { file_type, file -> file.size() > 0 }
             .filter { file_type, file -> !file.name.contains("_All.fasta") }     // Don't include the file with all sequences in the analysis
             .filter { file_type, file -> !file.name.contains("singleton") }      // Don't include singletons in the analysis
             .map { file_type, file ->
@@ -80,9 +82,11 @@ workflow PREPARE_FASTA {
             }
             .combine(sequence_type) // Add sequence type to the end of each tuple to allow a later step to limit files to the input SSN type
 
-        // Only use the files for the sequence file_type that was provided (e.g. if the input
-        // is UniRef50 SSN, then only use UniRef50 sequences) --> these go into
-        // seq_type_fasta_ch.sequence_type_files
+        // Obtain a channel only containing the files that will be passed to CD-HIT in the next
+        // step.  Since color_fasta_ch contains all file types (UniProt, UniRef, domain, etc.),
+        // compare the sequence file_type to the original SSN sequence type.  This branch code
+        // stores only the files corresponding to the input SSN sequence type.  These get stored
+        // in seq_type_fasta_ch.sequence_type_files.
         color_fasta_ch.branch {
             sequence_type_files:    it[0] == it[3]
             ignored_files:          true
@@ -94,13 +98,13 @@ workflow PREPARE_FASTA {
 
         // Only apply CD-HIT to UniProt sequences
         seq_type_fasta_ch.sequence_type_files.branch {
-            needs_reduction:    it[0] == 'uniprot'
+            needs_reduction:    it[0] =~ /uniprot/
             skip_reduction:     true
         }.set { reduction_set_ch }
 
         // Reduce all UniProt sequences by removing all sequences that are 100% identical over 100%
         // of the length of the sequence.  Then mix them with the sequences that did not need
-        // reduction
+        // reduction.
         condensed_ch = cdhit_reduce(reduction_set_ch.needs_reduction)
             .mix(reduction_set_ch.skip_reduction)
 

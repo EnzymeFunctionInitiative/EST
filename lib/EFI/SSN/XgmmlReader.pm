@@ -13,11 +13,12 @@ sub new {
     my $self = {};
     bless($self, $class);
 
+    $self->{domain_idx} = {};
+    $self->{edgelist} = [];
     $self->{input} = $args{xgmml_file};
     $self->{id_idx} = {};
     $self->{idx_seqid} = {};
     $self->{node_idx} = 0;
-    $self->{edgelist} = [];
     $self->{ssn_metadata} = { ssn_title => "" };
 
     $self->{metadata_only} = $args{metadata_only} // 0;
@@ -47,6 +48,12 @@ sub getIdIndexMap {
 sub getSsnMetadata {
     my $self = shift;
     return $self->{ssn_metadata};
+}
+
+
+sub getDomainIndexMap {
+    my $self = shift;
+    return $self->{domain_idx} // {};
 }
 
 
@@ -118,6 +125,12 @@ sub processNode {
     my $reader = shift;
     my $id = $reader->getAttribute("id");
     my $seqid = $reader->getAttribute("label") // $id;
+
+    $seqid =~ s/^([^:]+):(\d+):(\d+)$/$1/;
+    if (defined $2 and defined $3) {
+        push @{ $self->{domain_idx}->{$seqid} }, [$2, $3];
+    }
+
     $self->{id_idx}->{$id} = $self->{node_idx};
     $self->{idx_seqid}->{$self->{node_idx}} = $seqid;
     $self->{node_idx}++;
@@ -353,6 +366,29 @@ A hash ref with metadata, including a C<title> key.
     my $meta = $parser->getSsnMetadata();
     my $title = $meta->{title}; # always contains title
 
-    
+
+=head3 C<getDomainIndexMap()>
+
+Gets a hash ref mapping ID to the domain indices that were specified in the sequence ID in the
+SSN.  This will be populated when IDs take the form of C<UNIPROT_ID:#s:#e> (e.g. C<B0SS77:23:42>).
+
+=head4 Returns
+
+A hash ref where each key corresponds to a sequence in the network, and the values are array refs.
+
+=head4 Example Usage
+
+    my $domains = $parser->getDomainIndexMap();
+    if (keys %$domains == 0) {
+        print "No domains\n";
+    } else {
+        foreach my $id (keys %$domains) {
+            foreach my $region (@{ $domains->{$id} }) {
+                print "$id has domain region [" . join(", ", @$region) . "]\n";
+            }
+        }
+    }
+
+
 =cut
 

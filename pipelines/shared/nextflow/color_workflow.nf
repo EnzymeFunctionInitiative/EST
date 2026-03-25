@@ -17,22 +17,28 @@ process get_id_list {
         tuple val("uniprot"), path("uniprot/*.txt"), emit: "uniprot_tuples"
         tuple val("uniref90"), path("uniref90/*.txt", arity: "0..*"), emit: "uniref90_tuples"
         tuple val("uniref50"), path("uniref50/*.txt", arity: "0..*"), emit: "uniref50_tuples"
+        tuple val("uniprot_domain"), path("uniprot_domain/*.txt", arity: "0..*"), emit: "uniprot_domain_tuples"
+        tuple val("uniref90_domain"), path("uniref90_domain/*.txt", arity: "0..*"), emit: "uniref90_domain_tuples"
+        tuple val("uniref50_domain"), path("uniref50_domain/*.txt", arity: "0..*"), emit: "uniref50_domain_tuples"
 
         // Output paths for zipping directories
         path "uniprot", emit: "uniprot_dir"
         path "uniref90", emit: "uniref90_dir"
         path "uniref50", emit: "uniref50_dir"
+        path "uniprot_domain", emit: "uniprot_domain_dir"
+        path "uniref90_domain", emit: "uniref90_domain_dir"
+        path "uniref50_domain", emit: "uniref50_domain_dir"
 
     script:
     """
     # Always need to output these directories even if they're empty.  They will be excluded
     # from the zip process later if they are empty.
-    mkdir -p uniprot uniref90 uniref50
+    mkdir -p ./uniprot ./uniref90 ./uniref50 ./uniprot_domain ./uniref90_domain ./uniref50_domain
 
     id_list_dir="."
-    perl $projectDir/../shared/perl/get_id_lists.pl --cluster-map $cluster_id_map --singletons $singletons \
+    perl $projectDir/../shared/perl/get_id_lists.pl --cluster-map ${cluster_id_map} --singletons ${singletons} \
         --uniprot \$id_list_dir/uniprot --uniref90 \$id_list_dir/uniref90 --uniref50 \$id_list_dir/uniref50 \
-        --seqid-source-map $seqid_source_map --cluster-sizes cluster_sizes.txt \
+        --seqid-source-map ${seqid_source_map} --cluster-sizes cluster_sizes.txt \
         --config ${params.efi_config} --db-name ${params.efi_db}
     """
 }
@@ -141,9 +147,9 @@ process compute_clusters {
         path index_seqid_map
 
     output:
-        path "cluster_id_map.txt", emit: "cluster_id_map"
-        path "singletons.txt", emit: "singletons"
-        path "cluster_num_map.txt", emit: "cluster_num_map"
+        path "cluster_id_map.txt", emit: "cluster_id_map"   // Mapping of node label to cluster number by node and cluster number by sequence
+        path "singletons.txt", emit: "singletons"           // List of singletons
+        path "cluster_num_map.txt", emit: "cluster_num_map" // Mapping of cluster number to cluster size
 
     script:
     """
@@ -199,8 +205,9 @@ process zip_fasta_directories {
     """
     if [ -n "${fasta_files}" ]; then
         mkdir ${version_dir}
-        mv *.fasta ${version_dir}/
+        cp *.fasta ${version_dir}/
         zip -r "fasta_${version_dir}.zip" "${version_dir}"
+        rm -rf ${version_dir}
     fi
     """
 }
@@ -236,7 +243,10 @@ workflow color_and_retrieve {
         id_list = id_list_data.uniprot_tuples
                               .transpose()
                               .concat(id_list_data.uniref90_tuples.transpose(),
-                                      id_list_data.uniref50_tuples.transpose())
+                                      id_list_data.uniref50_tuples.transpose(),
+                                      id_list_data.uniprot_domain_tuples.transpose(),
+                                      id_list_data.uniref90_domain_tuples.transpose(),
+                                      id_list_data.uniref50_domain_tuples.transpose())
 
         // Get the FASTA files for each cluster
         fasta_files = get_fasta(id_list)
@@ -263,7 +273,10 @@ workflow color_and_retrieve {
 
         // Zip ID list by directory
         dirs_to_zip = id_list_data.uniprot_dir.mix(id_list_data.uniref90_dir,
-                                                   id_list_data.uniref50_dir)
+                                                   id_list_data.uniref50_dir,
+                                                   id_list_data.uniprot_domain_dir,
+                                                   id_list_data.uniref90_domain_dir,
+                                                   id_list_data.uniref50_domain_dir)
         zipped_id_dirs = zip_id_directories(dirs_to_zip)
 
         // Zip FASTA files by directory
