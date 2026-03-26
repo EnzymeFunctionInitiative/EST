@@ -45,7 +45,7 @@ if ($pctMaster and -f $pctMaster) {
 my $minCons = 100;
 
 foreach my $file (@posFiles) {
-    my $cons = $file =~ s/^consensus_residue_([\d\.]+)_.*$/$1/r;
+    my $cons = $file =~ s/^consensus_residue_._([\d\.]+)_.*$/$1/r;
 
     $minCons = $cons if $cons < $minCons;
 
@@ -75,7 +75,7 @@ foreach my $file (@posFiles) {
 
 
 foreach my $file (@pctFiles) {
-    my $cons = $file =~ s/^consensus_residue_([\d\.]+)_.*$/$1/r;
+    my $cons = $file =~ s/^consensus_residue_._([\d\.]+)_.*$/$1/r;
 
     open my $fh, $file or die "Unable to read $file: $!";
 
@@ -95,7 +95,6 @@ foreach my $file (@pctFiles) {
 
     close $fh;
 }
-
 
 my @clusterNumbers = sort { $a <=> $b } keys %rowInfo;
 
@@ -130,7 +129,7 @@ foreach my $num (@clusterNumbers) {
         print $pctOut join("\t", $num, $pct, $c, @info);
         foreach my $pos (@minPos) {
             print $posOut "\t" . (exists $pos{$pos} ? $pos : "");
-            print $pctOut "\t" . (exists $pct{$pos} ? $pct{$pos} : "");
+            print $pctOut "\t" . ($pct{$pos} // "");
         }
         print $posOut "\n";
         print $pctOut "\n";
