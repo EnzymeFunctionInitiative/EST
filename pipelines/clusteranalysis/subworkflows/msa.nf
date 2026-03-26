@@ -154,7 +154,7 @@ process run_clustal_omega {
     errorStrategy 'ignore'
 
     input:
-        tuple val(id), path(msa)
+        tuple val(id), path(msa), val(seq_type)
 
     output:
         path("*_pim.txt")
@@ -189,10 +189,10 @@ process zip_clustal_omega {
 process collect_aa_ids {
     tag "ca_count_msa_aa"
 
-    publishDir "${params.final_output_dir}/data/cons_res/${seq_type}/consensus_residue_results_${aa}", mode: "copy", pattern: "*.txt"
+    publishDir "${params.final_output_dir}/data/cons_res/${type}/consensus_residue_results_${aa}", mode: "copy", pattern: "*.txt"
 
     input:
-        tuple path("msas/*"), path("logos/*"), val(cluster_size_file), val(mapping_file), val(aa), val(threshold), val(type)
+        tuple path("msa_files/*"), path("logo_files/*"), path(cluster_size_file), path(mapping_file), val(aa), val(threshold), val(type)
 //        path("msa_files/*")
 //        path("logo_files/*")
 //        path cluster_count_file
@@ -200,14 +200,14 @@ process collect_aa_ids {
 //        tuple val(aa), val(threshold)
 
     output:
-        tuple val(aa), val(threshold), path("consensus_residue_${threshold}_position.txt"), path("consensus_residue_${threshold}_percentage.txt"), val(type)
+        tuple val(aa), val(threshold), path("consensus_residue_${aa}_${threshold}_position.txt"), path("consensus_residue_${aa}_${threshold}_percentage.txt"), val(type)
 
     script:
-    def base_name = "consensus_residue_${threshold}"
+    def base_name = "consensus_residue_${aa}_${threshold}"
     """
-    perl $projectDir/conv_ratio/count_msa_aa.pl --msa-dir msa_files --logo-dir logo_files --aa ${aa} --count-file ${base_name}_position.txt --pct-file ${base_name}_percentage.txt --threshold ${threshold} --node-count-file ${cluster_count_file}
+    perl $projectDir/conv_ratio/count_msa_aa.pl --msa-dir msa_files --logo-dir logo_files --aa ${aa} --count-file ${base_name}_position.txt --pct-file ${base_name}_percentage.txt --threshold ${threshold} --node-count-file ${cluster_size_file}
     mkdir id_lists_${threshold}
-    perl $projectDir/conv_ratio/collect_aa_ids.pl --aa-count-file ${base_name}_position.txt --output-dir id_lists_${threshold} --id-mapping ${id_cluster_mapping}
+    perl $projectDir/conv_ratio/collect_aa_ids.pl --aa-count-file ${base_name}_position.txt --output-dir id_lists_${threshold} --id-mapping ${mapping_file}
     """
 }
 
@@ -295,7 +295,9 @@ workflow ALIGN_AND_ANALYZE {
             collect_aa_input = msa_groups
                 .join(logo_groups)
                 .combine(cr_params_ch)
-                .map { type, msas, logos, aa, threshold ->
+                .combine(cluster_size_file)
+                .combine(id_cluster_mapping)
+                .map { type, msas, logos, aa, threshold, cluster_size_file, id_cluster_mapping ->
                     tuple(msas, logos, cluster_size_file, id_cluster_mapping, aa, threshold, type)
                 }
             //counted_residues_ch = collect_aa_ids(msa_files, logo_files, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
@@ -304,7 +306,7 @@ workflow ALIGN_AND_ANALYZE {
             // groupTuple allows us to create a structure that looks like [AA, [pos_files, ...], [pct_files, ...]]
             residues_ch = counted_residues_ch
                 .map { aa, threshold, pos_file, pct_file, seq_type -> tuple(seq_type, aa, pos_file, pct_file) }
-                .groupTuple()
+                .groupTuple(by: [0, 1])
             summarize_msa_aa(residues_ch)
         }
 
