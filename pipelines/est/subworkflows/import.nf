@@ -73,7 +73,7 @@ process filter_ids {
         filter_args = "--filter ${filter_args}"
     }
     """
-    perl $projectDir/import/filter_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --sequence-version ${params.sequence_version} $filter_args
+    perl $projectDir/../est/import/filter_ids.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --sequence-version ${params.sequence_version} $filter_args
     """
 }
 
@@ -86,7 +86,7 @@ process get_sunburst_data {
         path 'sunburst_tax.json'
     script:
     """
-    perl $projectDir/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db}
+    perl $projectDir/../est/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db}
     """
 }
 
