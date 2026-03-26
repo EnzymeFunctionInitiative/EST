@@ -78,7 +78,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, fasta_db, efi_db,
+def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, efi_db,
                   families=None, sequence_filter=None, input_file=None, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
@@ -88,7 +88,6 @@ def render_params(output_dir, import_mode, sequence_version, job_id, efi_config,
         "job_id": job_id,
         "efi_config": efi_config,
         "efi_db": efi_db,
-        "fasta_db": fasta_db,
         "import_mode": import_mode,
     }
     if families is not None:
