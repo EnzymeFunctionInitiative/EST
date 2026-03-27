@@ -26,6 +26,8 @@ def add_args(parser: argparse.ArgumentParser):
 
     # Option B: Family
     family_parser = subparsers.add_parser("family", help="Import sequences using the family option", parents=[common_parser]).add_argument_group("Family Options")
+    family_parser.add_argument("--min-seq-length", type=int, default=0, help="Minimum sequence length to be applied as a filter.")
+    family_parser.add_argument("--max-seq-length", type=int, default=65000, help="Maximum sequence length to be applied as a filter.")
 
     # Option C: FASTA
     fasta_parser = subparsers.add_parser("fasta", help="Import sequences using the FASTA option", parents=[common_parser]).add_argument_group("FASTA Options")
@@ -79,7 +81,8 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, efi_db,
-                  families=None, sequence_filter=None, input_file=None, **kwargs: dict):
+                  families=None, sequence_filter=None, input_file=None,
+                  min_sequence_length=0, max_sequence_length=65000, **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
         "sequence_version": sequence_version,
@@ -93,6 +96,11 @@ def render_params(output_dir, import_mode, sequence_version, job_id, efi_config,
     if families is not None:
         params |= {
             "families": families
+        }
+    if import_mode == "family":
+        params |= {
+            "min_sequence_length": min_sequence_length,
+            "max_sequence_length": max_sequence_length
         }
 
     # Handle kwargs dict, assuming each entry is a parameter to be added to params
