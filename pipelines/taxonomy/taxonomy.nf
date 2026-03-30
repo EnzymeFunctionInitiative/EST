@@ -1,11 +1,8 @@
 
 include { get_source_ids; filter_ids; get_sunburst_data } from "../est/subworkflows/import.nf"
+include { merge_stats } from "../../shared/nextflow/util.nf"
 
 workflow {
-
-        if (params.import_mode == "blast") {
-            exit(1)
-        }
 
         // We get sequence IDs and basic metadata from the input source, including those in FASTA files
         source_data = get_source_ids()
@@ -15,6 +12,11 @@ workflow {
 
         // Get sunburst data for all sequence IDs, after filtering
         get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)
+        
+        // Create the stats.json file
+        final_stats = merge_stats(sequence_id_files.import_stats)
 
+    emit:
+        final_stats
 }
 
