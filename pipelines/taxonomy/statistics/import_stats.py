@@ -32,6 +32,8 @@ if __name__ == "__main__":
     with open(args.sunburst_file, "r") as f:
         sunburst_data = json.load(f)
 
+    # the number of sequences having been gathered for the sunburst data is
+    # hardcoded in `sunburst_data["data"]["nq"]`
     num_seqs = sunburst_data["data"]["nq"]
 
     with open(args.stats_file, "r") as f:
@@ -39,7 +41,7 @@ if __name__ == "__main__":
 
     import_stats.update(
         {
-            "num_computed_ids": num_seqs
+            "num_unique_ids": num_seqs
         }
     )
 
