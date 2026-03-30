@@ -95,12 +95,12 @@ if ($opts->{family_filter}) {
 # Sequence Length: Restrict sequence lengths to the given range (only applies to Taxonomy Families)
 if ($opts->{min_seq_length} or $opts->{max_seq_length}) {
     my %args;
-    if ($opts->{min_seq_length} and $opts->{min_seq_length} =~ m/^d+$/) {
+    if ($opts->{min_seq_length}) {
         $args{min_seq_length} = $opts->{min_seq_length};
     } else {
-        $args{min_seq_length} = 0;
+        $args{min_seq_length} = 1;
     }
-    if ($opts->{max_seq_length} and $opts->{max_seq_length} =~ m/^d+$/) {
+    if ($opts->{max_seq_length}) {
         $args{max_seq_length} = $opts->{max_seq_length};
     } else {
         $args{max_seq_length} = 65000;
