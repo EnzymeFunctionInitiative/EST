@@ -95,15 +95,15 @@ if ($opts->{family_filter}) {
 # Sequence Length: Restrict sequence lengths to the given range (only applies to Taxonomy Families)
 if ($opts->{min_seq_length} or $opts->{max_seq_length}) {
     my %args;
-    if ($opts->{min_seq_length}) {
-	$args{min_seq_length} = $opts->{min_seq_length};
+    if ($opts->{min_seq_length} and $opts->{min_seq_length} =~ m/^d+$/) {
+        $args{min_seq_length} = $opts->{min_seq_length};
     } else {
-	$args{min_seq_length} = 0;
+        $args{min_seq_length} = 0;
     }
-    if ($opts->{max_seq_length}) {
-	$args{max_seq_length} = $opts->{max_seq_length};
+    if ($opts->{max_seq_length} and $opts->{max_seq_length} =~ m/^d+$/) {
+        $args{max_seq_length} = $opts->{max_seq_length};
     } else {
-	$args{max_seq_length} = 65000;
+        $args{max_seq_length} = 65000;
     }
 
     my $lengthFilter = new EFI::Import::Filter::Length(%defaultFilterArgs, %args);
