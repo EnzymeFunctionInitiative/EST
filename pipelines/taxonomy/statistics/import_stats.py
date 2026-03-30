@@ -13,10 +13,10 @@ def create_parser() -> argparse.ArgumentParser:
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
     fail = False
     if not os.path.exists(args.sunburst_file):
-        print(f"BLAST output '{args.sunburst_file}' does not exist")
+        print(f"Sunburst result file '{args.sunburst_file}' does not exist")
         fail = True
     if not os.path.exists(args.stats_file):
-        print(f"FASTA file '{args.stats_file}' does not exist")
+        print(f"Filtering stats file '{args.stats_file}' does not exist")
         fail = True
     
     if fail:
@@ -46,6 +46,6 @@ if __name__ == "__main__":
     )
 
     with open(args.output, "w") as f:
-        json.dump(output, f, indent=4)
+        json.dump(import_stats, f, indent=4)
         f.write("\n")
 
