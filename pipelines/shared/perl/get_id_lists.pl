@@ -115,9 +115,14 @@ sub saveClusterSizes {
 
     my @clusters = sort { $a <=> $b } keys %$clusterToId;
     foreach my $cnum (@clusters) {
+        # There may be no IDs in the cluster in which case the key is not valid.  This might occur
+        # when using UniRef and the UniRef IDs (or child UniProt IDs) are no longer in the database
+        # (e.g. an older network is being used).  In this case, skip the cluster.
+        next if not $clusterToId->{$cnum};
+
         my $uniprotSize = @{ $clusterToId->{$cnum} };
-        my $uniref90Size = @{ $unirefMap->{uniref90}->{$cnum} } if $unirefMap->{uniref90};
-        my $uniref50Size = @{ $unirefMap->{uniref50}->{$cnum} } if $unirefMap->{uniref50};
+        my $uniref90Size = @{ $unirefMap->{uniref90}->{$cnum} // [] } if $unirefMap->{uniref90};
+        my $uniref50Size = @{ $unirefMap->{uniref50}->{$cnum} // [] } if $unirefMap->{uniref50};
         my @row = ($cnum, $uniprotSize);
         push @row, $uniref90Size if $uniref90Size;
         push @row, $uniref50Size if $uniref50Size;
@@ -350,7 +355,7 @@ sub saveDomainIdLists {
 #
 # saveClusterIdList
 #
-# Save the IDs for a cluster to a file
+# Save the IDs for each cluster to files (one per cluster)
 #
 # Parameters:
 #    $clusterToId - hash ref mapping cluster num to list of IDs in cluster
@@ -367,6 +372,12 @@ sub saveClusterIdList {
 
     foreach my $cnum (@$clusters) {
         my $file = "${baseName}_Cluster_$cnum.txt";
+
+        # There may be no IDs in the cluster in which case the key is not valid.  This might occur
+        # when using UniRef and the UniRef IDs (or child UniProt IDs) are no longer in the database
+        # (e.g. an older network is being used).  In this case, skip the cluster.
+        next if not $clusterToId->{$cnum};
+
         my @ids = @{ $clusterToId->{$cnum} };
         open my $fh, ">", $file or die "Unable to open id list file '$file' for writing: $!";
         foreach my $id (@ids) {
