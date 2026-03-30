@@ -27,8 +27,8 @@ sub new {
 sub applyFilter {
     my $self = shift;
     my $seqs = shift;
-    my $min_seq_length = $self->{min_seq_length}
-    my $max_seq_length = $self->{max_seq_length}
+    my $min_seq_length = $self->{min_seq_length};
+    my $max_seq_length = $self->{max_seq_length};
 
     my @ids = $seqs->getAllSequenceIds();
     @ids = grep { not is_unknown_sequence($_) } @ids;
