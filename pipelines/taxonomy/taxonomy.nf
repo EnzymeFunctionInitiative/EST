@@ -1,6 +1,6 @@
 
 include { get_source_ids; filter_ids; get_sunburst_data } from "../est/subworkflows/import.nf"
-include { merge_stats } from "../../shared/nextflow/util.nf"
+include { merge_stats } from "../shared/nextflow/util.nf"
 
 workflow {
 
