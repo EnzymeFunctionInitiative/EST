@@ -34,10 +34,12 @@ if __name__ == "__main__":
     # loop over the stats files and update; detection of overwriting already
     # set values associated with keys is not currently implemented.
     for stats_file in args.stats_file:
-        with open(args.stats_file, "r") as f:
+        with open(stats_file, "r") as f:
             stats = json.load(f)
+            print(stats)
         combined.update(stats)
 
+    print(combined)
     # the website needs to have the number ids contained by the
     # sunburst_tax.json file set to the "num_unique_ids" key
     combined.update(
@@ -45,8 +47,9 @@ if __name__ == "__main__":
             "num_unique_ids": combined.get("num_sunburst_ids",0)
         }
     )
+    print(combined)
 
     with open(args.output, "w") as f:
-        json.dump(import_stats, f, indent=4)
+        json.dump(combined, f, indent=4)
         f.write("\n")
 

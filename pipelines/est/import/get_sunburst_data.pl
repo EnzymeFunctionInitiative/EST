@@ -71,8 +71,8 @@ sub saveToJson {
     if ($statsFile) {
         open my $fh, ">", $statsFile or die "Cannot open $statsFile: $!";
         my $out = {
-            num_sunburst_ids => $data->{nq},
-            num_sunburst_species => $data->{ns},
+            num_sunburst_ids => $data->{data}->{nq},
+            num_sunburst_species => $data->{data}->{ns},
         };
 
         $fh->print($json->pretty->encode($out));
