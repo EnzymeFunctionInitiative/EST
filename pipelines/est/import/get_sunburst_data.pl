@@ -35,7 +35,7 @@ my $creator = new EFI::Sunburst::Data(dbh => $dbh);
 my ($sbData) = $creator->getSunburstTaxonomy($seqData);
 
 
-saveToJson($sbData, $opts->{sunburst_data_file});
+saveToJson($sbData, $opts->{sunburst_data_file}, $opts->{sunburst_stats_file});
 
 
 
@@ -51,6 +51,7 @@ saveToJson($sbData, $opts->{sunburst_data_file});
 sub saveToJson {
     my $data = shift;
     my $outputFile = shift;
+    my $statsFile = shift;
 
     $data = {
         data => $data,
@@ -66,6 +67,19 @@ sub saveToJson {
     }
 
     close $fh;
+
+    if ($statsFile) {
+        open my $fh, ">", $statsFile or die "Cannot open $statsFile: $!";
+        my $out = {
+            num_sunburst_ids => $data->{nq},
+            num_sunburst_species => $data->{ns},
+        };
+
+        $fh->print($json->pretty->encode($out));
+
+        close $fh;
+    }
+
 }
 
 
