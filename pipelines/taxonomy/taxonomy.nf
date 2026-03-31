@@ -11,7 +11,7 @@ process process_sunburst_stats {
         path 'sunburst_stats.json', emit: 'stats_file'
     script:
     """
-    python $projectDir/statistics/import_stats.py --sunburst-file ${sunburst_tax_file} --stats-file ${import_stats_file} --output sunburst_stats.json
+    python $projectDir/statistics/update_import_stats.py --sunburst-file ${sunburst_tax_file} --stats-file ${import_stats_file} --output sunburst_stats.json
     """
 }
 
