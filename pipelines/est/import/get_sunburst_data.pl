@@ -136,6 +136,11 @@ Path to the output file that will contain the JSON data necessary for the web UI
 sunburst diagrams.
 Defaults to C<sunburst_tax.json> in the current directory if not specified.
 
+=item C<--sunburst-stats-file> (optional)
+
+Path to the output file that will contain the statistics on the sequence set analyzed by the
+taxonomy tool. If left undefined, this file will not be written.
+
 =item C<--pretty-print> (optional)
 
 Indicates if the JSON output should be human-readable.
