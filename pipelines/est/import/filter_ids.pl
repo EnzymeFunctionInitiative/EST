@@ -23,6 +23,8 @@ use EFI::Sequence::Collection;
 my $defaultPredefTaxFiltFileName = "predefined_taxonomy_filters.yml";
 my $defaultPredefTaxFiltFile = "$FindBin::Bin/../../shared/assets/$defaultPredefTaxFiltFileName";
 
+my $defaultMinSeqLength = EFI::Import::Config::Filter::DEFAULT_MIN_SEQ_LENGTH;
+my $defaultMaxSeqLength = EFI::Import::Config::Filter::DEFAULT_MAX_SEQ_LENGTH;
 
 my $optionParser = new EFI::Import::Config::Filter(predef_filter_file => $defaultPredefTaxFiltFile);
 my ($status, $help) = $optionParser->validateOptions();
@@ -93,18 +95,12 @@ if ($opts->{family_filter}) {
 
 
 # Sequence Length: Restrict sequence lengths to the given range (only applies to Taxonomy Families)
-if ($opts->{min_seq_length} or $opts->{max_seq_length}) {
+# values for min/max are set during validateOptions() call
+# check that one or both of the values are not equal to defaults; if False (both are equal to defaults), do not apply filter at all.
+if ($opts->{min_seq_length} != $defaultMinSeqLength or $opts->{max_seq_length} != $defaultMaxSeqLength) {
     my %args;
-    if ($opts->{min_seq_length} and $opts->{min_seq_length} =~ m/^d+$/) {
-        $args{min_seq_length} = $opts->{min_seq_length};
-    } else {
-        $args{min_seq_length} = 0;
-    }
-    if ($opts->{max_seq_length} and $opts->{max_seq_length} =~ m/^d+$/) {
-        $args{max_seq_length} = $opts->{max_seq_length};
-    } else {
-        $args{max_seq_length} = 65000;
-    }
+    $args{min_seq_length} = $opts->{min_seq_length};
+    $args{max_seq_length} = $opts->{max_seq_length};
 
     my $lengthFilter = new EFI::Import::Filter::Length(%defaultFilterArgs, %args);
     $lengthFilter->applyFilter($seqData);
@@ -272,6 +268,28 @@ are given to the Accession IDs tool to a certain subset.
     filter_ids.pl --filter family=PF05544 ...
 
     # Any IDs in the input file that are not in PF05544 are removed
+
+
+=head3 Sequence Length (C<--filter min_seq_length=# --filter max_seq_length=#>)
+
+This filter will remove all sequences outside the min and max length cutoffs. Both or only one of
+the filter keys need be supplied; if left undefined, a default value will be used. The purpose of
+this filter is to restrict the set of sequences analyzed by the Taxonomy tool.
+
+=head4 Example Usage
+
+    filter_ids.pl --filter min_seq_length=20 --filter max_seq_length=250 ...
+
+    # Any IDs in the input file that have sequence lengths outside the range of 20 to 250 will be
+    # ignored.
+
+    filter_ids.pl --filter min_seq_length=20 ...
+
+    # If max_seq_length is undefined, the default value of 65000 will be used as the upper limit.
+
+    filter_ids.pl --filter max_seq_length=250 ...
+
+    # If min_seq_length is undefined, the default value of 1 will be used as the lower limit.
 
 
 =head3 Taxonomy (C<--filter predef-filter=NAME --filter predef-file=PATH --filter user-filter=PATH>)

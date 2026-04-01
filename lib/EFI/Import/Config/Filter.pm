@@ -13,6 +13,8 @@ use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Options;
 use EFI::Sequence::Type qw(get_sequence_version);
 
+use constant DEFAULT_MIN_SEQ_LENGTH => 1;
+use constant DEFAULT_MAX_SEQ_LENGTH => 65000;
 
 
 sub new {
@@ -73,8 +75,8 @@ sub validateOptions {
     $opts->{fraction} = ($filter->{fraction} and $filter->{fraction} =~ m/^\d+$/) ? $filter->{fraction} : 1;
     $opts->{remove_fragments} = exists $filter->{fragments} ? 1 : 0;
     $opts->{family_filter} = $filter->{family};
-    $opts->{min_seq_length} = $filter->{min_seq_length};
-    $opts->{max_seq_length} = $filter->{max_seq_length};
+    $opts->{min_seq_length} = ($filter->{min_seq_length} and $filter->{min_seq_length} =~ m/^\d+$/) ? $filter->{min_seq_length} : DEFAULT_MIN_SEQ_LENGTH;
+    $opts->{max_seq_length} = ($filter->{max_seq_length} and $filter->{max_seq_length} =~ m/^\d+$/) ? $filter->{max_seq_length} : DEFAULT_MAX_SEQ_LENGTH;
     my @taxFilterErrors = $self->parseTaxonomyFilterOptions($filter, $opts);
     push @errors, @taxFilterErrors;
 

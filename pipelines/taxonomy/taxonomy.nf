@@ -1,6 +1,32 @@
 
-include { get_source_ids; filter_ids; get_sunburst_data } from "../est/subworkflows/import.nf"
-include { merge_stats } from "../shared/nextflow/util.nf"
+include { get_source_ids; filter_ids } from "../est/subworkflows/import.nf"
+
+process get_sunburst_data {
+    publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path accession_table
+        path sequence_metadata
+    output:
+        path 'sunburst_tax.json', emit: 'taxon_file'
+        path 'sunburst_stats.json', emit: 'stats_file'
+    script:
+    """
+    perl $projectDir/../est/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --sunburst-stats-file sunburst_stats.json
+    """
+}
+
+process process_sunburst_stats {
+    publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path sunburst_stats_file
+        path import_stats_file
+    output:
+        path 'stats.json'
+    script:
+    """
+    python $projectDir/statistics/update_import_stats.py --stats-file ${sunburst_stats_file} ${import_stats_file} --output stats.json
+    """
+}
 
 workflow {
 
@@ -11,12 +37,10 @@ workflow {
         sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats)
 
         // Get sunburst data for all sequence IDs, after filtering
-        get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)
+        sunburst_data = get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)
         
-        // Create the stats.json file
-        final_stats = merge_stats(sequence_id_files.import_stats)
+        // Process the sunburst_stats.json and import_stats.json files
+        process_sunburst_stats(sunburst_data.stats_file, sequence_id_files.import_stats)
 
-    emit:
-        final_stats
 }
 

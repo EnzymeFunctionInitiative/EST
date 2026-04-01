@@ -35,7 +35,7 @@ my $creator = new EFI::Sunburst::Data(dbh => $dbh);
 my ($sbData) = $creator->getSunburstTaxonomy($seqData);
 
 
-saveToJson($sbData, $opts->{sunburst_data_file});
+saveToJson($sbData, $opts->{sunburst_data_file}, $opts->{sunburst_stats_file});
 
 
 
@@ -51,6 +51,7 @@ saveToJson($sbData, $opts->{sunburst_data_file});
 sub saveToJson {
     my $data = shift;
     my $outputFile = shift;
+    my $statsFile = shift;
 
     $data = {
         data => $data,
@@ -66,6 +67,19 @@ sub saveToJson {
     }
 
     close $fh;
+
+    if ($statsFile) {
+        open my $fh, ">", $statsFile or die "Cannot open $statsFile: $!";
+        my $out = {
+            num_sunburst_ids => $data->{data}->{nq},
+            num_sunburst_species => $data->{data}->{ns},
+        };
+
+        $fh->print($json->pretty->encode($out));
+
+        close $fh;
+    }
+
 }
 
 
@@ -121,6 +135,11 @@ Defaults to C<accession_table.tab> in the current directory if not specified.
 Path to the output file that will contain the JSON data necessary for the web UI to display
 sunburst diagrams.
 Defaults to C<sunburst_tax.json> in the current directory if not specified.
+
+=item C<--sunburst-stats-file> (optional)
+
+Path to the output file that will contain the statistics on the sequence set analyzed by the
+taxonomy tool. If left undefined, this file will not be written.
 
 =item C<--pretty-print> (optional)
 

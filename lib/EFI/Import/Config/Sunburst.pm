@@ -32,6 +32,7 @@ sub addImportOptions {
     $self->addOption("sequence-meta-file=s", 0, "path to the input file that contains sequence metadata", OPT_FILE);
     $self->addOption("accession-table-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
     $self->addOption("sunburst-data-file=s", 0, "output file to put sunburst data into (defaults into --output-dir)", OPT_FILE);
+    $self->addOption("sunburst-stats-file=s", 0, "output file to put sunburst data into (defaults into --output-dir)", OPT_FILE);
     $self->addOption("pretty-print", 0, "pretty-print JSON");
 }
 
