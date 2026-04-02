@@ -54,9 +54,7 @@ process muscle3_align {
 process build_hmms {
     tag "ca_hmms_${id}"
 
-    publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.hmm"
-    publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.json"
-    publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.png"
+    publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.{hmm,json,png}"
 
     input:
         tuple val(id), path(msa), val(seq_type)
