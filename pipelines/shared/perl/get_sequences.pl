@@ -36,10 +36,17 @@ my $seqDb = new EFI::Import::SequenceDB(fasta_db => $config->{fasta_db});
 my $inputIdsFile = $config->{sequence_ids_file};
 my $outputFile = $config->{output_sequence_file};
 
+
+my $domainIdMap = {};
+if ($config->{domain_id_map}) {
+    $domainIdMap = parseDomainIdMap($config->{domain_id_map});
+}
+
+
 my $_start = time();
 
 $logger->message("Retrieving the sequences from the IDs in $inputIdsFile from " . $config->{fasta_db});
-my $numIds = $seqDb->getSequences($inputIdsFile, $outputFile);
+my $numIds = $seqDb->getSequences($inputIdsFile, $outputFile, $domainIdMap);
 
 my $_elapsed = int((time() - $_start) * 1000);
 
@@ -50,6 +57,45 @@ if ($numIds == -1) {
 
 $logger->message("Found $numIds IDs in FASTA file in $_elapsed ms"); 
 
+
+
+
+
+
+
+
+
+
+#
+# parseDomainIdMap
+#
+# Parse the domain ID-region mapping file into a hash ref that can be used by the sequence
+# retrieval to extract specific domains rather than the full sequence.
+#
+# Parameters:
+#    $file - path to domain ID map file
+#
+# Returns:
+#    hash ref { id => [[start1, end1], [start2, end2]], id2 => [[start, end]], id3 => ... }
+#
+sub parseDomainIdMap {
+    my $file = shift;
+
+    open my $fh, "<", $file or die "Unable to read domain ID map file '$file': $!";
+
+    my $header = <$fh>;
+
+    my $domainIdMap = {};
+    while (my $line = <$fh>) {
+        chomp $line;
+        my ($id, $start, $end) = split(m/\t/, $line);
+        push @{ $domainIdMap->{$id} }, [$start, $end];
+    }
+
+    close $fh;
+
+    return $domainIdMap;
+}
 
 
 

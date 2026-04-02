@@ -33,6 +33,7 @@ sub getSequences {
     my $self = shift;
     my $idFile = shift;
     my $fastaFile = shift;
+    my $domainIdMap = shift || {}; # optional
 
     my $tempFasta = "$fastaFile.tmp";
 
@@ -48,7 +49,7 @@ sub getSequences {
         return -1;
     }
 
-    my $numIds = $self->convertSequences($tempFasta, $fastaFile, $domains);
+    my $numIds = $self->convertSequences($tempFasta, $fastaFile, keys %$domainIdMap ? $domainIdMap : $domains);
 
     unlink($tempFasta);
     unlink($tempIdFile);
@@ -139,4 +140,106 @@ sub convertSequences {
 
 
 1;
+__END__
+
+=head1 EFI::Import::SequenceDB
+
+=head2 NAME
+
+B<EFI::Import::SequenceDB> - Perl utility module for obtaining sequence data from a FASTA database
+
+=head2 SYNOPSIS
+
+    use EFI::Import::SequenceDB;
+
+    my $fastaDbPath = "/path/to/blast/fastadb";
+
+    my $seqDb = new EFI::Import::SequenceDB(fasta_db => $fastaDbPath);
+
+    my $domainIdMap = {};
+    my $numIds = $seqDb->getSequences($inputIdsFile, $outputFile, $domainIdMap);
+
+
+=head2 DESCRIPTION
+
+B<EFI::Import::SequenceDB> is a Perl module for retrieving protein sequence data from a FASTA
+database.  The input is a file that contains a list of IDs and the output is a single FASTA
+file.  Domain regions can be optionally specified.
+
+=head2 METHODS
+
+=head3 C<new(fasta_db =E<gt> $fastaDbPath)>
+
+Creates a new B<EFI::SSN::XgmmlReader> object.
+
+=head4 Parameters
+
+=over
+
+=item C<fasta_db>
+
+Path to a BLAST FASTA database or FASTA file.
+
+=back
+
+=head4 Returns
+
+Returns an object.
+
+
+=head3 C<getSequences($inputIdsFile, $outputFile, $domainIdMap)>
+
+Retrieves the sequences using C<fastacmd> from the BLAST toolkit.  The input is a file
+containing a list of sequence IDs and the output is stored in the C<$outputFile>.
+If a domain map is specified (via a hash ref), then the regions that are specified in
+the mapping are used to extract a subset of the entire sequence.  If the map is not
+specified but the IDs in the input IDs file contain region indices, then the regions
+in the ID are used to extract a subset of the entire sequence.  A line in the
+C<$inputIdsFile> that contains domain regions will look like C<B0SS77:42:67>.
+
+=head4 Parameters
+
+=over
+
+=item C<$inputIdsFile>
+
+Path to a file containing the IDs.  They can optionally include domain regions.
+If domains are specified, then multiple instances of the same ID may occur with
+different regions.
+
+=item C<$outputFile>
+
+Path to the file to store FASTA data into.
+
+=item C<$domainIdMap>
+
+If specified, this will be used to extract domains from the sequences.  This is a hash
+ref containing array refs, e.g.
+
+    {
+        "ID" => [
+            [start1, end1],
+            [start2, end2]
+        ],
+        "ID2" => [
+            [start, end]
+        ],
+        ...
+    }
+
+=back
+
+=head4 Returns
+
+Returns the number of IDs that were actually retrieved (may be less than what was
+input if IDs in the input file are not contained in the database).
+
+=head4 Example Usage
+
+    my $domainIdMap = {};
+    my $numIds = $seqDb->getSequences($inputIdsFile, $outputFile, $domainIdMap);
+    print "$numIds were retrieved\n";
+
+
+=cut
 
