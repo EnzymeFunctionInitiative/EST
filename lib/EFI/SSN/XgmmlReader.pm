@@ -128,7 +128,7 @@ sub processNode {
 
     $seqid =~ s/^([^:]+):(\d+):(\d+)$/$1/;
     if (defined $2 and defined $3) {
-        push @{ $self->{domain_idx}->{$seqid} }, [$2, $3];
+        push @{ $self->{domain_idx}->{$1} }, [$2, $3];
     }
 
     $self->{id_idx}->{$id} = $self->{node_idx};
