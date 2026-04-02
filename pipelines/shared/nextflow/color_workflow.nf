@@ -9,6 +9,7 @@ process get_id_list {
         path cluster_id_map
         path singletons
         path seqid_source_map
+        val sequence_type
 
     output:
         path "cluster_sizes.txt", emit: "cluster_sizes"
@@ -36,10 +37,17 @@ process get_id_list {
     mkdir -p ./uniprot ./uniref90 ./uniref50 ./uniprot_domain ./uniref90_domain ./uniref50_domain
 
     id_list_dir="."
-    perl $projectDir/../shared/perl/get_id_lists.pl --cluster-map ${cluster_id_map} --singletons ${singletons} \
-        --uniprot \$id_list_dir/uniprot --uniref90 \$id_list_dir/uniref90 --uniref50 \$id_list_dir/uniref50 \
-        --seqid-source-map ${seqid_source_map} --cluster-sizes cluster_sizes.txt \
-        --config ${params.efi_config} --db-name ${params.efi_db}
+    perl $projectDir/../shared/perl/get_id_lists.pl \
+        --cluster-map ${cluster_id_map} \
+        --singletons ${singletons} \
+        --uniprot \$id_list_dir/uniprot \
+        --uniref90 \$id_list_dir/uniref90 \
+        --uniref50 \$id_list_dir/uniref50 \
+        --seqid-source-map ${seqid_source_map} \
+        --cluster-sizes cluster_sizes.txt \
+        --sequence-type ${sequence_type} \
+        --config ${params.efi_config} \
+        --db-name ${params.efi_db}
     """
 }
 
@@ -47,16 +55,26 @@ process get_id_list {
 process get_fasta {
     input:
         tuple val(version), path(id_file)
+        val sequence_type
+        path domain_id_map
 
     // Output a tuple with the sequence version (e.g. uniprot, uniref50, uniref90) and the fasta file
     output:
         tuple val(version), path("*.fasta", arity: "1")
 
     script:
+    // Check if the current file type matches the original SSN source ID type, and if so then
+    // if a domain ID map file is provided, use domain ID mapping to obtain the domain-specific
+    // portions of the sequences.
+    def domain_map_arg = (version == sequence_type && domain_id_map.size() > 0) ? "--domain-id-map ${domain_id_map}" : ""
+
     """
-    base_filename=\$(basename $id_file .txt)
-    fasta_file="\${base_filename}.fasta"
-    perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file ${id_file} --output-sequence-file \${fasta_file}
+    fasta_file="${id_file.baseName}.fasta"
+    perl $projectDir/../shared/perl/get_sequences.pl \
+        --fasta-db ${params.fasta_db} \
+        --sequence-ids-file ${id_file} \
+        ${domain_map_arg} \
+        --output-sequence-file \${fasta_file}
     """
 }
 
@@ -70,12 +88,19 @@ process get_ssn_id_info {
         path "index_seqid_map.txt", emit: "index_seqid_map"     // Maps node network ID to UniProt ID and the number of IDs in the metanode
         path "seqid_source_map.txt", emit: "seqid_source_map"   // Maps metanode IDs to UniProt IDs
         path "ssn_sequences.fasta", emit: "ssn_sequences"       // Custom sequences that are embedded in the SSN
+        path "domain_id_map.txt", emit: "domain_id_map"         // Map of sequence ID to domain region
         env SEQ_TYPE, emit: sequence_type                       // Type of sequences that the SSN is based on (uniprot, uniref90, uniref50)
 
     script:
     """
-    perl $projectDir/../shared/perl/ssn_to_id_list.pl --ssn $ssn_file --edgelist edgelist.txt --index-seqid index_seqid_map.txt \
-        --seqid-source-map seqid_source_map.txt --ssn-sequences ssn_sequences.fasta --sequence-type-file sequence_type.txt
+    perl $projectDir/../shared/perl/ssn_to_id_list.pl \
+        --ssn $ssn_file \
+        --edgelist edgelist.txt \
+        --index-seqid index_seqid_map.txt \
+        --seqid-source-map seqid_source_map.txt \
+        --ssn-sequences ssn_sequences.fasta \
+        --sequence-type-file sequence_type.txt \
+        --domain-id-map domain_id_map.txt
     SEQ_TYPE=\$(cat sequence_type.txt)
     """
 }
@@ -228,6 +253,9 @@ workflow color_and_retrieve {
         // Get the index and ID mapping tables and edgelist
         ssn_data = get_ssn_id_info(ssn_file)
 
+        // Convert to value channel
+        sequence_type_val = ssn_data.sequence_type.map { it.trim() }
+
         // Compute the clusters
         compute_info = compute_clusters(ssn_data.edgelist, ssn_data.index_seqid_map)
 
@@ -239,7 +267,7 @@ workflow color_and_retrieve {
         // if the input SSN is UniRef50, there will be three outputs: uniprot/cluster_N.txt,
         // uniref90/cluster_N.txt, and uniref50/cluster_N.txt, with one cluster_N.txt file
         // for each cluster in the network)
-        id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map)
+        id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map, sequence_type_val)
         id_list = id_list_data.uniprot_tuples
                               .transpose()
                               .concat(id_list_data.uniref90_tuples.transpose(),
@@ -249,7 +277,7 @@ workflow color_and_retrieve {
                                       id_list_data.uniref50_domain_tuples.transpose())
 
         // Get the FASTA files for each cluster
-        fasta_files = get_fasta(id_list)
+        fasta_files = get_fasta(id_list, sequence_type_val, ssn_data.domain_id_map)
 
         //
         // STEP 3: ASSIGN COLORS AND RETRIEVE METADATA
@@ -273,10 +301,7 @@ workflow color_and_retrieve {
 
         // Zip ID list by directory
         dirs_to_zip = id_list_data.uniprot_dir.mix(id_list_data.uniref90_dir,
-                                                   id_list_data.uniref50_dir,
-                                                   id_list_data.uniprot_domain_dir,
-                                                   id_list_data.uniref90_domain_dir,
-                                                   id_list_data.uniref50_domain_dir)
+                                                   id_list_data.uniref50_dir)
         zipped_id_dirs = zip_id_directories(dirs_to_zip)
 
         // Zip FASTA files by directory
@@ -284,9 +309,6 @@ workflow color_and_retrieve {
             .groupTuple()
             .set { grouped_fasta_ch }
         zipped_fasta_dirs = zip_fasta_directories(grouped_fasta_ch)
-
-        // Convert to value channel
-        sequence_type_val = ssn_data.sequence_type.map { it.trim() }
 
     emit:
         ssn_file
