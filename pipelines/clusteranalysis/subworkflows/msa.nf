@@ -157,7 +157,7 @@ process run_clustal_omega {
         tuple val(id), path(msa), val(seq_type)
 
     output:
-        path("*_pim.txt")
+        tuple val(seq_type), path("${id}_pim.txt")
 
     script:
     """
@@ -171,17 +171,17 @@ process zip_clustal_omega {
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
-        path input_pims
+        tuple val(seq_type), path(input_pims)
 
     output:
-        path("clustal_pims.zip")
+        path("clustal_pims_${seq_type}.zip")
 
     script:
     """
-    dir="clustal_pims"
+    dir="clustal_pims_${seq_type}"
     mkdir \$dir
     cp *_pim.txt \$dir
-    zip -rq "clustal_pims.zip" \$dir
+    zip -rq "clustal_pims_${seq_type}.zip" \$dir
     rm -rf \$dir
     """
 }
@@ -242,11 +242,11 @@ workflow ALIGN_AND_ANALYZE {
 
         // Compute the cluster size file
         cluster_size_file = prepared_fasta_ch
-//            .branch {
-//                domain_seq: it[0] =~ /_domain/
-//                full_seq:   true
-//            }
-//            .full_seq
+            .branch {
+                domain_seq: it[0] =~ /_domain/
+                full_seq:   true
+            }
+            .full_seq
             .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
             .concat( Channel.of("cluster_id\tnum_seq\n") )
             .collectFile(
@@ -311,6 +311,7 @@ workflow ALIGN_AND_ANALYZE {
         }
 
         // Compute percent ID matrices using Clustal-Omega
-        clustal_files = run_clustal_omega(msa_ch).collect()
-        zip_clustal_omega(clustal_files)
+        clustal_files = run_clustal_omega(msa_ch)
+
+        zip_clustal_omega(clustal_files.groupTuple())
 }

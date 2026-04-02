@@ -77,7 +77,7 @@ workflow PREPARE_FASTA {
             .map { file_type, file ->
                 // Transform the file name into a cluster ID.  Removes "cluster_UniProt_" (or
                 // "cluster_UniRefXX_") from the front if present
-                def clean_id = file.simpleName.replaceAll(/^cluster_Uni(Prot|Ref90|Ref50)_/, '')
+                def clean_id = file.simpleName.replaceAll(/^cluster_Uni(Prot|Ref90|Ref50)_(Domain_)?/, '')
                 return tuple(file_type, clean_id, file)
             }
             .combine(sequence_type) // Add sequence type to the end of each tuple to allow a later step to limit files to the input SSN type
@@ -86,9 +86,11 @@ workflow PREPARE_FASTA {
         // step.  Since color_fasta_ch contains all file types (UniProt, UniRef, domain, etc.),
         // compare the sequence file_type to the original SSN sequence type.  This branch code
         // stores only the files corresponding to the input SSN sequence type.  These get stored
-        // in seq_type_fasta_ch.sequence_type_files.
+        // in seq_type_fasta_ch.sequence_type_files.  If the input sequence_type is domain (e.g.
+        // ending in '_domain'), then we also want to include the base type (e.g. uniref90 and
+        // uniref90_domain).
         color_fasta_ch.branch {
-            sequence_type_files:    it[0] == it[3]
+            sequence_type_files:    it[0].replace('_domain', '') == it[3].replace('_domain', '')
             ignored_files:          true
         }.set { seq_type_fasta_ch }
 
@@ -98,7 +100,7 @@ workflow PREPARE_FASTA {
 
         // Only apply CD-HIT to UniProt sequences
         seq_type_fasta_ch.sequence_type_files.branch {
-            needs_reduction:    it[0] =~ /uniprot/
+            needs_reduction:    it[0].contains('uniprot')
             skip_reduction:     true
         }.set { reduction_set_ch }
 
@@ -125,7 +127,7 @@ workflow PREPARE_FASTA {
             ignored: true
         }.set { split_sampled_ch }
 
-        split_sampled_ch.ignored.view { "Dropping cluster ${it[1]} because it's small to compute an MSA for" }
+//        split_sampled_ch.ignored.view { "Dropping cluster ${it[1]} because it's small to compute an MSA for" }
 
         // Sample the FASTA files (aka subsetting)
         sampled_ch = subset_fasta(split_sampled_ch.large)
