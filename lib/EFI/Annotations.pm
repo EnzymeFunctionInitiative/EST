@@ -22,6 +22,7 @@ use constant ANNO_FIELDS_SSN_NUMERIC => 4;
 use constant ANNO_FIELDS_DB_USER => 8;
 use constant ANNO_FIELDS_SSN_COLOR => 16;
 use constant ANNO_FIELDS_SSN_GNT => 32;
+use constant ANNO_FIELDS_NB_CONN => 64;
 
 use constant INTERPRO_DOMAIN => "domain";
 use constant INTERPRO_FAMILY => "family";
@@ -337,7 +338,7 @@ sub get_annotation_data {
 # Parameters:
 #     $type - a subset of field names to retrieve. One of
 #         ANNO_FIELDS_SSN_DISPLAY, ANNO_FIELDS_BASE_SSN, ANNO_FIELDS_SSN_NUMERIC, ANNO_FIELDS_DB_USER,
-#         ANNO_FIELDS_SSN_COLOR, ANNO_FIELDS_SSN_GNT
+#         ANNO_FIELDS_SSN_COLOR, ANNO_FIELDS_SSN_GNT, ANNO_FIELDS_NB_CONN
 #         If not specified, returns all.
 #
 # Returns:
@@ -436,7 +437,9 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_GNT_NB_INTERPRO,       field_type => "gnt",                                    display => "Neighbor InterPro Families"};
 
         push @fields, {name => FIELD_SEQ_KEY,               field_type => "ssn",                                    display => "Sequence"};
-        push @fields, {name => "connectivity",              field_type => "ssn",                                    display => "Neighborhood Connectivity"};
+        push @fields, {name => FIELD_NB_CONN_COLOR,         field_type => "nb_conn",                                display => "Neighborhood Connectivity Color"};
+        push @fields, {name => FIELD_NB_CONN,               field_type => "nb_conn",                                display => "Neighborhood Connectivity"};
+        push @fields, {name => FIELD_NB_CONN_PRIMARY_COLOR, field_type => "nb_conn",                                display => FIELD_CYTOSCAPE_COLOR};
 
         $self->{fields} = \@fields;
     }
@@ -453,6 +456,8 @@ sub get_annotation_fields {
         return grep { $_->{field_type} eq "color" and not $_->{db_primary_col} } @{ $self->{fields} };
     } elsif ($type == ANNO_FIELDS_SSN_GNT) {
         return grep { $_->{field_type} eq "gnt" and not $_->{db_primary_col} } @{ $self->{fields} };
+    } elsif ($type == ANNO_FIELDS_NB_CONN) {
+        return grep { $_->{field_type} eq "nbconn" and not $_->{db_primary_col} } @{ $self->{fields} };
     } else {
         return @{ $self->{fields} };
     }
@@ -619,6 +624,13 @@ sub get_gnt_fields {
 }
 
 
+sub get_nb_conn_fields {
+    my $self = shift;
+    my @fields = (FIELD_NB_CONN, FIELD_NB_CONN_COLOR, FIELD_NB_CONN_PRIMARY_COLOR);
+    return $self->get_anno_group_fields(@fields);
+}
+
+
 #
 # get_anno_group_fields - internal method
 #
@@ -648,6 +660,12 @@ sub get_cluster_info_insert_location {
 
 
 sub get_gnt_info_insert_location {
+    my $self = shift;
+    return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
+}
+
+
+sub get_nb_connectivity_insert_location {
     my $self = shift;
     return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
 }
@@ -1210,6 +1228,25 @@ A string representing a SSN column heading (e.g. display name).
     }
 
 
+=head3 C<get_nb_connectivity_insert_location()>
+
+Returns the name of the SSN column where the neighborhood connectivity columns should be
+inserted.  This is designed so that the new columns will be inserted immediately following
+the returned column name.
+
+=head4 Returns
+
+A string representing a SSN column heading (e.g. display name).
+
+=head4 Example Usage
+
+    my $name = $anno->get_nb_connectivity_insert_location();
+    if ($currentSsnColName eq $name) {
+        # Insert a copy of the current SSN column
+        # Append the neighborhood connectivity data
+    }
+
+
 =head3 C<get_color_fields()>
 
 Gets a list of color SSN attribute display names (such as cluster number and color).
@@ -1275,7 +1312,35 @@ A hash ref of field name to field display (e.g. FIELD_AAAA => "").
     }
 
 
-=cut
+=head3 C<get_nb_conn_fields()>
+
+Gets a list of neighborhood connectivity SSN attribute display names. These are
+(from B<EFI::Annotations::Fields): C<FIELD_NB_CONN>, C<FIELD_NB_CONN_COLOR>,
+C<FIELD_NB_CONN_PRIMARY_COLOR>.
+
+=head4 Returns
+
+=over
+
+=item C<$fields>
+
+An array ref of fields from B<EFI::Annotations::Fields> of the C<nb_conn> group.
+
+=item C<$display>
+
+A hash ref mapping field name to field display.  The key is a constant from
+B<EFI::Annotations::Fields> and the value is from B<EFI::Annotations>.
+
+=back
+
+=head4 Example Usage
+
+    my $ssnField = "Neighborhood Connectivity";
+    my ($attrFields, $attrDisplay) = $anno->get_nb_conn_fields();
+    my %attr = map { $attrDisplay->{$_} => $_ } @$attrFields;
+    if (exists $attr->{$ssnField}) {
+        print "The SSN field $ssnField is one of the neighorhood connectivity fields\n";
+    }
 
 
 =cut

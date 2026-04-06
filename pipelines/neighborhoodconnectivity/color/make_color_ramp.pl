@@ -1,4 +1,3 @@
-#!/bin/env perl
 
 use strict;
 use warnings;
@@ -8,8 +7,9 @@ use GD::Text;
 use Getopt::Long;
 use FindBin;
 
-use lib "$FindBin::Bin/lib";
-use NeighborhoodConnectivity;
+use lib "$FindBin::Bin/../../../lib";
+
+use EFI::NeighborhoodConnectivity qw(compute_color_ramp get_color);
 
 
 my ($min, $max, $file, $inputFile);
@@ -53,17 +53,17 @@ if ($inputFile and -f $inputFile) {
 }
 
 
-my $px = 20; # padding for width
-my $py = 10; # padding for height
-my $pt = 5; # padding from ramp to text
-my $dy = 60; # Individual ramp color height
-my $th = 30; # Text height
-my $imw = 800+$px*2;
+my $px = 25; # padding for width
+my $py = 15; # padding for height
+my $pt = 10; # padding from ramp to text
+my $dy = 80; # Individual ramp color height
+my $th = 50; # Text height
+my $imw = 1600 + $px * 2;
 my $imh = $dy + $th + $pt + $py * 2;
 my $ticStep = 100;
 
 my $gdt = new GD::Text;
-$gdt->set_font(gdSmallFont);
+$gdt->set_font(gdLargeFont);
 my $im = GD::Image->newTrueColor($imw, $imh);
 my $white = $im->colorAllocate(255, 255, 255);
 my $black = $im->colorAllocate(0, 0, 0);
@@ -74,7 +74,7 @@ if (not defined $min or not $max) {
     print "Min/max error $min $max: saving empty image\n";
 } else {
     print "Found color min $min and max $max\n";
-    my $ramp = NeighborhoodConnectivity::computeColorRamp($min, $max);
+    my $ramp = compute_color_ramp($min, $max);
     
     
     my $range = $max - $min + 1;
@@ -90,7 +90,7 @@ if (not defined $min or not $max) {
         my $x1 = $px + $i;
         my $x2 = $x1 + 1;
         my $val = int(($i / $drawWidth) * $range) + $min;
-        my $color = NeighborhoodConnectivity::getColor($ramp, $val);
+        my $color = get_color($ramp, $val);
         my $gdc = $im->colorAllocate(@$color);
         $im->filledRectangle($x1, $y1, $x2, $y2, $gdc);
         if ($i % $ticStep == 0) {
@@ -103,7 +103,7 @@ if (not defined $min or not $max) {
 }
 
 
-drawText("Network Connectivity", $imw/2, $py+$dy+15, gdMediumBoldFont);
+drawText("Network Connectivity", $imw/2, $py+$dy+15, gdGiantFont);
 
 
 
@@ -126,9 +126,8 @@ sub drawText {
     my $text = shift;
     my $lx = shift;
     my $y2 = shift;
-    my $font = shift;
-    $gdt->set_font($font) if $font;
-    $font = gdSmallFont if not $font;
+    my $font = shift || gdLargeFont;
+    $gdt->set_font($font);
     $gdt->set_text("$text");
     my $w = $gdt->get("width");
     my $tx = $lx - $w/2;

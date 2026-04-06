@@ -1,15 +1,14 @@
-#!/bin/env perl
 
 use strict;
 use warnings;
 
 use FindBin;
 use Getopt::Long;
-use Data::Dumper;
 
-use lib "$FindBin::Bin/lib";
-use NeighborhoodConnectivity;
-use CdHitParser;
+use lib "$FindBin::Bin/../../../lib";
+
+use EFI::Util::CdHit::Parser;
+use EFI::NeighborhoodConnectivity qw(get_connectivity);
 
 
 my ($inputBlast, $inputXgmml, $output, $includeMeta, $cdhit);
@@ -80,7 +79,7 @@ close $in;
 map { if (not exists $degree{$_}) { $degree{$_} = 0; $N{$_} = []; } } keys %$filterIds;
 
 
-my $NC = getConnectivity(\%degree, \%N);
+my $NC = get_connectivity(\%degree, \%N);
 
 open my $out, ">", $output;
 
@@ -100,7 +99,7 @@ close $out;
 
 sub getCdHitClusters {
     my $file = shift;
-    my $cp = new CdHitParser();
+    my $cp = new EFI::Util::CdHit::Parser();
     open my $fh, "<", $file;
     while (my $line = <$fh>) {
         chomp $line;
