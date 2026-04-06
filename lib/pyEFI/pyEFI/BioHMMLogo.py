@@ -22,7 +22,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import pyhmmer
 
-from consensus_colors import ConsensusColors
+from . import ConsensusColors
 
 class BioHMMLogo:
     """

@@ -191,11 +191,6 @@ process collect_aa_ids {
 
     input:
         tuple path("msa_files/*"), path("logo_files/*"), path(cluster_size_file), path(mapping_file), val(aa), val(threshold), val(type)
-//        path("msa_files/*")
-//        path("logo_files/*")
-//        path cluster_count_file
-//        path id_cluster_mapping
-//        tuple val(aa), val(threshold)
 
     output:
         tuple val(aa), val(threshold), path("consensus_residue_${aa}_${threshold}_position.txt"), path("consensus_residue_${aa}_${threshold}_percentage.txt"), val(type)
@@ -203,9 +198,19 @@ process collect_aa_ids {
     script:
     def base_name = "consensus_residue_${aa}_${threshold}"
     """
-    perl $projectDir/conv_ratio/count_msa_aa.pl --msa-dir msa_files --logo-dir logo_files --aa ${aa} --count-file ${base_name}_position.txt --pct-file ${base_name}_percentage.txt --threshold ${threshold} --node-count-file ${cluster_size_file}
+    perl $projectDir/conv_ratio/count_msa_aa.pl \
+        --msa-dir msa_files \
+        --logo-dir logo_files \
+        --aa ${aa} \
+        --count-file ${base_name}_position.txt \
+        --pct-file ${base_name}_percentage.txt \
+        --threshold ${threshold} \
+        --node-count-file ${cluster_size_file}
     mkdir id_lists_${threshold}
-    perl $projectDir/conv_ratio/collect_aa_ids.pl --aa-count-file ${base_name}_position.txt --output-dir id_lists_${threshold} --id-mapping ${mapping_file}
+    perl $projectDir/conv_ratio/collect_aa_ids.pl \
+        --aa-count-file ${base_name}_position.txt \
+        --output-dir id_lists_${threshold} \
+        --id-mapping ${mapping_file}
     """
 }
 

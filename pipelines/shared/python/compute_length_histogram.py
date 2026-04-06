@@ -115,8 +115,9 @@ def compute_sequence_lengths(fasta_file: str, valid_ids: Set[str] = None) -> Lis
                 include_sequence = False
 
                 # Include the sequence if it starts with 'ZZ' (e.g. the input to the EST pipeline
-                # was a FASTA file that didn't have UniProt IDs in the header).
-                if header.startswith('ZZ'):
+                # was a FASTA file that didn't have UniProt IDs in the header) or 'ZINPUT' (the
+                # EST pipeline was based of a BLAST input).
+                if header.startswith('ZZ') or header.startswith('ZINPUT'):
                     include_sequence = True
                 
                 # Include if the ID is in our set of valid IDs.

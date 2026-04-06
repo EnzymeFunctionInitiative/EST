@@ -114,6 +114,7 @@ get_sequences.pl - retrieve the FASTA sequences for each ID in a file with UniPr
 =head2 SYNOPSIS
 
     get_sequences.pl --fasta-db <BLAST_DATABASE> --sequence-ids-file accession_ids.txt --output-sequence-file all_sequences.fasta
+        [--domain-id-map <FILE>]
 
 =head2 DESCRIPTION
 
@@ -144,6 +145,11 @@ in the B<EFI::Import::Config::Defaults> module is used from the output directory
 The path to the output file containing all of the FASTA sequences that were retrieved from the database.
 If this is not specified, the file with the name corresponding to the C<all_sequences> value
 in the B<EFI::Import::Config::Defaults> module is used in the output directory.
+
+=item C<--domain-id-map> (optional)
+
+If provided, sequences will be trimmed to the domain boundaries specified in this file.  This
+file contains three columns: sequence ID, start of domain, and end of domain.
 
 =back
 
