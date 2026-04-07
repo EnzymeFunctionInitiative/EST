@@ -1,16 +1,17 @@
 
-package NeighborhoodConnectivity;
+package EFI::NeighborhoodConnectivity;
 
 use Exporter 'import';
-our @EXPORT = qw(getConnectivity getConnectivityFromBlast);
+our @EXPORT_OK = qw(get_connectivity get_connectivity_from_blast compute_color_ramp get_color);
 
-use FindBin;
-use lib $FindBin::Bin;
+use Cwd qw(abs_path);
+use File::Basename qw(dirname);
+use lib dirname(abs_path(__FILE__)) . "/../"; # Import libs
+
 use Math::Gradient qw(array_gradient);
-use Data::Dumper;
 
 
-sub getConnectivity {
+sub get_connectivity {
     my $degree = shift;
     my $N = shift;
     
@@ -32,16 +33,16 @@ sub getConnectivity {
 
     $NC{_meta} = {min => $minNC, max => $maxNC};
     
-    my $ramp = computeColorRamp($minNC, $maxNC);
+    my $ramp = compute_color_ramp($minNC, $maxNC);
     foreach my $id (keys %NC) {
-        $NC{$id}->{color} = getColor($ramp, $NC{$id}->{nc}, 1);
+        $NC{$id}->{color} = get_color($ramp, $NC{$id}->{nc}, 1);
     }
 
     return \%NC;
 }
 
 
-sub getConnectivityFromBlast {
+sub get_connectivity_from_blast {
     my $file = shift;
     
     my %degree;
@@ -57,11 +58,11 @@ sub getConnectivityFromBlast {
     }
     close $fh;
 
-    return getConnectivity(\%degree, \%N);
+    return get_connectivity(\%degree, \%N);
 }
 
 
-sub computeColorRamp {
+sub compute_color_ramp {
     my $min = shift;
     my $max = shift;
     $min = int($min);
@@ -96,7 +97,7 @@ sub computeColorRamp {
 }
 
 
-sub getColor {
+sub get_color {
     my $ramp = shift;
     my $val = shift;
     my $wantHex = shift || 0;
@@ -115,7 +116,7 @@ sub TEST {
     my $min = shift || 1;
     my $max = shift || 39;
     my $wantJs = 1;
-    my $ramp = computeColorRamp($min, $max);
+    my $ramp = compute_color_ramp($min, $max);
     my @C;
     for (my $i = 1; $i <= $max; $i++) {
         push @C, getColor($ramp, $i, 1);

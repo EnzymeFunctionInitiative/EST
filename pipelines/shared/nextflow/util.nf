@@ -20,7 +20,7 @@ process zip_files {
         path file_to_zip
 
     output:
-        path "*.zip"
+        path "${file_to_zip}.zip"
 
     script:
     """

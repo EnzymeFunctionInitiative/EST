@@ -20,7 +20,18 @@ process threshold_blast {
     output:
         path "2.out"
     """
-    python $projectDir/threshold/render_threshold_blast_sql_template.py --blast-output $blast_parquet --threshold-metric ${params.threshold_metric} --threshold-min-val ${params.threshold_min_val} --min-length ${params.min_length} --max-length ${params.max_length} --sql-template $projectDir/templates/thresholdblast-template.sql --output-file 2.out --sql-output-file thresholded_blast.sql
+    DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
+    python $projectDir/threshold/render_threshold_blast_sql_template.py \
+        --blast-output $blast_parquet \
+        --threshold-metric ${params.threshold_metric} \
+        --threshold-min-val ${params.threshold_min_val} \
+        --min-length ${params.min_length} \
+        --max-length ${params.max_length} \
+        --sql-template $projectDir/templates/thresholdblast-template.sql \
+        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-temp-dir \${DUCKDB_TEMP} \
+        --output-file 2.out \
+        --sql-output-file thresholded_blast.sql
     duckdb < thresholded_blast.sql
     """
 }

@@ -4,7 +4,7 @@ import string
 
 from typing import Any
 
-def create_sql_template_render_parser(sql_template_file_default: str, desc: str, sql_output_file="statements.sql", duckdb_mem_limit="4GB", duckdb_temp_dir="./duckdb") -> argparse.ArgumentParser:
+def create_sql_template_render_parser(sql_template_file_default: str, desc: str, sql_output_file: str = "statements.sql", duckdb_mem_limit: str = "4GB", duckdb_temp_dir: str = "./duckdb") -> argparse.ArgumentParser:
     """
     Returns an `<argparse.ArgumentParser>_` that parses the following
     options:

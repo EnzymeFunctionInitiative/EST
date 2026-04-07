@@ -13,6 +13,8 @@ use EFI::Import::Config::Defaults qw(get_default_path);
 use EFI::Options;
 use EFI::Sequence::Type qw(get_sequence_version);
 
+use constant DEFAULT_MIN_SEQ_LENGTH => 1;
+use constant DEFAULT_MAX_SEQ_LENGTH => 65000;
 
 
 sub new {
@@ -34,7 +36,7 @@ sub addImportOptions {
     my $self = shift;
     $self->SUPER::addImportOptions(include_config => 1);
 
-    $self->addOption("filter:s%", 0, "filters to apply (predef-name, predef-file, user-file, fragments, fraction, family)");
+    $self->addOption("filter:s%", 0, "filters to apply (predef-name, predef-file, user-file, fragments, fraction, family, min_seq_length, max_seq_length)");
     $self->addOption("source-meta-file=s", 0, "path to the input file containing the source data to filter", OPT_FILE);
     $self->addOption("source-ids-file=s", 0, "path to the input file that contains UniRef and UniProt accession IDs", OPT_FILE);
     $self->addOption("sequence-version=s", 0, "source sequence type (one of uniprot, uniref90, uniref50), defaults to uniprot", OPT_VALUE, "uniprot");
@@ -73,6 +75,8 @@ sub validateOptions {
     $opts->{fraction} = ($filter->{fraction} and $filter->{fraction} =~ m/^\d+$/) ? $filter->{fraction} : 1;
     $opts->{remove_fragments} = exists $filter->{fragments} ? 1 : 0;
     $opts->{family_filter} = $filter->{family};
+    $opts->{min_seq_length} = ($filter->{min_seq_length} and $filter->{min_seq_length} =~ m/^\d+$/) ? $filter->{min_seq_length} : DEFAULT_MIN_SEQ_LENGTH;
+    $opts->{max_seq_length} = ($filter->{max_seq_length} and $filter->{max_seq_length} =~ m/^\d+$/) ? $filter->{max_seq_length} : DEFAULT_MAX_SEQ_LENGTH;
     my @taxFilterErrors = $self->parseTaxonomyFilterOptions($filter, $opts);
     push @errors, @taxFilterErrors;
 
