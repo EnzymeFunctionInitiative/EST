@@ -112,17 +112,16 @@ workflow {
     fasta_shards = split_fasta(reduced_fasta.fasta_file)
 
     blast_input = blast_databases.combine(fasta_shards.transpose(), by: 0)
-blast_input.view()
 
-//    blast_fractions = all_by_all_blast( blast_input ).groupTuple()
-//
-//    reduced_blast_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
-//
-//    // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
-//    blast_parquet = restore_condensed(reduced_blast_parquet.join(reduced_fasta.condensed))
-//
-//    stats_files = compute_conv_ratio(blast_parquet.combine(fasta_lengths_parquet, by: 0))
-//
-//    merge_conv_ratios(stats_files.collect())
+    blast_fractions = all_by_all_blast( blast_input ).groupTuple()
+
+    reduced_blast_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
+
+    // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
+    blast_parquet = restore_condensed(reduced_blast_parquet.join(reduced_fasta.condensed))
+
+    stats_files = compute_conv_ratio(blast_parquet.combine(fasta_lengths_parquet, by: 0))
+
+    merge_conv_ratios(stats_files.collect())
 }
 
