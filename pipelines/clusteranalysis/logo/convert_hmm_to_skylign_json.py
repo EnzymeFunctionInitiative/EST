@@ -1,7 +1,7 @@
 
 import argparse
 import json
-from pyEFI import BioHMMLogo
+from pyEFI.BioHMMLogo import BioHMMLogo
 
 def convert_hmm_to_skylign_json(hmm_path, output_json_path, output_png_path):
     """
