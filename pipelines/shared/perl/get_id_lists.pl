@@ -37,6 +37,7 @@ my ($sourceClusterIdMap) = parse_cluster_map_file($opts->{cluster_map});
 
 # Strip any domain regions from the input IDs
 my ($clusterIdMap, $hasDomain) = stripDomainRegions($sourceClusterIdMap);
+$hasDomain = $hasDomain || ($opts->{sequence_type} and $opts->{sequence_type} =~ m/_domain$/);
 
 # Determine if the IDs provided are UniRef and if so get the input file contents
 # that maps UniRef ID to UniProt ID
@@ -115,9 +116,14 @@ sub saveClusterSizes {
 
     my @clusters = sort { $a <=> $b } keys %$clusterToId;
     foreach my $cnum (@clusters) {
+        # There may be no IDs in the cluster in which case the key is not valid.  This might occur
+        # when using UniRef and the UniRef IDs (or child UniProt IDs) are no longer in the database
+        # (e.g. an older network is being used).  In this case, skip the cluster.
+        next if not $clusterToId->{$cnum};
+
         my $uniprotSize = @{ $clusterToId->{$cnum} };
-        my $uniref90Size = @{ $unirefMap->{uniref90}->{$cnum} } if $unirefMap->{uniref90};
-        my $uniref50Size = @{ $unirefMap->{uniref50}->{$cnum} } if $unirefMap->{uniref50};
+        my $uniref90Size = @{ $unirefMap->{uniref90}->{$cnum} // [] } if $unirefMap->{uniref90};
+        my $uniref50Size = @{ $unirefMap->{uniref50}->{$cnum} // [] } if $unirefMap->{uniref50};
         my @row = ($cnum, $uniprotSize);
         push @row, $uniref90Size if $uniref90Size;
         push @row, $uniref50Size if $uniref50Size;
@@ -350,7 +356,7 @@ sub saveDomainIdLists {
 #
 # saveClusterIdList
 #
-# Save the IDs for a cluster to a file
+# Save the IDs for each cluster to files (one per cluster)
 #
 # Parameters:
 #    $clusterToId - hash ref mapping cluster num to list of IDs in cluster
@@ -367,6 +373,12 @@ sub saveClusterIdList {
 
     foreach my $cnum (@$clusters) {
         my $file = "${baseName}_Cluster_$cnum.txt";
+
+        # There may be no IDs in the cluster in which case the key is not valid.  This might occur
+        # when using UniRef and the UniRef IDs (or child UniProt IDs) are no longer in the database
+        # (e.g. an older network is being used).  In this case, skip the cluster.
+        next if not $clusterToId->{$cnum};
+
         my @ids = @{ $clusterToId->{$cnum} };
         open my $fh, ">", $file or die "Unable to open id list file '$file' for writing: $!";
         foreach my $id (@ids) {
@@ -466,6 +478,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("singletons=s", 0, "path to a file listing the singletons", OPT_FILE);
     $optParser->addOption("cluster-sizes=s", 1, "path to an output file to save cluster sizes to", OPT_FILE);
     $optParser->addOption("config=s", 1, "path to the config file for database connection", OPT_FILE);
+    $optParser->addOption("sequence-type=s", 0, "the type of sequence that the SSN contains (uniprot, uniref90, uniref50, with optional _domain suffix)");
     $optParser->addOption("db-name=s", 1, "name of the EFI database to connect to for retrieving UniRef sequences");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
@@ -490,6 +503,7 @@ C<get_id_lists.pl> - gets ID lists from the input SSN and stores them in files b
     get_id_lists.pl --cluster-map <FILE> --uniprot <DIR> --cluster-sizes <FILE>
         --config <FILE> --db-name <NAME>
         [--uniref90 <DIR> --uniref50 <DIR> --seqid-source-map <FILE> --singletons <FILE>]
+        [--sequence-type <VALUE>]
 
 =head2 DESCRIPTION
 
@@ -556,6 +570,11 @@ to sequence IDs that are within the metanode. Used when the input network is a R
 =item C<--singletons>
 
 Path to a file listing the singletons in the network (e.g. nodes without any edges)
+
+=item C<--sequence-type>
+
+The type of sequences in the SSN.  One of C<SEQ_UNIPROT>, C<SEQ_UNIREF90>, C<SEQ_UNIREF50>,
+C<SEQ_REPNODE>, and optionally suffixed with C<_domain>.
 
 =back
 

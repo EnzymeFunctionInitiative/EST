@@ -5,7 +5,7 @@ use warnings;
 use Getopt::Long;
 use FindBin;
 
-use lib "$FindBin::Bin/../../lib";
+use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Options;
 use EFI::SSN::AttributeWriter;

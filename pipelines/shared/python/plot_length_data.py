@@ -17,7 +17,7 @@ def create_parser():
         required=True,
         help="Tab-separated file containing lengths and counts",
     )
-    parser.add_argument("--job-id", required=True, help="Job ID number for BLAST output file")
+    parser.add_argument("--job-id", required=False, help="Job ID number for BLAST output file")
     parser.add_argument("--frac", type=float, default=1, help="Percent of length values to include in plot")
     parser.add_argument(
         "--plot-filename",
@@ -25,6 +25,7 @@ def create_parser():
         required=True,
         help="Filename, without extension, to write the plots to",
     )
+    parser.add_argument("--title", required=False, type=str, default="", help="Set the plot title (if provided, --title-extra and --job-id are ignored)")
     parser.add_argument("--title-extra", type=str, default="", help="Extra text to include plot title")
     parser.add_argument("--output-type", type=str, default="png", choices=["png", "svg", "pdf"])
     parser.add_argument(
@@ -51,7 +52,7 @@ def parse_args(parser):
         return args
 
 
-def main(lengths_file, job_id, frac, output_filename, title_extra, output_filetype, proxies):
+def main(lengths_file, frac, output_filename, plot_title, output_filetype, proxies):
     print(f"Reading lengths from '{lengths_file}'")
     df = count_lengths(lengths_file, frac)
 
@@ -73,7 +74,7 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
         fig,
         axs,
         df["length"],
-        f"Number of Sequences at Each Length for Job ID {job_id} {title_extra}",
+        plot_title,
         "Sequence Length",
         "Number of Sequences",
         output_filename,
@@ -82,15 +83,23 @@ def main(lengths_file, job_id, frac, output_filename, title_extra, output_filety
     )
     plt.close(fig)
 
+def get_plot_title(job_id, title, title_extra):
+    if title:
+        return title
+    else:
+        job_id_arg = f" for Job ID {job_id}" if job_id else ""
+        extra_arg = f" {title_extra}" if title_extra else ""
+        plot_title = f"Number of Sequences at Each Length{job_id_arg}{extra_arg}"
+        return plot_title
 
 if __name__ == "__main__":
     args = parse_args(create_parser())
+    plot_title = get_plot_title(args.job_id, args.title, args.title_extra)
     main(
         args.lengths,
-        args.job_id,
         args.frac,
         args.plot_filename,
-        args.title_extra,
+        plot_title,
         args.output_type,
         args.proxies,
     )
