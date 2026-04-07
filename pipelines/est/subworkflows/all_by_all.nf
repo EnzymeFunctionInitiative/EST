@@ -1,12 +1,12 @@
 
-include { condense_redundant } from "../../shared/nextflow/sequence.nf"
-
 process create_blast_db {
     input:
-        path fasta_file
+        tuple val(fid), path(fasta_file)
+
     output:
-        path "database.*", emit: 'database_files'
-        val "database", emit: 'database_name'
+        tuple val(fid), path("database.*"), val("database")
+
+    script:
     """
     formatdb -i $fasta_file -n database -p T -o T
     """
@@ -14,11 +14,11 @@ process create_blast_db {
 
 process all_by_all_blast {
     input:
-        path(blast_db_files, arity: 5)
-        val blast_db_name
-        path frac
+        tuple val(fid), path(blast_db_files, arity: 5), val(blast_db_name), path(frac)
+
     output:
-        path "${frac}.tab.sorted.parquet"
+        tuple val(fid), path("${frac}.tab.sorted.parquet")
+
     script:
     """
     # run blast to get similarity metrics
@@ -36,10 +36,12 @@ process all_by_all_blast {
 
 process blastreduce_transcode_fasta {
     input:
-        path fasta_file
-    output:
-        path "${fasta_file.getName()}.parquet"
+        tuple val(fid), path(fasta_file)
 
+    output:
+        tuple val(fid), path("${fasta_file.getName()}.parquet")
+
+    script:
     """
     python $projectDir/blastreduce/transcode_fasta_lengths.py --fasta $fasta_file --output ${fasta_file.getName()}.parquet
     """
@@ -47,9 +49,12 @@ process blastreduce_transcode_fasta {
 
 process split_fasta {
     input:
-        path fasta_file
+        tuple val(fid), path(fasta_file)
+
     output:
-        path "fracfile-*.fa"
+        tuple val(fid), path("fracfile-*.fa")
+
+    script:
     """
     perl $projectDir/split_fasta/split_fasta.pl -parts ${params.num_fasta_shards} -source ${fasta_file}
     """
@@ -57,13 +62,14 @@ process split_fasta {
 
 process blastreduce {
     publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
+
     input:
-        path blast_files
-        path fasta_length_parquet
+        tuple val(fid), path(blast_files), path(fasta_length_parquet)
 
     output:
-        path "1.out.parquet"
+        tuple val(fid), path("1.out.parquet")
 
+    script:
     """
     DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
     python $projectDir/blastreduce/render_reduce_sql_template.py --blast-output $blast_files  --sql-template $projectDir/templates/reduce-template.sql --fasta-length-parquet $fasta_length_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir \${DUCKDB_TEMP} --sql-output-file allreduce.sql
@@ -71,14 +77,32 @@ process blastreduce {
     """
 }
 
+// Formerly known as multiplex
+process condense_redundant {
+    input:
+        tuple val(fid), path(fasta_file)
+
+    output:
+        tuple val(fid), path("sequences.fasta"), emit: "fasta_file"
+        tuple val(fid), path("sequences.fasta.clstr"), emit: "condensed"
+
+    script:
+    """
+    cd-hit -d 0  -c 1 -s 1 -i ${fasta_file} -o sequences.fasta -M "${params.cdhit_memory_limit}"
+    """
+}
+
 // Formerly known as demultiplex
 process restore_condensed {
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
+
     input:
-        path blast_parquet, stageAs: 'reduced.parquet'
-        path condensed
+        tuple val(fid), path(blast_parquet, stageAs: "reduced.parquet"), path(condensed)
+
     output:
-        path '1.out.parquet'
+        tuple val(fid), path("1.out.parquet")
+
+    script:
     """
     DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
     python $projectDir/condense/render_restore_sql_template.py --blast-parquet $blast_parquet --sql-template $projectDir/templates/restore-template.sql --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir \${DUCKDB_TEMP} --sql-output-file restore.sql
@@ -111,18 +135,16 @@ workflow ALL_BY_ALL {
 
         // All-by-all BLAST
         fasta_shards = split_fasta(blast_input_fasta)
-        blast_fractions = all_by_all_blast(
-            blastdb.database_files,
-            blastdb.database_name,
-            fasta_shards.flatten()
-        ) | collect
+
+        blast_input = blastdb.combine(fasta_shards.transpose(), by: 0)
+        blast_fractions = all_by_all_blast( blast_input ).groupTuple()
 
         // Eliminate duplicate and self-edges
-        reduced_blast_parquet = blastreduce(blast_fractions, fasta_lengths_parquet)
+        reduced_blast_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
 
         // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
         if (params.multiplex) {
-            reduced_blast_parquet = restore_condensed(reduced_blast_parquet, condensed)
+            reduced_blast_parquet = restore_condensed(reduced_blast_parquet.join(condensed))
         }
 
     emit:
