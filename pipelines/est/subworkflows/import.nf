@@ -1,5 +1,5 @@
 
-include { get_sequences; split_sequence_ids } from "../../shared/nextflow/sequence.nf"
+include { get_sequences } from "../../shared/nextflow/sequence.nf"
 
 process get_source_ids {
     publishDir params.final_output_dir, mode: 'copy'
@@ -106,6 +106,21 @@ process cat_fasta_files {
     } else {
         cat_cmd
     }
+}
+
+process split_sequence_ids {
+    input:
+        path accessions_file
+        val num_accession_shards
+    output:
+        path "accession_ids.txt.part*"
+    """
+    if [[ -s "${accessions_file}" ]]; then
+        split -d -e -n r/$num_accession_shards ${accessions_file} accession_ids.txt.part
+    else
+        touch accession_ids.txt.part
+    fi
+    """
 }
 
 process import_fasta {
