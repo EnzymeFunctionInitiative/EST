@@ -1,9 +1,9 @@
 
 include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; split_fasta } from "../est/subworkflows/all_by_all.nf"
 include { unzip_ssn } from "../shared/nextflow/util.nf"
-include { compute_clusters; get_id_list; get_ssn_id_info } from "../shared/nextflow/color_workflow.nf"
+include { compute_clusters; get_conv_ratio_table; get_id_list; get_ssn_id_info } from "../shared/nextflow/color_workflow.nf"
 
-process compute_conv_ratio {
+process compute_blast_conv_ratio {
     input:
         tuple val(cluster_id), path(blast_parquet), path(fasta_file)
 
@@ -12,7 +12,10 @@ process compute_conv_ratio {
 
     script:
     """
-    python $projectDir/statistics/conv_ratio.py --blast-output ${blast_parquet} --fasta ${fasta_file} --output "${cluster_id}_conv_ratio.json"
+    python $projectDir/statistics/conv_ratio.py \
+        --blast-output ${blast_parquet} \
+        --fasta ${fasta_file} \
+        --output "${cluster_id}_conv_ratio.json"
     """
 }
 
@@ -21,13 +24,17 @@ process merge_conv_ratios {
 
     input:
         path stats_files
+        path cr_table
 
     output:
         path "conv_ratio.tab"
 
     script:
     """
-    python $projectDir/statistics/merge_conv_ratios.py --stats ${stats_files} --output conv_ratio.tab
+    python $projectDir/statistics/merge_conv_ratios.py \
+        --ssn-conv-ratio ${cr_table} \
+        --stats ${stats_files} \
+        --output conv_ratio.tab
     """
 }
 
@@ -40,9 +47,10 @@ process get_fasta_files {
 
     script:
     """
-    base_filename=\$(basename $id_file .txt)
-    fasta_file="\${base_filename}.fasta"
-    perl $projectDir/../shared/perl/get_sequences.pl --fasta-db ${params.fasta_db} --sequence-ids-file ${id_file} --output-sequence-file \${fasta_file}
+    perl $projectDir/../shared/perl/get_sequences.pl \
+        --fasta-db ${params.fasta_db} \
+        --sequence-ids-file ${id_file} \
+        --output-sequence-file "${id_file.baseName}.fasta"
     """
 }
 
@@ -76,18 +84,27 @@ workflow {
         ssn_file = params.ssn_input
     }
 
-    // Get the index and ID mapping tables and edgelist
-    ssn_data = get_ssn_id_info(ssn_file)
+    //
+    // STEP 1: GET ID LISTS AND COMPUTE CLUSTERS
+    //
 
-    // Convert to value channel
-    sequence_type_val = ssn_data.sequence_type.map { it.trim() }
+    ssn_data = get_ssn_id_info(ssn_file)
 
     compute_info = compute_clusters(ssn_data.edgelist, ssn_data.index_seqid_map)
 
+    // Convert the sequence type to a value channel
+    sequence_type_val = ssn_data.sequence_type.map { it.trim() }
+
     id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map, sequence_type_val)
 
+    // Get the ID lists that will be used, e.g. the original sequences from the SSN
     input_seq_type_id_lists = get_selected_id_lists(id_list_data.uniprot_dir, id_list_data.uniref90_dir, id_list_data.uniref50_dir)
 
+    //
+    // STEP 2: OBTAIN THE FASTA FILES
+    //
+
+    // Get the cluster IDs from the file names
     cluster_id_lists = input_seq_type_id_lists 
             .flatten()
             .filter { file -> !file.name.contains("_All") }          // Don"t include the file with all sequences in the analysis
@@ -99,10 +116,15 @@ workflow {
                 return tuple(clean_id, file)
             }
 
+    // Get FASTA files; the return value is a channel of tuples of [clusterId, file]
     cluster_fasta = get_fasta_files(cluster_id_lists)
-    // cluster_fasta is a channel of tuples of [clusterId, file]
 
+    //
+    // STEP 3: RUN THE EST-BASED ALL-BY-ALL WORKFLOW
     // Run a workflow that is nearly identical to the ALL_BY_ALL workflow in the est pipeline.
+    // See the workflow for more information on how this works.
+    //
+
     reduced_fasta = condense_redundant(cluster_fasta)
 
     blast_databases = create_blast_db(reduced_fasta.fasta_file)
@@ -113,15 +135,26 @@ workflow {
 
     blast_input = blast_databases.combine(fasta_shards.transpose(), by: 0)
 
-    blast_fractions = all_by_all_blast( blast_input ).groupTuple()
+    blast_fractions = all_by_all_blast(blast_input).groupTuple()
 
     reduced_blast_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
 
     // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
     blast_parquet = restore_condensed(reduced_blast_parquet.join(reduced_fasta.condensed))
 
-    stats_files = compute_conv_ratio(blast_parquet.combine(fasta_lengths_parquet, by: 0))
+    //
+    // STEP 4: COMPUTE CONVERGENCE RATIOS
+    //
 
-    merge_conv_ratios(stats_files.collect())
+    // Compute the convergence ratio based on the edges and nodes in each cluster
+    cr_table = get_conv_ratio_table(ssn_data.edgelist, ssn_data.index_seqid_map, compute_info.cluster_id_map, ssn_data.seqid_source_map)
+
+    // Compute the convergence ratio based on the BLAST results
+    //stats_files = compute_blast_conv_ratio(blast_parquet.combine(fasta_lengths_parquet, by: 0))
+    //stats_files = compute_blast_conv_ratio(reduced_blast_parquet.combine(fasta_lengths_parquet, by: 0))
+    stats_files = compute_blast_conv_ratio(reduced_blast_parquet.join(fasta_lengths_parquet))
+
+    // Merge the data for all the clusters into one file
+    merge_conv_ratios(stats_files.collect(), cr_table)
 }
 
