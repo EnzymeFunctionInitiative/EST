@@ -1,5 +1,5 @@
 
-include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; split_fasta } from "../est/subworkflows/all_by_all.nf"
+include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; split_fasta } from "../shared/nextflow/blast.nf"
 include { unzip_ssn } from "../shared/nextflow/util.nf"
 include { compute_clusters; get_conv_ratio_table; get_id_list; get_ssn_id_info } from "../shared/nextflow/color_workflow.nf"
 
@@ -12,7 +12,7 @@ process compute_blast_conv_ratio {
 
     script:
     """
-    python $projectDir/statistics/conv_ratio.py \
+    python $projectDir/../shared/statistics/conv_ratio.py \
         --blast-output ${blast_parquet} \
         --fasta ${fasta_file} \
         --output "${cluster_id}_conv_ratio.json"

@@ -7,7 +7,7 @@ import os
 
 import shared_args
 
-NXF_SCRIPT = "pipelines/est/convergenceratio.nf"
+NXF_SCRIPT = "pipelines/convergenceratio/convergenceratio.nf"
 
 def add_args(parser: argparse.ArgumentParser):
     """

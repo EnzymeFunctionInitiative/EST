@@ -1,5 +1,5 @@
 
-include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; split_fasta } from "../shared/nextflow/blast.nf"
+include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; split_fasta } from "../../shared/nextflow/blast.nf"
 
 workflow ALL_BY_ALL {
     take:

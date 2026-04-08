@@ -13,11 +13,21 @@ process compute_stats {
         path "conv_ratio.json", emit: stats
     """
     # compute convergence ratio
-    python $projectDir/statistics/conv_ratio.py --blast-output $blast_parquet --fasta $fasta_file --output conv_ratio.json
+    python $projectDir/../shared/statistics/conv_ratio.py \
+        --blast-output $blast_parquet \
+        --fasta $fasta_file \
+        --output conv_ratio.json
 
     # compute boxplot stats and evalue.tab
     DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
-    python $projectDir/statistics/render_boxplotstats_sql_template.py --blast-output $blast_parquet --duckdb-memory-limit ${params.duckdb_memory_limit} --duckdb-temp-dir \${DUCKDB_TEMP} --boxplot-stats-output boxplot_stats.parquet --evalue-output evalue.tab --sql-template $projectDir/templates/boxplotstats-template.sql --sql-output-file boxplotstats.sql
+    python $projectDir/statistics/render_boxplotstats_sql_template.py \
+        --blast-output $blast_parquet \
+        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-temp-dir \${DUCKDB_TEMP} \
+        --boxplot-stats-output boxplot_stats.parquet \
+        --evalue-output evalue.tab \
+        --sql-template $projectDir/templates/boxplotstats-template.sql \
+        --sql-output-file boxplotstats.sql
     duckdb < boxplotstats.sql
     """
 }
@@ -30,8 +40,18 @@ process visualize_boxplot_stats {
         path '*.json', emit: json
         path '*.png', emit: plots
     """
-    python $projectDir/visualization/plot_blast_results.py --boxplot-stats $boxplot_stats --job-id ${params.job_id} --length-plot-filename alignment_length --pident-plot-filename percent_identity --edge-hist-filename number_of_edges --proxies sm:48
-    python $projectDir/visualization/export_blast_results_plot_json.py --boxplot-stats $boxplot_stats --length-json-filename alignment_length.json --pident-json-filename percent_identity.json --edge-hist-json-filename number_of_edges.json
+    python $projectDir/visualization/plot_blast_results.py \
+        --boxplot-stats $boxplot_stats \
+        --job-id ${params.job_id} \
+        --length-plot-filename alignment_length \
+        --pident-plot-filename percent_identity \
+        --edge-hist-filename number_of_edges \
+        --proxies sm:48
+    python $projectDir/visualization/export_blast_results_plot_json.py \
+        --boxplot-stats $boxplot_stats \
+        --length-json-filename alignment_length.json \
+        --pident-json-filename percent_identity.json \
+        --edge-hist-json-filename number_of_edges.json
     """
 }
 
@@ -44,8 +64,17 @@ process visualize_length_histograms {
         path '*.png', emit: plots
     """
     base_name=\$(basename "${length_histogram_file}" .histogram.txt)
-    python $projectDir/../shared/python/plot_length_data.py --lengths $length_histogram_file --job-id ${params.job_id} --frac 1 --plot-filename length_histogram_\${base_name} --output-type png --proxies sm:48
-    python $projectDir/visualization/export_length_histogram_json.py --lengths $length_histogram_file --frac 1 --output-json-filename length_histogram_\${base_name}.json 
+    python $projectDir/../shared/python/plot_length_data.py \
+        --lengths $length_histogram_file \
+        --job-id ${params.job_id} \
+        --frac 1 \
+        --plot-filename length_histogram_\${base_name} \
+        --output-type png \
+        --proxies sm:48
+    python $projectDir/visualization/export_length_histogram_json.py \
+        --lengths $length_histogram_file \
+        --frac 1 \
+        --output-json-filename length_histogram_\${base_name}.json 
     """
 }
 
