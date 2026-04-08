@@ -120,9 +120,14 @@ process get_annotated_mapping_tables {
 
     script:
     """
-    perl $projectDir/../shared/perl/annotate_mapping_table.pl --seqid-source-map $seqid_source_map --cluster-map $cluster_id_map \
-        --cluster-color-map $cluster_color_map --mapping-table mapping_table.txt --swissprot-table swissprot_clusters_desc.txt \
-        --config ${params.efi_config} --db-name ${params.efi_db}
+    perl $projectDir/../shared/perl/annotate_mapping_table.pl \
+        --seqid-source-map $seqid_source_map \
+        --cluster-map $cluster_id_map \
+        --cluster-color-map $cluster_color_map \
+        --mapping-table mapping_table.txt \
+        --swissprot-table swissprot_clusters_desc.txt \
+        --config ${params.efi_config} \
+        --db-name ${params.efi_db}
     """
 }
 
@@ -141,8 +146,12 @@ process get_conv_ratio_table {
 
     script:
     """
-    perl $projectDir/../shared/perl/compute_conv_ratio.pl --cluster-map $cluster_id_map --index-seqid-map $index_seqid_map \
-        --edgelist $edgelist --seqid-source-map $seqid_source_map --conv-ratio conv_ratio.txt
+    perl $projectDir/../shared/perl/compute_conv_ratio.pl \
+        --cluster-map $cluster_id_map \
+        --index-seqid-map $index_seqid_map \
+        --edgelist $edgelist \
+        --seqid-source-map $seqid_source_map \
+        --conv-ratio conv_ratio.txt
     """
 }
 
@@ -158,8 +167,11 @@ process get_cluster_stats {
 
     script:
     """
-    perl $projectDir/../shared/perl/compute_stats.pl --cluster-map $cluster_id_map --seqid-source-map $seqid_source_map \
-        --singletons $singletons --stats color_workflow_stats.json
+    perl $projectDir/../shared/perl/compute_stats.pl \
+        --cluster-map $cluster_id_map \
+        --seqid-source-map $seqid_source_map \
+        --singletons $singletons \
+        --stats color_workflow_stats.json
     """
 }
 
@@ -178,8 +190,12 @@ process compute_clusters {
 
     script:
     """
-    python $projectDir/../shared/python/compute_clusters.py --edgelist $edgelist --index-seqid-map $index_seqid_map \
-        --clusters cluster_id_map.txt --singletons singletons.txt --cluster-num-map cluster_num_map.txt
+    python $projectDir/../shared/python/compute_clusters.py \
+        --edgelist $edgelist \
+        --index-seqid-map $index_seqid_map \
+        --clusters cluster_id_map.txt \
+        --singletons singletons.txt \
+        --cluster-num-map cluster_num_map.txt
     """
 }
 
@@ -193,7 +209,8 @@ process assign_cluster_colors {
 
     script:
     """
-    perl $projectDir/../shared/perl/assign_cluster_colors.pl --cluster-num-map ${cluster_num_map} \
+    perl $projectDir/../shared/perl/assign_cluster_colors.pl \
+        --cluster-num-map ${cluster_num_map} \
         --cluster-color-map cluster_colors.txt
     """
 }
