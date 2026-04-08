@@ -47,7 +47,7 @@ process get_fasta_files {
 
     script:
     """
-    perl $projectDir/../shared/perl/get_sequences.pl \
+    perl $projectDir/../shared/import/get_sequences.pl \
         --fasta-db ${params.fasta_db} \
         --sequence-ids-file ${id_file} \
         --output-sequence-file "${id_file.baseName}.fasta"
