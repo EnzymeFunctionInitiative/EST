@@ -44,7 +44,11 @@ process filter_fasta {
         path "filtered_sequences.fasta", emit: filtered_fasta
         path "filtered_sequence_metadata.tab", emit: filtered_seq_meta_file
     """
-    perl $projectDir/filter/filter_fasta.pl --fastain $fasta --fastaout filtered_sequences.fasta -minlen ${params.min_length} --maxlen ${params.max_length}
+    perl $projectDir/filter/filter_fasta.pl \
+        --fastain $fasta \
+        --fastaout filtered_sequences.fasta \
+        --minlen ${params.min_length} \
+        --maxlen ${params.max_length}
     cp $seq_meta_file filtered_sequence_metadata.tab
     """
 }
@@ -56,7 +60,13 @@ process get_annotations {
         path "ssn_metadata.tab"
     script:
     """
-    perl $projectDir/annotations/get_annotations.pl --ssn-anno-out ssn_metadata.tab --min-len ${params.min_length} --max-len ${params.max_length} --seq-meta-in $filtered_seq_meta_file --config ${params.efi_config} --db-name ${params.efi_db}
+    perl $projectDir/annotations/get_annotations.pl \
+        --ssn-anno-out ssn_metadata.tab \
+        --min-len ${params.min_length} \
+        --max-len ${params.max_length} \
+        --seq-meta-in $filtered_seq_meta_file \
+        --config ${params.efi_config} \
+        --db-name ${params.efi_db}
     """
 }
 
@@ -84,7 +94,14 @@ process create_full_ssn {
     def file_name = (clean_file_name ?: "full_ssn") + ".xgmml"
 
     """
-    perl $projectDir/create/create_full_ssn.pl --blast $thresholded_blast --fasta $filtered_fasta --metadata $ssn_meta_file --output "${file_name}" --title "${final_job_name}" --db-version ${params.db_version} --stats stats.json
+    perl $projectDir/create/create_full_ssn.pl \
+        --blast $thresholded_blast \
+        --fasta $filtered_fasta \
+        --metadata $ssn_meta_file \
+        --output "${file_name}" \
+        --title "${final_job_name}" \
+        --db-version ${params.db_version} \
+        --stats stats.json
     zip full_ssn.xgmml.zip "${file_name}"
     rm "${file_name}"
     touch job.finish
