@@ -1,5 +1,5 @@
 
-include { get_source_ids; filter_ids } from "../est/subworkflows/import.nf"
+include { filter_ids; get_source_ids } from "../shared/nextflow/sequence.nf"
 
 process get_sunburst_data {
     publishDir params.final_output_dir, mode: 'copy'
@@ -11,7 +11,7 @@ process get_sunburst_data {
         path 'sunburst_stats.json', emit: 'stats_file'
     script:
     """
-    perl $projectDir/../est/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --sunburst-stats-file sunburst_stats.json
+    perl $projectDir/../shared/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --sunburst-stats-file sunburst_stats.json
     """
 }
 
