@@ -1,21 +1,26 @@
 
+def formatFilterArgs(filter_list) {
+    if (!filter_list || filter_list.isEmpty()) {
+        return ""
+    }
+    return "--filter " + filter_list.join(" --filter ")
+}
+
 process filter_ids {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path source_ids     // table of all sequence IDs, including UniRef IDs
-        path source_meta    // sequence metdata
-        path source_stats   // statistics of source import process
+        path source_ids         // table of all sequence IDs, including UniRef IDs
+        path source_meta        // sequence metdata
+        path source_stats       // statistics of source import process
+        path explicit_ids_file  // manually specify which IDs pass through; this may be empty (e.g. Channel.value([]))
     output:
         path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
         path 'import_stats.json', emit: 'import_stats'          // final statistics of source and filter import processes
         path 'retrieval_ids.tab', emit: 'retrieval_ids'         // list of IDs that came from the database, as opposed to user-specified FASTA files, including domain data
     script:
-    filter_args = ""
-    if (params.filter) {
-        filter_args = params.filter.join(" --filter ")
-        filter_args = "--filter ${filter_args}"
-    }
+    def xids_file = explicit_ids_file ? "--filter explicit-ids-file=${explicit_ids_file}" : ""
+    def filter_args = formatFilterArgs(params.filter)
     """
     perl $projectDir/../shared/import/filter_ids.pl \
         --efi-config ${params.efi_config} \
@@ -28,7 +33,8 @@ process filter_ids {
         --sequence-meta-file sequence_metadata.tab \
         --retrieval-ids-file retrieval_ids.tab \
         --stats-file import_stats.json \
-        ${filter_args}
+        ${filter_args} \
+        ${xids_file}
     """
 }
 
