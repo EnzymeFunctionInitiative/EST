@@ -79,9 +79,9 @@ process get_selected_id_lists {
 
 workflow {
     if (params.ssn_input =~ /\.zip$/) {
-        ssn_file = unzip_ssn(params.ssn_input)
+        ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
     } else {
-        ssn_file = params.ssn_input
+        ssn_file = Channel.value(file(params.ssn_input))
     }
 
     //
@@ -111,7 +111,7 @@ workflow {
             .filter { file -> !file.name.contains("singleton") }     // Don"t include singletons in the analysis
             .map { file ->
                 // Transform the file name into a cluster ID.  Removes "cluster_UniProt_" (or
-                // "cluster_UniRefXX_") from the front if present
+                // "cluster_UniRefXX_") from the front if present, leaving "Cluster_#"
                 def clean_id = file.simpleName.replaceAll(/^cluster_Uni(Prot|Ref90|Ref50)_/, "")
                 return tuple(clean_id, file)
             }
