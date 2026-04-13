@@ -54,7 +54,7 @@ process parse_blast_results_for_ids {
 
     script:
     """
-    perl ${projectDir}/../shared/perl/get_sequence_ids.pl \
+    perl $projectDir/../shared/import/get_sequence_ids.pl \
         --efi-config "${params.efi_config}" \
         --efi-db "${params.efi_db}" \
         --sequence-version ${params.sequence_version} \
@@ -75,7 +75,7 @@ process parse_fasta_for_ids {
 
     script:
     """
-    perl $projectDir/../shared/perl/get_sequence_ids.pl \
+    perl $projectDir/../shared/import/get_sequence_ids.pl \
         --efi-config "${params.efi_config}" \
         --efi-db "${params.efi_db}" \
         --sequence-version ${params.sequence_version} \
@@ -95,7 +95,7 @@ process parse_accession_for_ids {
 
     script:
     """
-    perl $projectDir/../shared/perl/get_sequence_ids.pl \
+    perl $projectDir/../shared/import/get_sequence_ids.pl \
         --efi-config "${params.efi_config}" \
         --efi-db "${params.efi_db}" \
         --sequence-version ${params.sequence_version} \

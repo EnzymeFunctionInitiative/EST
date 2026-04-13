@@ -115,7 +115,7 @@ sub computeConvRatio {
         my $denom = $numIds * ($numIds - 1);
         my $convRatio = 0;
         $convRatio = $numDegree / $denom if $denom > 0;
-        $convRatio = sprintf("%.1e", $convRatio);
+        $convRatio = sprintf("%.2e", $convRatio);
         push @data, [$cnum, $convRatio, $numNodes, $numIds, $numDegree / 2];
     }
 
