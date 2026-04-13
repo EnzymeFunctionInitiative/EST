@@ -40,30 +40,34 @@ def load_blast_conv_files(input_files: List) -> Dict[str, Dict[str, str]]:
         filename = os.path.basename(json_file)
 
         # Extract the cluster number
-        match = re.search(r'[cC]luster_(\d+)_conv_ratio\.json', filename)
+        match = re.search(r'Cluster_(\d+)_conv_ratio\.json', filename)
         if match:
             cluster_id = match.group(1)
         else:
-            cluster_id = filename.replace('_conv_ratio.json', '')
+            # Terminate because something bad happened, if the files aren't in the specified format
+            raise Exception(f"Invalid filename format '{filename}'")
 
+        conv_ratio = None
+        edges = None
+        nodes = None
         try:
             with open(json_file, 'r') as fh:
                 data = json.load(fh)
 
-                conv_ratio = data.get('convergence_ratio', 'NA')
-                edges = data.get('num_blast_edges', 'NA')
-                nodes = data.get('num_unique_ids', 'NA')
+                conv_ratio = data.get('convergence_ratio', None)
+                edges = data.get('num_blast_edges', None)
+                nodes = data.get('num_unique_ids', None)
 
-                if conv_ratio != 'NA':
+                if conv_ratio != None:
                     conv_ratio = float(conv_ratio)
-
-                blast_data[cluster_id] = {
-                    'ratio': conv_ratio,
-                    'edges': edges,
-                    'nodes': nodes
-                }
         except Exception as e:
             print(f"Error processing file {json_file}: {e}", file=sys.stderr)
+
+        blast_data[cluster_id] = {
+            'ratio': conv_ratio,
+            'edges': edges,
+            'nodes': nodes
+        }
 
     return blast_data
 
@@ -87,7 +91,6 @@ def load_ssn_conv_data(data_file: str) -> Dict[str, Dict[str, str]]:
             header = next(fh)
 
             for line in fh:
-                #Cluster Number  Convergence Ratio       Number of SSN Nodes     Number of UniProt IDs   Number of Edges
                 cluster_num, conv_ratio, num_nodes, num_ids, num_edges = re.split(r'\t', line.strip())
                 ssn_data[cluster_num] = {
                     'ratio': conv_ratio,
