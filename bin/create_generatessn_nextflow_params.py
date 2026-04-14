@@ -22,6 +22,7 @@ def add_args(parser):
     ssn_args_parser.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
     ssn_args_parser.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
     ssn_args_parser.add_argument("--maxfull", default=0)
+    ssn_args_parser.add_argument("--color-ssn", action="store_true", help="Numbers and colors the clusters in the SSN")
 
     # Add a subparser for automatically populating from EST output dir
     subparsers = parser.add_subparsers(dest="mode", required=True)
@@ -122,7 +123,7 @@ def render_params(blast_parquet, fasta_file, source_ids_file, seq_meta_file, out
         efi_config, db_version, job_id, efi_db, mode, ssn_name, job_name, maxfull,
         threshold_min_val,
         threshold_metric=None, min_length=None, max_length=None, sequence_filter=None,
-        **kwargs: dict):
+        color_ssn=False, **kwargs: dict):
     params = {
         "blast_parquet": blast_parquet,
         "fasta_file": fasta_file,
@@ -141,6 +142,7 @@ def render_params(blast_parquet, fasta_file, source_ids_file, seq_meta_file, out
         "db_version": db_version,
         "job_id": job_id,
         "efi_db": efi_db,
+        "color_ssn": color_ssn,
     }
     
     # Handle kwargs dict, assuming each entry is a parameter to be added to params

@@ -1,5 +1,8 @@
 
+include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
+include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids } from "../shared/nextflow/sequence.nf"
+include { zip_files } from "../shared/nextflow/util.nf"
 
 process import_data {
     input:
@@ -138,4 +141,10 @@ workflow {
 
     // Create networks
     full_ssn = create_full_ssn(thresholded_blast, input_data.fasta, ssn_meta_file)
+
+    if (params.color_ssn) {
+        computed = COMPUTE_COLOR_CLUSTER_WORKFLOW(full_ssn.ssn_unzipped)
+        colored_ssn = color_ssn(full_ssn.ssn_unzipped, computed.cluster_id_map, computed.cluster_num_map, computed.cluster_colors)
+        zipped_files = zip_files(colored_ssn.ssn)
+    }
 }
