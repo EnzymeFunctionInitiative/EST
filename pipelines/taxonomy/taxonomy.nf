@@ -11,7 +11,10 @@ process get_sunburst_data {
         path 'sunburst_stats.json', emit: 'stats_file'
     script:
     """
-    perl $projectDir/../shared/import/get_sunburst_data.pl --efi-config ${params.efi_config} --efi-db ${params.efi_db} --sunburst-stats-file sunburst_stats.json
+    perl $projectDir/../shared/import/get_sunburst_data.pl \
+        --efi-config ${params.efi_config} \
+        --efi-db ${params.efi_db} \
+        --sunburst-stats-file sunburst_stats.json
     """
 }
 
@@ -24,7 +27,10 @@ process process_sunburst_stats {
         path 'stats.json'
     script:
     """
-    python $projectDir/statistics/update_import_stats.py --stats-file ${sunburst_stats_file} ${import_stats_file} --output stats.json
+    python $projectDir/statistics/update_import_stats.py \
+        --stats-file ${sunburst_stats_file} \
+        ${import_stats_file} \
+        --output stats.json
     """
 }
 

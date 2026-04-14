@@ -13,8 +13,8 @@ workflow {
     blast_input = initial_data.fasta_file.map { fasta_file -> tuple("ALL_DATA", fasta_file) }
     axa_results = ALL_BY_ALL(blast_input)
 
-    blast_parquet = axa_results.blast_parquet.map { junk, file -> file }
-    fasta_lengths_parquet = axa_results.fasta_lengths_parquet.map { junk, file -> file }
+    blast_parquet = axa_results.blast_parquet.map { fid, file -> file }
+    fasta_lengths_parquet = axa_results.fasta_lengths_parquet.map { fid, file -> file }
 
     results = REPORTING(blast_parquet, fasta_lengths_parquet, initial_data.fasta_file, initial_data.accession_table, initial_data.import_stats)
 }

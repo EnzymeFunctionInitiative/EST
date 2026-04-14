@@ -83,7 +83,11 @@ process condense_redundant {
 
     script:
     """
-    cd-hit -d 0  -c 1 -s 1 -i ${fasta_file} -o sequences.fasta -M "${params.cdhit_memory_limit}"
+    cd-hit \
+        -d 0 -c 1 -s 1 \
+        -i ${fasta_file} \
+        -o sequences.fasta \
+        -M "${params.cdhit_memory_limit}"
     """
 }
 
@@ -142,7 +146,10 @@ process split_fasta {
     script:
     """
     mkdir parts
-    seqkit split2 ${fasta_file} -p ${params.num_fasta_shards} --out-dir parts
+    seqkit split2 \
+        ${fasta_file} \
+        -p ${params.num_fasta_shards} \
+        --out-dir parts
     """
 }
 
