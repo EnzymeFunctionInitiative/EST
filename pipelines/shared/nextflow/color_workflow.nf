@@ -12,23 +12,23 @@ process get_id_list {
         val sequence_type
 
     output:
-        path "cluster_sizes.txt", emit: "cluster_sizes"
+        path "cluster_sizes.txt", emit: cluster_sizes
 
         // Outputs for FASTA retrieval
-        tuple val("uniprot"), path("uniprot/*.txt"), emit: "uniprot_tuples"
-        tuple val("uniref90"), path("uniref90/*.txt", arity: "0..*"), emit: "uniref90_tuples"
-        tuple val("uniref50"), path("uniref50/*.txt", arity: "0..*"), emit: "uniref50_tuples"
-        tuple val("uniprot_domain"), path("uniprot_domain/*.txt", arity: "0..*"), emit: "uniprot_domain_tuples"
-        tuple val("uniref90_domain"), path("uniref90_domain/*.txt", arity: "0..*"), emit: "uniref90_domain_tuples"
-        tuple val("uniref50_domain"), path("uniref50_domain/*.txt", arity: "0..*"), emit: "uniref50_domain_tuples"
+        tuple val("uniprot"), path("uniprot/*.txt"), emit: uniprot_tuples
+        tuple val("uniref90"), path("uniref90/*.txt", arity: "0..*"), emit: uniref90_tuples
+        tuple val("uniref50"), path("uniref50/*.txt", arity: "0..*"), emit: uniref50_tuples
+        tuple val("uniprot_domain"), path("uniprot_domain/*.txt", arity: "0..*"), emit: uniprot_domain_tuples
+        tuple val("uniref90_domain"), path("uniref90_domain/*.txt", arity: "0..*"), emit: uniref90_domain_tuples
+        tuple val("uniref50_domain"), path("uniref50_domain/*.txt", arity: "0..*"), emit: uniref50_domain_tuples
 
         // Output paths for zipping directories
-        path "uniprot", emit: "uniprot_dir"
-        path "uniref90", emit: "uniref90_dir"
-        path "uniref50", emit: "uniref50_dir"
-        path "uniprot_domain", emit: "uniprot_domain_dir"
-        path "uniref90_domain", emit: "uniref90_domain_dir"
-        path "uniref50_domain", emit: "uniref50_domain_dir"
+        path "uniprot", emit: uniprot_dir
+        path "uniref90", emit: uniref90_dir
+        path "uniref50", emit: uniref50_dir
+        path "uniprot_domain", emit: uniprot_domain_dir
+        path "uniref90_domain", emit: uniref90_domain_dir
+        path "uniref50_domain", emit: uniref50_domain_dir
 
     script:
     """
@@ -84,17 +84,17 @@ process get_ssn_id_info {
         path ssn_file
 
     output:
-        path "edgelist.txt", emit: "edgelist"                   // Specifies the network, i.e. the edges between node network IDs
-        path "index_seqid_map.txt", emit: "index_seqid_map"     // Maps node network ID to UniProt ID and the number of IDs in the metanode
-        path "seqid_source_map.txt", emit: "seqid_source_map"   // Maps metanode IDs to UniProt IDs
-        path "ssn_sequences.fasta", emit: "ssn_sequences"       // Custom sequences that are embedded in the SSN
-        path "domain_id_map.txt", emit: "domain_id_map"         // Map of sequence ID to domain region
+        path "edgelist.txt", emit: edgelist                     // Specifies the network, i.e. the edges between node network IDs
+        path "index_seqid_map.txt", emit: index_seqid_map       // Maps node network ID to UniProt ID and the number of IDs in the metanode
+        path "seqid_source_map.txt", emit: seqid_source_map     // Maps metanode IDs to UniProt IDs
+        path "ssn_sequences.fasta", emit: ssn_sequences         // Custom sequences that are embedded in the SSN
+        path "domain_id_map.txt", emit: domain_id_map           // Map of sequence ID to domain region
         env SEQ_TYPE, emit: sequence_type                       // Type of sequences that the SSN is based on (uniprot, uniref90, uniref50)
 
     script:
     """
     perl $projectDir/../shared/perl/ssn_to_id_list.pl \
-        --ssn $ssn_file \
+        --ssn ${ssn_file} \
         --edgelist edgelist.txt \
         --index-seqid index_seqid_map.txt \
         --seqid-source-map seqid_source_map.txt \
@@ -115,8 +115,8 @@ process get_annotated_mapping_tables {
         path cluster_color_map
 
     output:
-        path "mapping_table.txt", emit: "mapping_table"
-        path "swissprot_clusters_desc.txt", emit: "swissprot_table"
+        path "mapping_table.txt", emit: mapping_table
+        path "swissprot_clusters_desc.txt", emit: swissprot_table
 
     script:
     """
@@ -142,7 +142,7 @@ process get_conv_ratio_table {
         path seqid_source_map
 
     output:
-        path "conv_ratio.txt", emit: "conv_ratio"
+        path "conv_ratio.txt", emit: conv_ratio
 
     script:
     """
@@ -163,7 +163,7 @@ process get_cluster_stats {
         path singletons
 
     output:
-        path "color_workflow_stats.json", emit: "stats"
+        path "color_workflow_stats.json", emit: stats
 
     script:
     """
@@ -184,9 +184,9 @@ process compute_clusters {
         path index_seqid_map
 
     output:
-        path "cluster_id_map.txt", emit: "cluster_id_map"   // Mapping of node label to cluster number by node and cluster number by sequence
-        path "singletons.txt", emit: "singletons"           // List of singletons
-        path "cluster_num_map.txt", emit: "cluster_num_map" // Mapping of cluster number to cluster size
+        path "cluster_id_map.txt", emit: cluster_id_map     // Mapping of node label to cluster number by node and cluster number by sequence
+        path "singletons.txt", emit: singletons             // List of singletons
+        path "cluster_num_map.txt", emit: cluster_num_map   // Mapping of cluster number to cluster size
 
     script:
     """
@@ -205,7 +205,7 @@ process assign_cluster_colors {
         path cluster_num_map
 
     output:
-        path "cluster_colors.txt", emit: "cluster_colors"
+        path "cluster_colors.txt", emit: cluster_colors
 
     script:
     """
@@ -255,26 +255,45 @@ process zip_fasta_directories {
 }
 
 
-workflow color_and_retrieve {
+workflow COMPUTE_COLOR_CLUSTER_WORKFLOW {
+    take:
+        ssn_file
+
     main:
-        if (params.ssn_input =~ /\.zip$/) {
-            ssn_file = unzip_ssn(params.ssn_input)
-        } else {
-            ssn_file = params.ssn_input
-        }
-
-        //
-        // STEP 1: PARSE THE SSN
-        //
-
         // Get the index and ID mapping tables and edgelist
         ssn_data = get_ssn_id_info(ssn_file)
+
+        // Compute the clusters
+        compute_info = compute_clusters(ssn_data.edgelist, ssn_data.index_seqid_map)
 
         // Convert to value channel
         sequence_type_val = ssn_data.sequence_type.map { it.trim() }
 
-        // Compute the clusters
-        compute_info = compute_clusters(ssn_data.edgelist, ssn_data.index_seqid_map)
+        cluster_colors = assign_cluster_colors(compute_info.cluster_num_map)
+
+    emit:
+        edgelist = ssn_data.edgelist
+        index_seqid_map = ssn_data.index_seqid_map
+        seqid_source_map = ssn_data.seqid_source_map
+        domain_id_map = ssn_data.domain_id_map
+        sequence_type = sequence_type_val
+        cluster_id_map = compute_info.cluster_id_map
+        singletons = compute_info.singletons
+        cluster_num_map = compute_info.cluster_num_map
+        cluster_colors 
+}
+
+
+workflow COLOR_AND_RETRIEVE {
+    take:
+        ssn_file
+
+    main:
+        //
+        // STEP 1: PARSE THE SSN
+        //
+
+        computed = COMPUTE_COLOR_CLUSTER_WORKFLOW(ssn_file)
 
         //
         // STEP 2: ID LISTS AND FASTA
@@ -284,7 +303,7 @@ workflow color_and_retrieve {
         // if the input SSN is UniRef50, there will be three outputs: uniprot/cluster_N.txt,
         // uniref90/cluster_N.txt, and uniref50/cluster_N.txt, with one cluster_N.txt file
         // for each cluster in the network)
-        id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map, sequence_type_val)
+        id_list_data = get_id_list(computed.cluster_id_map, computed.singletons, computed.seqid_source_map, computed.sequence_type)
         id_list = id_list_data.uniprot_tuples
                               .transpose()
                               .concat(id_list_data.uniref90_tuples.transpose(),
@@ -294,23 +313,23 @@ workflow color_and_retrieve {
                                       id_list_data.uniref50_domain_tuples.transpose())
 
         // Get the FASTA files for each cluster
-        fasta_files = get_fasta(id_list, sequence_type_val, ssn_data.domain_id_map)
+        fasta_files = get_fasta(id_list, computed.sequence_type, computed.domain_id_map)
 
         //
         // STEP 3: ASSIGN COLORS AND RETRIEVE METADATA
         //
 
-        cluster_colors = assign_cluster_colors(compute_info.cluster_num_map)
+        cluster_colors = assign_cluster_colors(computed.cluster_num_map)
 
-        anno_tables = get_annotated_mapping_tables(compute_info.cluster_id_map, ssn_data.seqid_source_map, cluster_colors)
+        anno_tables = get_annotated_mapping_tables(computed.cluster_id_map, computed.seqid_source_map, cluster_colors)
 
         //
         // STEP 4: COMPUTE STATS
         //
 
-        cr_table = get_conv_ratio_table(ssn_data.edgelist, ssn_data.index_seqid_map, compute_info.cluster_id_map, ssn_data.seqid_source_map)
+        cr_table = get_conv_ratio_table(computed.edgelist, computed.index_seqid_map, computed.cluster_id_map, computed.seqid_source_map)
 
-        cluster_data = get_cluster_stats(compute_info.cluster_id_map, ssn_data.seqid_source_map, compute_info.singletons)
+        cluster_data = get_cluster_stats(computed.cluster_id_map, computed.seqid_source_map, computed.singletons)
 
         //
         // STEP 5: ZIP DIRECTORIES AND FILES
@@ -334,14 +353,14 @@ workflow color_and_retrieve {
         cr_table
         cluster_stats = cluster_data.stats
         cluster_sizes = id_list_data.cluster_sizes
-        cluster_num_map = compute_info.cluster_num_map
-        cluster_id_map = compute_info.cluster_id_map
-        singletons = compute_info.singletons
-        metanode_map = ssn_data.seqid_source_map
+        cluster_num_map = computed.cluster_num_map
+        cluster_id_map = computed.cluster_id_map
+        singletons = computed.singletons
+        metanode_map = computed.seqid_source_map
         cluster_colors
         zipped_id_dirs
         zipped_fasta_dirs
         fasta_files
-        sequence_type = sequence_type_val
+        sequence_type = computed.sequence_type
 }
 

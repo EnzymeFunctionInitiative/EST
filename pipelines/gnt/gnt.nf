@@ -1,6 +1,6 @@
 
-include { color_and_retrieve } from "../shared/nextflow/color_workflow.nf"
-include { zip_files; merge_stats } from "../shared/nextflow/util.nf"
+include { COLOR_AND_RETRIEVE } from "../shared/nextflow/color_workflow.nf"
+include { merge_stats; unzip_ssn; zip_files } from "../shared/nextflow/util.nf"
 
 cluster_data_dir = "cluster-data"
 
@@ -94,9 +94,15 @@ process zip_directories {
 
 
 workflow {
+    if (params.ssn_input =~ /\.zip$/) {
+        ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
+    } else {
+        ssn_file = Channel.value(file(params.ssn_input))
+    }
+
     // Files are published to params.final_output_dir by the processes inside the
     // color_and_retrieve workflow
-    color_work = color_and_retrieve()
+    color_work = COLOR_AND_RETRIEVE(ssn_file)
 
     // Compute the GNN and GND data and create the GNN XGMML files
     gnn_data = create_gnns(color_work.cluster_id_map, color_work.singletons, color_work.metanode_map, color_work.ssn_file)

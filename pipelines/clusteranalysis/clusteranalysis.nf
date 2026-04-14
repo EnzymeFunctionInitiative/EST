@@ -1,16 +1,22 @@
 
-include { color_and_retrieve } from "../shared/nextflow/color_workflow.nf"
-include { merge_stats; zip_files } from "../shared/nextflow/util.nf"
+include { COLOR_AND_RETRIEVE } from "../shared/nextflow/color_workflow.nf"
+include { merge_stats; unzip_ssn; zip_files } from "../shared/nextflow/util.nf"
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { ALIGN_AND_ANALYZE } from "./subworkflows/msa.nf"
 include { MAKE_HISTOGRAMS } from "./subworkflows/length_histograms.nf"
 include { PREPARE_FASTA } from "./subworkflows/prepare.nf"
 
 workflow {
-    // Run the color_and_retrieve workflow to get the FASTA sequences from the input SSN as 
+    if (params.ssn_input =~ /\.zip$/) {
+        ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
+    } else {
+        ssn_file = Channel.value(file(params.ssn_input))
+    }
+
+    // Run the COLOR_AND_RETRIEVE workflow to get the FASTA sequences from the input SSN as 
     // well as other SSN-related metadata.  Files are published to params.final_output_dir by
-    // the processes inside the color_and_retrieve workflow
-    color_work = color_and_retrieve()
+    // the processes inside the COLOR_AND_RETRIEVE workflow
+    color_work = COLOR_AND_RETRIEVE(ssn_file)
 
     // PREPARE: Get FASTA files for the histograms and the MSA-based analyses
     prepared_fasta_ch = PREPARE_FASTA(color_work.fasta_files, color_work.sequence_type)
