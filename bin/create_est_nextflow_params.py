@@ -95,6 +95,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"Family mode requires --families argument")
         fail = True
 
+    # Need to store this as 'sequence_filter' because 'filter' is a reserved keyword in some
+    # contexts and can't be used in a function definition
     args.sequence_filter = args.filter
     del args.filter
 

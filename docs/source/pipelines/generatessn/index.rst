@@ -15,7 +15,7 @@ pipeline in an "automatic" mode, or the specific necessary files in "manual"
 mode.  The parameter file necessary to run the pipeline is created with the
 ``bin/create_generatessn_nextflow_params.py`` script: ::
 
-    python bin/create_generatessn_nextflow_params.py auto --filter-min-val 23 --ssn-name ssn.xgmml --ssn-title "SSN Title" --est-output-dir est_results/ --efi-config efi.config --efi-db efi_202406 --nextflow-config file.config
+    python bin/create_generatessn_nextflow_params.py auto --threshold-min-val 23 --ssn-name ssn.xgmml --ssn-title "SSN Title" --est-output-dir est_results/ --efi-config efi.config --efi-db efi_202406 --nextflow-config file.config
 
 A file ``params.yml`` is created in ``est_results/ssn/`` that contains the
 information needed to run the EST pipeline.  Additionally, a shell script
@@ -58,9 +58,10 @@ SSN pipeline-specific arguments are:
 
 * common arguments shared between the **auto** and **manual** modes:
 
-  * ``--filter-min-val``: the alignment score to use to segregate sequences
-    into clusters; functionally equivalent to retaining rows in the input BLAST
-    parquet results where computed alignment score >= this value. [*required*]
+  * ``--threshold-min-val``: the threshold cutoff to use to segregate sequences
+    into clusters based on a metric (defaults to alignment score); functionally
+    equivalent to retaining rows in the input BLAST parquet results where
+    computed alignment score >= this value. [*required*]
 
   * ``--ssn-name``: the file name to use to save the SSN (e.g. ``ssn.xgmml``).
     The file is saved into the output directory (either ``est_output_dir/ssn``
@@ -68,10 +69,11 @@ SSN pipeline-specific arguments are:
 
   * ``--ssn-title``: descriptive name of the SSN (e.g. "SSN Test"). [*required*]
 
-  * ``--filter-parameter``: specify which parameter to filter edges on;
-    acceptable values are ``pident``, ``alignment_length``, ``bitscore``,
-    ``query_length``, and ``alignment_score``.  The default option
-    ``alignment_score`` should always be used unless the user is an expert user.
+  * ``--threshold-metric``: specify which BLAST results parameter to apply
+    threshold on; acceptable values are ``pident``, ``alignment_length``,
+    ``bitscore``, ``query_length``, and ``alignment_score``.  The default option
+    ``alignment_score`` should be used unless the user has extensive
+    knowledge of BLAST and SSNs.
 
   * ``--min-length``: minimum sequence length to include in the output SSN; all
     sequences less than this value are not included in the SSN.
@@ -91,7 +93,7 @@ and computational intensity.  An additional script is provided which can
 generate a job script for SLURM as well as the parameter file.  To generate
 these files, ::
 
-    python bin/create_nextflow_job.py generatessn auto --filter-min-val 23 --ssn-name ssn.xgmml --ssn-title "SSN Title" --est-output-dir est_results/ --efi-config efi.config --efi-db efi_202406 --nextflow-config slurm.config
+    python bin/create_nextflow_job.py generatessn auto --threshold-min-val 23 --ssn-name ssn.xgmml --ssn-title "SSN Title" --est-output-dir est_results/ --efi-config efi.config --efi-db efi_202406 --nextflow-config slurm.config
 
 In addition to the ``params.yml`` seen above, this will generate a SLURM job
 submission script called ``run_nextflow.sh`` which can be started by running
@@ -102,5 +104,5 @@ Stages
 .. toctree::
     :maxdepth: 1
 
-    filter/index.rst
+    threshold/index.rst
 

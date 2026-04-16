@@ -65,7 +65,7 @@ workflow IMPORT_AND_FILTER {
         source_data = get_source_ids()
 
         // Filter on all sequence IDs including UniRef, and including IDs in FASTA files
-        sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats)
+        sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats, Channel.value([]))
 
         // Get sunburst data for all sequence IDs, after filtering
         get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)

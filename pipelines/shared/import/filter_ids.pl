@@ -10,6 +10,7 @@ use lib "$FindBin::Bin/../../../lib";
 use EFI::Annotations::Fields qw(:source :annotations ANNO_ROW_SEP);
 use EFI::Database;
 use EFI::Import::Config::Filter;
+use EFI::Import::Filter::ExplicitIds;
 use EFI::Import::Filter::Family;
 use EFI::Import::Filter::Fraction;
 use EFI::Import::Filter::Fragment;
@@ -104,6 +105,13 @@ if ($opts->{min_seq_length} != $defaultMinSeqLength or $opts->{max_seq_length} !
 
     my $lengthFilter = new EFI::Import::Filter::Length(%defaultFilterArgs, %args);
     $lengthFilter->applyFilter($seqData);
+}
+
+
+# Manually limit the input to the IDs in the provided file
+if ($opts->{explicit_ids_file}) {
+    my $explicitFilter = new EFI::Import::Filter::ExplicitIds(%defaultFilterArgs, file => $opts->{explicit_ids_file});
+    $explicitFilter->applyFilter($seqData);
 }
 
 
