@@ -303,7 +303,6 @@ workflow ALIGN_AND_ANALYZE {
                 .map { type, msas, logos, aa, threshold, cluster_size_file, id_cluster_mapping ->
                     tuple(msas, logos, cluster_size_file, id_cluster_mapping, aa, threshold, type)
                 }
-            //counted_residues_ch = collect_aa_ids(msa_files, logo_files, cluster_size_file, id_cluster_mapping, residue_ch.combine(threshold_ch))
             counted_residues_ch = collect_aa_ids(collect_aa_input)
 
             // groupTuple allows us to create a structure that looks like [AA, [pos_files, ...], [pct_files, ...]]

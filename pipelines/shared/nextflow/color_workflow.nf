@@ -5,6 +5,8 @@ cluster_data_dir = "cluster-data"
 
 
 process get_id_list {
+    publishDir params.final_output_dir, mode: "copy", pattern: "cluster_size.txt"
+
     input:
         path cluster_id_map
         path singletons
@@ -12,7 +14,7 @@ process get_id_list {
         val sequence_type
 
     output:
-        path "cluster_sizes.txt", emit: cluster_sizes
+        path "cluster_size.txt", emit: cluster_sizes
 
         // Outputs for FASTA retrieval
         tuple val("uniprot"), path("uniprot/*.txt"), emit: uniprot_tuples
@@ -44,7 +46,7 @@ process get_id_list {
         --uniref90 \$id_list_dir/uniref90 \
         --uniref50 \$id_list_dir/uniref50 \
         --seqid-source-map ${seqid_source_map} \
-        --cluster-sizes cluster_sizes.txt \
+        --cluster-sizes cluster_size.txt \
         --sequence-type ${sequence_type} \
         --config ${params.efi_config} \
         --db-name ${params.efi_db}
