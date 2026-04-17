@@ -80,11 +80,7 @@ sub computeStats {
     my $numClusters = @clusters;
     my $numSingletons = @$singletons;
 
-    if ($idType =~ m/uniref(\d+)/i) {
-        $idType = "UniRef$1";
-    } else {
-        $idType = "UniProt";
-    }
+    $idType = lc($idType);
 
     my $stats = {
         num_ssn_clusters => $numClusters,
