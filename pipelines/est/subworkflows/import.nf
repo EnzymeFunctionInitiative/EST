@@ -26,9 +26,17 @@ process cat_fasta_files {
         """
         $cat_cmd
         perl $projectDir/import/append_blast_query.pl --blast-query-file ${params.input_file} --output-sequence-file all_sequences.fasta
+
+        # Stop Nextflow here if the file is empty (i.e. no sequences were found)
+        [ -s all_sequences.fasta ] || { echo "ERROR: No sequences found after retrieval and merge."; exit 1; }
         """
     } else {
-        cat_cmd
+        """
+        $cat_cmd
+
+        # Stop Nextflow here if the file is empty (i.e. no sequences were found)
+        [ -s all_sequences.fasta ] || { echo "ERROR: No sequences found after retrieval and merge."; exit 1; }
+        """
     }
 }
 

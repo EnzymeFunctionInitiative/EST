@@ -1,5 +1,4 @@
 
-include { get_length_histogram } from "../../shared/nextflow/sequence.nf"
 include { merge_stats } from "../../shared/nextflow/util.nf"
 
 process compute_stats {
@@ -52,6 +51,22 @@ process visualize_boxplot_stats {
         --length-json-filename alignment_length.json \
         --pident-json-filename percent_identity.json \
         --edge-hist-json-filename number_of_edges.json
+    """
+}
+
+process get_length_histogram {
+    input:
+        path fasta_file
+        path accession_table
+        val seq_version
+    output:
+        path("*.histogram.txt"), emit: histograms
+    """
+    python $projectDir/../shared/python/compute_length_histogram.py \
+        --fasta-file ${fasta_file} \
+        --accession-table ${accession_table} \
+        --seq-type ${seq_version} \
+        --output-file ${seq_version}.histogram.txt
     """
 }
 
