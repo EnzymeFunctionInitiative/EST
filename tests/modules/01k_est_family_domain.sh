@@ -9,7 +9,7 @@ OUTPUT_DIR="$TEST_RESULTS_DIR/$self"
 
 rm -rf $OUTPUT_DIR
 
-family="IPR050967"
+family=$(<$EFI_TEST_FAMILY_ID)
 
 ./bin/create_est_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --domain --domain-region domain
 bash $OUTPUT_DIR/run_nextflow.sh
