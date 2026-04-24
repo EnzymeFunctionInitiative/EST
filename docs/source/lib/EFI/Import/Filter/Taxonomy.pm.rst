@@ -26,8 +26,8 @@ taxonomic classification.
 JSON FILE FORMAT
 ================
 
-The JSON file format is an array of filter objects. Each object can
-define a filter by name, which can be referenced later.
+The predefined JSON file format is an array of filter objects. Each
+object can define a filter by name, which can be referenced later.
 
 ::
 
@@ -43,6 +43,22 @@ define a filter by name, which can be referenced later.
            "conditions": [ ... ]
        }
    ]
+
+The user-defined JSON file format is a single filter object:
+
+::
+
+   {
+       "name": "user_defined",
+       "operator": "AND" | "OR",
+       "conditions": [
+           {
+               "field":"domain",
+               "operator":"=",
+               "value":"Bacteria"
+           }, ...
+       ]
+   }
 
 
 
@@ -82,7 +98,6 @@ rule.
    The value to match against the specified field.
 
 **negate** (string, optional)
-   ----------------------------------------------------------------------------------------------------
    If present and set to ``"true"``, the condition is negated. This
    effectively changes the operator from equality to inequality (e.g.,
    ``"="`` becomes ``"!="``) or from ``"LIKE"`` to ``"NOT LIKE"``.
@@ -147,7 +162,6 @@ A filter that represents Eukaryota but excludes fungi:
 
 ::
 
-   [
        {
        "name": "eukaroyta_no_fungi",
        "operator": "AND",
@@ -184,21 +198,18 @@ A filter that represents Eukaryota but excludes fungi:
            }
        ]
    }
-   ]
 
 A user-defined filter that includes Bacteria only:
 
 ::
 
-   [
-       {
-           "name": "bacteria",
-           "operator": "OR",
-           "conditions": [
-               {
-                   "field": "domain",
-                   "value": "Bacteria"
-               }
-           ]
-       }
-   ]
+   {
+       "name": "bacteria",
+       "operator": "OR",
+       "conditions": [
+           {
+               "field": "domain",
+               "value": "Bacteria"
+           }
+       ]
+   }

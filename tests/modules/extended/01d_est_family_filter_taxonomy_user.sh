@@ -15,18 +15,16 @@ family=$(<$EFI_TEST_FAMILY_ID)
 user_filter="$TEST_RESULTS_DIR/${self}_user_filter.json"
 
 cat <<JSON > $user_filter
-[
-    {
-        "name": "bacteria",
-        "operator": "OR",
-        "conditions": [
-            {
-                "field": "domain",
-                "value": "Bacteria"
-            }
-        ]
-    }
-]
+{
+    "name": "bacteria",
+    "operator": "OR",
+    "conditions": [
+        {
+            "field": "domain",
+            "value": "Bacteria"
+        }
+    ]
+}
 JSON
 
 ./bin/create_est_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --filter user-file=$user_filter
