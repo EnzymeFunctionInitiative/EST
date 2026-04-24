@@ -9,7 +9,7 @@ def formatFilterArgs(filter_list) {
 
 def get_user_filter_file() {
     def user_filter_entry = params.filter?.find { it.startsWith("user-filter=") }
-    def user_filter_file = user_filter_entry ? file(user_filter_entry.split('=')[1]) : null
+    def user_filter_file = user_filter_entry ? file(user_filter_entry.split('=')[1]) : Channel.value([])
     return user_filter_file
 }
 

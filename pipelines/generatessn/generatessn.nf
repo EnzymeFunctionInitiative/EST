@@ -134,7 +134,7 @@ workflow {
         : Channel.value([])
 
     // Filter sequences out by length or other criteria (e.g. fragment, taxonomy)
-    final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, Channel.value(null))
+    final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, Channel.value([]))
 
     // Get annotations
     ssn_meta_file = get_annotations(final_ids.sequence_metadata)
