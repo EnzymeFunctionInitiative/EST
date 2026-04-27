@@ -1,4 +1,5 @@
 
+include { get_length_histogram } from "../../shared/nextflow/sequence.nf"
 include { merge_stats } from "../../shared/nextflow/util.nf"
 
 process compute_stats {
@@ -54,22 +55,6 @@ process visualize_boxplot_stats {
     """
 }
 
-process get_length_histogram {
-    input:
-        path fasta_file
-        path accession_table
-        val seq_version
-    output:
-        path("${seq_version}.histogram.txt"), emit: histograms
-    """
-    python $projectDir/../shared/python/compute_length_histogram.py \
-        --fasta-file ${fasta_file} \
-        --accession-table ${accession_table} \
-        --seq-type ${seq_version} \
-        --output-file ${seq_version}.histogram.txt
-    """
-}
-
 process visualize_length_histograms {
     publishDir params.final_output_dir, mode: 'copy'
     input:
@@ -117,7 +102,7 @@ workflow REPORTING {
         histo_viz = visualize_length_histograms(length_histograms)
 
         files_to_merge_stream = import_stats.mix(stats.stats)
-        files_to_merge_stream.collect().set { files_to_merge }
+        files_to_merge = files_to_merge_stream.collect()
         final_stats = merge_stats(files_to_merge)
 
     emit:
