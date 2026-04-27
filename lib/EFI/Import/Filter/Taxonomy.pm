@@ -66,9 +66,9 @@ sub parseFilter {
     my $filterString = $self->readFile($filterFile);
 
     my $json = decode_json($filterString);
-    die "Invalid JSON filter string" if not $json or not $json->[0];
+    die "Invalid JSON filter string" if not $json or not ref $json eq "HASH";
 
-    my $whereClause = $self->parseFilterJson($json->[0]);
+    my $whereClause = $self->parseFilterJson($json);
 
     return $whereClause;
 }
@@ -140,7 +140,8 @@ taxonomic classification.
 
 =head1 JSON FILE FORMAT
 
-The JSON file format is an array of filter objects. Each object can define a filter by name, which can be referenced later.
+The predefined JSON file format is an array of filter objects. Each object can define a filter by
+name, which can be referenced later.
 
     [
         {
@@ -154,6 +155,20 @@ The JSON file format is an array of filter objects. Each object can define a fil
             "conditions": [ ... ]
         }
     ]
+
+The user-defined JSON file format is a single filter object:
+
+    {
+        "name": "user_defined",
+        "operator": "AND" | "OR",
+        "conditions": [
+            {
+                "field":"domain",
+                "operator":"=",
+                "value":"Bacteria"
+            }, ...
+        ]
+    }
 
 =head2 Top-Level Filter Object
 
@@ -258,59 +273,55 @@ SQL equivalent: C<< phylum NOT LIKE 'Ascomycota' >>
 
 A filter that represents Eukaryota but excludes fungi:
 
-	[
-	    {
-            "name": "eukaroyta_no_fungi",
-            "operator": "AND",
-            "conditions": [
-                {
-                    "field": "domain",
-                    "value": "Eukaryota"
-                },
-                {
-                    "field": "phylum",
-                    "value": "Ascomycota",
-                    "operator": "NOT"
-                },
-                {
-                    "field": "phylum",
-                    "value": "Basidiomycota",
-                    "operator": "NOT"
-                },
-                {
-                    "field": "phylum",
-                    "value": "Fungi incertae sedis",
-                    "operator": "NOT"
-                },
-                {
-                    "field": "phylum",
-                    "value": "unclassified Fungi",
-                    "operator": "NOT"
-                },
-                {
-                    "field": "species",
-                    "value": "%metagenome%",
-                    "operator": "NOT",
-                    "exact": false
-                }
-            ]
-        }
-	]
+	{
+        "name": "eukaroyta_no_fungi",
+        "operator": "AND",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Eukaryota"
+            },
+            {
+                "field": "phylum",
+                "value": "Ascomycota",
+                "operator": "NOT"
+            },
+            {
+                "field": "phylum",
+                "value": "Basidiomycota",
+                "operator": "NOT"
+            },
+            {
+                "field": "phylum",
+                "value": "Fungi incertae sedis",
+                "operator": "NOT"
+            },
+            {
+                "field": "phylum",
+                "value": "unclassified Fungi",
+                "operator": "NOT"
+            },
+            {
+                "field": "species",
+                "value": "%metagenome%",
+                "operator": "NOT",
+                "exact": false
+            }
+        ]
+    }
 
 A user-defined filter that includes Bacteria only:
 
-    [
-        {
-            "name": "bacteria",
-            "operator": "OR",
-            "conditions": [
-                {
-                    "field": "domain",
-                    "value": "Bacteria"
-                }
-            ]
-        }
-    ]
+    {
+        "name": "bacteria",
+        "operator": "OR",
+        "conditions": [
+            {
+                "field": "domain",
+                "value": "Bacteria"
+            }
+        ]
+    }
 
 
 =cut

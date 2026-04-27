@@ -3,7 +3,14 @@ def formatFilterArgs(filter_list) {
     if (!filter_list || filter_list.isEmpty()) {
         return ""
     }
-    return "--filter " + filter_list.join(" --filter ")
+    def filter_args_list = filter_list.findAll { !it.startsWith("user-filter=") }
+    return !filter_args_list.isEmpty() ? "--filter " + filter_args_list.join(" --filter ") : ""
+}
+
+def get_user_filter_file() {
+    def user_filter_entry = params.filter?.find { it.startsWith("user-filter=") }
+    def user_filter_file = user_filter_entry ? file(user_filter_entry.split('=')[1]) : Channel.value([])
+    return user_filter_file
 }
 
 process filter_ids {
@@ -13,6 +20,8 @@ process filter_ids {
         path source_meta        // sequence metdata
         path source_stats       // statistics of source import process
         path explicit_ids_file  // manually specify which IDs pass through; this may be empty (e.g. Channel.value([]))
+        path user_filter_file   // path to user taxonomy filter file; this may be empty (e.g. Channel.value([]));
+                                //     this is necessary to stage the filter file so it can be read inside this process
     output:
         path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
@@ -21,6 +30,7 @@ process filter_ids {
     script:
     def xids_file = explicit_ids_file ? "--filter explicit-ids-file=${explicit_ids_file}" : ""
     def filter_args = formatFilterArgs(params.filter)
+    def user_filter_arg = user_filter_file ? "--filter user-filter=${user_filter_file}" : ""
     """
     perl $projectDir/../shared/import/filter_ids.pl \
         --efi-config ${params.efi_config} \
@@ -33,7 +43,7 @@ process filter_ids {
         --sequence-meta-file sequence_metadata.tab \
         --retrieval-ids-file retrieval_ids.tab \
         --stats-file import_stats.json \
-        ${filter_args} \
+        ${filter_args} ${user_filter_arg} \
         ${xids_file}
     """
 }

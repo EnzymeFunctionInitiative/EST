@@ -1,5 +1,5 @@
 
-include { filter_ids; get_source_ids } from "../shared/nextflow/sequence.nf"
+include { filter_ids; get_source_ids; get_user_filter_file } from "../shared/nextflow/sequence.nf"
 
 process get_sunburst_data {
     publishDir params.final_output_dir, mode: 'copy'
@@ -39,9 +39,11 @@ workflow {
     // We get sequence IDs and basic metadata from the input source, including those in FASTA files
     source_data = get_source_ids()
 
+    user_filter_file = get_user_filter_file()
+
     // Filter on all sequence IDs including UniRef, and including IDs in FASTA files.
     // The last parameter is empty (used only for generatessn)
-    sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats, Channel.value([]))
+    sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats, Channel.value([]), user_filter_file)
 
     // Get sunburst data for all sequence IDs, after filtering
     sunburst_data = get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)
