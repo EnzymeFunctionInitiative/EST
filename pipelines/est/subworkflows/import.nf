@@ -26,9 +26,17 @@ process cat_fasta_files {
         """
         $cat_cmd
         perl $projectDir/import/append_blast_query.pl --blast-query-file ${params.input_file} --output-sequence-file all_sequences.fasta
+
+        # Stop Nextflow here if the file is empty (i.e. no sequences were found)
+        [ -s all_sequences.fasta ] || { echo "ERROR: No sequences found after retrieval and merge."; exit 1; }
         """
     } else {
-        cat_cmd
+        """
+        $cat_cmd
+
+        # Stop Nextflow here if the file is empty (i.e. no sequences were found)
+        [ -s all_sequences.fasta ] || { echo "ERROR: No sequences found after retrieval and merge."; exit 1; }
+        """
     }
 }
 
@@ -76,7 +84,7 @@ workflow IMPORT_AND_FILTER {
         // from the BLAST sequence database.  If the import mode is FASTA, then these IDs are only
         // ones that come from adding a family to the job
         accession_shards = split_sequence_ids(sequence_id_files.retrieval_ids, params.num_accession_shards)
-        fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db)
+        raw_fasta_files = get_sequences(accession_shards.flatten(), params.fasta_db)
 
         // If importing FASTA file, reformat the FASTA file and create the file that will be added to
         // the dataset for all-by-all BLAST
@@ -84,10 +92,16 @@ workflow IMPORT_AND_FILTER {
             // sequence metadata is used to ensure that any sequences that were filtered out in a
             // prior step are also removed when rewriting the user fasta
             import_fasta_file = import_fasta(sequence_id_files.sequence_metadata, source_data.seq_mapping)
-            fasta_files = fasta_files.concat(import_fasta_file)
+            fasta_files = raw_fasta_files.concat(import_fasta_file)
+        } else {
+            fasta_files = raw_fasta_files
         }
 
-        fasta_file = cat_fasta_files(fasta_files.collect())
+        all_fasta_files = fasta_files.collect()
+        fasta_file = cat_fasta_files(
+            all_fasta_files
+                .ifEmpty { error "No FASTA sequences were retrieved. Terminating pipeline." }
+        )
 
     emit:
         accession_table = sequence_id_files.accession_table

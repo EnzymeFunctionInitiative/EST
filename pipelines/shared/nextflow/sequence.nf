@@ -144,7 +144,7 @@ process get_length_histogram {
         path accession_table
         val seq_version
     output:
-        path("*.histogram.txt"), emit: histograms
+        path("${seq_version}.histogram.txt"), emit: histograms
     """
     python $projectDir/../shared/python/compute_length_histogram.py \
         --fasta-file ${fasta_file} \

@@ -1,37 +1,10 @@
 
 import argparse
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 from collections import Counter
+import re
 import sys
 from typing import Iterator, Tuple, TextIO, Set, List
-
-def parse_fasta(file_handle: TextIO) -> Iterator[Tuple[str, str]]:
-    """
-    A simple FASTA parser that yields tuples of (header, sequence).
-
-    Parameters
-    ----------
-        file_handle
-            TextIO file object
-
-    Returns
-    -------
-        Iterator that returns one sequence at a time
-    """
-    header = None
-    sequence = []
-    for line in file_handle:
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith('>'):
-            if header:
-                yield (header, ''.join(sequence))
-            header = line[1:].split()[0] # Get the ID before any spaces
-            sequence = []
-        else:
-            sequence.append(line)
-    if header:
-        yield (header, ''.join(sequence))
 
 def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -> Set[str]:
     """
@@ -111,17 +84,20 @@ def compute_sequence_lengths(fasta_file: str, valid_ids: Set[str] = None) -> Lis
     sequence_lengths = []
     try:
         with open(fasta_file, 'r') as fh:
-            for header, sequence in parse_fasta(fh):
+            for title, sequence in SimpleFastaParser(fh):
+                id_chunk = re.split(r'[ :]', title)[0]
+                parsed_id = id_chunk.split('|')[1] if '|' in id_chunk else id_chunk
+
                 include_sequence = False
 
                 # Include the sequence if it starts with 'ZZ' (e.g. the input to the EST pipeline
                 # was a FASTA file that didn't have UniProt IDs in the header) or 'ZINPUT' (the
                 # EST pipeline was based of a BLAST input).
-                if header.startswith('ZZ') or header.startswith('ZINPUT'):
+                if parsed_id.startswith(('ZZ', 'ZINPUT')):
                     include_sequence = True
                 
                 # Include if the ID is in our set of valid IDs.
-                elif valid_ids == None or header in valid_ids:
+                elif valid_ids == None or parsed_id in valid_ids:
                     include_sequence = True
 
                 if include_sequence:
