@@ -121,6 +121,56 @@ process create_full_ssn {
     """
 }
 
+process create_repnode_ssns {
+    publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
+
+    input:
+        path thresholded_blast
+        path all_fasta
+        path ssn_meta_file
+        val repnode_pct
+    output:
+        path "repnode_${repnode_pct}_ssn.xgmml.zip", emit: "ssn"
+        path "repnode_stats.json", emit: "stats"
+    script:
+    // If there was no job name specified, then assign a default
+    def default_name = "repnode-${repnode_pct}"
+    def final_job_name = params.job_name ? params.job_name + " " + default_name : default_name
+    def file_name = getCleanFilename(final_job_name, default_name)
+
+    def cdhit_pct = (repnode_pct.toBigDecimal() / 100).setScale(2, BigDecimal.ROUND_HALF_UP)
+
+    // This is left over from the legacy code, and is being kept here for future work (e.g. CGFP)
+    def word_opt = 2
+    def algo_opt = "" // "-g 1"
+    def bandwidth_opt = "" // optional user input, in future
+    def length_overlap_opt = "-s 1" // optional user input, in future
+
+    // For future modes
+    //if (cdhit_pct < 0.51)      { word_opt = 2 }
+    //else if (cdhit_pct < 0.61) { word_opt = 3 }
+    //else if (cdhit_pct < 0.71) { word_opt = 4 }
+    //else { word_opt = 5 }
+
+    """
+    touch ssn.xgmml
+    echo '{}' > repnode_stats.json
+    cd-hit -n ${word_opt} ${length_overlap_opt} -i ${all_fasta} -o cdhit_${repnode_pct} -c ${cdhit_pct} -d 0 ${algo_opt} ${bandwidth_opt}
+    #perl $projectDir/create/create_repnode_ssn.pl \
+    #    --blast ${thresholded_blast} \
+    #    --fasta ${all_fasta} \
+    #    --metadata ${ssn_meta_file} \
+    #    --cd-hit repnode_cdhit.clstr \
+    #    --output ssn.xgmml \
+    #    --title "${final_job_name}" \
+    #    --db-version ${params.db_version} \
+    #    --stats repnode_stats.json
+    cp ssn.xgmml "${file_name}"
+    zip repnode_${repnode_pct}_ssn.xgmml.zip "${file_name}"
+    rm "${file_name}"
+    """
+}
+
 workflow {
     // Import data from EST run
     input_data = import_data(params.blast_parquet, params.fasta_file, params.source_ids_file, params.seq_meta_file)
@@ -143,6 +193,18 @@ workflow {
 
     // Create full network
     full_ssn = create_full_ssn(thresholded_blast, input_data.fasta, ssn_meta_file)
+
+    // Create repnode networks
+    if (params.make_repnodes) {
+        repnode_pct = Channel.from(params.repnode_pct)
+        repnode_ssns = create_repnode_ssns(thresholded_blast, input_data.fasta, ssn_meta_file, repnode_pct)
+        repnode_stats = repnode_ssns.stats
+    } else {
+        repnode_stats = Channel.of([])
+    }
+
+    // Merge full and repnode SSN stats into one file
+    final_stats = merge_stats(full_ssn.stats.mix(repnode_stats))
 
     if (params.color_ssn) {
         computed = COMPUTE_COLOR_CLUSTER_WORKFLOW(full_ssn.ssn_unzipped)
