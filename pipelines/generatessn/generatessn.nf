@@ -2,7 +2,17 @@
 include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids } from "../shared/nextflow/sequence.nf"
-include { zip_files } from "../shared/nextflow/util.nf"
+include { merge_stats; zip_files } from "../shared/nextflow/util.nf"
+
+def getCleanFilename(job_name, default_name) {
+    // Create a clean job name for the file
+    def clean_file_name = job_name
+        .replaceAll(/[^\p{ASCII}]/, "")
+        .replaceAll(/[^a-zA-Z0-9_\-\.]/, "_")
+        .replaceAll(/^[_-]+|[_-]+$/, "");
+    def file_name = (clean_file_name ?: default_name) + ".xgmml"
+    return file_name
+}
 
 process import_data {
     input:
@@ -80,7 +90,7 @@ process get_annotations {
 }
 
 process create_full_ssn {
-    publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip,json,finish}"
+    publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
     input:
         path thresholded_blast
         path all_fasta
@@ -88,20 +98,13 @@ process create_full_ssn {
     output:
         path "full_ssn.xgmml.zip", emit: "ssn"
         path "ssn.xgmml", emit: "ssn_unzipped"
-        path "job.finish"
-        path "stats.json", emit: "stats"
+        path "full_stats.json", emit: "stats"
+    script:
 
     // If there was no job name specified, then assign a default
-    def final_job_name = params.job_name ?: "Full SSN"
-
-    // Create a clean job name for the file
-    def clean_file_name = final_job_name
-        .replaceAll(/[^\p{ASCII}]/, "")
-        .replaceAll(/[^a-zA-Z0-9_\-\.]/, "_")
-        .replaceAll(/^[_-]+|[_-]+$/, "")
-        .toLowerCase();
-
-    def file_name = (clean_file_name ?: "full_ssn") + ".xgmml"
+    def default_name = "Full SSN"
+    def final_job_name = params.job_name ?: default_name
+    def file_name = getCleanFilename(final_job_name, default_name)
 
     """
     perl $projectDir/create/create_full_ssn.pl \
@@ -111,11 +114,10 @@ process create_full_ssn {
         --output ssn.xgmml \
         --title "${final_job_name}" \
         --db-version ${params.db_version} \
-        --stats stats.json
+        --stats full_stats.json
     cp ssn.xgmml "${file_name}"
     zip full_ssn.xgmml.zip "${file_name}"
     rm "${file_name}"
-    touch job.finish
     """
 }
 
@@ -139,12 +141,12 @@ workflow {
     // Get annotations
     ssn_meta_file = get_annotations(final_ids.sequence_metadata)
 
-    // Create networks
+    // Create full network
     full_ssn = create_full_ssn(thresholded_blast, input_data.fasta, ssn_meta_file)
 
     if (params.color_ssn) {
         computed = COMPUTE_COLOR_CLUSTER_WORKFLOW(full_ssn.ssn_unzipped)
         colored_ssn = color_ssn(full_ssn.ssn_unzipped, computed.cluster_id_map, computed.cluster_num_map, computed.cluster_colors)
-        zipped_files = zip_files(colored_ssn.ssn)
+        zipped_full_ssn = zip_files(colored_ssn.ssn)
     }
 }
