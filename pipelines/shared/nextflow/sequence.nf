@@ -63,13 +63,13 @@ process get_source_ids {
 
     family_args = ""
     if (params.families) {
-        family_args = "--family " + params.families
+        family_args = "--family \"${params.families}\""
     }
 
     if (params.domain) {
-        family_args = family_args + " --domain " + params.domain_region
+        family_args = "${family_args} --domain ${params.domain_region}"
         if (params.domain_family) {
-            family_args = family_args + " --domain-family " + params.domain_family
+            family_args = "${family_args} --domain-family ${params.domain_family}"
         }
     }
 
@@ -81,8 +81,8 @@ process get_source_ids {
             -i ${params.input_file} \
             -d ${params.import_blast_fasta_db} \
             -m 8 \
-            -e ${params.import_blast_evalue} \
-            -b ${params.import_blast_num_matches} \
+            -e "${params.import_blast_evalue}" \
+            -b "${params.import_blast_num_matches}" \
             -o init_blast.out
         if [[ -s init_blast.out ]]; then
             awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
