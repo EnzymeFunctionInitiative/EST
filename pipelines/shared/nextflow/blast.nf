@@ -34,7 +34,7 @@ process all_by_all_blast {
     """
 }
 
-process blastreduce {
+process blastreduce_old {
     publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
 
     input:
@@ -54,6 +54,27 @@ process blastreduce {
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file allreduce.sql
     duckdb < allreduce.sql
+    """
+}
+
+process blastreduce {
+    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
+
+    input:
+        tuple val(fid), path(blast_files), path(fasta_length_parquet)
+
+    output:
+        tuple val(fid), path("1.out.parquet")
+
+    script:
+    """
+    DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
+    python $projectDir/../shared/blastreduce/map_blast_reduce.py \
+        --blast-output ${blast_files} \
+        --fasta-length-parquet ${fasta_length_parquet} \
+        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-temp-dir \${DUCKDB_TEMP} \
+        --output-file 1.out.parquet
     """
 }
 
