@@ -102,7 +102,7 @@ workflow REPORTING {
         histo_viz = visualize_length_histograms(length_histograms)
 
         files_to_merge_stream = import_stats.mix(stats.stats)
-        files_to_merge_stream.collect().set { files_to_merge }
+        files_to_merge = files_to_merge_stream.collect()
         final_stats = merge_stats(files_to_merge)
 
     emit:

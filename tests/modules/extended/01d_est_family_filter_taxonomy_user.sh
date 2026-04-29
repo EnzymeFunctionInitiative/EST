@@ -12,24 +12,22 @@ mkdir $OUTPUT_DIR
 
 family=$(<$EFI_TEST_FAMILY_ID)
 
-user_filter="$TEST_RESULTS_DIR/${self}_user_filter.json"
+user_filter=$(realpath "$TEST_RESULTS_DIR/${self}_user_filter.json")
 
 cat <<JSON > $user_filter
-[
-    {
-        "name": "bacteria",
-        "operator": "OR",
-        "conditions": [
-            {
-                "field": "domain",
-                "value": "Bacteria"
-            }
-        ]
-    }
-]
+{
+    "name": "archae",
+    "operator": "OR",
+    "conditions": [
+        {
+            "field": "domain",
+            "value": "Archaea"
+        }
+    ]
+}
 JSON
 
-./bin/create_est_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --filter user-file=$user_filter
+./bin/create_est_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --filter user-filter=$user_filter
 bash $OUTPUT_DIR/run_nextflow.sh
 
 ./bin/create_generatessn_nextflow_params.py auto --threshold-min-val 87 --ssn-name testssn --job-name test-ssn --est-output-dir $OUTPUT_DIR --nextflow-config $CONFIG_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME
