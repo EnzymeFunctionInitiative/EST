@@ -67,9 +67,9 @@ process get_source_ids {
     }
 
     if (params.domain) {
-        family_args = "${family_args} --domain ${params.domain_region}"
+        family_args = "${family_args} --domain \"${params.domain_region}\""
         if (params.domain_family) {
-            family_args = "${family_args} --domain-family ${params.domain_family}"
+            family_args = "${family_args} --domain-family \"${params.domain_family}\""
         }
     }
 
