@@ -30,7 +30,7 @@ def connect_duckdb(args: argparse.Namespace) -> duckdb.DuckDBPyConnection:
     conn = duckdb.connect(database=':memory:')
     conn.execute(f"SET memory_limit='{args.duckdb_memory_limit}';")
     conn.execute(f"SET temp_directory='{args.duckdb_temp_dir}';")
-    conn.execute("SET threads={args.duckdb_threads};")
+    conn.execute(f"SET threads={args.duckdb_threads};")
 
     return conn
 
@@ -93,7 +93,7 @@ def merge_and_sort(args: argparse.Namespace, conn: duckdb.DuckDBPyConnection):
         )
         SELECT * FROM global_dedup
         ORDER BY alignment_score DESC
-    ) TO '{args.output_file}' (FORMAT 'parquet', COMPRESSION '{args.compression}');
+    ) TO '{args.output_file}' (FORMAT 'parquet', COMPRESSION '{args.duckdb_compression}');
     """
     conn.execute(final_query)
 
