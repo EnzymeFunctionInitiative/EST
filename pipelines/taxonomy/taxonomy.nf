@@ -53,8 +53,13 @@ workflow {
     // Process the sunburst_stats.json and import_stats.json files
     process_sunburst_stats(sunburst_data.stats_file, sequence_id_files.import_stats)
 
+
+
+
     // Get fasta file of UniProtKB-level sequences
     fasta_file = get_sequences(sequence_id_files.accession_table, params.fasta_db)
+    fasta_file.view()
+    println fasta_file.getClass()
 
     // Plot the sequence lengths for UniProtKB, Uniref90, Uniref50
     seq_versions = ["uniprot", "uniref90", "uniref50"]
@@ -63,8 +68,13 @@ workflow {
     length_histograms = get_length_histogram(fasta_file, sequence_id_files.accession_table, seq_version_ch)
     histo_viz = visualize_length_histograms(length_histograms)
 
+    fasta_file.view()
+    println fasta_file.getClass()
     // Make Blast sequence database
-    create_blast_db(fasta_file)
+    fasta_file_tuple = fasta_file.map { fasta_file -> tuple("ALL_DATA", fasta_file) }
+    fasta_file_tuple.view()
+
+    create_blast_db(fasta_file_tuple)
 
 }
 

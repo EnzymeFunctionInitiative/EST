@@ -1,6 +1,5 @@
 
-include { visualize_length_histograms } from "../../shared/nextflow/reporting.nf"
-include { get_length_histogram } from "../../shared/nextflow/sequence.nf"
+include { get_length_histogram; visualize_length_histograms } from "../../shared/nextflow/reporting.nf"
 include { merge_stats } from "../../shared/nextflow/util.nf"
 
 process compute_stats {

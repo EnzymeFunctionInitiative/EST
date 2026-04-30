@@ -138,19 +138,3 @@ process get_sequences {
     """
 }
 
-process get_length_histogram {
-    input:
-        path fasta_file
-        path accession_table
-        val seq_version
-    output:
-        path("${seq_version}.histogram.txt"), emit: histograms
-    """
-    python $projectDir/../shared/python/compute_length_histogram.py \
-        --fasta-file ${fasta_file} \
-        --accession-table ${accession_table} \
-        --seq-type ${seq_version} \
-        --output-file ${seq_version}.histogram.txt
-    """
-}
-
