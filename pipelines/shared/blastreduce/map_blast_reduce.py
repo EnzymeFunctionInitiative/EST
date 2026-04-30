@@ -4,6 +4,13 @@ import glob
 import os
 
 def get_args() -> argparse.ArgumentParser:
+    """
+    Obtain the command line arguments.
+
+    Returns
+    -------
+        argparse Namespace containing the input parameters and output file path
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--blast-output", type=str, nargs="+", help="Path to directory containing the BLAST output files")
     parser.add_argument("--fasta-length-parquet", type=str, help="Path to the FASTA file to transcode")
@@ -25,6 +32,19 @@ def get_args() -> argparse.ArgumentParser:
     return parser.parse_args()
 
 def connect_duckdb(args: argparse.Namespace) -> duckdb.DuckDBPyConnection:
+    """
+    Create a connection to a duckdb instance.  We do computations using the duckdb library.
+    duckdb pages data to local temp storage directory if it runs out of RAM.
+
+    Parameters
+    ----------
+        args
+            argparse Namespace containing duckdb parameters
+
+    Returns
+    -------
+        connection to duckdb database in memory
+    """
 
     # Initialize DuckDB connection with strict limits
     conn = duckdb.connect(database=':memory:')
@@ -35,6 +55,18 @@ def connect_duckdb(args: argparse.Namespace) -> duckdb.DuckDBPyConnection:
     return conn
 
 def load_input(args: argparse.Namespace, conn: duckdb.DuckDBPyConnection):
+    """
+    Load all of the sharded input files into the in-memory (and paged if necessary) database.
+    These are de-duplicated and sorted individually to improve performance.  They are written
+    to the temporary directory for use in a later step.
+
+    Parameters
+    ----------
+        args
+            argparse Namespace containing path to the input BLAST parquet files, temp dir
+        conn
+            duckdb connection object
+    """
     os.makedirs(args.duckdb_temp_dir, exist_ok=True)
 
     print("Loading sequence lengths...")
@@ -45,6 +77,17 @@ def load_input(args: argparse.Namespace, conn: duckdb.DuckDBPyConnection):
     for i, file in enumerate(args.blast_output):
         temp_out = os.path.join(args.duckdb_temp_dir, f"chunk_{i}.parquet")
 
+        # This query does two things:
+        #     1. Loads the given shard, partitions it, and removes duplicate entries (e.g. multiple
+        #        occurrences of a query-subject pair).  It does this by grouping them using an
+        #        SQL partition and numbering each row in a group, then removing them by choosing
+        #        only the first row.
+        #     2. Collect only the relevant parameters, such as query and subject IDs, percent
+        #        identity, alignment length, bitscore, query length, subject length, and computing
+        #        an alignment score.
+        #
+        # It writes the output to a new database in the temporary directory so the process doesn't
+        # need to keep the entire dataset in memory.
         query = f"""
         COPY (
             WITH local_dedup AS (
@@ -74,11 +117,26 @@ def load_input(args: argparse.Namespace, conn: duckdb.DuckDBPyConnection):
         print(f"Processed file {i+1}/{len(args.blast_output)}")
 
 def merge_and_sort(args: argparse.Namespace, conn: duckdb.DuckDBPyConnection):
+    """
+    Merge all of the files processed in the previous step, perform a final de-duplication, and sort
+    them into the necessary order.
 
-    # Global merge and final sort
-    print("Starting Phase 2: Global merge and final sort...")
+    Parameters
+    ----------
+        args
+            argparse Namespace containing path to the input BLAST parquet files, temp dir
+        conn
+            duckdb connection object
+    """
+    # Get all of the temporary files
+    print("Starting global merge and final sort...")
     temp_glob = os.path.join(args.duckdb_temp_dir, "chunk_*.parquet")
 
+    # This query does two things:
+    #     1. Removes duplicates (e.g. multiple instances of the same query-subject pair).  While
+    #        this was handled in the previous step, there may be edge cases in which matches
+    #        occur in separate shards, so this is a final safety de-duplication to cover all cases.
+    #     2. Sort by alignment score and save to output file.
     final_query = f"""
     COPY (
         WITH global_dedup AS (
