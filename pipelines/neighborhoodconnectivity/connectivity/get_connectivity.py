@@ -3,6 +3,7 @@ import collections
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import os
+from pyEFI.nb_conn_colormap import get_nb_conn_colormap
 import re
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -19,7 +20,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--output-map", type=str, required=True, help="Output map file")
     parser.add_argument("--include-meta", action="store_true", help="Include min/max meta row")
     parser.add_argument("--cdhit", type=str, help="CD-HIT cluster file to filter by")
-    parser.add_argument("--matplotlib-colormap", type=str, default="viridis", help="The type of colorbar to use (acceptable values are ones supported by matplotlib color maps")
+    parser.add_argument("--matplotlib-colormap", type=str, help="The type of colorbar to use (acceptable values are ones supported by matplotlib color maps, e.g.  'viridis', 'jet', 'coolwarm', etc.). If not specified, a custom internal one is used")
 
     args = parser.parse_args()
 
@@ -217,7 +218,12 @@ def save_table(args: argparse.Namespace, min_nc: float, max_nc: float, NC: Dict[
     """
 
     # Initialize Matplotlib color mapping setup
-    cmap = plt.get_cmap(args.matplotlib_colormap) 
+    if args.matplotlib_colormap:
+        # Use matplotlib standard
+        cmap = plt.get_cmap(args.matplotlib_colormap)
+    else:
+        # Use custom EFI
+        cmap = get_nb_conn_colormap()
     norm = mpl.colors.Normalize(vmin=min_nc, vmax=max_nc)
 
     # Generate colors based on NC value and attach to final dictionary
@@ -226,7 +232,7 @@ def save_table(args: argparse.Namespace, min_nc: float, max_nc: float, NC: Dict[
         # Generates a standard Cytoscape-friendly hex string (e.g. #440154)
         NC[nid]['color'] = mpl.colors.to_hex(cmap(norm(val))).upper()
 
-    # Write output map 
+    # Write output map
     with open(args.output_map, 'w') as f:
         # Save a header line containing min and max
         if args.include_meta:
