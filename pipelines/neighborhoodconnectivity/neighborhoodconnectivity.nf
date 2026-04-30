@@ -12,7 +12,7 @@ process compute_connectivity {
 
     script:
     """
-    perl $projectDir/connectivity/get_connectivity.pl \
+    perl $projectDir/connectivity/get_connectivity.py \
         --input-xgmml ${ssn_file} \
         --output-map nc.tab
     """
@@ -54,9 +54,9 @@ process make_legend {
 
     script:
     """
-    perl $projectDir/color/make_color_ramp.pl \
-        --input ${nc_table} \
-        --output legend.png
+    perl $projectDir/color/make_color_ramp.py \
+        --input-file ${nc_table} \
+        --output-file legend.png
     """
 }
 
