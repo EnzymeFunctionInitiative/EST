@@ -1,8 +1,9 @@
 import argparse
-import sys
-import os
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import os
+from pyEFI.nb_conn_colormap import get_nb_conn_colormap
+import sys
 
 def is_numeric(val):
     try:
@@ -24,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max", type=float, help="Maximum value for the ramp")
     parser.add_argument("--input-file", type=str, help="Input TSV file to infer min/max")
     parser.add_argument("--output-file", type=str, required=True, help="Output PNG file path")
-    parser.add_argument("--matplotlib-colormap", type=str, default="viridis", help="The type of colorbar to use (acceptable values are ones supported by matplotlib color maps")
+    parser.add_argument("--matplotlib-colormap", type=str, help="The type of colorbar to use (acceptable values are ones supported by matplotlib color maps, e.g.  'viridis', 'jet', 'coolwarm', etc.). If not specified, a custom internal one is used")
 
     args = parser.parse_args()
 
@@ -117,22 +118,26 @@ def plot_color_ramp(args: argparse.Namespace):
     print(f"Found color min {args.min} and max {args.max}")
 
     # Set up the colormap and normalization range
-    # 'viridis', 'jet', 'coolwarm', etc.
-    cmap = plt.get_cmap(args.matplotlib_colormap) 
+    if args.matplotlib_colormap:
+        # Use matplotlib standard
+        cmap = plt.get_cmap(args.matplotlib_colormap) 
+    else:
+        # Use custom EFI
+        cmap = get_nb_conn_colormap()
     norm = mpl.colors.Normalize(vmin=args.min, vmax=args.max)
 
     # Draw the color ramp (colorbar)
     cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
 
     # Configure the labels and ticks
-    cb.set_label('Network Connectivity', fontsize=20, labelpad=15)
+    cb.set_label('Neighborhood Connectivity', fontsize=20, labelpad=15)
     ax.tick_params(labelsize=14)
 
     # Adjust canvas layout to accommodate labels
     plt.subplots_adjust(bottom=0.45, top=0.85, left=0.03, right=0.97)
 
     # Save the output
-    plt.savefig(args.output_file)
+    plt.savefig(args.output_file, bbox_inches='tight')
     print(f"Successfully wrote {args.output_file}")
 
 if __name__ == "__main__":
