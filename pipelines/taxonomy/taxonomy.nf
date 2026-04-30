@@ -1,5 +1,6 @@
 
 include { filter_ids; get_source_ids; get_user_filter_file; get_sequences; get_length_histogram } from "../shared/nextflow/sequence.nf"
+include { create_blast_db } from "../shared/nextflow/blast.nf"
 
 process get_sunburst_data {
     publishDir params.final_output_dir, mode: 'copy'
@@ -31,20 +32,6 @@ process process_sunburst_stats {
         --stats-file ${sunburst_stats_file} \
         ${import_stats_file} \
         --output stats.json
-    """
-}
-
-process create_blast_db {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path fasta_file
-
-    script:
-    """
-    formatdb \
-        -i $fasta_file \
-        -n database \
-        -p T -o T
     """
 }
 
