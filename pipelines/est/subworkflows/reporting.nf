@@ -1,4 +1,5 @@
 
+include { visualize_length_histograms } from "../../shared/nextflow/reporting.nf"
 include { get_length_histogram } from "../../shared/nextflow/sequence.nf"
 include { merge_stats } from "../../shared/nextflow/util.nf"
 
@@ -41,7 +42,7 @@ process visualize_boxplot_stats {
         path '*.png', emit: plots
     """
     python $projectDir/visualization/plot_blast_results.py \
-        --boxplot-stats $boxplot_stats \
+ets directly. Exposure can be a        --boxplot-stats $boxplot_stats \
         --job-id ${params.job_id} \
         --length-plot-filename alignment_length \
         --pident-plot-filename percent_identity \
@@ -52,29 +53,6 @@ process visualize_boxplot_stats {
         --length-json-filename alignment_length.json \
         --pident-json-filename percent_identity.json \
         --edge-hist-json-filename number_of_edges.json
-    """
-}
-
-process visualize_length_histograms {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path length_histogram_file
-    output:
-        path '*.json', emit: json
-        path '*.png', emit: plots
-    """
-    base_name=\$(basename "${length_histogram_file}" .histogram.txt)
-    python $projectDir/../shared/python/plot_length_data.py \
-        --lengths $length_histogram_file \
-        --job-id ${params.job_id} \
-        --frac 1 \
-        --plot-filename length_histogram_\${base_name} \
-        --output-type png \
-        --proxies sm:48
-    python $projectDir/visualization/export_length_histogram_json.py \
-        --lengths $length_histogram_file \
-        --frac 1 \
-        --output-json-filename length_histogram_\${base_name}.json 
     """
 }
 
