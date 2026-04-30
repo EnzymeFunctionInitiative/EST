@@ -42,7 +42,7 @@ process visualize_boxplot_stats {
         path '*.png', emit: plots
     """
     python $projectDir/visualization/plot_blast_results.py \
-ets directly. Exposure can be a        --boxplot-stats $boxplot_stats \
+	--boxplot-stats $boxplot_stats \
         --job-id ${params.job_id} \
         --length-plot-filename alignment_length \
         --pident-plot-filename percent_identity \

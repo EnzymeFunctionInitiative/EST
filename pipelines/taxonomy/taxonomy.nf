@@ -1,6 +1,7 @@
 
 include { filter_ids; get_source_ids; get_user_filter_file; get_sequences; get_length_histogram } from "../shared/nextflow/sequence.nf"
 include { create_blast_db } from "../shared/nextflow/blast.nf"
+include { visualize_length_histograms } from "../shared/nextflow/reporting.nf"
 
 process get_sunburst_data {
     publishDir params.final_output_dir, mode: 'copy'
