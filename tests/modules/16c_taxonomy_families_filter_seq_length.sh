@@ -11,6 +11,6 @@ rm -rf $OUTPUT_DIR
 
 family=$(<$EFI_TEST_FAMILY_ID)
 
-./bin/create_taxonomy_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --filter min_seq_length=10 --filter max_seq_length=150
+./bin/create_taxonomy_nextflow_params.py family --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME --fasta-db $EFI_FASTA_DB --families $family --sequence-version uniprot --nextflow-config $CONFIG_FILE --filter min_seq_length=10 --filter max_seq_length=150
 bash $OUTPUT_DIR/run_nextflow.sh
 

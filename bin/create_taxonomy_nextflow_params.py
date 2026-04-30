@@ -15,6 +15,7 @@ def add_args(parser: argparse.ArgumentParser):
     """
     # General parameters
     common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument("--fasta-db", type=str, required=True, help="FASTA file or BLAST database to retrieve sequences from")
     common_parser.add_argument("--sequence-version", type=str, choices=["uniprot", "uniref90", "uniref50"])
     common_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
     common_parser.add_argument("--input-file", type=str, help="Input file containing the information needed to gather sequences. Used in ACCESSIONS, BLAST, and FASTA import modes.")
@@ -47,6 +48,10 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     else:
         args = validated_args
 
+    if len(glob.glob(f"{args.fasta_db}.*")) == 0:
+        print(f"FASTA database '{args.fasta_db}' not found")
+        fail = True
+
     # Handle a sequence-specifying input file for BLAST, ACCESSION, and FASTA input modes
     if args.input_file and not os.path.exists(args.input_file):
         print(f"Input file for sequence importing '{args.input_file}' does not exist")
@@ -78,7 +83,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, efi_db,
+def render_params(output_dir, import_mode, sequence_version, job_id, efi_config, fasta_db, efi_db,
                   families=None, sequence_filter=None, input_file=None,
                   **kwargs: dict):
     params = {
@@ -89,6 +94,7 @@ def render_params(output_dir, import_mode, sequence_version, job_id, efi_config,
         "job_id": job_id,
         "efi_config": efi_config,
         "efi_db": efi_db,
+        "fasta_db": fasta_db,
         "import_mode": import_mode,
     }
     if families is not None:
