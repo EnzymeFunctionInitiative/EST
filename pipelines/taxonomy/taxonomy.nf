@@ -34,6 +34,20 @@ process process_sunburst_stats {
     """
 }
 
+process create_blast_db {
+    publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path fasta_file
+
+    script:
+    """
+    formatdb \
+        -i $fasta_file \
+        -n database \
+        -p T -o T
+    """
+}
+
 workflow {
 
     // We get sequence IDs and basic metadata from the input source, including those in FASTA files
@@ -61,7 +75,8 @@ workflow {
     length_histograms = get_length_histogram(fasta_file, sequence_id_files.accession_table, seq_version_ch)
     histo_viz = visualize_length_histograms(length_histograms)
 
-    // Make Blast sequence database 
+    // Make Blast sequence database
+    create_blast_db(fasta_file)
 
 }
 
