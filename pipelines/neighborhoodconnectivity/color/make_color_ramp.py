@@ -5,13 +5,6 @@ import os
 from pyEFI.nb_conn_colormap import get_nb_conn_colormap
 import sys
 
-def is_numeric(val):
-    try:
-        float(val)
-        return True
-    except ValueError:
-        return False
-
 def parse_args() -> argparse.Namespace:
     """
     Parse the command line arguments.
@@ -72,7 +65,8 @@ def update_min_max_from_file(args: argparse.Namespace):
             k = parts[0]
             v = parts[1:]
 
-            # Check for the _META row to get the min max from that row, otherwise compute from data
+            # Check for the _META row to get the global min and max, avoiding scanning the file;
+            # otherwise compute from data
             if k == "_META" and len(v) >= 4:
                 min_val = float(v[1] if v[0] == "min" else v[3])
                 max_val = float(v[3] if v[2] == "max" else v[1])
@@ -80,12 +74,13 @@ def update_min_max_from_file(args: argparse.Namespace):
                 break
 
             # Check if the second column (v[0]) is numeric to find min/max dynamically
-            if len(v) > 0 and is_numeric(v[0]):
-                val = float(v[0])
-                if val < new_min:
-                    new_min = val
-                if val > new_max:
-                    new_max = val
+            if v:
+                try:
+                    val = float(v[0])
+                    new_min = min(new_min, val)
+                    new_max = max(new_max, val)
+                except ValueError:
+                    pass
 
     if not found_min_max:
         min_val = new_min
@@ -105,24 +100,23 @@ def plot_color_ramp(args: argparse.Namespace):
             input file or command line arguments, and the output file path
     """
     # Setup the figure canvas
-    # The Perl script used 1650x150 pixels. 
-    # At 100 DPI, 16.5 x 1.5 inches provides the exact same canvas size.
-    fig, ax = plt.subplots(figsize=(16.5, 1.5), dpi=100)
+    fig, ax = plt.subplots(figsize=(16.5, 1.5), dpi=300)
 
     if args.min is None or args.max is None or args.min == float('inf'):
-        print(f"Min/max error {args.min} {args.max}: saving empty image")
-        ax.axis('off')
-        plt.savefig(args.output_file, bbox_inches='tight')
-        return
+        sys.exit(f"Min/max error {args.min} {args.max}")
 
     print(f"Found color min {args.min} and max {args.max}")
 
     # Set up the colormap and normalization range
     if args.matplotlib_colormap:
-        # Use matplotlib standard
-        cmap = plt.get_cmap(args.matplotlib_colormap) 
+        # Ensure that the input color map is one of the standard matplotlib color maps
+        try:
+            cmap = plt.get_cmap(args.matplotlib_colormap)
+        except:
+            # Use custom EFI mapping if the color map was invalid
+            cmap = get_nb_conn_colormap()
     else:
-        # Use custom EFI
+        # Use custom EFI mapping
         cmap = get_nb_conn_colormap()
     norm = mpl.colors.Normalize(vmin=args.min, vmax=args.max)
 

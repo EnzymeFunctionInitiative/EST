@@ -8,11 +8,6 @@ import re
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-try:
-    import cdhit_reader
-except ImportError:
-    print("Warning: 'cdhit-reader' package is not installed. If you are using the --cdhit flag, please install it via 'pip install cdhit-reader'.", file=sys.stderr)
-
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Calculate Neighborhood Connectivity and map to colors.")
     parser.add_argument("--input-blast", type=str, help="Input blast (TSV) file")
@@ -61,8 +56,8 @@ def parse_blast_line(line: str, filter_ids: Set[str], use_cdhit: bool) -> Tuple[
         filter_ids
             Set of cluster IDs in a cd-hit file
         use_cdhit
-            true to search in the filter_ids set to return only if either query or subject are
-            in the set, false to return always
+            If true, only return the IDs if the source and target IDs are present in input
+            filter_ids; if false, return any valid source and target IDs
 
     Returns
     -------
@@ -105,9 +100,9 @@ def parse_xgmml_line(line: str) -> Tuple[Optional[str], Optional[str]]:
 
     return None, None
 
-def parse_input(args: argparse.Namespace) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
+def parse_input(args: argparse.Namespace) -> Dict[str, List[str]]:
     """
-    Parse the input file (either BLAST or XGMML) and save degree and neighborhood.
+    Parse the input file (either BLAST or XGMML) and save degrees of each node.
 
     Parameters
     ----------
@@ -116,7 +111,7 @@ def parse_input(args: argparse.Namespace) -> Tuple[Dict[str, int], Dict[str, Lis
 
     Returns
     -------
-        Tuple containing dictionary of degrees, and dictionary of neighbor list
+        Dictionary of neighbor list
     """
 
     filter_ids = set()
@@ -127,11 +122,10 @@ def parse_input(args: argparse.Namespace) -> Tuple[Dict[str, int], Dict[str, Lis
         use_cdhit = True
 
     # Graph data structures
-    degree = collections.defaultdict(int)
     neighbors = collections.defaultdict(list)
 
     # Determine input type, either a BLAST file or a XGMML file, and create a callback to
-    # handle the parsing line
+    # handle parsing the line
     if args.input_blast:
         in_file = args.input_blast
         parse_fn = lambda l: parse_blast_line(l, filter_ids, use_cdhit)
@@ -145,28 +139,23 @@ def parse_input(args: argparse.Namespace) -> Tuple[Dict[str, int], Dict[str, Lis
             source, target = parse_fn(line)
             if not source:
                 continue
-            degree[source] += 1
-            degree[target] += 1
             neighbors[source].append(target)
             neighbors[target].append(source)
 
     # Ensure all CD-HIT cluster reps are present (even those with a degree of 0)
     if use_cdhit:
         for nid in filter_ids:
-            if nid not in degree:
-                degree[nid] = 0
+            if nid not in neighbors:
                 neighbors[nid] = []
 
-    return degree, neighbors
+    return neighbors
 
-def compute_connectivity(degree: Dict[str, int], neighbors: Dict[str, List[str]]) -> Tuple[float, float, Dict[str, Any]]:
+def compute_connectivity(neighbors: Dict[str, List[str]]) -> Tuple[float, float, Dict[str, Any]]:
     """
-    Compute neighborhood connectivity and assign colors, and save a table with connectivity and colors.
+    Compute neighborhood connectivity.
 
     Parameters
     ----------
-        degree
-            Dictionary of node degree mapping
         neighbors
             Dictionary of neighborhood data
 
@@ -184,15 +173,17 @@ def compute_connectivity(degree: Dict[str, int], neighbors: Dict[str, List[str]]
     min_nc = float('inf')
 
     # Calculate Neighborhood Connectivity
-    for nid, k in degree.items():
-        nc_sum = sum(degree[n] for n in neighbors[nid])
+    for nid, nb_list in neighbors.items():
+        k = len(nb_list)
+        nc_sum = sum(len(neighbors[n]) for n in nb_list)
 
-        # Perform rounding
-        val = int((nc_sum * 100) / k) / 100.0 if k > 0 else 0.0
+        # Compute factor and convert to percentage
+        val = (nc_sum * 100) / k if k > 0 else 0.0
 
         NC[nid] = {'nc': val}
-        if val > max_nc: max_nc = val
-        if val < min_nc: min_nc = val
+
+        min_nc = min(min_nc, val)
+        max_nc = max(max_nc, val)
 
     # Handle empty graph fallbacks smoothly
     if min_nc > max_nc:
@@ -203,7 +194,7 @@ def compute_connectivity(degree: Dict[str, int], neighbors: Dict[str, List[str]]
 
 def save_table(args: argparse.Namespace, min_nc: float, max_nc: float, NC: Dict[str, Any]) -> None:
     """
-    Save a table with connectivity and colors.
+    Save a table with connectivity and color for each node in the network.
 
     Parameters
     ----------
@@ -240,10 +231,10 @@ def save_table(args: argparse.Namespace, min_nc: float, max_nc: float, NC: Dict[
 
         f.write("ID\tNC\tCOLOR\n")
         for nid in sorted(NC.keys()):
-            f.write(f"{nid}\t{NC[nid]['nc']}\t{NC[nid]['color']}\n")
+            f.write(f"{nid}\t{NC[nid]['nc']:.2f}\t{NC[nid]['color']}\n")
 
 if __name__ == "__main__":
     args = get_args()
-    degree, neighbors = parse_input(args)
-    min_nc, max_nc, NC = compute_connectivity(degree, neighbors)
+    neighbors = parse_input(args)
+    min_nc, max_nc, NC = compute_connectivity(neighbors)
     save_table(args, min_nc, max_nc, NC)
