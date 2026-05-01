@@ -92,6 +92,7 @@ process condense_redundant {
 }
 
 process create_blast_db {
+    publishDir params.final_output_dir, mode: 'copy', pattern: "{database.*}"
     input:
         tuple val(fid), path(fasta_file)
 
