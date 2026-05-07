@@ -168,8 +168,10 @@ sub validateInputBlast {
     # Grab first line of file
     open my $fh, "<", $inputBlast or die "Unable to read input BLAST file '$inputBlast': $!";
     my $line = "";
-    while (not ($line = <$fh>)) {};
+    while (not ($line = <$fh>) and not eof($fh)) {};
     close $fh;
+
+    return (VALID, undef, 0) if not $line;
 
     my ($sid, $qid, @p) = split(m/\t/, $line);
     my $seqType = get_sequence_type($sid);
