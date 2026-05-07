@@ -44,7 +44,7 @@ sub write {
     my $sequences = shift;
     my $connectivity = shift;
     my $title = shift;
-    my $edges = shift;
+    my $edgeGenerator = shift;
 
     $self->{sequences} = $sequences;
     $self->{metadata} = $metadata;
@@ -65,7 +65,7 @@ sub write {
 
     $self->writeNodes(\@ids, $attrs);
 
-    $self->writeEdges($edges);
+    $self->writeEdges($edgeGenerator);
 
     $self->writeClosing();
 
@@ -185,13 +185,14 @@ sub writeNode {
 # Writes the edges to the file.
 #
 # Parameters:
-#    $edges - array ref of edge data
+#    $edgeGenerator - generator returning edge data every time it is called
 #
 sub writeEdges {
     my $self = shift;
-    my $edges = shift;
+    my $edgeGenerator = shift;
 
-    foreach my $edge (@$edges) {
+    # Read edges from the file line-by-line
+    while (my $edge = $edgeGenerator->()) {
         $self->writeEdge($edge);
         $self->{stats}->{num_edges}++;
     }
