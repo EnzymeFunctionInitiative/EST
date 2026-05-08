@@ -11,6 +11,10 @@ process create_gnd {
 
     script:
     def blastHitsArgs = params.import_mode == "blast" ? "--blast-evalues ${blast_evalue_file}" : ""
+    
+    // If there was no job name specified, then assign a default
+    def final_job_name = params.job_name ?: "Sequence Source: ${params.sequence_version}, nNeighbors: ${params.nb_size}"
+
     """
     perl ${projectDir}/create_gnd.pl \
         --efi-config "${params.efi_config}" \
@@ -20,6 +24,7 @@ process create_gnd {
         --nb-size ${params.nb_size} \
         --gnd gnd.sqlite \
         --stats stats.json \
+        --title "${final_job_name}" \
         ${blastHitsArgs}
     zip gnd.sqlite.zip gnd.sqlite
     """
@@ -134,14 +139,15 @@ workflow {
 
     if (params.import_mode == "accessions") {
         parse_data = parse_accession_for_ids(input_file_ch)
-        extra_metadata_file = Channel.empty()
+        extra_metadata_file = Channel.value([])
     } else if (params.import_mode == "blast") {
         blast_results = run_blast(input_file_ch)
         parse_data = parse_blast_results_for_ids(input_file_ch, blast_results.raw_blast_out)
         extra_metadata_file = blast_results.e_values
     } else if (params.import_mode == "fasta") {
         parse_data = parse_fasta_for_ids(input_file_ch)
-        extra_metadata_file = Channel.empty()
+        extra_metadata_file = Channel.value([])
+        //extra_metadata_file = Channel.empty()
     } else {
         error "Mode '${params.import_mode}' is invalid"
     }
