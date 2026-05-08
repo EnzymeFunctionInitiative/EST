@@ -70,6 +70,10 @@ sub save {
         $self->{uniref}->insertUnirefMapping($clusterData, $networkType, $uniref50IdMapping, $uniref90IdMapping, $idIndexMap, $idClusterMap);
     }
 
+    if ($args{blast_evalues}) {
+	    # handle blast evalues being added to the GND table...
+    }
+
     $self->{dbh}->commit();
 
     my $numIds = scalar keys %$idIndexMap;

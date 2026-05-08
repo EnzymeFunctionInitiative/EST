@@ -69,6 +69,12 @@ if ($opts->{sequence_version} ne SEQ_UNIPROT) {
     $args{metanode_mapping} = $uniprotMapping;
 }
 
+# Read the blast_hits.tab file to get the array of blast_evalues to the query sequence
+if (defined $opts->{blast_evalues}) {
+    my blastEvalues = parse_blast_hits($opts->{blast_evalues})
+    $args{blast_evalues} = $blastEvalues
+}
+
 my $numIdsSaved = $gnd->save($opts->{gnd}, $gnn, $metadata, %args);
 if (not $numIdsSaved) {
     die "Unable to save GND to '$opts->{gnd}'";
@@ -96,6 +102,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("source-type=s", 0, "the source of the data provided, e.g. BLAST, FASTA, ID list");
     $optParser->addOption("source-sequence-file=s", 0, "path to a file containing the sequence used to generate the results, only valid for BLAST sources");
     $optParser->addOption("stats=s", 0, "path to file to output GND statistics to");
+    $optParser->addOption("blast-evalues=s", 0, "path to file containing e-values for the BLAST alignment results for gathered sequence");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
