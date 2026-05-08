@@ -14,7 +14,7 @@ use EFI::SSN::XgmmlWriter;
 use EFI::Util::FASTA qw(read_fasta_file);
 use EFI::Util::FileStats qw(save_stats);
 
-use constant DEFAULT_MAX_EDGES => 10000000;
+use constant DEFAULT_MAX_EDGES => 200000000;
 use constant VALID => 1;
 
 
