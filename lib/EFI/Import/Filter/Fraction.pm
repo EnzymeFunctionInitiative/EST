@@ -33,6 +33,8 @@ sub applyFilter {
     # Get only IDs that originated from the family
     my @ids = grep { $idSources->{$_} eq FIELD_SEQ_SRC_VALUE_FAMILY } keys %$idSources;
 
+    # Get the list of SwissProt IDs; we always keep these, even if they meet the fraction
+    # filter
     my $sql = "SELECT accession, swissprot_status FROM annotations WHERE accession IN (<IDS>) AND swissprot_status = 1";
     my $swissProts = $self->getMatchedSequences(\@ids, $sql);
 
