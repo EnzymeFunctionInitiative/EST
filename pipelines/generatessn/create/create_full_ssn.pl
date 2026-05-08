@@ -1,17 +1,12 @@
-#!/usr/bin/env perl
 
 use strict;
 use warnings;
 
 use FindBin;
-use Getopt::Long;
-use JSON;
-use List::MoreUtils qw{uniq};
 
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Annotations::Fields qw(:annotations);
-use EFI::EST::AlignmentScore qw(compute_ascore);
 use EFI::Options;
 use EFI::Sequence::Collection;
 use EFI::Sequence::Type qw(get_sequence_type);
@@ -19,7 +14,7 @@ use EFI::SSN::XgmmlWriter;
 use EFI::Util::FASTA qw(read_fasta_file);
 use EFI::Util::FileStats qw(save_stats);
 
-use constant DEFAULT_MAX_EDGES => 10000000;
+use constant DEFAULT_MAX_EDGES => 200000000;
 use constant VALID => 1;
 
 
@@ -48,10 +43,10 @@ my $sequences = read_fasta_file($opts->{fasta});
 
 my $connectivity = loadConnectivity($opts->{nc_map});
 
-my $edges = loadEdges($opts->{blast});
+my $edgeGenerator = loadEdges($opts->{blast});
 
 my $writer = new EFI::SSN::XgmmlWriter(output_file => $opts->{output}, use_min_edge_attr => $opts->{use_min_edge_attr}, db_version => $dbVersion, seq_type => $seqType);
-$writer->write($inputIds, $sequences, $connectivity, $title, $edges);
+$writer->write($inputIds, $sequences, $connectivity, $title, $edgeGenerator);
 
 
 my $stats = { file_stats => $writer->getStats() };
@@ -76,13 +71,15 @@ save_stats($opts->{stats}, $stats) if $opts->{stats};
 #
 # loadEdges
 #
-# Loads the SSN edges by reading the BLAST results file and computing the alignment score.
+# Creates a generator function that returns edge data every time it is called.
 #
 # Parameters:
 #    $inputBlast - path to input BLAST file from all-by-all
 #
 # Returns:
-#    array ref of edges, with each edge being a hash ref of edge data
+#    A "generator" function that yields edge data every time it is called.  The data returned
+#    by the iterator contains a hash ref of edge data (source, target, pid, ascore, alen).  The
+#    return value is undef when the end of the file is reached
 #
 # Notes:
 #
@@ -92,26 +89,24 @@ save_stats($opts->{stats}, $stats) if $opts->{stats};
 sub loadEdges {
     my $inputBlast = shift;
 
-    # Write edges to the SSN
     open my $bfh, "<", $inputBlast or die "Could not open BLAST file '$inputBlast': $!";
 
-    my @edges;
+    return sub {
+        my $line = <$bfh>;
+        return if not $line;
 
-    while (my $line = <$bfh>) {
         chomp $line;
 
-        my @parts = split /\t/, $line;
-        #   0     1     2     3      4          5      6
-        my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen) = @parts;
+        my ($qid, $sid, $pid, $alen, $bitscore, $qlen, $slen, $alignmentScore) = split(/\t/, $line);
 
-        my $alignmentScore = compute_ascore(@parts);
-
-        push @edges, { source => $qid, target => $sid, pid => $pid, ascore => $alignmentScore, alen => $alen };
+        return {
+            source => $qid,
+            target => $sid,
+            pid => $pid,
+            ascore => $alignmentScore,
+            alen => $alen,
+        };
     }
-
-    close $bfh;
-
-    return \@edges;
 }
 
 
@@ -168,8 +163,10 @@ sub validateInputBlast {
     # Grab first line of file
     open my $fh, "<", $inputBlast or die "Unable to read input BLAST file '$inputBlast': $!";
     my $line = "";
-    while (not ($line = <$fh>)) {};
+    while (not ($line = <$fh>) and not eof($fh)) {};
     close $fh;
+
+    return (VALID, undef, 0) if not $line;
 
     my ($sid, $qid, @p) = split(m/\t/, $line);
     my $seqType = get_sequence_type($sid);

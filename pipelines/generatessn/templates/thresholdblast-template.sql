@@ -4,7 +4,7 @@ SET threads TO 1;
 SET preserve_insertion_order = false;
 
 COPY (
-    SELECT qseqid, sseqid, pident, alignment_length, bitscore, query_length, subject_length
+    SELECT qseqid, sseqid, pident, alignment_length, bitscore, query_length, subject_length, alignment_score
     FROM read_parquet('$blast_output')
     WHERE $threshold_metric >= $threshold_min_val AND
           query_length >= $min_length AND
