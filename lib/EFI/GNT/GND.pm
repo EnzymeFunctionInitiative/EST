@@ -42,6 +42,8 @@ sub save {
     my $matchedIds = $args{matched_ids} // {};
     my $unmatchedIds = $args{unmatched_ids} // [];
 
+    my $blastEValues = $args{blast_evalues} // {};
+
     if (not $self->initializeDatabase($gndFile, $networkType)) {
         return 0;
     }
@@ -58,7 +60,7 @@ sub save {
 
     my $sortSeqIds = $args{sort_sequence_ids} // 0;
 
-    my ($families, $clusterIndex, $idIndexMap, $idClusterMap) = $self->insertClusterData($clusterData, $clusterNames, $sortSeqIds, $unirefSizeMapping);
+    my ($families, $clusterIndex, $idIndexMap, $idClusterMap) = $self->insertClusterData($clusterData, $clusterNames, $sortSeqIds, $unirefSizeMapping, $blastEValues);
     $self->insertMetadata($metadata);
     $self->insertFamilies($families);
     $self->insertClusterIndex($clusterIndex);
@@ -68,10 +70,6 @@ sub save {
 
     if ($networkType ne SEQ_UNIPROT and $uniref50IdMapping and $uniref90IdMapping) {
         $self->{uniref}->insertUnirefMapping($clusterData, $networkType, $uniref50IdMapping, $uniref90IdMapping, $idIndexMap, $idClusterMap);
-    }
-
-    if ($args{blast_evalues}) {
-	    # handle blast evalues being added to the GND table...
     }
 
     $self->{dbh}->commit();
@@ -127,6 +125,8 @@ sub initializeDatabase {
 #        default IDs are ordered as they exist in the input
 #    $unirefSizeMapping - hash ref that maps ID to UniRef sizes; only UniRef IDs will be present,
 #        see EFI::GNT::GND::Uniref::computeUnirefSizeMapping() for format
+#    $blastEValues - has ref that maps ID to blast E-Values; only filled if the GND is associated
+#        with GND Retrieve Diagram job with import_mode BLAST.
 #
 # Returns:
 #    $families - array ref of list of all Pfam and InterPro families that were in the input,
@@ -142,6 +142,7 @@ sub insertClusterData {
     my $clusterNames = shift;
     my $sortSequenceIds = shift;
     my $unirefSizeMapping = shift // {};
+    my $blastEValues = shift // {};
 
     my $families = {};
     # A unique, sequential number for each query ID
@@ -166,6 +167,10 @@ sub insertClusterData {
         $queryData{uniref50_size} = $unirefSizeMapping->{$queryData{id}}->{uniref50} // 0;
         $queryData{&COLOR_COLUMN} = $self->{util}->getColorForPfam($queryData{pfam}, assign_query_gene_color => 1);
         $queryData{cluster_num} = $clusterNum;
+
+	# NOTE
+        $queryData{evalue} = $blastEValues->{$queryData{id}} if exists $blastEValues->{$queryData{id}};
+
         return \%queryData;
     };
 

@@ -54,7 +54,7 @@ my $matchedIds = {};
 my $unmatchedIds = [];
 my $metadata = {
     neighborhood_size => $opts->{nb_size},
-    title => $opts->{title} // "",
+    name => $opts->{title} // "",
     type => $opts->{source_type} // "",
     sequence => $opts->{source_sequence} // "",
 };
@@ -134,7 +134,7 @@ sub parseBlastHits {
     my $blastHitsTab = shift;
     my %results;
     
-    open my $fh, "<" $blastHitsTab or die "Unable to open tabulated blast alignments file '$blastHitsTab': $!";
+    open my $fh, "<", $blastHitsTab or die "Unable to open tabulated blast alignments file '$blastHitsTab': $!";
     while (my $line = <$fh>) {
         chomp $line;
         

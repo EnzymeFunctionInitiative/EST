@@ -13,7 +13,7 @@ process create_gnd {
     def blastHitsArgs = params.import_mode == "blast" ? "--blast-evalues ${blast_evalue_file}" : ""
     
     // If there was no job name specified, then assign a default
-    def final_job_name = params.job_name ?: "Sequence Source: ${params.sequence_version}, nNeighbors: ${params.nb_size}"
+    def final_job_name = params.job_name ?: "${params.import_mode}, Sequence Source: ${params.sequence_version}, nNeighbors: ${params.nb_size}"
 
     """
     perl ${projectDir}/create_gnd.pl \
