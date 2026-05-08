@@ -1,12 +1,8 @@
-#!/usr/bin/env perl
 
 use strict;
 use warnings;
 
 use FindBin;
-use Getopt::Long;
-use JSON;
-use List::MoreUtils qw{uniq};
 
 use lib "$FindBin::Bin/../../../lib";
 
