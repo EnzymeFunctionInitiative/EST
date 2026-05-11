@@ -138,14 +138,14 @@ sub parseBlastHits {
     while (my $line = <$fh>) {
         chomp $line;
         
-        # skip empty lines
+        # Skip empty lines
         next if $line =~ /^\s*$/;
         
-        # expected line formats:
+        # Expected line formats:
         # tr|A0A7C7D6A2|A0A7C7D6A2_9FIRM    9e-148 # returns {"A0A7C7D6A2": "9e-148"} 
         # A0A0U1KYM0                        8e-147 # returns {"A0A0U1KYM0": "8e-147"}
 
-        # split line by tab-separated columns
+        # Split line by tab-separated columns
         my ($col1, $evalue) = split /\t/, $line;
         my $id = ($col1 =~ /^[^|]+\|([^|]+)\|/) ? $1 : $col1;
 

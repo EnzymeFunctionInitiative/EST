@@ -125,7 +125,7 @@ sub initializeDatabase {
 #        default IDs are ordered as they exist in the input
 #    $unirefSizeMapping - hash ref that maps ID to UniRef sizes; only UniRef IDs will be present,
 #        see EFI::GNT::GND::Uniref::computeUnirefSizeMapping() for format
-#    $blastEValues - has ref that maps ID to blast E-Values; only filled if the GND is associated
+#    $blastEValues - hash ref that maps ID to blast E-Values; only filled if the GND is associated
 #        with GND Retrieve Diagram job with import_mode BLAST.
 #
 # Returns:
@@ -167,8 +167,6 @@ sub insertClusterData {
         $queryData{uniref50_size} = $unirefSizeMapping->{$queryData{id}}->{uniref50} // 0;
         $queryData{&COLOR_COLUMN} = $self->{util}->getColorForPfam($queryData{pfam}, assign_query_gene_color => 1);
         $queryData{cluster_num} = $clusterNum;
-
-	# NOTE
         $queryData{evalue} = $blastEValues->{$queryData{id}} if exists $blastEValues->{$queryData{id}};
 
         return \%queryData;
