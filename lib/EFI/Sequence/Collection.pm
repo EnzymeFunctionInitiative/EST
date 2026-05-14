@@ -409,7 +409,7 @@ sub saveMetadataFile {
         my $seq = $self->getSequence($id);
         my @attr = $seq->getAttributeNames();
         foreach my $attr (@attr) {
-            my $value = $seq->packAttributeValue($seq->getAttribute($attr));
+            my $value = $seq->packAttributeValue($seq->getAttribute($attr)) // "";
             $fh->print(join("\t", $id, $attr, $value), "\n");
         }
     }
