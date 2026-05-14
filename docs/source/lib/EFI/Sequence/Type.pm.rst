@@ -32,6 +32,9 @@ SYNOPSIS
    my $seqId = "B0SS77:1:100";
    print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
 
+   my $seqNum = 42;
+   print "New unknown ID is: ", make_unknown_sequence($seqNum), "\n";
+
 
 
 DESCRIPTION
@@ -122,6 +125,43 @@ Example Usage
 
 
 
+``make_unknown_sequence($seqNumber)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Creates an unknown ID from the given sequential number. The return is a
+10-character string beginning with ZZ and followed by additional Zs and
+numbers.
+
+
+
+Parameters
+^^^^^^^^^^
+
+``$seqCount``
+   The sequence number (integer) to format into an unknown sequence ID.
+
+
+
+Returns
+^^^^^^^
+
+String containing the new ID.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $seqNumber = 42;
+   my $id = make_unknown_sequence($seqNumber);
+   print "Unknown sequence ID is: $id\n";
+   # The result is:
+   #    Unknown sequence ID is: ZZZZZZZZ42
+
+
+
 CONSTANTS
 ---------
 
@@ -183,3 +223,44 @@ Example Usage
    my $seqId = "B0SS75:1:100";
    print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
    #prints "Sequence B0SS75 is domain"
+
+
+
+``strip_domain($id)``
+~~~~~~~~~~~~~~~~~~~~~
+
+Strips any domain-related regions from the sequence ID. For example, if
+an ID is ``B0SS77:23:500``, the actual ID is ``B0SS77`` and the domain
+data is ``23:500``.
+
+
+
+Parameters
+^^^^^^^^^^
+
+``$id``
+   Sequence ID, with or without domain regions.
+
+
+
+Returns
+^^^^^^^
+
+Sequence ID without domain regions.
+
+
+
+Example Usage
+^^^^^^^^^^^^^
+
+::
+
+   my $inputSeqId = "B0SS77";
+   my $seqId = strip_domain($inputSeqId);
+   print "$inputSeqId without domain region is $seqId\n";
+   # "B0SS77 without domain region is B0SS77"
+
+   my $inputSeqId = "B0SS77:23:500";
+   my $seqId = strip_domain($inputSeqId);
+   print "$inputSeqId without domain region is $seqId\n";
+   # "B0SS77:23:500 without domain region is B0SS77"
