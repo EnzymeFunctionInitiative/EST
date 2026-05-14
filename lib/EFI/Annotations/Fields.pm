@@ -52,7 +52,7 @@ use constant FIELD_NB_CONN_COLOR => "nb_connectivity_color";
 use constant FIELD_NB_CONN_PRIMARY_COLOR => FIELD_CYTOSCAPE_COLOR;
 
 
-use constant INPUT_SEQ_ID => "ZINPUTSEQ";
+use constant INPUT_SEQ_ID => "ZZINPUTSEQ";
 
 use constant ANNO_ROW_SEP => "^";
 
