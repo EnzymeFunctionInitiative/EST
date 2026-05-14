@@ -297,7 +297,7 @@ specified, the current working directory is used.
 
 =item C<--output-metadata-file> (optional, defaults)
 
-The script also outputs a metadata file (see B<EFI::EST::Metadata> for the format of this file).
+The script also outputs a metadata file (see B<EFI::Sequence::Collection> for the format of this file).
 If this is not specified, the file is named according to the C<sequence_metadata> value
 in the B<EFI::Import::Config::Defaults> module and put in the output directory.
 
