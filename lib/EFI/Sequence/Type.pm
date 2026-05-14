@@ -30,7 +30,7 @@ sub get_sequence_version {
 
 sub is_unknown_sequence {
     my $seq = shift;
-    return ($seq =~ m/^ZZ/ or $seq =~ m/^ZINPUT/i);
+    return ($seq =~ m/^ZZ/ or $seq eq "ZINPUTSEQ");
 }
 
 
