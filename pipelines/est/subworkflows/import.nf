@@ -103,7 +103,7 @@ workflow IMPORT_AND_FILTER {
         fasta_file = cat_fasta_files(
             all_fasta_files
                 .ifEmpty { error "No FASTA sequences were retrieved. Terminating pipeline." },
-            source_data.input_file
+            source_data.input_file.ifEmpty([])
         )
 
     emit:
