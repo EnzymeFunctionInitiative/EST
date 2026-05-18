@@ -20,7 +20,7 @@ sub new {
     # Default the sequence version to UniProt, later set by load()
     my $seqVersion = SEQ_UNIPROT;
 
-    # seqs is a hash ref containing a mapping of sequence ID to EFI::Sequence object (the sequence
+    # seq is a hash ref containing a mapping of sequence ID to EFI::Sequence object (the sequence
     # IDs are either UniProt or UniRef depending on the input
     #
     # fields is an array ref containing a list of the attributes in the metadata file
@@ -364,7 +364,7 @@ sub loadIdFile {
     while (my $line = <$fh>) {
         chomp $line;
         my ($uniprot, $uniref90, $uniref50) = split(m/\t/, $line);
-        $self->associateUnirefIds($uniprot, $uniref90, $uniref50);
+        $self->associateUnirefIds($uniprot, $uniref90, $uniref50) if $uniref90 and $uniref50;
     }
 
     $fh->close();
@@ -403,13 +403,13 @@ sub saveMetadataFile {
 
     $fh->print(join("\t", "UniProt_ID", "Attribute", "Value"), "\n");
 
-    my @ids  = $self->getSequenceIds();
+    my @ids = $self->getSequenceIds();
 
     foreach my $id (@ids) {
         my $seq = $self->getSequence($id);
         my @attr = $seq->getAttributeNames();
         foreach my $attr (@attr) {
-            my $value = $seq->packAttributeValue($seq->getAttribute($attr));
+            my $value = $seq->packAttributeValue($seq->getAttribute($attr)) // "";
             $fh->print(join("\t", $id, $attr, $value), "\n");
         }
     }
@@ -422,7 +422,8 @@ sub saveMetadataFile {
 # saveIdFile - private method
 #
 # Saves the internal UniProt-UniRef mapping to a file (e.g accession_table.tab).  The file is
-# three columns in width with a header line.
+# three columns in width with a header line.  Non-UniProt IDs (e.g. unknown/FASTA sequence IDs)
+# can be included, with empty columns for the UniRef values.
 #
 # Parameters:
 #    $outputFile - path to output file
@@ -435,8 +436,18 @@ sub saveIdFile {
     
     $fh->print(join("\t", "uniprot_id", "uniref90_id", "uniref50_id"), "\n");
 
+    # Some sequences do not have UniRef info (e.g. unknown FASTA sequences), so we need to keep
+    # track of those. We do that by using this hash and removing elements from it as we process
+    # an ID. The remainder are written to the file in the next step.
+    my %seqIds = map { $_ => 1 } $self->getSequenceIds();
     foreach my $id (keys %{ $self->{uniprot} }) {
-        $fh->print(join("\t", $id, $self->{uniprot}->{$id}->[0], $self->{uniprot}->{$id}->[1]), "\n");
+        $fh->print(join("\t", $id, $self->{uniprot}->{$id}->[0] // "", $self->{uniprot}->{$id}->[1] // ""), "\n");
+        delete $seqIds{$id};
+    }
+
+    # Save the remainder (e.g. IDs that do not have UniRef data)
+    foreach my $id (keys %seqIds) {
+        $fh->print(join("\t", $id, "", ""), "\n");
     }
 
     $fh->close();

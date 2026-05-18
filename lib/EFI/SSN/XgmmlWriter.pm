@@ -340,7 +340,7 @@ sub makeNodeAttributes {
     }
 
     # Add the actual FASTA sequence if there was a user-provided one
-    if (($source eq FIELD_SEQ_SRC_VALUE_FASTA or $source eq FIELD_SEQ_SRC_VALUE_FASTA_FAMILY) and $self->{sequences}->{$id}) {
+    if (($source eq FIELD_SEQ_SRC_VALUE_FASTA or $source eq FIELD_SEQ_SRC_VALUE_FASTA_FAMILY or $source eq FIELD_SEQ_SRC_VALUE_INPUT) and $self->{sequences}->{$id}) {
         $nodeAttr->{&FIELD_SEQ_KEY} = $self->{sequences}->{$id};
         $self->{has_fasta_attribute} = 1;
     }

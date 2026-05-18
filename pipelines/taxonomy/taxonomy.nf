@@ -1,5 +1,5 @@
 
-include { filter_ids; get_source_ids; get_user_filter_file; get_sequences } from "../shared/nextflow/sequence.nf"
+include { filter_ids; GET_SOURCE_IDS; get_user_filter_file; get_sequences } from "../shared/nextflow/sequence.nf"
 include { create_blast_db } from "../shared/nextflow/blast.nf"
 include { get_length_histogram; visualize_length_histograms } from "../shared/nextflow/reporting.nf"
 
@@ -39,7 +39,7 @@ process process_sunburst_stats {
 workflow {
 
     // We get sequence IDs and basic metadata from the input source, including those in FASTA files
-    source_data = get_source_ids()
+    source_data = GET_SOURCE_IDS()
 
     user_filter_file = get_user_filter_file()
 
