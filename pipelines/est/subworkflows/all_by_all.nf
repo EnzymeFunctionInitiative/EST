@@ -6,8 +6,10 @@ workflow ALL_BY_ALL {
         original_fasta
 
     main:
-        // Cluster redundant sequences for BLAST computation (formerly known as multiplex)
-        if (params.multiplex) {
+        // Cluster redundant sequences for BLAST computation (formerly known as multiplex).
+        // Only performed when input sequences are from Uniprot, since sequence sets from
+        // UniRef90 and UniRef50 are already sequence-unique.
+        if (params.multiplex && params.sequence_version == "uniprot") {
             condensed_files = condense_redundant(original_fasta)
             blast_input_fasta = condensed_files.fasta_file
             condensed = condensed_files.condensed
