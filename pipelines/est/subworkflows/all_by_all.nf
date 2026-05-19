@@ -30,11 +30,11 @@ workflow ALL_BY_ALL {
         blast_input = blastdb.combine(fasta_shards.transpose(), by: 0)
         blast_fractions = all_by_all_blast( blast_input ).groupTuple()
 
-        // Eliminate duplicate and self-edges
+        // Eliminate duplicates
         reduced_blast_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
 
         // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
-        if (params.multiplex) {
+        if (params.multiplex && params.sequence_version == "uniprot") {
             reduced_blast_parquet = restore_condensed(reduced_blast_parquet.join(condensed))
         }
 

@@ -35,7 +35,7 @@ process all_by_all_blast {
 }
 
 process blastreduce_old {
-    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
+    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex && params.sequence_version == "uniprot"
 
     input:
         tuple val(fid), path(blast_files), path(fasta_length_parquet)
@@ -58,7 +58,7 @@ process blastreduce_old {
 }
 
 process blastreduce {
-    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
+    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex && params.sequence_version == "uniprot"
 
     input:
         tuple val(fid), path(blast_files), path(fasta_length_parquet)
