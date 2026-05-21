@@ -266,7 +266,8 @@ if __name__ == "__main__":
         conn,
         cluster_parquet,
         args.condensed_blast,
-        args.output_file
+        args.output_file,
+        args.use_old_method
     )
 
     close_duckdb(conn)
