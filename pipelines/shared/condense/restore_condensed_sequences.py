@@ -1,5 +1,6 @@
 
 import argparse
+import os
 import re
 
 import duckdb
@@ -22,11 +23,13 @@ def get_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cd-hit-cluster",
         type=str,
+        required=True,
         help="Path to the CD-HIT cluster file"
     )
     parser.add_argument(
         "--condensed-blast",
         type=str,
+        required=True,
         help="Path to the condensed BLAST result parquet"
     )
     parser.add_argument(
@@ -64,7 +67,7 @@ def get_args() -> argparse.ArgumentParser:
 
 def connect_duckdb(
         memory_limit: str,
-        temp_dir: str | Path,
+        temp_dir: str,
         n_threads: int
     ) -> duckdb.DuckDBPyConnection:
     """
@@ -189,7 +192,7 @@ def restore_blast_results(
     # Expand all blast results using the cluster mapping using Cartesian
     # product of the sequence id set. Remove duplicates and self-alignments 
     # here. Equivalent to filling in and reporting only the top triangle of the
-    # 2d matrix.
+    # 2d matrix, ignoring the diagonal.
     temp_out = os.path.join(args.duckdb_temp_dir, f"restored.parquet")
     # Prepare the query to do the uncondensing work.
     query = f"""
@@ -205,6 +208,19 @@ def restore_blast_results(
 
         JOIN cluster_mapping AS smap ON aln.sseqid = smap.rep_id
 
+        /* 
+        
+        /* 
+           This query removes self-alignments, duplicate edges, and 
+           intra-cluster alignments too (wrong to do so)
+        */ 
+        WHERE aln.qseqid != aln.sseqid
+          AND qmap.seq_id < smap.seq_id
+        */
+
+        /* 
+           This query removes self-alignments and duplicate edges.
+        */ 
         WHERE qmap.seq_id < smap.seq_id
 
     ) TO '{output_file_path}' (FORMAT 'parquet');
