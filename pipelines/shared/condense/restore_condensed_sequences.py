@@ -63,6 +63,12 @@ def get_args() -> argparse.ArgumentParser:
         default="./duckdb",
         help="Location DuckDB should use for temporary files"
     )
+    parser.add_argument(
+        "--use-old-method",
+        type=bool,
+        default=False,
+        help="Past versions of did not include intra-cluster edges. Will be mirrored if set to True"
+    )
     return parser.parse_args()
 
 def connect_duckdb(
@@ -161,7 +167,8 @@ def restore_blast_results(
         conn: duckdb.DuckDBPyConnection,
         cluster_parquet: str,
         condensed_blast: str,
-        output_file_path: str
+        output_file_path: str,
+        old_method_bool: bool = False
     ):
     """
     Read the reduced but still condensed BLAST results parquet file then
@@ -179,6 +186,9 @@ def restore_blast_results(
             str, path to the input condensed BLAST results parquet file.
         output_file_path
             str, path where the final parquet file will be written.
+        old_method_bool
+            bool, if True, ignore intra-cluster alignment results equivalent
+            to ignoring edges between 100% identical sequences.
 
     Creates the reduced, uncondensed BLAST results parquet file, saved as
     f"{output_file_path}".
@@ -190,11 +200,28 @@ def restore_blast_results(
     )
 
     # Expand all blast results using the cluster mapping using Cartesian
-    # product of the sequence id set. Remove duplicates and self-alignments 
+    # product of the sequence id set. Remove duplicates and self-alignments
     # here. Equivalent to filling in and reporting only the top triangle of the
     # 2d matrix, ignoring the diagonal.
     temp_out = os.path.join(args.duckdb_temp_dir, f"restored.parquet")
     # Prepare the query to do the uncondensing work.
+
+    if old_method_bool:
+        CONDITION = """
+        /*
+           This query removes self-alignments, duplicate edges, and
+           intra-cluster alignments too (wrong to do so)
+        */
+        WHERE aln.qseqid != aln.sseqid AND qmap.seq_id < smap.seq_id
+        """
+    else:
+        CONDITION = """
+        /*
+           This query removes self-alignments and duplicate edges.
+        */
+        WHERE qmap.seq_id < smap.seq_id
+        """
+
     query = f"""
     COPY (
         SELECT
@@ -208,20 +235,7 @@ def restore_blast_results(
 
         JOIN cluster_mapping AS smap ON aln.sseqid = smap.rep_id
 
-        /* 
-        
-        /* 
-           This query removes self-alignments, duplicate edges, and 
-           intra-cluster alignments too (wrong to do so)
-        */ 
-        WHERE aln.qseqid != aln.sseqid
-          AND qmap.seq_id < smap.seq_id
-        */
-
-        /* 
-           This query removes self-alignments and duplicate edges.
-        */ 
-        WHERE qmap.seq_id < smap.seq_id
+        {CONDITION}
 
     ) TO '{output_file_path}' (FORMAT 'parquet');
     """
