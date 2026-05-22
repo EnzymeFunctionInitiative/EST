@@ -48,78 +48,6 @@ process filter_ids {
     """
 }
 
-process get_source_ids {
-    publishDir params.final_output_dir, mode: 'copy'
-    output:
-        path 'source_ids.tab', emit: 'source_ids'
-        path 'source_seq.tab', emit: 'source_meta'
-        path 'source_stats.json', emit: 'source_stats'
-        path 'blast_hits.tab', optional: true
-        path 'seq_mapping.tab', emit: 'seq_mapping', optional: true
-        path 'unmatched_id.tab', optional: true
-    script:
-
-    common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode} --sequence-version ${params.sequence_version}"
-
-    family_args = ""
-    if (params.families) {
-        family_args = "--family " + params.families
-    }
-
-    if (params.domain) {
-        family_args = family_args + " --domain " + params.domain_region
-        if (params.domain_family) {
-            family_args = family_args + " --domain-family " + params.domain_family
-        }
-    }
-
-    if (params.import_mode == "blast") {
-        // blast_hits.tab is provided as an output to the user
-        """
-        blastall \
-            -p blastp \
-            -i ${params.input_file} \
-            -d ${params.import_blast_fasta_db} \
-            -m 8 \
-            -e ${params.import_blast_evalue} \
-            -b ${params.import_blast_num_matches} \
-            -o init_blast.out
-        if [[ -s init_blast.out ]]; then
-            awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
-        else
-            echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
-            exit 1
-        fi
-        perl $projectDir/../shared/import/get_sequence_ids.pl \
-            ${common_args} \
-            ${family_args} \
-            --blast-output init_blast.out \
-            --blast-query ${params.input_file}
-        """
-    } else if (params.import_mode == "accessions") {
-        """
-        perl $projectDir/../shared/import/get_sequence_ids.pl \
-            ${common_args} \
-            ${family_args} \
-            --accessions ${params.input_file}
-        """
-    } else if (params.import_mode == "fasta") {
-        """
-        perl $projectDir/../shared/import/get_sequence_ids.pl \
-            ${common_args} \
-            ${family_args} \
-            --fasta ${params.input_file} \
-            --sequence-mapping-file seq_mapping.tab
-        """
-    } else if (params.import_mode == "family") {
-        """
-        perl $projectDir/../shared/import/get_sequence_ids.pl ${common_args} ${family_args}
-        """
-    } else {
-        error "Mode '${params.import_mode}' not yet implemented"
-    }
-}
-
 process get_sequences {
     input:
         path accession_ids
@@ -138,19 +66,147 @@ process get_sequences {
     """
 }
 
-process get_length_histogram {
+def get_import_args() {
+    def common_args = "--efi-config ${params.efi_config} --efi-db ${params.efi_db} --mode ${params.import_mode} --sequence-version ${params.sequence_version}"
+
+    def family_args = ""
+    if (params.families) {
+        family_args = "--family \"${params.families}\""
+    }
+
+    if (params.domain) {
+        family_args = "${family_args} --domain \"${params.domain_region}\""
+        if (params.domain_family) {
+            family_args = "${family_args} --domain-family \"${params.domain_family}\""
+        }
+    }
+
+    return "${common_args} ${family_args}".trim()
+}
+
+workflow GET_SOURCE_IDS {
+    main:
+        def seq_mapping_ch = Channel.empty()   // Used by fasta option
+        def input_file_ch = Channel.empty() // Return input file as a Nextflow channel
+        def import_files = null
+
+        if (params.import_mode == "accessions") {
+            input_file_ch = Channel.fromPath(params.input_file)
+            import_files = get_source_ids_accession(input_file_ch)
+            seq_mapping_ch = Channel.empty()
+
+        } else if (params.import_mode == "blast") {
+            input_file_ch = Channel.fromPath(params.input_file)
+            import_files = get_source_ids_blast(input_file_ch)
+            seq_mapping_ch = Channel.empty()
+
+        } else if (params.import_mode == "family") {
+            import_files = get_source_ids_family()
+            seq_mapping_ch = Channel.empty()
+
+        } else if (params.import_mode == "fasta") {
+            input_file_ch = Channel.fromPath(params.input_file)
+            import_files = get_source_ids_fasta(input_file_ch)
+            seq_mapping_ch = import_files.seq_mapping
+
+        } else {
+            seq_mapping_ch = Channel.empty()
+            error "Mode '${params.import_mode}' not yet implemented"
+        }
+
+    emit:
+        source_ids = import_files.source_ids
+        source_meta = import_files.source_meta
+        source_stats = import_files.source_stats
+        input_file = input_file_ch
+        seq_mapping = seq_mapping_ch
+}
+
+process get_source_ids_accession {
     input:
-        path fasta_file
-        path accession_table
-        val seq_version
+        path input_file
     output:
-        path("${seq_version}.histogram.txt"), emit: histograms
+        path 'source_ids.tab', emit: 'source_ids'
+        path 'source_seq.tab', emit: 'source_meta'
+        path 'source_stats.json', emit: 'source_stats'
+    script:
+
+    def common_args = get_import_args()
+
     """
-    python $projectDir/../shared/python/compute_length_histogram.py \
-        --fasta-file ${fasta_file} \
-        --accession-table ${accession_table} \
-        --seq-type ${seq_version} \
-        --output-file ${seq_version}.histogram.txt
+    perl $projectDir/../shared/import/get_sequence_ids.pl \
+        ${common_args} \
+        --accessions ${input_file}
+    """
+}
+
+process get_source_ids_blast {
+    publishDir params.final_output_dir, mode: 'copy', pattern: '{blast_hits.tab}'
+    input:
+        path input_file
+    output:
+        path 'source_ids.tab', emit: 'source_ids'
+        path 'source_seq.tab', emit: 'source_meta'
+        path 'source_stats.json', emit: 'source_stats'
+        path 'blast_hits.tab'
+    script:
+
+    def common_args = get_import_args()
+
+    // blast_hits.tab is provided as an output to the user
+    """
+    blastall \
+        -p blastp \
+        -i ${input_file} \
+        -d ${params.import_blast_fasta_db} \
+        -m 8 \
+        -e "${params.import_blast_evalue}" \
+        -b "${params.import_blast_num_matches}" \
+        -o init_blast.out
+    if [[ -s init_blast.out ]]; then
+        awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
+    else
+        echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
+        exit 1
+    fi
+    perl $projectDir/../shared/import/get_sequence_ids.pl \
+        ${common_args} \
+        --blast-output init_blast.out \
+        --blast-query ${input_file}
+    """
+}
+
+process get_source_ids_family {
+    output:
+        path 'source_ids.tab', emit: 'source_ids'
+        path 'source_seq.tab', emit: 'source_meta'
+        path 'source_stats.json', emit: 'source_stats'
+    script:
+
+    def common_args = get_import_args()
+
+    """
+    perl $projectDir/../shared/import/get_sequence_ids.pl ${common_args}
+    """
+}
+
+process get_source_ids_fasta {
+    input:
+        path input_file
+    output:
+        path 'source_ids.tab', emit: 'source_ids'
+        path 'source_seq.tab', emit: 'source_meta'
+        path 'source_stats.json', emit: 'source_stats'
+        path 'seq_mapping.tab', emit: 'seq_mapping'
+    script:
+
+    def common_args = get_import_args()
+
+    """
+    perl $projectDir/../shared/import/get_sequence_ids.pl \
+        ${common_args} \
+        --fasta ${input_file} \
+        --sequence-mapping-file seq_mapping.tab
     """
 }
 

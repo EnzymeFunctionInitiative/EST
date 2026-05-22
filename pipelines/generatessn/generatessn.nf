@@ -26,6 +26,7 @@ process import_data {
         path '_accession_table.tab', emit: source_ids
         path '_sequence_metadata.tab', emit: seq_meta_file
         path 'empty_stats.json', emit: stats                // This serves as an empty placeholder; required as a starting point for filter_ids
+    script:
     """
     cp $existing_blast_output _1.out.parquet
     cp $existing_fasta_file _sequences.fa
@@ -40,6 +41,7 @@ process threshold_blast {
         path blast_parquet
     output:
         path "2.out"
+    script:
     """
     DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
     python $projectDir/threshold/render_threshold_blast_sql_template.py \
@@ -113,6 +115,7 @@ process create_full_ssn {
         --metadata ${ssn_meta_file} \
         --output ssn.xgmml \
         --title "${final_job_name}" \
+        --max-edges ${params.max_ssn_edges} \
         --db-version ${params.db_version} \
         --stats full_stats.json
     cp ssn.xgmml "${file_name}"

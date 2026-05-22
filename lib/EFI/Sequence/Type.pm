@@ -14,7 +14,7 @@ use constant SEQ_DOMAIN => "domain";
 use constant SEQ_FULL => "full";
 
 
-our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type strip_domain SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL SEQ_REPNODE);
+our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type make_unknown_sequence strip_domain SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL SEQ_REPNODE);
 our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90', 'SEQ_DOMAIN', 'SEQ_FULL', 'SEQ_REPNODE']);
 Exporter::export_ok_tags('types');
 
@@ -30,7 +30,15 @@ sub get_sequence_version {
 
 sub is_unknown_sequence {
     my $seq = shift;
-    return $seq =~ m/^Z/i;
+    return $seq =~ m/^ZZ/;
+}
+
+
+sub make_unknown_sequence {
+    my $seqNumber = shift;
+    my $id = sprintf("ZZ%8d", $seqNumber);
+    $id =~ tr/ /Z/;
+    return $id;
 }
 
 
@@ -71,6 +79,9 @@ B<EFI::Sequence::Type> - Perl module for sequence ID types
 
     my $seqId = "B0SS77:1:100";
     print "Sequence $seqId is ", get_sequence_type($seqId), "\n";
+
+    my $seqNum = 42;
+    print "New unknown ID is: ", make_unknown_sequence($seqNum), "\n";
 
 
 =head2 DESCRIPTION
@@ -136,6 +147,34 @@ C<1> if the ID is unknown, C<0> if it is UniProt-formatted.
     print "Sequence $seqId is ", (is_unknown_sequence($seqId) ? "Unknown" : "UniProt-formatted"), "\n";
     my $seqId = "zzzz42";
     print "Sequence $seqId is ", (is_unknown_sequence($seqId) ? "Unknown" : "UniProt-formatted"), "\n";
+
+
+=head3 C<make_unknown_sequence($seqNumber)>
+
+Creates an unknown ID from the given sequential number.  The return is a 10-character string
+beginning with ZZ and followed by additional Zs and numbers.
+
+=head4 Parameters
+
+=over
+
+=item C<$seqCount>
+
+The sequence number (integer) to format into an unknown sequence ID.
+
+=back
+
+=head4 Returns
+
+String containing the new ID.
+
+=head4 Example Usage
+
+    my $seqNumber = 42;
+    my $id = make_unknown_sequence($seqNumber);
+    print "Unknown sequence ID is: $id\n";
+    # The result is:
+    #    Unknown sequence ID is: ZZZZZZZZ42
 
 
 =head2 CONSTANTS

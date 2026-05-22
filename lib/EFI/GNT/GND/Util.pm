@@ -13,7 +13,7 @@ use EFI::Util::Colors;
 
 sub new {
     my $class = shift;
-    my %args;
+    my %args = @_;
 
     my $self = {};
     bless $self, $class;

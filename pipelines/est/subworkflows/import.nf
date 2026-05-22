@@ -1,5 +1,5 @@
 
-include { filter_ids; get_sequences; get_source_ids; get_user_filter_file } from "../../shared/nextflow/sequence.nf"
+include { filter_ids; get_sequences; GET_SOURCE_IDS; get_user_filter_file } from "../../shared/nextflow/sequence.nf"
 
 process get_sunburst_data {
     publishDir params.final_output_dir, mode: 'copy'
@@ -17,15 +17,16 @@ process get_sunburst_data {
 process cat_fasta_files {
     publishDir params.final_output_dir, mode: 'copy'
     input:
-        path '*.fasta'
+        path fasta_files
+        path input_file
     output:
         path 'all_sequences.fasta'
     script:
-    cat_cmd = "cat *.fasta > all_sequences.fasta"
+    cat_cmd = "cat ${fasta_files} > all_sequences.fasta"
     if (params.import_mode == "blast") {
         """
         $cat_cmd
-        perl $projectDir/import/append_blast_query.pl --blast-query-file ${params.input_file} --output-sequence-file all_sequences.fasta
+        perl $projectDir/import/append_blast_query.pl --blast-query-file ${input_file} --output-sequence-file all_sequences.fasta
 
         # Stop Nextflow here if the file is empty (i.e. no sequences were found)
         [ -s all_sequences.fasta ] || { echo "ERROR: No sequences found after retrieval and merge."; exit 1; }
@@ -60,17 +61,18 @@ process import_fasta {
     input:
         path sequence_metadata
         path seq_mapping
+        path input_file
     output:
         path "imported_sequences.fasta", emit: "fasta_file"
     """
-    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${params.input_file} --sequence-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
+    perl $projectDir/import/import_fasta.pl --uploaded-fasta ${input_file} --sequence-mapping-file ${seq_mapping} --output-sequence-file imported_sequences.fasta
     """
 }
 
 workflow IMPORT_AND_FILTER {
     main:
         // We get sequence IDs and basic metadata from the input source, including those in FASTA files
-        source_data = get_source_ids()
+        source_data = GET_SOURCE_IDS()
 
         user_filter_file = get_user_filter_file()
 
@@ -91,7 +93,7 @@ workflow IMPORT_AND_FILTER {
         if (params.import_mode == "fasta") {
             // sequence metadata is used to ensure that any sequences that were filtered out in a
             // prior step are also removed when rewriting the user fasta
-            import_fasta_file = import_fasta(sequence_id_files.sequence_metadata, source_data.seq_mapping)
+            import_fasta_file = import_fasta(sequence_id_files.sequence_metadata, source_data.seq_mapping, source_data.input_file)
             fasta_files = raw_fasta_files.concat(import_fasta_file)
         } else {
             fasta_files = raw_fasta_files
@@ -100,7 +102,8 @@ workflow IMPORT_AND_FILTER {
         all_fasta_files = fasta_files.collect()
         fasta_file = cat_fasta_files(
             all_fasta_files
-                .ifEmpty { error "No FASTA sequences were retrieved. Terminating pipeline." }
+                .ifEmpty { error "No FASTA sequences were retrieved. Terminating pipeline." },
+            source_data.input_file.ifEmpty([])
         )
 
     emit:

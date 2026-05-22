@@ -96,7 +96,11 @@ my $annoSpec = readAnnoSpec($annoSpecFile);
 my %unirefIds;
 my %unirefClusterIdSeqLen;
 foreach my $accession (sort @$accessions){
-    next if is_unknown_sequence($accession);
+    if (is_unknown_sequence($accession)) {
+        my $data = formatAnnoData($accession, [], [], {}, {});
+        $outputIds->addSequence($accession, $data);
+        next;
+    }
 
     my $accessionSql = $anno->build_query_string($accession);
 

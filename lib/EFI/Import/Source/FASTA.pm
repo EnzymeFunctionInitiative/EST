@@ -16,6 +16,7 @@ use parent qw(EFI::Import::Source);
 
 use EFI::Annotations::Fields ':source';
 
+use EFI::Sequence::Type qw(make_unknown_sequence);
 use EFI::Util::FASTA::Headers;
 
 
@@ -176,7 +177,7 @@ sub parseFasta {
 
             # If no UniProt IDs were detected, then make an ID
             } else {
-                $curId = makeSequenceId($seqCount);
+                $curId = make_unknown_sequence($seqCount);
                 $addSequence->($curId, $header, 0);
             }
 
@@ -235,26 +236,6 @@ sub makeMetadata {
         }
         $destSeqData->addSequence($id, $attr, $seq->{$id});
     }
-}
-
-
-
-
-#
-# makeSequenceId - private function
-#
-# Parameters:
-#    $seqCount - the nth sequence in the file
-#
-# Returns:
-#    An unidentified ID, a 7-character string beginning with Z and followed by additional Zs and numbers.
-#    For example, for input of 10000 the output would be Z10000. For input of 10, the output would be ZZZZ10.
-#
-sub makeSequenceId {
-    my ($seqCount) = @_;
-    my $id = sprintf("%7d", $seqCount);
-    $id =~ tr/ /Z/;
-    return $id;
 }
 
 

@@ -1,11 +1,13 @@
 alabaster==0.7.16
 Babel==2.14.0
 biopython==1.83
+cdhit-reader==0.3.0
 certifi==2024.2.2
 charset-normalizer==3.3.2
 contourpy==1.2.0
 cycler==0.12.1
 docutils==0.20.1
+duckdb==1.5.2
 fonttools==4.50.0
 idna==3.6
 igraph==0.11.6

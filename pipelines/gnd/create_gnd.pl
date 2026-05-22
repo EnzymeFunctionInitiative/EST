@@ -54,7 +54,7 @@ my $matchedIds = {};
 my $unmatchedIds = [];
 my $metadata = {
     neighborhood_size => $opts->{nb_size},
-    title => $opts->{title} // "",
+    name => $opts->{title} // "",
     type => $opts->{source_type} // "",
     sequence => $opts->{source_sequence} // "",
 };
@@ -67,6 +67,12 @@ if ($opts->{sequence_version} ne SEQ_UNIPROT) {
     my $idMapping = new EFI::IdMapping(efi_dbh => $dbh);
     my $uniprotMapping = $idMapping->getUniprotMapping($opts->{sequence_version}, \@uniprotIds);
     $args{metanode_mapping} = $uniprotMapping;
+}
+
+# Read the blast_hits.tab file to get the array of blast_evalues to the query sequence
+if ($opts->{blast_evalues} and -f $opts->{blast_evalues}) {
+    my $blastEvalues = parseBlastHits($opts->{blast_evalues});
+    $args{blast_evalues} = $blastEvalues;
 }
 
 my $numIdsSaved = $gnd->save($opts->{gnd}, $gnn, $metadata, %args);
@@ -96,6 +102,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("source-type=s", 0, "the source of the data provided, e.g. BLAST, FASTA, ID list");
     $optParser->addOption("source-sequence-file=s", 0, "path to a file containing the sequence used to generate the results, only valid for BLAST sources");
     $optParser->addOption("stats=s", 0, "path to file to output GND statistics to");
+    $optParser->addOption("blast-evalues=s", 0, "path to file containing e-values for the BLAST alignment results for gathered sequence", OPT_FILE);
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -118,5 +125,34 @@ sub validateAndProcessOptions {
     }
 
     return $opts;
+}
+
+
+
+
+sub parseBlastHits {
+    my $blastHitsTab = shift;
+    my %results;
+    
+    open my $fh, "<", $blastHitsTab or die "Unable to open tabulated blast alignments file '$blastHitsTab': $!";
+    while (my $line = <$fh>) {
+        chomp $line;
+        
+        # Skip empty lines
+        next if $line =~ /^\s*$/;
+        
+        # Expected line formats:
+        # tr|A0A7C7D6A2|A0A7C7D6A2_9FIRM    9e-148 # returns {"A0A7C7D6A2": "9e-148"} 
+        # A0A0U1KYM0                        8e-147 # returns {"A0A0U1KYM0": "8e-147"}
+
+        # Split line by tab-separated columns
+        my ($col1, $evalue) = split /\t/, $line;
+        my $id = ($col1 =~ /^[^|]+\|([^|]+)\|/) ? $1 : $col1;
+
+        $results{$id} = $evalue;
+   }
+
+   close $fh;
+   return \%results;
 }
 
