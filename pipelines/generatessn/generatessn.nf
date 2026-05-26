@@ -3,6 +3,7 @@ include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workfl
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids } from "../shared/nextflow/sequence.nf"
 include { merge_stats; zip_files } from "../shared/nextflow/util.nf"
+include { compute_connectivity_from_blast; make_nc_legend } from "../shared/nextflow/connectivity.nf"
 
 def getCleanFilename(job_name, default_name) {
     // Create a clean job name for the file
@@ -26,6 +27,7 @@ process import_data {
         path '_accession_table.tab', emit: source_ids
         path '_sequence_metadata.tab', emit: seq_meta_file
         path 'empty_stats.json', emit: stats                // This serves as an empty placeholder; required as a starting point for filter_ids
+
     script:
     """
     cp $existing_blast_output _1.out.parquet
@@ -41,6 +43,7 @@ process threshold_blast {
         path blast_parquet
     output:
         path "2.out"
+
     script:
     """
     DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
@@ -64,6 +67,7 @@ process compute_fasta_lengths {
         path fasta_file
     output:
         path "explicit_id_list.tab"
+
     script:
     def min_len_arg = params.min_length != 0 ? "--min-len ${params.min_length}" : ""
     def max_len_arg = params.max_length != 65000 ? "--max-len ${params.max_length}" : ""
@@ -79,6 +83,7 @@ process get_annotations {
         path filtered_seq_meta_file
     output:
         path "ssn_metadata.tab"
+
     script:
     """
     perl $projectDir/annotations/get_annotations.pl \
@@ -97,28 +102,37 @@ process create_full_ssn {
         path thresholded_blast
         path all_fasta
         path ssn_meta_file
+        path nc_table // Optional (can be empty)
     output:
         path "full_ssn.xgmml.zip", emit: "ssn"
-        path "ssn.xgmml", emit: "ssn_unzipped"
+        path "full_ssn.xgmml", emit: "ssn_unzipped"
         path "full_stats.json", emit: "stats"
-    script:
 
+    script:
     // If there was no job name specified, then assign a default
     def default_name = "Full SSN"
     def final_job_name = params.job_name ?: default_name
     def file_name = getCleanFilename(final_job_name, default_name)
+    def temp_name = "full_ssn.xgmml"
 
     """
+    NC_ARG=""
+    if [ -n "${nc_table}" ] && [ -f "${nc_table}" ]; then
+        NC_ARG="--nc-map ${nc_table}"
+    fi
+
     perl $projectDir/create/create_full_ssn.pl \
         --blast ${thresholded_blast} \
         --fasta ${all_fasta} \
         --metadata ${ssn_meta_file} \
-        --output ssn.xgmml \
+        --output ${temp_name} \
         --title "${final_job_name}" \
         --max-edges ${params.max_ssn_edges} \
         --db-version ${params.db_version} \
+        \$NC_ARG \
+        --stats-ssn-name "full_ssn.xgmml.zip" \
         --stats full_stats.json
-    cp ssn.xgmml "${file_name}"
+    cp ${temp_name} "${file_name}"
     zip full_ssn.xgmml.zip "${file_name}"
     rm "${file_name}"
     """
@@ -126,21 +140,52 @@ process create_full_ssn {
 
 process create_repnode_ssns {
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
-
     input:
         path thresholded_blast
         path all_fasta
         path ssn_meta_file
-        val repnode_pct
+        tuple val(repnode_pct), path(repnode_cdhit), path(nc_table)
     output:
         path "repnode_${repnode_pct}_ssn.xgmml.zip", emit: "ssn"
-        path "repnode_stats.json", emit: "stats"
+        path "repnode_${repnode_pct}_stats.json", emit: "stats"
+
     script:
     // If there was no job name specified, then assign a default
     def default_name = "repnode-${repnode_pct}"
     def final_job_name = params.job_name ? params.job_name + " " + default_name : default_name
     def file_name = getCleanFilename(final_job_name, default_name)
+    def temp_name = "repnode_${repnode_pct}_ssn.xgmml"
 
+    """
+    NC_ARG=""
+    if [ -n "${nc_table}" ] && [ -f "${nc_table}" ]; then
+        NC_ARG="--nc-map ${nc_table}"
+    fi
+
+    perl $projectDir/create/create_repnode_ssn.pl \
+        --blast ${thresholded_blast} \
+        --fasta ${all_fasta} \
+        --metadata ${ssn_meta_file} \
+        --cdhit ${repnode_cdhit} \
+        --output "${temp_name}" \
+        --title "${final_job_name}" \
+        --db-version ${params.db_version} \
+        \$NC_ARG \
+        --stats repnode_${repnode_pct}_stats.json
+    mv "${temp_name}" "${file_name}"
+    zip "${temp_name}.zip" "${file_name}"
+    rm "${file_name}"
+    """
+}
+
+process compute_repnode_cdhit {
+    input:
+        path all_fasta
+        val repnode_pct
+    output:
+        tuple val(repnode_pct), path("cdhit_${repnode_pct}.clstr")
+
+    script:
     def cdhit_pct = (repnode_pct.toBigDecimal() / 100).setScale(2, BigDecimal.ROUND_HALF_UP)
 
     // This is left over from the legacy code, and is being kept here for future work (e.g. CGFP)
@@ -156,21 +201,25 @@ process create_repnode_ssns {
     //else { word_opt = 5 }
 
     """
-    touch ssn.xgmml
-    echo '{}' > repnode_stats.json
     cd-hit -n ${word_opt} ${length_overlap_opt} -i ${all_fasta} -o cdhit_${repnode_pct} -c ${cdhit_pct} -d 0 ${algo_opt} ${bandwidth_opt}
-    #perl $projectDir/create/create_repnode_ssn.pl \
-    #    --blast ${thresholded_blast} \
-    #    --fasta ${all_fasta} \
-    #    --metadata ${ssn_meta_file} \
-    #    --cd-hit repnode_cdhit.clstr \
-    #    --output ssn.xgmml \
-    #    --title "${final_job_name}" \
-    #    --db-version ${params.db_version} \
-    #    --stats repnode_stats.json
-    cp ssn.xgmml "${file_name}"
-    zip repnode_${repnode_pct}_ssn.xgmml.zip "${file_name}"
-    rm "${file_name}"
+    """
+}
+
+process compute_repnode_connectivity_from_blast {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{*.tab}"
+    input:
+        path blast_tsv
+        tuple val(repnode_pct), path(cdhit_clstr)
+
+    output:
+        tuple val(repnode_pct), path("nc_${repnode_pct}.tab")
+
+    script:
+    """
+    python $projectDir/../shared/connectivity/get_connectivity.py \
+        --input-blast ${blast_tsv} \
+        --cdhit ${cdhit_clstr} \
+        --output-map "nc_${repnode_pct}.tab"
     """
 }
 
@@ -184,7 +233,7 @@ workflow {
     // Explicitly specify the IDs that will be passed through, by computing the lengths of the
     // sequences and returning a file containing IDs for all of the sequences that fit the length
     // criteria.
-    def explicit_ids_file = (params.min_length != 0 || params.max_length != 65000)
+    explicit_ids_file = (params.min_length != 0 || params.max_length != 65000)
         ? compute_fasta_lengths(input_data.fasta)
         : Channel.value([])
 
@@ -194,13 +243,36 @@ workflow {
     // Get annotations
     ssn_meta_file = get_annotations(final_ids.sequence_metadata)
 
+    if (params.compute_ssn_nc_factor) {
+        full_nc_table = compute_connectivity_from_blast(thresholded_blast, Channel.value([]))
+        make_nc_legend(full_nc_table)
+    } else {
+        full_nc_table = Channel.value([])
+    }
+
     // Create full network
-    full_ssn = create_full_ssn(thresholded_blast, input_data.fasta, ssn_meta_file)
+    full_ssn = create_full_ssn(thresholded_blast, input_data.fasta, ssn_meta_file, full_nc_table)
 
     // Create repnode networks
     if (params.make_repnodes) {
-        repnode_pct = Channel.from(params.repnode_pct)
-        repnode_ssns = create_repnode_ssns(thresholded_blast, input_data.fasta, ssn_meta_file, repnode_pct)
+        // Get a channel so we can parallelize the computations
+        repnode_pct_ch = Channel.from(params.repnode_pct)
+
+        // Compute the CD-HIT cluster files necessary for grouping nodes into repnodes
+        cdhit_result = compute_repnode_cdhit(input_data.fasta, repnode_pct_ch)
+
+        // Compute the neighborhood connectivity values
+        if (params.compute_ssn_nc_factor) {
+            nc_table = compute_repnode_connectivity_from_blast(thresholded_blast, cdhit_result)
+            make_nc_legend(nc_table)
+        } else {
+            nc_table = repnode_pct_ch.map { pct -> [pct, []] }
+        }
+
+        // Create a tuple: [pct, cdhit_file, nc_table_file]
+        create_repnode_inputs = cdhit_result.join(nc_table)
+
+        repnode_ssns = create_repnode_ssns(thresholded_blast, input_data.fasta, ssn_meta_file, create_repnode_inputs)
         repnode_stats = repnode_ssns.stats
     } else {
         repnode_stats = Channel.of([])

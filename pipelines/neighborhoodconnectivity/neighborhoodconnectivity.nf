@@ -1,5 +1,5 @@
 
-include { compute_connectivity_from_ssn; make_legend } from "../shared/nextflow/connectivity.nf"
+include { compute_connectivity_from_ssn; make_nc_legend } from "../shared/nextflow/connectivity.nf"
 include { zip_files; unzip_ssn } from "../shared/nextflow/util.nf"
 
 process color_by_connectivity {
@@ -35,7 +35,7 @@ workflow {
 
     colored = color_by_connectivity(ssn_file, nc_table)
 
-    legend = make_legend(nc_table)
+    legend = make_nc_legend(nc_table)
 
     zipped_files = zip_files(colored.ssn)
 }

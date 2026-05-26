@@ -21,7 +21,7 @@ process compute_connectivity_from_blast {
 
     input:
         path blast_tsv
-        path cdhit_clustr // Optional (if empty)
+        path cdhit_clstr // Optional (if empty)
 
     output:
         path "nc.tab", emit: "nc_table"
@@ -29,8 +29,8 @@ process compute_connectivity_from_blast {
     script:
     """
     CDHIT_ARG=""
-    if [ -n "${cdhit_cluster}" ] && [ -f "${cdhit_cluster}" ]; then
-        CDHIT_ARG="--cdhit ${cdhit_cluster}"
+    if [ -n "${cdhit_clstr}" ] && [ -f "${cdhit_clstr}" ]; then
+        CDHIT_ARG="--cdhit ${cdhit_clstr}"
     fi
 
     python $projectDir/../shared/connectivity/get_connectivity.py \
@@ -40,7 +40,7 @@ process compute_connectivity_from_blast {
     """
 }
 
-process make_legend {
+process make_nc_legend {
     publishDir params.final_output_dir, mode: "copy", pattern: "{legend.png}"
 
     // In case the required Perl modules are not installed
