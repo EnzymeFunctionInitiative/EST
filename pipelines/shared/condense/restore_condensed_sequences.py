@@ -66,7 +66,7 @@ def get_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--use-old-method",
         type=bool,
-        default=False,
+        default=True,
         help="Past versions of did not include intra-cluster edges. Will be mirrored if set to True"
     )
     return parser.parse_args()
