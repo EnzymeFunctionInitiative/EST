@@ -204,8 +204,10 @@ def restore_blast_results(
     # here. Equivalent to filling in and reporting only the top triangle of the
     # 2d matrix, ignoring the diagonal.
     temp_out = os.path.join(args.duckdb_temp_dir, f"restored.parquet")
-    # Prepare the query to do the uncondensing work.
 
+    # Prepare the query to do the uncondensing work.
+    # Query strings generated using Chat-GPT:
+    # https://chatgpt.com/share/6a106cef-be94-83ea-bba5-47e396f53c5d
     if old_method_bool:
         CONDITION = """
         /*
