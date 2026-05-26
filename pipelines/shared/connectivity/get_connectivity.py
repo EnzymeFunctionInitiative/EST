@@ -40,9 +40,17 @@ def get_cdhit_clusters(file_path: str) -> Set[str]:
     """
 
     filter_ids = set()
-    # Read the .clstr file to find cluster representatives
-    for cluster in cdhit_reader.read_cdhit(file_path):
-        filter_ids.add(cluster.refname)
+
+    # Capture sequence ID for representative sequence
+    id_pattern = re.compile(r'>([^\s\.]+)\.\.\.\s+\*')
+
+    with open(file_path, 'r') as fh:
+        for line in fh:
+            if line.rstrip().endswith('*'):
+                id_match = id_pattern.search(line)
+                if id_match:
+                    filter_ids.add(id_match.group(1))
+
     return filter_ids
 
 def parse_blast_line(line: str, filter_ids: Set[str], use_cdhit: bool) -> Tuple[Optional[str], Optional[str]]:
