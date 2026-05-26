@@ -361,7 +361,7 @@ sub get_annotation_fields {
         push @fields, {name => "swissprot_description",     field_type => "ssn",                                    display => "SwissProt Description",         base_ssn => 1};
         push @fields, {name => FIELD_SEQ_LEN_KEY,           field_type => "db",     type_spec => "INT",             display => "Sequence Length",               base_ssn => 1,  ssn_num_type => 1,                      db_primary_col => 1};
 
-        push @fields, {name => FIELD_REPNODE_IDS,           field_type => "ssn",                                    display => "List of IDs in Rep Node"};
+        push @fields, {name => FIELD_REPNODE_IDS,           field_type => "ssn",                                    display => "List of IDs in Rep Node",                                           ssn_list_type => 1};
         push @fields, {name => FIELD_REPNODE_SIZE,          field_type => "ssn",                                    display => "Number of IDs in Rep Node",                     ssn_num_type => 1};
         push @fields, {name => "Query_IDs",                 field_type => "ssn",                                    display => "Query IDs",                                                         ssn_list_type => 1};
         push @fields, {name => "Other_IDs",                 field_type => "ssn",                                    display => "Other IDs",                                                         ssn_list_type => 1};
