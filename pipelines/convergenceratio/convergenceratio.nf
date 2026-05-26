@@ -152,7 +152,7 @@ workflow {
     // Compute the convergence ratio based on the BLAST results
     //stats_files = compute_blast_conv_ratio(blast_parquet.combine(fasta_lengths_parquet, by: 0))
     //stats_files = compute_blast_conv_ratio(reduced_blast_parquet.combine(fasta_lengths_parquet, by: 0))
-    stats_files = compute_blast_conv_ratio(reduced_blast_parquet.join(fasta_lengths_parquet))
+    stats_files = compute_blast_conv_ratio(blast_parquet.join(fasta_lengths_parquet))
 
     // Merge the data for all the clusters into one file
     merge_conv_ratios(stats_files.collect(), cr_table)
