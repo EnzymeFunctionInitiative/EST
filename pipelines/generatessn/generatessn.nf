@@ -40,6 +40,7 @@ process import_data {
 process threshold_blast {
     input:
         path blast_parquet
+        path filtered_ids
     output:
         path "2.out"
 
@@ -56,8 +57,22 @@ process threshold_blast {
         --duckdb-memory-limit ${params.duckdb_memory_limit} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --output-file 2.out \
-        --sql-output-file thresholded_blast.sql
+        --sql-output-file thresholded_blast.sql \
+        --filtered-ids-file ${filtered_ids}
     duckdb < thresholded_blast.sql
+    """
+}
+
+process filter_fasta {
+    input:
+        path input_fasta
+        path filtered_ids
+    output:
+        path "filtered_sequences.fasta"
+
+    script:
+    """
+    seqkit grep -f ${filtered_ids} ${input_fasta} -o filtered_sequences.fasta
     """
 }
 
@@ -98,7 +113,7 @@ process get_annotations {
 process create_full_ssn {
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
     input:
-        path thresholded_blast
+        path blast
         path all_fasta
         path ssn_meta_file
         path nc_table // Optional (can be empty)
@@ -121,7 +136,7 @@ process create_full_ssn {
     fi
 
     perl $projectDir/create/create_full_ssn.pl \
-        --blast ${thresholded_blast} \
+        --blast ${blast} \
         --fasta ${all_fasta} \
         --metadata ${ssn_meta_file} \
         --output ${temp_name} \
@@ -140,7 +155,7 @@ process create_full_ssn {
 process create_repnode_ssns {
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
     input:
-        path thresholded_blast
+        path blast
         path all_fasta
         path ssn_meta_file
         tuple val(repnode_pct), path(repnode_cdhit), path(nc_table)
@@ -162,7 +177,7 @@ process create_repnode_ssns {
     fi
 
     perl $projectDir/create/create_repnode_ssn.pl \
-        --blast ${thresholded_blast} \
+        --blast ${blast} \
         --fasta ${all_fasta} \
         --metadata ${ssn_meta_file} \
         --cdhit ${repnode_cdhit} \
@@ -284,9 +299,6 @@ workflow {
     // Import data from EST run
     input_data = import_data(params.blast_parquet, params.fasta_file, params.source_ids_file, params.seq_meta_file)
 
-    // Apply threshold to BLAST and fasta file
-    thresholded_blast = threshold_blast(input_data.blast_output)
-
     // Explicitly specify the IDs that will be passed through, by computing the lengths of the
     // sequences and returning a file containing IDs for all of the sequences that fit the length
     // criteria.
@@ -296,6 +308,11 @@ workflow {
 
     // Filter sequences out by length or other criteria (e.g. fragment, taxonomy)
     final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, Channel.value([]))
+
+    filtered_fasta = filter_fasta(input_data.fasta, final_ids.retrieval_ids)
+
+    // Apply threshold to BLAST file
+    thresholded_blast = threshold_blast(input_data.blast_output, final_ids.retrieval_ids)
 
     // Get annotations
     ssn_meta_file = get_annotations(final_ids.sequence_metadata)
@@ -308,7 +325,7 @@ workflow {
     }
 
     // Create full network
-    full_ssn = create_full_ssn(thresholded_blast, input_data.fasta, ssn_meta_file, full_nc_table)
+    full_ssn = create_full_ssn(thresholded_blast, filtered_fasta, ssn_meta_file, full_nc_table)
 
     // Create repnode networks
     if (params.make_repnodes) {
@@ -316,7 +333,7 @@ workflow {
         repnode_pct_ch = Channel.from(params.repnode_pct)
 
         // Compute the CD-HIT cluster files necessary for grouping nodes into repnodes
-        cdhit_result = compute_repnode_cdhit(input_data.fasta, repnode_pct_ch)
+        cdhit_result = compute_repnode_cdhit(filtered_fasta, repnode_pct_ch)
 
         // Compute the neighborhood connectivity values
         if (params.compute_ssn_nc_factor) {
@@ -329,7 +346,7 @@ workflow {
         // Create a tuple: [pct, cdhit_file, nc_table_file]
         create_repnode_inputs = cdhit_result.join(nc_table)
 
-        repnode_ssns = create_repnode_ssns(thresholded_blast, input_data.fasta, ssn_meta_file, create_repnode_inputs)
+        repnode_ssns = create_repnode_ssns(thresholded_blast, filtered_fasta, ssn_meta_file, create_repnode_inputs)
         repnode_stats = repnode_ssns.stats
     } else {
         repnode_stats = Channel.of([])

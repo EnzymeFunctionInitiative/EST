@@ -10,6 +10,7 @@ use EFI::Annotations::Fields qw(:annotations);
 use EFI::Util::CdHit::Parser qw(parse_cdhit_clstr);
 use EFI::Options;
 use EFI::Sequence::Collection;
+use EFI::Sequence::Type qw(strip_domain);
 use EFI::SSN::Util::Creator qw(load_connectivity load_edges validate_and_process_options validate_input_blast);
 use EFI::SSN::XgmmlWriter;
 use EFI::Util::FASTA qw(read_fasta_file);
@@ -74,8 +75,8 @@ sub updateForRepnode {
     my $clusters = shift;
 
     foreach my $clusterId (keys %$clusters) {
-        my $clusterNodeId = $clusters->{$clusterId}->{representative};
-        my @members = grep { $_ ne $clusterNodeId } @{ $clusters->{$clusterId}->{members} };
+        my $clusterNodeId = strip_domain($clusters->{$clusterId}->{representative});
+        my @members = grep { $_ ne $clusterNodeId } map { strip_domain($_) } @{ $clusters->{$clusterId}->{members} };
 
         # Update the collection to merge IDs and node attributes into a single cluster
         $inputIds->mergeSequences($clusterNodeId, @members);

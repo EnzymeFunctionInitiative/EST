@@ -5,12 +5,23 @@ import os
 from pyEFI import sql_template_render
 
 def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--blast-output", type=str, required=True, help="Path to directory containing the reduced BLAST output file")
+    parser.add_argument(
+        "--blast-output",
+        type=str,
+        required=True,
+        help="Path to directory containing the reduced BLAST output file"
+    )
     parser.add_argument(
         "--output-file",
         type=str,
         required=True,
         help="The final output file the thresholded BLAST output should be written to. Will be tab-separated"
+    )
+    parser.add_argument(
+        "--filtered-ids-file",
+        type=str,
+        required=True,
+        help="The master set of IDs to limit output results to"
     )
     parser.add_argument(
         "--threshold-metric",
@@ -70,5 +81,6 @@ if __name__ == "__main__":
         "max_length": args.max_length,
         "thresholded_blast_output": args.output_file,
         "compression": "zstd",
+        "filtered_ids_file": args.filtered_ids_file,
     }
     sql_template_render.render(args.sql_template, mapping, args.sql_output_file)
