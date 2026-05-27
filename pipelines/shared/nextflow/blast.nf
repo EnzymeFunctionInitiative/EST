@@ -35,7 +35,7 @@ process all_by_all_blast {
 }
 
 process blastreduce_old {
-    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
+    publishDir params.final_output_dir, mode: 'copy', enabled: (!params.multiplex || params.sequence_version != "uniprot")
 
     input:
         tuple val(fid), path(blast_files), path(fasta_length_parquet)
@@ -58,7 +58,7 @@ process blastreduce_old {
 }
 
 process blastreduce {
-    publishDir params.final_output_dir, mode: 'copy', enabled: !params.multiplex
+    publishDir params.final_output_dir, mode: 'copy', enabled: (!params.multiplex || params.sequence_version != "uniprot")
 
     input:
         tuple val(fid), path(blast_files), path(fasta_length_parquet)
@@ -130,7 +130,7 @@ process create_blast_db {
 }
 
 // Formerly known as demultiplex
-process restore_condensed {
+process restore_condensed_old {
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
 
     input:
@@ -149,7 +149,7 @@ process restore_condensed {
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file restore.sql
     duckdb < restore.sql
-    python $projectDir/../shared/condense/restore_condensed_sequences.py \
+    python $projectDir/../shared/condense/restore_condensed_sequences_old.py \
         --condensed-blast condensed.out \
         --restored-blast 1.out \
         --cd-hit-cluster ${condensed}
@@ -157,6 +157,30 @@ process restore_condensed {
         --blast-output 1.out
     """
 }
+
+process restore_condensed {
+    publishDir params.final_output_dir, mode: 'copy', overwrite: true
+
+    input:
+        tuple val(fid), path(blast_parquet, stageAs: "reduced.parquet"), path(condensed)
+
+    output:
+        tuple val(fid), path("1.out.parquet")
+
+    script:
+    """
+    # python script
+    DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
+    python $projectDir/../shared/condense/restore_condensed_sequences.py \
+        --cd-hit-cluster ${condensed} \
+        --condensed-blast reduced.parquet \
+        --output-file 1.out.parquet \
+        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-threads 1 \
+        --duckdb-temp-dir \${DUCKDB_TEMP}
+    """
+}
+
 
 process split_fasta {
     input:

@@ -6,8 +6,10 @@ workflow ALL_BY_ALL {
         original_fasta
 
     main:
-        // Cluster redundant sequences for BLAST computation (formerly known as multiplex)
-        if (params.multiplex) {
+        // Cluster redundant sequences for BLAST computation (formerly known as multiplex).
+        // Only performed when input sequences are from Uniprot, since sequence sets from
+        // UniRef90 and UniRef50 are already sequence-unique.
+        if (params.multiplex && params.sequence_version == "uniprot") {
             condensed_files = condense_redundant(original_fasta)
             blast_input_fasta = condensed_files.fasta_file
             condensed = condensed_files.condensed
@@ -28,11 +30,11 @@ workflow ALL_BY_ALL {
         blast_input = blastdb.combine(fasta_shards.transpose(), by: 0)
         blast_fractions = all_by_all_blast( blast_input ).groupTuple()
 
-        // Eliminate duplicate and self-edges
+        // Eliminate duplicates
         reduced_blast_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
 
         // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
-        if (params.multiplex) {
+        if (params.multiplex && params.sequence_version == "uniprot") {
             reduced_blast_parquet = restore_condensed(reduced_blast_parquet.join(condensed))
         }
 
