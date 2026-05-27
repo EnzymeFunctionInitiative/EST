@@ -1,6 +1,22 @@
 
-include { compute_connectivity_from_ssn; make_nc_legend } from "../shared/nextflow/connectivity.nf"
 include { zip_files; unzip_ssn } from "../shared/nextflow/util.nf"
+
+process compute_connectivity_from_ssn {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{nc.tab}"
+
+    input:
+        path ssn_file
+
+    output:
+        path "nc.tab", emit: "nc_table"
+
+    script:
+    """
+    python $projectDir/../shared/connectivity/get_connectivity.py \
+        --input-xgmml ${ssn_file} \
+        --output-map nc.tab
+    """
+}
 
 process color_by_connectivity {
     publishDir params.final_output_dir, mode: "copy", pattern: "{stats.json}"
@@ -21,6 +37,23 @@ process color_by_connectivity {
         --color-map ${nc_table} \
         --primary-color \
         --stats stats.json
+    """
+}
+
+process make_nc_legend {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{legend.png}"
+
+    input:
+        path nc_table
+
+    output:
+        path "legend.png", emit: "legend"
+
+    script:
+    """
+    python $projectDir/../shared/connectivity/make_color_ramp.py \
+        --input-file ${nc_table} \
+        --output-file legend.png
     """
 }
 

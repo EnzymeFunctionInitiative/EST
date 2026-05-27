@@ -3,7 +3,6 @@ include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workfl
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids } from "../shared/nextflow/sequence.nf"
 include { merge_stats; zip_files } from "../shared/nextflow/util.nf"
-include { compute_connectivity_from_blast; make_nc_legend } from "../shared/nextflow/connectivity.nf"
 
 def getCleanFilename(job_name, default_name) {
     // Create a clean job name for the file
@@ -205,6 +204,30 @@ process compute_repnode_cdhit {
     """
 }
 
+process compute_full_connectivity_from_blast {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{full_nc.tab}"
+
+    input:
+        path blast_tsv
+        path cdhit_clstr // Optional (if empty)
+
+    output:
+        path "full_nc.tab", emit: "nc_table"
+
+    script:
+    """
+    CDHIT_ARG=""
+    if [ -n "${cdhit_clstr}" ] && [ -f "${cdhit_clstr}" ]; then
+        CDHIT_ARG="--cdhit ${cdhit_clstr}"
+    fi
+
+    python $projectDir/../shared/connectivity/get_connectivity.py \
+        --input-blast ${blast_tsv} \
+        \$CDHIT_ARG \
+        --output-map full_nc.tab
+    """
+}
+
 process compute_repnode_connectivity_from_blast {
     publishDir params.final_output_dir, mode: "copy", pattern: "{*.tab}"
     input:
@@ -212,14 +235,48 @@ process compute_repnode_connectivity_from_blast {
         tuple val(repnode_pct), path(cdhit_clstr)
 
     output:
-        tuple val(repnode_pct), path("nc_${repnode_pct}.tab")
+        tuple val(repnode_pct), path("repnode_${repnode_pct}_nc.tab")
 
     script:
     """
     python $projectDir/../shared/connectivity/get_connectivity.py \
         --input-blast ${blast_tsv} \
         --cdhit ${cdhit_clstr} \
-        --output-map "nc_${repnode_pct}.tab"
+        --output-map "repnode_${repnode_pct}_nc.tab"
+    """
+}
+
+process make_full_nc_legend {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{full_nc_legend.png}"
+
+    input:
+        path nc_table
+
+    output:
+        path "full_nc_legend.png", emit: "legend"
+
+    script:
+    """
+    python $projectDir/../shared/connectivity/make_color_ramp.py \
+        --input-file ${nc_table} \
+        --output-file full_nc_legend.png
+    """
+}
+
+process make_repnode_nc_legend {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{*.png}"
+
+    input:
+        tuple val(repnode_pct), path(nc_table)
+
+    output:
+        path "repnode_${repnode_pct}_nc_legend.png", emit: "legend"
+
+    script:
+    """
+    python $projectDir/../shared/connectivity/make_color_ramp.py \
+        --input-file ${nc_table} \
+        --output-file "repnode_${repnode_pct}_nc_legend.png"
     """
 }
 
@@ -244,8 +301,8 @@ workflow {
     ssn_meta_file = get_annotations(final_ids.sequence_metadata)
 
     if (params.compute_ssn_nc_factor) {
-        full_nc_table = compute_connectivity_from_blast(thresholded_blast, Channel.value([]))
-        make_nc_legend(full_nc_table)
+        full_nc_table = compute_full_connectivity_from_blast(thresholded_blast, Channel.value([]))
+        make_full_nc_legend(full_nc_table)
     } else {
         full_nc_table = Channel.value([])
     }
@@ -264,7 +321,7 @@ workflow {
         // Compute the neighborhood connectivity values
         if (params.compute_ssn_nc_factor) {
             nc_table = compute_repnode_connectivity_from_blast(thresholded_blast, cdhit_result)
-            make_nc_legend(nc_table)
+            make_repnode_nc_legend(nc_table)
         } else {
             nc_table = repnode_pct_ch.map { pct -> [pct, []] }
         }
@@ -279,7 +336,7 @@ workflow {
     }
 
     // Merge full and repnode SSN stats into one file
-    final_stats = merge_stats(full_ssn.stats.mix(repnode_stats))
+    final_stats = merge_stats(full_ssn.stats.mix(repnode_stats).collect())
 
     if (params.color_ssn) {
         computed = COMPUTE_COLOR_CLUSTER_WORKFLOW(full_ssn.ssn_unzipped)
