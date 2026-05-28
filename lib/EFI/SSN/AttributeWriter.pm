@@ -260,12 +260,6 @@ sub processAttElement {
 
     my $attName = $self->{reader}->getAttribute("name");
 
-    my $newEmptyTag = sub {
-        my $info = shift;
-        my $value = shift;
-        $self->emptyTag("att", "name" => $info->[0], "type" => $info->[1], "value" => $value);
-    };
-
     # An 'empty' element is a leaf (e.g. no child elements; <att X="Y" /> is empty);
     # also, skip existing color or cluster number attrs
     if (not $self->{skip_att}->{$attName}) {
