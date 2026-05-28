@@ -74,13 +74,18 @@ sub write {
             if ($ntype == XML_READER_TYPE_ELEMENT) {
                 my $seqId = $reader->getAttribute("label");
                 my $id = $reader->getAttribute("id");
-                map { $_->onNodeStart($seqId, $id); } @{ $self->{attr_handlers} };
-                my @attr = ("id" => $id, "label" => $seqId);
-                $self->startTag("node", @attr);
+
+                foreach my $h (@{ $self->{attr_handlers} }) {
+                    $h->onNodeStart($seqId, $id);
+                }
+
+                $self->startTag("node", "id" => $id, "label" => $seqId);
                 $stats->{num_nodes}++;
             } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
                 $self->endTag("node");
-                map { $_->onNodeEnd(); } @{ $self->{attr_handlers} };
+                foreach my $h (@{ $self->{attr_handlers} }) {
+                    $h->onNodeEnd();
+                }
             }
         } elsif ($nname eq "att") {
             if ($ntype == XML_READER_TYPE_ELEMENT) {
@@ -201,10 +206,16 @@ sub copyElementWithoutNamespace {
     my $ntype = shift;
     if ($ntype == XML_READER_TYPE_ELEMENT) {
         my @attr;
-        foreach my $attr ($self->{reader}->copyCurrentNode(0)->getAttributes()) {
-            next if $attr->name eq "xmlns";
-            push @attr, $attr->name, $attr->value;
+        if ($self->{reader}->moveToFirstAttribute()) {
+            do {
+                my $name = $self->{reader}->name;
+                next if $name eq "xmlns";
+                push @attr, $name, $self->{reader}->value;
+            } while ($self->{reader}->moveToNextAttribute());
+
+            $self->{reader}->moveToElement();
         }
+
         $self->createElementWithAttr(@attr);
     } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
         $self->endTag($self->{reader}->name);
@@ -222,11 +233,11 @@ sub copyEdge {
     if ($self->{reader}->nodeType == XML_READER_TYPE_ELEMENT) {
         my @attr;
         # Add attribute to element if it exists in the reader element
-        my $addAttr = sub { my $attrName = shift; my $attrValue = $self->{reader}->getAttribute($attrName); push @attr, $attrName => $attrValue if $attrValue; };
-        $addAttr->("id");
-        $addAttr->("label");
-        $addAttr->("source");
-        $addAttr->("target");
+        foreach my $attrName ("id", "label", "source", "target") {
+            my $attrValue = $self->{reader}->getAttribute($attrName);
+            push @attr, $attrName => $attrValue if $attrValue;
+        }
+
         if ($self->{reader}->isEmptyElement()) {
             $self->emptyTag("edge", @attr);
         } else {
@@ -269,11 +280,11 @@ sub processAttElement {
                     if (ref $info->[2] eq "ARRAY") {
                         $self->startTag("att", "name" => $info->[0], "type" => "list");
                         foreach my $value (@{ $info->[2] }) {
-                            $newEmptyTag->($info, $value);
+                            $self->emptyTag("att", "name" => $info->[0], "type" => $info->[1], "value" => $value);
                         }
                         $self->endTag("att");
                     } else {
-                        $newEmptyTag->($info, $info->[2]);
+                        $self->emptyTag("att", "name" => $info->[0], "type" => $info->[1], "value" => $info->[2]);
                     }
                 }
             }
