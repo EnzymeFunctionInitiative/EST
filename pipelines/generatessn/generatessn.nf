@@ -205,7 +205,7 @@ process compute_repnode_cdhit {
     def cdhit_pct = (repnode_pct.toBigDecimal() / 100).setScale(2, BigDecimal.ROUND_HALF_UP)
 
     // This is left over from the legacy code, and is being kept here for future work (e.g. CGFP)
-    def word_opt = 2
+    def word_opt = 5
     def algo_opt = "" // "-g 1"
     def bandwidth_opt = "" // optional user input, in future
     def length_overlap_opt = "-s 1" // optional user input, in future
