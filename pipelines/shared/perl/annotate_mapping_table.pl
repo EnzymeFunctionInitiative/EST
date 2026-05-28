@@ -108,7 +108,7 @@ sub saveMappingData {
         foreach my $id (@ids) {
             my $data = $annoData->{$id} // {};
             $fh->print(join("\t", $id, $clusterNum, $colorMap->{$clusterNum} // "", $data->{taxonomy_id} // "", $data->{species} // ""), "\n") if $fh;
-            $spfh->print(join("\t", $clusterNum, $id, $data->{swissprot}), "\n") if $spfh;
+            $spfh->print(join("\t", $clusterNum, $id, $data->{swissprot}), "\n") if $spfh and $data->{swissprot};
         }
     }
 
