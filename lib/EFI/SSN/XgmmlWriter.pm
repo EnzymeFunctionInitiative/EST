@@ -65,7 +65,7 @@ sub write {
 
     $self->writeNodes(\@ids, $attrs);
 
-    $self->writeEdges($edgeGenerator);
+    $self->writeEdges($edgeGenerator, $attrs);
 
     $self->writeClosing();
 
@@ -77,7 +77,7 @@ sub write {
 # public
 sub getStats {
     my $self = shift;
-    my $fileName = fileparse($self->{output_file});
+    my $fileName = shift // fileparse($self->{output_file});
     my $fileSize = -s $self->{output_file};
     my $stats = { $fileName => { type => "full", num_nodes => $self->{stats}->{num_nodes}, num_edges => $self->{stats}->{num_edges}, size => $fileSize } };
     return $stats;
@@ -153,10 +153,10 @@ sub writeNode {
     foreach my $field (@{ $self->{fields} }) {
         next if not defined $attr->{$field->{name}};
 
-        if ($field->{is_list}) {
-            $self->startTag("att", "type" => "list", "name" => $field->{display});
+        my $value = $attr->{$field->{name}};
 
-            my $value = $attr->{$field->{name}};
+        if ($field->{is_list} or ref $value eq "ARRAY") {
+            $self->startTag("att", "type" => "list", "name" => $field->{display});
 
             my @values;
             if (ref $value eq "ARRAY") {
@@ -165,13 +165,15 @@ sub writeNode {
                 @values = ($value);
             }
 
-            foreach my $val (@values) {
+            # Only write out unique values
+            my %values = map { $_ => 1 } @values;
+            foreach my $val (sort keys %values) {
                 $self->emptyTag("att", "type" => $field->{type}, "name" => $field->{display}, "value" => $val);
             }
 
             $self->endTag("att");
         } else {
-            $self->emptyTag("att", "name" => $field->{display}, "type" => $field->{type}, "value" => $attr->{$field->{name}});
+            $self->emptyTag("att", "name" => $field->{display}, "type" => $field->{type}, "value" => $value);
         }
     }
 
@@ -190,11 +192,16 @@ sub writeNode {
 sub writeEdges {
     my $self = shift;
     my $edgeGenerator = shift;
+    my $nodeIds = shift;
 
     # Read edges from the file line-by-line
     while (my $edge = $edgeGenerator->()) {
-        $self->writeEdge($edge);
-        $self->{stats}->{num_edges}++;
+        # Only write edges that have nodes in the input list.  We do this because the full BLAST
+        # file is provided to repnode generations, which only use a subset of the nodes.
+        if ($nodeIds->{ $edge->{source} } and $nodeIds->{ $edge->{target} }) {
+            $self->writeEdge($edge);
+            $self->{stats}->{num_edges}++;
+        }
     }
 }
 
@@ -332,8 +339,9 @@ sub makeNodeAttributes {
         # If the value is a scalar, but the field type is a list, then split the value into pieces
         # to force the values into a XGMML list.  This is done because database fields with
         # multiple values are separated by commas.
-        if ($fields->{$field}->{is_list} and not ref $value) {
-            $value = [ split(m/[,\^]/, $value) ];
+        if ($fields->{$field}->{is_list}) {
+            my @vals = ref $value ? @$value : ($value);
+            $value = [ map { split(m/[,\^]/) } @vals ];
         }
 
         $nodeAttr->{$field} = $value;

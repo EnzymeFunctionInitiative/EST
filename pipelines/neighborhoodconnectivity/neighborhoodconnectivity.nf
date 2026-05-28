@@ -1,7 +1,7 @@
 
 include { zip_files; unzip_ssn } from "../shared/nextflow/util.nf"
 
-process compute_connectivity {
+process compute_connectivity_from_ssn {
     publishDir params.final_output_dir, mode: "copy", pattern: "{nc.tab}"
 
     input:
@@ -12,7 +12,7 @@ process compute_connectivity {
 
     script:
     """
-    python $projectDir/connectivity/get_connectivity.py \
+    python $projectDir/../shared/connectivity/get_connectivity.py \
         --input-xgmml ${ssn_file} \
         --output-map nc.tab
     """
@@ -40,11 +40,8 @@ process color_by_connectivity {
     """
 }
 
-process make_legend {
+process make_nc_legend {
     publishDir params.final_output_dir, mode: "copy", pattern: "{legend.png}"
-
-    // In case the required Perl modules are not installed
-    errorStrategy 'ignore'
 
     input:
         path nc_table
@@ -54,7 +51,7 @@ process make_legend {
 
     script:
     """
-    python $projectDir/color/make_color_ramp.py \
+    python $projectDir/../shared/connectivity/make_color_ramp.py \
         --input-file ${nc_table} \
         --output-file legend.png
     """
@@ -67,11 +64,11 @@ workflow {
         ssn_file = params.ssn_input
     }
 
-    nc_table = compute_connectivity(ssn_file)
+    nc_table = compute_connectivity_from_ssn(ssn_file)
 
     colored = color_by_connectivity(ssn_file, nc_table)
 
-    legend = make_legend(nc_table)
+    legend = make_nc_legend(nc_table)
 
     zipped_files = zip_files(colored.ssn)
 }

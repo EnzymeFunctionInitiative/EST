@@ -137,6 +137,33 @@ sub removeSequence {
 
 
 # public
+sub mergeSequences {
+    my $self = shift;
+    my $targetId = shift;
+    my @mergedIds = @_;
+
+    my $mergedSeq = $self->getSequence($targetId);
+
+    my %mergedAttrs;
+    map { push @{ $mergedAttrs{$_} }, $mergedSeq->getAttribute($_, 1); } $mergedSeq->getAttributeNames();
+
+    foreach my $id (@mergedIds) {
+        my $seq = $self->getSequence($id);
+        map { push @{ $mergedAttrs{$_} }, $seq->getAttribute($_, 1); } $seq->getAttributeNames();
+        $self->removeSequence($id);
+    }
+
+    foreach my $attrName (keys %mergedAttrs) {
+        # Save array reference
+        $mergedSeq->setAttribute($attrName, $mergedAttrs{$attrName});
+    }
+
+    $mergedSeq->setAttribute(FIELD_REPNODE_IDS, @mergedIds);
+    $mergedSeq->setAttribute(FIELD_REPNODE_SIZE, scalar @mergedIds);
+}
+
+
+# public
 sub getSequenceIds {
     my $self = shift;
     my @ids = keys %{ $self->{seq} };
