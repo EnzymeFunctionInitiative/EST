@@ -226,20 +226,13 @@ process compute_full_connectivity_from_blast {
 
     input:
         path blast_tsv
-        path cdhit_clstr // Optional (if empty)
     output:
         path "full_nc.tab", emit: "nc_table"
 
     script:
     """
-    CDHIT_ARG=""
-    if [ -n "${cdhit_clstr}" ] && [ -f "${cdhit_clstr}" ]; then
-        CDHIT_ARG="--cdhit ${cdhit_clstr}"
-    fi
-
     python $projectDir/../shared/connectivity/get_connectivity.py \
         --input-blast ${blast_tsv} \
-        \$CDHIT_ARG \
         --output-map full_nc.tab
     """
 }
