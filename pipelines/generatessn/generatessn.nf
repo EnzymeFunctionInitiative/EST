@@ -136,7 +136,7 @@ process create_full_ssn {
         NC_ARG="--nc-map ${nc_table}"
     fi
 
-    perl $projectDir/create/create_full_ssn.pl \
+    perl $projectDir/create/create_ssn.pl \
         --blast ${blast} \
         --fasta ${all_fasta} \
         --metadata ${ssn_meta_file} \
@@ -145,7 +145,6 @@ process create_full_ssn {
         --max-edges ${params.max_ssn_edges} \
         --db-version ${params.db_version} \
         \$NC_ARG \
-        --stats-ssn-name "full_ssn.xgmml.zip" \
         --stats full_stats.json
     cp ${temp_name} "${file_name}"
     zip full_ssn.xgmml.zip "${file_name}"
@@ -178,13 +177,14 @@ process create_repnode_ssns {
         NC_ARG="--nc-map ${nc_table}"
     fi
 
-    perl $projectDir/create/create_repnode_ssn.pl \
+    perl $projectDir/create/create_ssn.pl \
         --blast ${blast} \
         --fasta ${all_fasta} \
         --metadata ${ssn_meta_file} \
-        --cdhit ${repnode_cdhit} \
+        --repnode-cdhit ${repnode_cdhit} \
         --output "${temp_name}" \
         --title "${final_job_name}" \
+        --max-edges ${params.max_ssn_edges} \
         --db-version ${params.db_version} \
         \$NC_ARG \
         --stats repnode_${repnode_pct}_stats.json
