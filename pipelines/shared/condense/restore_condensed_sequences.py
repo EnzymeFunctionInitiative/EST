@@ -129,20 +129,22 @@ def process_cd_hit_clusters(clstr_file: str, output_path: str):
 
     Creates the map file in f"{output_path}/map.parquet"
     """
-    cluster_mapping = {"seq_id":[], "rep_id": []}
-    current_rep = None
-
-    # Regex to extract ID between '>' and '...'
-    # Example: 0	200aa, >SeqID... *
+    # Regex to extract ID between '>' and '...'. Example lines:
+    # 0	200aa, >SeqID... at 99%
+    # 1	201aa, >SeqID... *
     id_pattern = re.compile(r">(.*?)\.\.\.")
 
+    # tree list contains cluster dicts with keys "rep_id" and "members"
+    tree = []
+    branch = {"rep_id": "", "members" = []}
     with open(clstr_file, "r") as f:
         for line in f:
             line = line.strip()
             # ">Cluster ###" lines indicate a new rep seq and associated
             # degenerate sequences.
             if line.startswith(">Cluster"):
-                current_rep = None
+                tree.append(branch)
+                branch = {"rep_id": "", "members" = []}
             else:
                 # match the regex pattern for the seq_id
                 matched_id = id_pattern.search(line)
@@ -150,16 +152,28 @@ def process_cd_hit_clusters(clstr_file: str, output_path: str):
                     seq_id = matched_id.group(1)
                     # rep seq lines end with "*"
                     if line.endswith("*"):
-                        current_rep = seq_id
+                        branch["rep_id"] = seq_id
+                    # whether a rep seq or not, add the seq_id to the members
+                    # list
+                    branch["members"].append(seq_id)
 
-                    cluster_mapping["seq_id"].append(seq_id)
-                    if current_rep:
-                        cluster_mapping["rep_id"].append(current_rep)
-                    else:
-                        print(line)
-                        cluster_mapping["rep_id"].append(seq_id)
+    # add last branch of the tree
+    tree.append(branch)
 
-    table = pa.Table.from_pydict(cluster_mapping)
+    # create the mapping between seq_id and its associated rep_id
+    cluster_mapping = [
+        (seq_id, cluster["rep_id"])
+        for cluster in tree
+        for seq_id in cluster["members"]
+        if cluster["rep_id"] and cluster["members"]
+    ]
+
+    # create the final mapping
+    seq_ids, rep_ids = map(list,zip(*cluster_mapping))
+    final_mapping = {"seq_id":seq_ids, "rep_id": rep_ids}
+
+    # write the final mapping parquet file
+    table = pa.Table.from_pydict(final_mapping)
     pq.write_table(table, f"{output_path}/map.parquet")
     return f"{output_path}/map.parquet"
 
