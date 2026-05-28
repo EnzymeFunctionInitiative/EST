@@ -10,7 +10,7 @@ use EFI::Annotations::Fields qw(:annotations);
 use EFI::Util::CdHit::Parser qw(parse_cdhit_clstr);
 use EFI::Options;
 use EFI::Sequence::Collection;
-use EFI::Sequence::Type qw(strip_domain);
+use EFI::Sequence::Type qw(strip_domain get_sequence_type);
 use EFI::SSN::XgmmlWriter;
 use EFI::Util::FASTA qw(read_fasta_file);
 use EFI::Util::FileStats qw(save_stats);
@@ -47,7 +47,7 @@ my $edgeGenerator = loadEdges($opts->{blast});
 
 # If this argument is present, then we create a RepNode network
 if ($opts->{repnode_cdhit}) {
-    my $cdhitClusters = parse_cdhit_clstr($opts->{cdhit});
+    my $cdhitClusters = parse_cdhit_clstr($opts->{repnode_cdhit});
 
     # Merge IDs in the CD-HIT clusters into single nodes; this updates the data structures rather
     # than creating new ones
