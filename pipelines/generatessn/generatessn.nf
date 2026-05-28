@@ -112,6 +112,7 @@ process get_annotations {
 
 process create_full_ssn {
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
+
     input:
         path blast
         path all_fasta
@@ -154,6 +155,7 @@ process create_full_ssn {
 
 process create_repnode_ssns {
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
+
     input:
         path blast
         path all_fasta
@@ -225,7 +227,6 @@ process compute_full_connectivity_from_blast {
     input:
         path blast_tsv
         path cdhit_clstr // Optional (if empty)
-
     output:
         path "full_nc.tab", emit: "nc_table"
 
@@ -245,10 +246,10 @@ process compute_full_connectivity_from_blast {
 
 process compute_repnode_connectivity_from_blast {
     publishDir params.final_output_dir, mode: "copy", pattern: "{*.tab}"
+
     input:
         path blast_tsv
         tuple val(repnode_pct), path(cdhit_clstr)
-
     output:
         tuple val(repnode_pct), path("repnode_${repnode_pct}_nc.tab")
 
@@ -266,7 +267,6 @@ process make_full_nc_legend {
 
     input:
         path nc_table
-
     output:
         path "full_nc_legend.png", emit: "legend"
 
@@ -283,7 +283,6 @@ process make_repnode_nc_legend {
 
     input:
         tuple val(repnode_pct), path(nc_table)
-
     output:
         path "repnode_${repnode_pct}_nc_legend.png", emit: "legend"
 
