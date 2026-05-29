@@ -72,8 +72,6 @@ sub loadFromSource {
 
     my ($ids, $numIds, $uniprotUniref) = $self->executeQueries($queryData);
 
-    my $numFullFamily = keys %$uniprotUniref;
-
     my $numSharedSeq = $self->makeMetadata($ids, $destSeqData);
 
     # Edit the structure to get the UniRef IDs that are in the input family(s)
@@ -81,15 +79,14 @@ sub loadFromSource {
 
     # Add the UniRef IDs to the metadata file
     $self->addUnirefIds($destSeqData, $self->{sequence_version}, $uniprotUniref);
+    my $numFromFamily = 0;
 
-    $self->addStatsValue("num_ids", $numIds);
     if ($self->{sequence_version} ne SEQ_UNIPROT) {
-        $self->addStatsValue("num_full_family", $numFullFamily);
-        $self->addStatsValue("num_shared_uniref_ids", $numSharedSeq) if $numSharedSeq; # overlap between primary import source and family
+        $self->addStatsValue("num_full_family", $numIds);
     } else {
-        $self->addStatsValue("num_family", $numFullFamily);
-        $self->addStatsValue("num_shared_ids", $numSharedSeq) if $numSharedSeq; # overlap between primary import source and family
+        $self->addStatsValue("num_family", $numIds);
     }
+    $self->addStatsValue("num_shared_ids", $numSharedSeq) if $numSharedSeq; # overlap between primary import source (Accession, BLAST, FASTA) and family
 
     return $numIds;
 }
