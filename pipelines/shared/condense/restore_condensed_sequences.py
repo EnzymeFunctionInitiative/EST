@@ -136,7 +136,7 @@ def process_cd_hit_clusters(clstr_file: str, output_path: str):
 
     # tree list contains cluster dicts with keys "rep_id" and "members"
     tree = []
-    branch = {"rep_id": "", "members" = []}
+    branch = {"rep_id": "", "members": []}
     with open(clstr_file, "r") as f:
         for line in f:
             line = line.strip()
@@ -144,7 +144,7 @@ def process_cd_hit_clusters(clstr_file: str, output_path: str):
             # degenerate sequences.
             if line.startswith(">Cluster"):
                 tree.append(branch)
-                branch = {"rep_id": "", "members" = []}
+                branch = {"rep_id": "", "members": []}
             else:
                 # match the regex pattern for the seq_id
                 matched_id = id_pattern.search(line)
