@@ -32,7 +32,7 @@ $xwriter->write();
 
 
 if ($opts->{stats}) {
-    my $stats = $xwriter->getStats();
+    my $stats = { file_stats => $xwriter->getStats() };
     save_stats($opts->{stats}, $stats);
 }
 
