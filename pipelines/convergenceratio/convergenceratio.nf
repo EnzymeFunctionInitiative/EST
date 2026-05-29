@@ -20,14 +20,15 @@ process compute_blast_conv_ratio {
 }
 
 process merge_conv_ratios {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{conv_ratio.tab}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{conv_ratio.tab,stats.json}"
 
     input:
         path stats_files
         path cr_table
 
     output:
-        path "conv_ratio.tab"
+        path "conv_ratio.tab", emit: "conv_ratio"
+        path "stats.json", emit: "stats"
 
     script:
     """
@@ -35,6 +36,7 @@ process merge_conv_ratios {
         --ssn-conv-ratio ${cr_table} \
         --stats ${stats_files} \
         --output conv_ratio.tab
+    echo "{}" > stats.json
     """
 }
 
