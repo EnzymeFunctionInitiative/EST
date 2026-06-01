@@ -72,23 +72,21 @@ sub loadFromSource {
 
     my ($ids, $numIds, $uniprotUniref) = $self->executeQueries($queryData);
 
-    my $numFullFamily = keys %$uniprotUniref;
-
     my $numSharedSeq = $self->makeMetadata($ids, $destSeqData);
 
-    # Get the UniRef IDs that are in the input family(s)
-    my ($numUniref90Matched, $numUniref50Matched) = $self->getUnirefIds($uniprotUniref);
+    # Edit the structure to get the UniRef IDs that are in the input family(s)
+    $self->getUnirefIds($uniprotUniref);
 
     # Add the UniRef IDs to the metadata file
     $self->addUnirefIds($destSeqData, $self->{sequence_version}, $uniprotUniref);
+    my $numFromFamily = 0;
 
-    $self->addStatsValue("num_ids", $numIds);
     if ($self->{sequence_version} ne SEQ_UNIPROT) {
-        $self->addStatsValue("num_full_family", $numFullFamily);
-        $self->addStatsValue("num_uniref90_in_family", $numUniref90Matched);
-        $self->addStatsValue("num_uniref50_in_family", $numUniref50Matched);
+        $self->addStatsValue("num_full_family", $numIds);
+    } else {
+        $self->addStatsValue("num_family", $numIds);
     }
-    $self->addStatsValue("num_shared_ids", $numSharedSeq) if $numSharedSeq; # overlap between primary import source and family
+    $self->addStatsValue("num_shared_ids", $numSharedSeq) if $numSharedSeq; # overlap between primary import source (Accession, BLAST, FASTA) and family
 
     return $numIds;
 }
@@ -185,8 +183,9 @@ sub getFamilyNames {
 #     $queryData - hash ref pointing to list of query parameters
 #
 # Returns:
-#     hash ref of IDs mapping to family domain
-#     total number of IDs found
+#     hash ref of IDs mapping to family domain; if the input mode is UniRef, this will only
+#         contain the UniRef IDs, otherwise UniProt IDs
+#     total number of UniProt IDs found
 #     hash ref of mapping of UniProt to corresponding UniRef90 and UniRef50 IDs
 #
 sub executeQueries {
@@ -194,7 +193,6 @@ sub executeQueries {
     my $queryData = shift;
 
     my $ids = {};
-    my $numIds = 0;
     my $uniprotUniref = {};
     my $sequenceLengths = {};
 
@@ -214,8 +212,7 @@ sub executeQueries {
         }
 
         # Returns the number of UniProt or UniRef sequences
-        my $numUp = $self->processQuery($sth, $ids, $uniprotUniref, $sequenceLengths);
-        $numIds += $numUp;
+        $self->processQuery($sth, $ids, $uniprotUniref, $sequenceLengths);
     }
 
     # Alter the domains to fit the given region if the user specifies a domain region that is
@@ -223,6 +220,9 @@ sub executeQueries {
     if ($self->{domain}) {
         $ids = $self->{domain}->processDomains($ids, $sequenceLengths);
     }
+
+    # This hash ref contains the lengths of every unique UniProt sequence ID in the entire dataset
+    my $numIds = scalar keys %$sequenceLengths;
 
     return ($ids, $numIds, $uniprotUniref);
 }
@@ -275,17 +275,12 @@ sub makeSqlStatement {
 #     $uniprotUniref - hash ref, mapping UniProt ID to corresponding UniRef90 and UniRef50 IDs
 #     $sequenceLengths - hash ref, mapping UniProt ID to sequence length
 #
-# Returns:
-#     number of UniProt IDs in the query
-#
 sub processQuery {
     my $self = shift;
     my $sth = shift;
     my $ids = shift;
     my $uniprotUniref = shift;
     my $sequenceLengths = shift;
-
-    my $numIds = 0;
 
     my $uniprotCol = "accession";
     my $seqCol = $uniprotCol;
@@ -294,13 +289,6 @@ sub processQuery {
         $seqCol = "$self->{sequence_version}_seed";
         $isUniref = 1;
     }
-
-    my $rowData = sub {
-        my $row = shift;
-        # First element is N, second is C
-        my @r = ($row->{start}, $row->{end});
-        return \@r;
-    };
 
     # The retrieval process gets all IDs even if we're using UniRef so that we can get easily get
     # the domain.
@@ -313,25 +301,20 @@ sub processQuery {
         if ($isUniref) {
             # This is true when the sequence row corresponds to a UniRef sequence ID
             if ($uniprotId eq $seqId) {
-                my $domain = $rowData->($row);
+                my $domain = [ $row->{start}, $row->{end} ]; # First element is N, second is C
                 push @{ $ids->{$seqId} }, $domain;
             }
         } else {
-            my $domain = $rowData->($row);
+            my $domain = [ $row->{start}, $row->{end} ]; # First element is N, second is C
             push @{ $ids->{$seqId} }, $domain;
         }
 
-        #$uniprotUniref->{$uniprotId} = [$row->{uniref90_seed} || "", $row->{uniref50_seed} || ""];
         $uniprotUniref->{$uniprotId} = ["", ""];
 
         if (not $sequenceLengths->{$uniprotId} and defined $row->{seq_len}) {
             $sequenceLengths->{$uniprotId} = $row->{seq_len};
         }
-
-        $numIds++;
     }
-
-    return $numIds;
 }
 
 

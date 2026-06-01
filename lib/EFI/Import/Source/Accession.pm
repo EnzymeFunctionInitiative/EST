@@ -180,7 +180,6 @@ sub identifyAccessionIds {
         $destSeqData->addSequence($id, $attr);
     }
 
-    $self->addStatsValue("num_ids", scalar @ids);
     $self->addStatsValue("num_matched", $numUniprotIds);
     $self->addStatsValue("num_unmatched", $numNoMatches);
     $self->addStatsValue("num_foreign", $numForeign);

@@ -68,7 +68,6 @@ if (not $numLoaded) {
     $logger->error(@errors);
     die "\n";
 }
-my $numIds = $numLoaded;
 
 
 my $stats = new EFI::Import::Statistics();
@@ -87,8 +86,11 @@ if ($opts->{family} and $opts->{mode} ne FAMILY_SOURCE_NAME) {
     my $familySource = $sources->createSource(FAMILY_SOURCE_NAME);
     my $numFamLoaded = $familySource->loadFromSource($seqData);
     $familySource->addStats($stats);
-    $numIds += $numFamLoaded;
 }
+
+my @allIds = $seqData->getSequenceIds();
+my $numIds = scalar @allIds;
+$stats->addValue("num_ids", $numIds);  # The total collection of IDs from all sources
 
 
 my $_elapsed = int((time() - $_start) * 1000);
