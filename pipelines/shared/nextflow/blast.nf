@@ -182,7 +182,7 @@ process restore_condensed {
 }
 
 
-process split_fasta {
+process sort_and_split_fasta {
     input:
         tuple val(fid), path(fasta_file)
 
@@ -192,10 +192,11 @@ process split_fasta {
     script:
     """
     mkdir parts
-    seqkit split2 \
-        ${fasta_file} \
+    seqkit sort -l --reverse -2 ${fasta_file} \
+        | seqkit split2 \
         -p ${params.num_fasta_shards} \
-        --out-dir parts
+        --out-dir parts \
+        --out-prefix "all_sequences.fasta_"
     """
 }
 
