@@ -1,5 +1,5 @@
 
-include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; split_fasta } from "../shared/nextflow/blast.nf"
+include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; sort_and_split_fasta } from "../shared/nextflow/blast.nf"
 include { unzip_ssn } from "../shared/nextflow/util.nf"
 include { compute_clusters; get_conv_ratio_table; get_id_list; get_ssn_id_info } from "../shared/nextflow/color_workflow.nf"
 
@@ -131,7 +131,7 @@ workflow {
 
     fasta_lengths_parquet = blastreduce_transcode_fasta(cluster_fasta)
 
-    fasta_shards = split_fasta(reduced_fasta.fasta_file)
+    fasta_shards = sort_and_split_fasta(reduced_fasta.fasta_file)
 
     blast_input = blast_databases.combine(fasta_shards.transpose(), by: 0)
 

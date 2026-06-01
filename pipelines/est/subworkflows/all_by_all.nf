@@ -1,11 +1,14 @@
 
-include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; split_fasta } from "../../shared/nextflow/blast.nf"
+include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; sort_and_split_fasta } from "../../shared/nextflow/blast.nf"
 
 workflow ALL_BY_ALL {
     take:
         original_fasta
 
     main:
+        // For stats computation later; using the original fasta file
+        fasta_lengths_parquet = blastreduce_transcode_fasta(original_fasta)
+
         // Cluster redundant sequences for BLAST computation (formerly known as multiplex).
         // Only performed when input sequences are from Uniprot, since sequence sets from
         // UniRef90 and UniRef50 are already sequence-unique.
@@ -21,11 +24,8 @@ workflow ALL_BY_ALL {
         // Create BLAST database
         blastdb = create_blast_db(blast_input_fasta)
 
-        // For stats computation later
-        fasta_lengths_parquet = blastreduce_transcode_fasta(original_fasta)
-
         // All-by-all BLAST
-        fasta_shards = split_fasta(blast_input_fasta)
+        fasta_shards = sort_and_split_fasta(blast_input_fasta)
 
         blast_input = blastdb.combine(fasta_shards.transpose(), by: 0)
         blast_fractions = all_by_all_blast( blast_input ).groupTuple()
