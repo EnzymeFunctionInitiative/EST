@@ -198,7 +198,6 @@ process sort_and_split_fasta {
         --threads ${task.cpus} \
         ${fasta_file} \
         | seqkit split2 \
-        --two-pass \
         --threads ${task.cpus} \
         -p ${params.num_fasta_shards} \
         --out-dir parts \
