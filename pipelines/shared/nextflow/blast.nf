@@ -192,8 +192,14 @@ process sort_and_split_fasta {
     script:
     """
     mkdir parts
-    seqkit sort -l --reverse -2 ${fasta_file} \
+    seqkit sort --by-length \
+        --reverse \
+        --two-pass \
+        --threads ${task.cpus} \
+        ${fasta_file} \
         | seqkit split2 \
+        --two-pass \
+        --threads ${task.cpus} \
         -p ${params.num_fasta_shards} \
         --out-dir parts \
         --out-prefix "all_sequences.fasta_"
