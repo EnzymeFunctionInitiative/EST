@@ -52,7 +52,7 @@
         ]
     },
     {
-        "name": "eukaroyta_no_fungi",
+        "name": "eukaryota_no_fungi",
         "operator": "AND",
         "conditions": [
             {
