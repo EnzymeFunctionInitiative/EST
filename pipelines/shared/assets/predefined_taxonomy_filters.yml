@@ -1,6 +1,6 @@
 [
     {
-        "name": "bacteria_fungi",
+        "name": "bacteria_archaea_fungi",
         "operator": "OR",
         "conditions": [
             {
