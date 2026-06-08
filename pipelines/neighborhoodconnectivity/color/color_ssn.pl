@@ -54,7 +54,7 @@ sub parseMappingFile {
     my %data;
     while (my $line = <$fh>) {
         chomp $line;
-        my ($id, $color, $value) = split(m/\t/, $line);
+        my ($id, $value, $color) = split(m/\t/, $line);
         $data{$id} = { color => $color, value => $value };
     }
 
