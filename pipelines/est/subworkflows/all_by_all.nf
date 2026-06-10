@@ -1,5 +1,5 @@
 
-include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; sort_and_split_fasta } from "../../shared/nextflow/blast.nf"
+include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; remove_self_alignments; sort_and_split_fasta } from "../../shared/nextflow/blast.nf"
 
 workflow ALL_BY_ALL {
     take:
@@ -36,6 +36,9 @@ workflow ALL_BY_ALL {
         // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
         if (params.multiplex && params.sequence_version == "uniprot") {
             reduced_blast_parquet = restore_condensed(reduced_blast_parquet.join(condensed))
+        }
+        else {
+            reduced_blast_parquet = remove_self_alignments(reduced_blast_parquet)
         }
 
     emit:
