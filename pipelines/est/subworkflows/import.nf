@@ -110,5 +110,6 @@ workflow IMPORT_AND_FILTER {
         accession_table = sequence_id_files.accession_table
         fasta_file
         import_stats = sequence_id_files.import_stats
+        sequence_metadata = sequence_id_files.sequence_metadata
 }
 

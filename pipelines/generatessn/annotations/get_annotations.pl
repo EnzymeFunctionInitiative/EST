@@ -1,12 +1,9 @@
-#!/usr/bin/env perl
 
 use strict;
 use warnings;
 
 use Getopt::Long;
-use List::MoreUtils qw{apply};
 use FindBin;
-use Data::Dumper;
 
 use FindBin;
 use lib "$FindBin::Bin/../../../lib";

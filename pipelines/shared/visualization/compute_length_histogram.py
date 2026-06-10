@@ -109,27 +109,57 @@ def compute_sequence_lengths(fasta_file: str, valid_ids: Set[str] = None) -> Lis
 
     return sequence_lengths
 
-def compute_histogram(fasta_file: str, output_file: str, accession_table: str = None, seq_type: str = None):
+def load_length_mapping(length_mapping_file: str, valid_ids: Set[str] = None) -> List[int]:
     """
-    Compute a length histogram for sequences.  The output file contains a histogram, with each
-    line containing the length of a sequence and the number of sequences with that length,
-    ordered by sequence count.
+    Process a length mapping file to collect lengths.
 
     Parameters
     ----------
-        fasta_file
-            path to FASTA file containing sequences
-        output_file
-            path to output file containing histogram
+        length_mapping_file
+            path to a two-column tab-separated file containing sequence ID and sequence length
+        valid_ids
+            Set of string IDs, or None; if None, then all sequences are included in the
+            computation, otherwise only sequence IDs that are in the Set are included
+
+    Returns
+    -------
+        List of sequence lengths, ordered by occurrence of sequence in the file
+    """
+    sequence_lengths = []
+    try:
+        with open(length_mapping_file, 'r') as fh:
+            for line in fh:
+                parts = line.strip().split('\t')
+                if valid_ids == None or parts[0] in valid_ids:
+                    sequence_lengths.append(parts[1])
+
+    except FileNotFoundError:
+        print(f"Error: length mapping file not found at '{length_mapping_file}'", file=sys.stderr)
+        sys.exit(1)
+
+    return sequence_lengths
+
+def get_sequence_lengths(accession_table: str, fasta_file: str, length_mapping_file: str, seq_type: str = None) -> List[int]:
+    """
+    Get the sequence lengths from the inputs.  If a FASTA file is specified, compute the lengths
+    from the file.  If a length mapping file is specified, retrieve the lengths from the file.
+
+    Parameters
+    ----------
         accession_table
             path to accession table, or None; if provided, then this file is parsed to obtain a
             list of IDs to use for generating the length histogram
+        fasta_file
+            path to FASTA file containing sequences
+        length_mapping_file
+            path to a two-column tab-separated file containing sequence ID and sequence length
         seq_type
             sequence type to use for obtaining IDs when `accession_table` is provided
-    """
 
-    # For a log message
-    seq_type_str = f" for type '{seq_type}'" if seq_type else ""
+    Returns
+    -------
+        List of sequence lengths, ordered by occurrence of sequence in the file
+    """
 
     # None == use all sequences in fasta
     if accession_table and seq_type:
@@ -137,7 +167,31 @@ def compute_histogram(fasta_file: str, output_file: str, accession_table: str = 
     else:
         valid_ids = None
 
-    sequence_lengths = compute_sequence_lengths(fasta_file, valid_ids)
+    if fasta_file:
+        sequence_lengths = compute_sequence_lengths(fasta_file, valid_ids)
+    elif length_mapping_file:
+        sequence_lengths = load_length_mapping(length_mapping_file, valid_ids)
+
+    return sequence_lengths
+
+def compute_histogram(sequence_lengths: List[int], output_file: str, seq_type: str = None):
+    """
+    Compute a length histogram for sequences.  The output file contains a histogram, with each
+    line containing the length of a sequence and the number of sequences with that length,
+    ordered by sequence count.
+
+    Parameters
+    ----------
+        sequence_lengths
+            list of sequence lengths
+        output_file
+            path to output file containing histogram
+        seq_type
+            sequence type to use for obtaining IDs when `accession_table` is provided
+    """
+
+    # For a log message
+    seq_type_str = f" for type '{seq_type}'" if seq_type else ""
 
     if not sequence_lengths:
         print(f"Warning: No sequences were selected for histogram generation{seq_type_str}. Output will be empty.", file=sys.stderr)
@@ -155,11 +209,18 @@ def compute_histogram(fasta_file: str, output_file: str, accession_table: str = 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Compute a length histogram for sequences in a FASTA file.")
-    parser.add_argument('--fasta-file', required=True, help="Path to the input FASTA file.")
+    parser.add_argument('--fasta-file', required=False, help="Path to the input FASTA file.")
+    parser.add_argument('--length-mapping-file', required=False, help="Path to the file mapping IDs to lengths.")
     parser.add_argument('--output-file', required=True, help="Path to write the output histogram file.")
     parser.add_argument('--accession-table', required=False, help="Path to accession table file, containing three columns (uniprot, uniref90, uniref50).  If not specified, then all of the sequences in the FASTA file are used in the length histogram computation.")
     parser.add_argument('--seq-type', required=False, choices=['uniprot', 'uniref90', 'uniref50'], help="The sequence type to generate the histogram for; choosing 'uniprot' is equivalent to choosing the first column.")
 
     args = parser.parse_args()
-    
-    compute_histogram(args.fasta_file, args.output_file, args.accession_table, args.seq_type)
+
+    if not args.fasta_file and not args.length_mapping_file:
+        print(f"Error: require either --fasta-file or --length-mapping-file as input arguments; neither found", file=sys.stderr)
+        sys.exit(1)
+
+    sequence_lengths = get_sequence_lengths(args.accession_table, args.fasta_file, args.length_mapping_file, args.seq_type)
+
+    compute_histogram(sequence_lengths, args.output_file, args.seq_type)
