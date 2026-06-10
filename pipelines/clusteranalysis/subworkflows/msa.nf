@@ -2,12 +2,10 @@
 process muscle5_align {
     tag "ca_muscle5_${id}"
     label "muscle_align"
-
     publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     input:
         tuple val(id), path(fasta), val(seq_type)
-
     output:
         tuple val(id), path("${id}.afa"), val(seq_type), emit: msa
 
@@ -26,7 +24,6 @@ process muscle5_align {
 process muscle3_align {
     tag "ca_muscle3_${id}"
     label "muscle_align"
-
     publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     // MUSCLE can crash due to out of memory errors, or invalid data.  If we crash due to OOM,
@@ -41,7 +38,6 @@ process muscle3_align {
 
     input:
         tuple val(id), path(fasta), val(seq_type)
-
     output:
         tuple val(id), path("${id}.afa"), val(seq_type), emit: msa
 
@@ -53,12 +49,10 @@ process muscle3_align {
 
 process build_hmms {
     tag "ca_hmms_${id}"
-
     publishDir "${params.final_output_dir}/data/hmms/${seq_type}", mode: "copy", pattern: "*.{hmm,json,png}"
 
     input:
         tuple val(id), path(msa), val(seq_type)
-
     output:
         tuple val(seq_type), path("${id}.hmm"), emit: hmms
         path("${id}.json"), emit: json
@@ -72,12 +66,10 @@ process build_hmms {
 
 process zip_hmms {
     tag "ca_hmms_zip"
-    
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
         tuple val(seq_type), path(input_hmms)
-
     output:
         path("hmms_${seq_type}.zip")
 
@@ -93,12 +85,10 @@ process zip_hmms {
 
 process make_weblogos {
     tag "ca_weblogos_${id}"
-
     publishDir "${params.final_output_dir}/data/weblogos/${seq_type}", mode: "copy", pattern: "*.png"
 
     input:
         tuple val(id), path(msa), val(seq_type)
-
     output:
         tuple val(seq_type), path("${id}.png"), emit: pngs
         tuple val(seq_type), path("${id}_sm.png"), emit: sm_pngs
@@ -125,12 +115,10 @@ process make_weblogos {
 
 process zip_weblogos {
     tag "ca_weblogos_zip"
-    
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
         tuple val(seq_type), path(input_pngs)
-
     output:
         path("weblogos_${seq_type}.zip")
 
@@ -153,7 +141,6 @@ process run_clustal_omega {
 
     input:
         tuple val(id), path(msa), val(seq_type)
-
     output:
         tuple val(seq_type), path("${id}_pim.txt")
 
@@ -165,12 +152,10 @@ process run_clustal_omega {
 
 process zip_clustal_omega {
     tag "ca_clustal_zip"
-    
     publishDir params.final_output_dir, mode: "copy", pattern: "*.zip"
 
     input:
         tuple val(seq_type), path(input_pims)
-
     output:
         path("clustal_pims_${seq_type}.zip")
 
@@ -186,12 +171,10 @@ process zip_clustal_omega {
 
 process collect_aa_ids {
     tag "ca_count_msa_aa"
-
     publishDir "${params.final_output_dir}/data/cons_res/${type}/consensus_residue_results_${aa}", mode: "copy", pattern: "*.txt"
 
     input:
         tuple path("msa_files/*"), path("logo_files/*"), path(cluster_size_file), path(mapping_file), val(aa), val(threshold), val(type)
-
     output:
         tuple val(aa), val(threshold), path("consensus_residue_${aa}_${threshold}_position.txt"), path("consensus_residue_${aa}_${threshold}_percentage.txt"), val(type)
 
@@ -216,12 +199,10 @@ process collect_aa_ids {
 
 process summarize_msa_aa {
     tag "ca_summarize_msa_aa"
-
     publishDir "${params.final_output_dir}/data/cons_res/${seq_type}", mode: "copy", pattern: "*.txt"
 
     input:
         tuple val(seq_type), val(aa), path(pos_files), path(pct_files)
-
     output:
         path("*.txt")
 
@@ -253,7 +234,7 @@ workflow ALIGN_AND_ANALYZE {
             .map { type, id, fasta, seq_type, num_seq -> "${id}\t${num_seq}\n" }
             .concat( Channel.of("cluster_id\tnum_seq\n") )
             .collectFile(
-                name: "cluster_size.txt",
+                name: "msa_cluster_size.txt",
                 storeDir: params.final_output_dir,
                 keepHeader: false,
                 sort: { item ->
