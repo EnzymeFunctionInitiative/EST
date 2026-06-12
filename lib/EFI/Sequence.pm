@@ -43,7 +43,7 @@ sub getId {
 # public
 sub getAttribute {
     my $self = shift;
-    my $attr = shift or die;
+    my $attr = shift || die "Require attribute name";
     my $doUnpack = shift || 0;
     my $val = $self->{attr}->{$attr};
     if ($doUnpack) {
