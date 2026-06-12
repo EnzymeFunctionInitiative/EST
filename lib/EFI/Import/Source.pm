@@ -100,6 +100,9 @@ sub addStatsValue {
 #    $unirefIds - optional hash ref of manually-specified UniRef IDs (i.e. from the Family source);
 #        if this is specified, then no database lookup is made and the IDs are added from this hash
 #
+# Returns:
+#    number of UniRef IDs in the version the user selected
+#
 sub addUnirefIds {
     my $self = shift;
     my $seqData = shift;
@@ -107,8 +110,14 @@ sub addUnirefIds {
     my $unirefIds = shift;
 
     if ($unirefIds) {
-        map { $seqData->associateUnirefIds($_, $unirefIds->{$_}->[0] || "", $unirefIds->{$_}->[1] || ""); } keys %$unirefIds;
-        return;
+        my %uniqueIds;
+        my $unirefIndex = $seqVersion eq SEQ_UNIREF90 ? 0 : 1;
+
+        foreach my $id (keys %$unirefIds) {
+            $seqData->associateUnirefIds($id, $unirefIds->{$id}->[0] || "", $unirefIds->{$id}->[1] || "");
+            $uniqueIds{ $unirefIds->{$id}->[$unirefIndex] }++;
+        }
+        return scalar keys %uniqueIds;
     }
 
     # If the IDs from the collection are already UniRef IDs, we need to retrieve the IDs from
@@ -125,9 +134,13 @@ sub addUnirefIds {
     my @ids = $seqData->getSequenceIds();
 
     my $matched = $self->{db_util}->batchRetrieveIds(\@ids, $sql, "accession");
+    my %uniqueIds;
     foreach my $id (sort keys %$matched) {
         $seqData->associateUnirefIds($id, $matched->{$id}->{uniref90_seed}, $matched->{$id}->{uniref50_seed});
+        $uniqueIds{ $matched->{$id}->{$tableKey} }++;
     }
+
+    return scalar keys %uniqueIds;
 }
 
 
