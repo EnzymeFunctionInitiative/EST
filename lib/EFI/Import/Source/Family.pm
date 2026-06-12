@@ -78,11 +78,12 @@ sub loadFromSource {
     $self->getUnirefIds($uniprotUniref);
 
     # Add the UniRef IDs to the metadata file
-    $self->addUnirefIds($destSeqData, $self->{sequence_version}, $uniprotUniref);
+    my $numUnirefIds = $self->addUnirefIds($destSeqData, $self->{sequence_version}, $uniprotUniref);
     my $numFromFamily = 0;
 
     if ($self->{sequence_version} ne SEQ_UNIPROT) {
-        $self->addStatsValue("num_full_family", $numIds);
+        $self->addStatsValue("num_full_family", $numIds); # The number of UniProt IDs in the families
+        $self->addStatsValue("num_family", $numUnirefIds); # If this is a UniRef job, this is the number of UniRef clusters in the families
     } else {
         $self->addStatsValue("num_family", $numIds);
     }

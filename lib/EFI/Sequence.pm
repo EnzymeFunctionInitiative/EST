@@ -18,7 +18,7 @@ sub new {
 
     die "Require id argument" if not $id;
 
-    my $self = { id => $id, attr => {}, seq => "", attr_delimiter => ANNO_ROW_SEP };
+    my $self = { id => $id, attr => {}, seq => "" };
     bless($self, $class);
 
     if ($args{attr}) {
@@ -27,7 +27,7 @@ sub new {
         }
     }
     $self->{seq} = $args{sequence} if $args{sequence};
-    $self->{attr_delimiter} = $args{attr_delimiter} if $args{attr_delimiter};
+    $self->{attr_delimiter} = ANNO_ROW_SEP;
 
     return $self;
 }
@@ -47,7 +47,8 @@ sub getAttribute {
     my $doUnpack = shift || 0;
     my $val = $self->{attr}->{$attr};
     if ($doUnpack) {
-        return $self->unpackAttributeValue($val);
+        my @vals = $self->unpackAttributeValue($val);
+        return \@vals;
     } else {
         return $val;
     }
@@ -110,7 +111,7 @@ sub packAttributeValue {
 sub unpackAttributeValue {
     my $self = shift;
     my $value = shift;
-    my @parts = split($self->{attr_delimiter}, $value);
+    my @parts = split(m/\Q$self->{attr_delimiter}\E/, $value, -1);
     if (@parts > 1) {
         if (wantarray) {
             return @parts;
@@ -144,8 +145,7 @@ B<EFI::Sequence> - Perl module that represents a sequence
     $attr->{&FIELD_SWISSPROT_DESC} = "Caveolin-1";
     my $fastaSeq = "MSGGKYVDSEGHLYTVPIREQGNIYKPNNKAMAEEINEKQVYDAHTKEIDLVNRDPKHLNDDVVKIDFEDVIAEPEGTHSFDGIWKASFTTFTVTKYWFYRLLSALFGIPMALIWGIYFAILSFLHIWAVVPCIKSFLIEIQCISRVYSIYVHTFCDPFFEAVGKIFSNIRINMQKEI";
 
-    my $defaultDelim = "^";
-    my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq, attr_delimiter => $defaultDelim);
+    my $seq = new EFI::Sequence($id, attr => $attr, sequence => $fastaSeq);
 
     my $seqId = $seq->getId();
     print "Sequence ID $seqId\n";
@@ -175,7 +175,7 @@ with the sequence and attributes.
 
 =head2 METHODS
 
-=head3 C<new($id, attr =E<gt> $attr, sequence =E<gt> $seq, attr_delimiter =E<gt> $delimiter)>
+=head3 C<new($id, attr =E<gt> $attr, sequence =E<gt> $seq)>
 
 Creates a new B<EFI::Sequence> instance with the ID C<$id>, attributes stored in C<$attr>,
 and sequence stored in C<$seq>.
@@ -195,11 +195,6 @@ Optional attributes, as a hash ref.
 =item C<sequence>
 
 Optional protein sequence as a string.
-
-=item C<attr_delimiter>
-
-Optional string to use as a delimiter when serializing arrays of values into metadata
-values (defaults to caret C<^>).
 
 =back
 
