@@ -1,7 +1,7 @@
 
 include { filter_ids; GET_SOURCE_IDS; get_user_filter_file; get_sequences } from "../shared/nextflow/sequence.nf"
 include { create_blast_db } from "../shared/nextflow/blast.nf"
-include { get_length_histogram; visualize_length_histograms } from "../shared/nextflow/reporting.nf"
+include { visualize_length_histograms } from "../shared/nextflow/reporting.nf"
 
 process get_sunburst_data {
     publishDir params.final_output_dir, mode: 'copy'
@@ -36,6 +36,24 @@ process process_sunburst_stats {
     """
 }
 
+process get_length_histogram_fasta {
+    input:
+        path fasta_file
+        path accession_table
+        val seq_version
+    output:
+        tuple val(seq_version), path("${seq_version}.histogram.txt")
+
+    script:
+    """
+    python $projectDir/../shared/visualization/compute_length_histogram.py \
+        --fasta-file ${fasta_file} \
+        --accession-table ${accession_table} \
+        --seq-type ${seq_version} \
+        --output-file ${seq_version}.histogram.txt
+    """
+}
+
 workflow {
 
     // We get sequence IDs and basic metadata from the input source, including those in FASTA files
@@ -60,8 +78,11 @@ workflow {
     seq_versions = ["uniprot", "uniref90", "uniref50"]
     seq_version_ch = Channel.fromList(seq_versions)
 
-    length_histograms = get_length_histogram(fasta_file, sequence_id_files.accession_table, seq_version_ch)
-    histo_viz = visualize_length_histograms(length_histograms)
+    length_histograms = get_length_histogram_fasta(
+        fasta_file.first(),                         // convert to value channel
+        sequence_id_files.accession_table.first(),  // convert to value channel
+        seq_version_ch)
+    visualize_length_histograms(length_histograms)
 
     // Make Blast sequence database
     fasta_file_tuple = fasta_file.map { fasta_file -> tuple("ALL_DATA", fasta_file) }

@@ -16,6 +16,12 @@ workflow {
     blast_parquet = axa_results.blast_parquet.map { fid, file -> file }
     fasta_lengths_parquet = axa_results.fasta_lengths_parquet.map { fid, file -> file }
 
-    results = REPORTING(blast_parquet, fasta_lengths_parquet, initial_data.fasta_file, initial_data.accession_table, initial_data.import_stats)
+    results = REPORTING(
+        blast_parquet.first(),
+        fasta_lengths_parquet.first(),
+        initial_data.fasta_file.first(),
+        initial_data.accession_table,
+        initial_data.import_stats,
+        initial_data.sequence_metadata)
 }
 

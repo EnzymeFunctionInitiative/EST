@@ -14,11 +14,11 @@ process MAKE_HISTOGRAMS {
 
     script:
     """
-    python $projectDir/../shared/python/visualization/compute_length_histogram.py \
+    python $projectDir/../shared/visualization/compute_length_histogram.py \
         --fasta-file ${fasta} \
         --output-file histogram.txt
     if [[ -f "histogram.txt" && -s "histogram.txt" ]]; then
-        python $projectDir/../shared/python/visualization/plot_length_data.py \
+        python $projectDir/../shared/visualization/plot_length_data.py \
             --lengths histogram.txt \
             --title "Number of Sequences at Each Length (${id}, ${sequence_type})" \
             --frac 1 \
