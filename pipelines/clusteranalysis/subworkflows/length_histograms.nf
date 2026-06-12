@@ -3,14 +3,13 @@
 // sequences.
 process MAKE_HISTOGRAMS {
     tag "ca_histo_${type}_${id}"
-
     publishDir "${params.final_output_dir}/data/histo/${type}", mode: "copy"
 
     input:
         tuple val(type), val(id), path(fasta), val(sequence_type)
-
     output:
         path("${id}.png")
+        path("${id}_sm.png")
 
     script:
     """
