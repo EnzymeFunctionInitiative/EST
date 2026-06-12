@@ -110,7 +110,7 @@ sub packAttributeValue {
 sub unpackAttributeValue {
     my $self = shift;
     my $value = shift;
-    my @parts = split($self->{attr_delimiter}, $value);
+    my @parts = split("\\$self->{attr_delimiter}", $value);
     if (@parts > 1) {
         if (wantarray) {
             return @parts;
