@@ -29,7 +29,7 @@ SYNOPSIS
 
    my $colorHandler = EFI::SSN::AttributeWriter::Handler::Color->new(cluster_map => $clusterMap, colors => $colors);
 
-   my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_file => $outputSsn, append_new_attr => 1);
+   my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_file => $outputSsn);
    $xwriter->addAttributeHandler($colorHandler);
    $xwriter->write();
 
@@ -51,8 +51,8 @@ METHODS
 
 
 
-``new(ssn => $ssnFile, output_file => $outputSsn, append_new_attr => 1)``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``new(ssn => $ssnFile, output_file => $outputSsn)``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creates a new **EFI::SSN::AttributeWriter** object.
 
@@ -67,14 +67,6 @@ Parameters
 ``output_file``
    Path to the SSN file to write.
 
-``append_new_attr``
-   If true (non-zero), then new attributes are appended after the node
-   attribute location specified by **EFI::Annotations** (e.g.
-   ``get_cluster_info_insert_location`` and
-   ``get_gnt_info_insert_location``). Otherwise the new node attributes
-   will be prepended to the location. *Defaults to true (e.g.
-   appending).*
-
 
 
 Example Usage
@@ -82,10 +74,9 @@ Example Usage
 
 ::
 
-   my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_file => $outputSsn,
-       append_new_attr => 0);
-   # If the location is the node attribute "Organism", then fields will be inserted
-   # before the "Organism" attribute and then "Organism" will be added.
+   my $xwriter = EFI::SSN::AttributeWriter->new(ssn => $inputSsn, output_file => $outputSsn);
+   # If the location is the node attribute "Organism", then the existing "Organism" attribute
+   # will be added, and then fields will be inserted after that
 
 ``write()``
 ~~~~~~~~~~~
