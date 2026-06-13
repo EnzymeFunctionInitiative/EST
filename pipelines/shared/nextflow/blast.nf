@@ -188,7 +188,7 @@ process remove_self_alignments {
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
 
     input:
-        tuple val(fid), path(blast_parquet, stageAs: "reduced.parquet"), path(condensed)
+        tuple val(fid), path(blast_parquet, stageAs: "reduced.parquet")
 
     output:
         tuple val(fid), path("1.out.parquet")
