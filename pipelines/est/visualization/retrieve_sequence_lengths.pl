@@ -89,14 +89,14 @@ $dbh->disconnect();
 sub parseFastaLengths {
     my $parquetFile = shift;
 
-    my $duckdbCommand = "duckdb -csv -noheader -c \"COPY (SELECT seqid, sequence_length FROM read_parquet('$parquetFile')) to '/dev/stdout' (FORMAT CSV, HEADER FALSE, DELIMITER '\t');\"";
+    my $duckdbCommand = "duckdb -csv -noheader -c \"SELECT seqid, sequence_length FROM read_parquet('$parquetFile')\"";
 
     open my $reader, "-|", $duckdbCommand or die "Error: Failed to execute duckdb command '$duckdbCommand': $!";
 
     my $lengths = {};
     while (my $line = <$reader>) {
         chomp $line;
-        my ($seqid, $seqlen) = split(m/\t/, $line, 2);
+        my ($seqid, $seqlen) = split(m/,/, $line, 2);
         next if not defined $seqid or not defined $seqlen;
         $lengths->{$seqid} = $seqlen;
     }
