@@ -5,7 +5,6 @@ requires 'Config::IniFiles', '3.000003';
 requires 'JSON', '4.10';
 requires 'XML::Writer', '0.900';
 requires 'XML::LibXML', '2.0210';
-requires 'DBD::DuckDB';
 requires 'DBD::SQLite', '1.74';
 requires 'DBD::mysql', '4.046';
 
