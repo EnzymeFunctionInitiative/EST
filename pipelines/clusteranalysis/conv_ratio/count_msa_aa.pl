@@ -45,8 +45,8 @@ foreach my $msa (@files) {
     my $logoData = parseLogo($logo, $numSeq, $conThreshold);
 
     (my $clusterNum = $name) =~ s/^.*?(\d+).*?$/$1/;
-    my $nodeCount = $nodeCount{$clusterNum} ? $nodeCount{$clusterNum} : 0;
-    push @data, {cluster_num => $clusterNum, num_seq => $numSeq, num_residue => scalar @$logoData, num_uniprot => $nodeCount, data => $logoData};
+    my $numSsnNodes = $nodeCount{$name} ? $nodeCount{$name} : 0;
+    push @data, {cluster_num => $clusterNum, num_seq => $numSeq, num_residue => scalar @$logoData, num_ssn => $numSsnNodes, data => $logoData};
 }
 
 
@@ -62,8 +62,8 @@ foreach my $row (@sorted) {
     my @idx = map { $_->[0] } @{$row->{data}};
     my @vals = map { $_->[1] } @{$row->{data}};
     # If you change the number of cols here you need to modify collect_aa_ids.pl as well.
-    print $countFh join("\t", $row->{cluster_num}, $row->{num_residue}, $row->{num_uniprot}, $row->{num_seq}, @idx), "\n";
-    print $pctFh join("\t", $row->{cluster_num}, $row->{num_residue}, $row->{num_uniprot}, $row->{num_seq}, @vals), "\n";
+    print $countFh join("\t", $row->{cluster_num}, $row->{num_residue}, $row->{num_ssn}, $row->{num_seq}, @idx), "\n";
+    print $pctFh join("\t", $row->{cluster_num}, $row->{num_residue}, $row->{num_ssn}, $row->{num_seq}, @vals), "\n";
 }
 
 close $countFh;

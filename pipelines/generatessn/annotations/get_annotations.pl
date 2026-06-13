@@ -1,12 +1,9 @@
-#!/usr/bin/env perl
 
 use strict;
 use warnings;
 
 use Getopt::Long;
-use List::MoreUtils qw{apply};
 use FindBin;
-use Data::Dumper;
 
 use FindBin;
 use lib "$FindBin::Bin/../../../lib";
@@ -323,11 +320,11 @@ sub queryDatabase {
 sub getUnirefQuerySql {
     my $accession = shift;
 
-    my $clusterIds = $inputIds->getSequence($accession)->getAttribute($clusterField);
+    my $clusterIds = $inputIds->getSequence($accession)->getAttribute($clusterField, 1);
     return () if not $clusterIds;
 
     my @sql;
-    my @allIds = split(m/,/, $clusterIds);
+    my @allIds = ref($clusterIds) eq "ARRAY" ? @$clusterIds : $clusterIds;
     my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
     while (my @chunk = splice(@idList, 0, 200)) {
         my $sql = $anno->build_query_string(\@chunk, $unirefLenFiltWhere);
