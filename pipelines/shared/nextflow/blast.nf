@@ -215,9 +215,10 @@ process sort_and_split_fasta {
         tuple val(fid), path("parts/*.fasta")
 
     script:
+    def sort_str = params.sort_seq_by_length ? "--by-length" : "--by-name"
     """
     mkdir parts
-    seqkit sort --by-length \
+    seqkit sort ${sort_str} \
         --reverse \
         --two-pass \
         --threads ${task.cpus} \
