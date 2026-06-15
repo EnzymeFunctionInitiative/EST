@@ -31,14 +31,14 @@ workflow ALL_BY_ALL {
         blast_fractions = all_by_all_blast( blast_input ).groupTuple()
 
         // Eliminate duplicates
-        reduced_blast_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
+        top_triangle_parquet = blastreduce(blast_fractions.join(fasta_lengths_parquet))
 
         // Expand redundant sequences after BLAST computation (formerly known as demultiplex)
         if (params.multiplex && params.sequence_version == "uniprot") {
-            reduced_blast_parquet = restore_condensed(reduced_blast_parquet.join(condensed))
+            reduced_blast_parquet = restore_condensed(top_triangle_parquet.join(condensed))
         }
         else {
-            reduced_blast_parquet = remove_self_alignments(reduced_blast_parquet)
+            reduced_blast_parquet = remove_self_alignments(top_triangle_parquet)
         }
 
     emit:
