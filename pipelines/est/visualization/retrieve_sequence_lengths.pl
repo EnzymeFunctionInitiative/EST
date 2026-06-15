@@ -89,15 +89,19 @@ $dbh->disconnect();
 sub parseFastaLengths {
     my $parquetFile = shift;
 
-    my $dbh = DBI->connect("dbi:DuckDB:dbname=:memory:", "", "", { RaiseError => 1 });
+    my $duckdbCommand = "duckdb -csv -noheader -c \"SELECT seqid, sequence_length FROM read_parquet('$parquetFile')\"";
 
-    my $sth = $dbh->prepare("SELECT seqid, sequence_length FROM read_parquet('$parquetFile')");
-    $sth->execute();
+    open my $reader, "-|", $duckdbCommand or die "Error: Failed to execute duckdb command '$duckdbCommand': $!";
 
     my $lengths = {};
-    while (my $row = $sth->fetchrow_hashref) {
-        $lengths->{ $row->{seqid} } = $row->{sequence_length};
+    while (my $line = <$reader>) {
+        chomp $line;
+        my ($seqid, $seqlen) = split(m/,/, $line, 2);
+        next if not defined $seqid or not defined $seqlen;
+        $lengths->{$seqid} = $seqlen;
     }
+
+    $reader->close();
 
     return $lengths;
 }
