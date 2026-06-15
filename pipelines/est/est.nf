@@ -20,8 +20,8 @@ workflow {
         blast_parquet.first(),
         fasta_lengths_parquet.first(),
         initial_data.fasta_file.first(),
-        initial_data.accession_table,
+        initial_data.accession_table.first(),
         initial_data.import_stats,
-        initial_data.sequence_metadata)
+        initial_data.sequence_metadata.first())
 }
 
