@@ -10,7 +10,7 @@ use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations :source FIELD_CYTOSCAPE_COLOR);
-use EFI::Sequence::Type qw(is_unknown_sequence SEQ_FULL SEQ_DOMAIN);
+use EFI::Sequence::Type qw(is_unknown_sequence strip_domain SEQ_FULL SEQ_DOMAIN);
 
 use parent qw(EFI::Xgmml::Writer);
 
@@ -51,7 +51,7 @@ sub write {
     $self->{nb_conn} = $connectivity;
     $self->{title} = $title;
 
-    my @ids = sort $self->{metadata}->getSequenceIds();
+    my @ids = sort keys %$sequences;
 
     my $attrs = $self->getNodeAttributes(\@ids);
 
@@ -240,7 +240,7 @@ sub writeEdge {
 # Gets all of the attributes for the input nodes.
 #
 # Parameters:
-#    $ids - list of IDs in array ref
+#    $ids - list of IDs in array ref; contain domain data if the input is a domain dataset
 #
 # Returns:
 #    hash ref that maps IDs to hash refs containing attributes for the sequence
@@ -313,7 +313,7 @@ sub getFieldMetadata {
 # to populate a hash ref containing values to insert as attributes in the SSN.
 #
 # Parameters:
-#    $id - sequence ID
+#    $id - sequence ID; contains domain data if input dataset is domain
 #    $fields - hash ref of field metadata
 #
 # Returns:
@@ -325,6 +325,8 @@ sub makeNodeAttributes {
     my $id = shift;
     my $fields = shift;
 
+    my $uniprotId = strip_domain($id);
+
     my $source = "";
     my $nodeAttr = {};
 
@@ -332,7 +334,7 @@ sub makeNodeAttributes {
         # Skip any sequence defined in the metadata file
         next if $field eq FIELD_SEQ_KEY;
 
-        my $value = $self->{metadata}->getSequence($id)->getAttribute($field, 1);
+        my $value = $self->{metadata}->getSequence($uniprotId)->getAttribute($field, 1);
         $value = MISSING_VALUE if not $value;
         $source = $value if $field eq FIELD_SEQ_SRC_KEY;
 
