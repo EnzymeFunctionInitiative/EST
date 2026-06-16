@@ -62,27 +62,27 @@
             {
                 "field": "phylum",
                 "value": "Ascomycota",
-                "operator": "NOT"
+                "negate": "true"
             },
             {
                 "field": "phylum",
                 "value": "Basidiomycota",
-                "operator": "NOT"
+                "negate": "true"
             },
             {
                 "field": "phylum",
                 "value": "Fungi incertae sedis",
-                "operator": "NOT"
+                "negate": "true"
             },
             {
                 "field": "phylum",
                 "value": "unclassified Fungi",
-                "operator": "NOT"
+                "negate": "true"
             },
             {
                 "field": "species",
                 "value": "%metagenome%",
-                "operator": "NOT",
+                "negate": "true",
                 "exact": false
             }
         ]
