@@ -22,6 +22,11 @@ def count_lengths(count_file: str, frac: float) -> pd.DataFrame:
         A pandas DataFrame object with "count" and "length" columns
     """
     df = pd.read_csv(count_file, sep='\s+')
+
+    # sort numerically, in case the data didn't come in sorted
+    df["length"] = pd.to_numeric(df["length"])
+    df = df.sort_values(by="length").reset_index(drop=True)
+
     df["sequence_sum"] = df["count"].cumsum()
     # trim values using --frac value
     end_trim = int(df["count"].sum() * (1.0 - frac) / 2.0)
