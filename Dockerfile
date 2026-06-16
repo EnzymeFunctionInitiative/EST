@@ -51,7 +51,7 @@ ENV PATH="${PATH}:/opt/cd-hit-v4.8.1-2019-0228/bin"
 
 # install SeqKit
 RUN mkdir -p /opt/seqkit && \
-    curl -L -o /opt/seqkit/seqkit.tar.gz https://github.com/shenwei356/seqkit/releases/download/v2.12.0/seqkit_linux_amd64.tar.gz && \
+    curl -L -o /opt/seqkit/seqkit.tar.gz https://github.com/shenwei356/seqkit/releases/download/v2.13.0/seqkit_linux_amd64.tar.gz && \
     tar -zxvf /opt/seqkit/seqkit.tar.gz -C /opt/seqkit && \
     rm /opt/seqkit/seqkit.tar.gz
 ENV PATH="${PATH}:/opt/seqkit"
