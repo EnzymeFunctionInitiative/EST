@@ -54,8 +54,8 @@ sub get_sequence_type {
 
 sub strip_domain {
     my $id = shift;
-    $id =~ s/^([^\:]+):\d+:\d+$/$1/;
-    return $id;
+    my $colonPos = index($id, ":");
+    return $colonPos > -1 ? substr($id, 0, $colonPos) : $id;
 }
 
 
