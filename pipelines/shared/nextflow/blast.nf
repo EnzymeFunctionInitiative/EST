@@ -31,6 +31,7 @@ process all_by_all_blast {
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file prereduce.sql
     duckdb < prereduce.sql
+    rm -Rf \${DUCKDB_TEMP}
     """
 }
 
@@ -54,12 +55,11 @@ process blastreduce_old {
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file allreduce.sql
     duckdb < allreduce.sql
+    rm -Rf \${DUCKDB_TEMP}
     """
 }
 
 process blastreduce {
-    publishDir params.final_output_dir, mode: 'copy', enabled: (!params.multiplex || params.sequence_version != "uniprot")
-
     input:
         tuple val(fid), path(blast_files), path(fasta_length_parquet)
 
@@ -75,6 +75,7 @@ process blastreduce {
         --duckdb-memory-limit ${params.duckdb_memory_limit} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --output-file 1.out.parquet
+    rm -Rf \${DUCKDB_TEMP}
     """
 }
 
@@ -149,6 +150,7 @@ process restore_condensed_old {
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file restore.sql
     duckdb < restore.sql
+    rm -Rf \${DUCKDB_TEMP}
     python $projectDir/../shared/condense/restore_condensed_sequences_old.py \
         --condensed-blast condensed.out \
         --restored-blast 1.out \
@@ -178,11 +180,34 @@ process restore_condensed {
         --duckdb-memory-limit ${params.duckdb_memory_limit} \
         --duckdb-threads 1 \
         --duckdb-temp-dir \${DUCKDB_TEMP}
+    rm -Rf \${DUCKDB_TEMP}
     """
 }
 
+process remove_self_alignments {
+    publishDir params.final_output_dir, mode: 'copy', overwrite: true
 
-process split_fasta {
+    input:
+        tuple val(fid), path(blast_parquet, stageAs: "reduced.parquet")
+
+    output:
+        tuple val(fid), path("1.out.parquet")
+
+    script:
+    """
+    # python script
+    DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
+    python $projectDir/../shared/condense/remove_self_alignments.py \
+        --condensed-blast reduced.parquet \
+        --output-file 1.out.parquet \
+        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-threads 1 \
+        --duckdb-temp-dir \${DUCKDB_TEMP}
+    rm -Rf \${DUCKDB_TEMP}
+    """
+}
+
+process sort_and_split_fasta {
     input:
         tuple val(fid), path(fasta_file)
 
@@ -190,12 +215,19 @@ process split_fasta {
         tuple val(fid), path("parts/*.fasta")
 
     script:
+    def sort_str = params.sort_seq_by_length ? "--by-length" : "--by-name"
     """
     mkdir parts
-    seqkit split2 \
+    seqkit sort ${sort_str} \
+        --reverse \
+        --two-pass \
+        --threads ${task.cpus} \
         ${fasta_file} \
+        | seqkit split2 \
+        --threads ${task.cpus} \
         -p ${params.num_fasta_shards} \
-        --out-dir parts
+        --out-dir parts \
+        --out-prefix "all_sequences.fasta_"
     """
 }
 
