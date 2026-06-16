@@ -310,7 +310,7 @@ workflow {
     ssn_meta_file = get_annotations(final_ids.sequence_metadata)
 
     if (params.compute_ssn_nc_factor) {
-        full_nc_table = compute_full_connectivity_from_blast(thresholded_blast, Channel.value([]))
+        full_nc_table = compute_full_connectivity_from_blast(thresholded_blast)
         make_full_nc_legend(full_nc_table)
     } else {
         full_nc_table = Channel.value([])
