@@ -196,7 +196,7 @@ def compute_histogram(sequence_lengths: List[int], output_file: str, seq_type: s
     if not sequence_lengths:
         print(f"Warning: No sequences were selected for histogram generation{seq_type_str}. Output will be empty.", file=sys.stderr)
 
-    length_counts = Counter(sequence_lengths)
+    length_counts = Counter(int(length) for length in sequence_lengths)
 
     with open(output_file, 'w') as f_out:
         f_out.write("length\tcount\n")
