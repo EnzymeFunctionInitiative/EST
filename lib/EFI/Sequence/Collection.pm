@@ -391,7 +391,7 @@ sub loadIdFile {
     while (my $line = <$fh>) {
         chomp $line;
         my ($uniprot, $uniref90, $uniref50) = split(m/\t/, $line);
-        $self->associateUnirefIds($uniprot, $uniref90, $uniref50) if $uniref90 and $uniref50;
+        $self->associateUnirefIds($uniprot, $uniref90 // "", $uniref50 // "");
     }
 
     $fh->close();
