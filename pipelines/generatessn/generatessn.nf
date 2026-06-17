@@ -153,6 +153,8 @@ process create_full_ssn {
 }
 
 process create_repnode_ssns {
+    label 'create_ssn'
+
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
 
     input:
