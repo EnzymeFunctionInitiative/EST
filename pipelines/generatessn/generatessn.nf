@@ -301,10 +301,10 @@ workflow {
     // Filter sequences out by length or other criteria (e.g. fragment, taxonomy)
     final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, Channel.value([]))
 
-    filtered_fasta = filter_fasta(input_data.fasta, final_ids.retrieval_ids)
+    filtered_fasta = filter_fasta(input_data.fasta, final_ids.master_ids)
 
     // Apply threshold to BLAST file
-    thresholded_blast = threshold_blast(input_data.blast_output, final_ids.retrieval_ids)
+    thresholded_blast = threshold_blast(input_data.blast_output, final_ids.master_ids)
 
     // Get annotations
     ssn_meta_file = get_annotations(final_ids.sequence_metadata)
