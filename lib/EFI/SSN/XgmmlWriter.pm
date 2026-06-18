@@ -9,7 +9,7 @@ use File::Basename;
 use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::Annotations;
-use EFI::Annotations::Fields qw(:annotations :source FIELD_CYTOSCAPE_COLOR);
+use EFI::Annotations::Fields qw(:annotations :source);
 use EFI::Sequence::Type qw(is_unknown_sequence strip_domain SEQ_FULL SEQ_DOMAIN);
 
 use parent qw(EFI::Xgmml::Writer);
@@ -267,6 +267,14 @@ sub getNodeAttributes {
     # we need to add the sequence field as an attribute to the SSN.  $self->{hash_fasta_attribute}
     # is set in makeNodeAttributes if this attribute is found.
     $fieldMeta{&FIELD_SEQ_KEY} = $self->getFieldMetadata(FIELD_SEQ_KEY, $anno) if $self->{has_fasta_attribute};
+
+    # Add neighborhood connectivity colors
+    if ($self->{nb_conn}) {
+        $fieldMeta{&FIELD_NB_CONN} = $self->getFieldMetadata(FIELD_NB_CONN, $anno);
+        $fieldMeta{&FIELD_NB_CONN_COLOR} = $self->getFieldMetadata(FIELD_NB_CONN_COLOR, $anno);
+        $fieldMeta{&FIELD_NB_CONN_PRIMARY_COLOR} = $self->getFieldMetadata(FIELD_NB_CONN_PRIMARY_COLOR, $anno);
+    }
+
     my @fields = $anno->sort_annotations(keys %fieldMeta);
 
     $self->{fields} = [];
@@ -365,7 +373,7 @@ sub makeNodeAttributes {
         $nodeAttr->{&FIELD_NB_CONN} = $nc->{nc};
         if ($nc->{color}) {
             $nodeAttr->{&FIELD_NB_CONN_COLOR} = $nc->{color};
-            $nodeAttr->{&FIELD_CYTOSCAPE_COLOR} = $nc->{color};
+            $nodeAttr->{&FIELD_NB_CONN_PRIMARY_COLOR} = $nc->{color};
         }
     }
 
