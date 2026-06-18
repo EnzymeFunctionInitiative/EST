@@ -45,6 +45,7 @@ sub addImportOptions {
     $self->addOption("source-stats-file=s", 0, "path to the file containing source import stats", OPT_FILE);
     $self->addOption("stats-file=s", 0, "path to the file to save filter statistics to (appends to source stats)", OPT_FILE);
     $self->addOption("retrieval-ids-file=s", 0, "path to the file to save IDs that are for retrieving, as opposed to those sequences in a user-specified FASTA", OPT_FILE);
+    $self->addOption("master-ids-file=s", 0, "path to the file to save the master list of primary IDs", OPT_FILE);
 }
 
 
@@ -88,6 +89,7 @@ sub validateOptions {
     $opts->{source_stats_file} = get_default_path("source_stats", $outputDir) if not $opts->{source_stats_file};
     $opts->{stats_file} = get_default_path("import_stats", $outputDir) if not $opts->{stats_file};
     $opts->{retrieval_ids_file} = get_default_path("retrieval_ids", $outputDir) if not $opts->{retrieval_ids_file};
+    $opts->{master_ids_file} = get_default_path("master_ids", $outputDir) if not $opts->{master_ids_file};
 
     if (@errors) {
         my $help = $self->printHelp(\@errors);
