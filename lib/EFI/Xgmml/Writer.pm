@@ -22,6 +22,7 @@ sub new {
     $self->{xmlns} = $args{xmlns} // DEFAULT_XMLNS;
     $self->{data_indent} = $args{data_indent} // 0;
     $self->{output_file} = $args{output_file};
+    $self->{mem_buffer_size} = 10 * 1024 * 1024;
 
     return $self;
 }
@@ -31,16 +32,60 @@ sub new {
 sub open {
     my $self = shift;
 
+    my $bufferFh = $self->openBuffer();
+
     my $fh = new IO::File(">$self->{output_file}") or die "Unable to write to output SSN file '$self->{output_file}': $!";
+    $fh->autoflush(0); # Enable buffering
 
     eval {
         flock($fh, LOCK_EX) or warn "Unable to obtain exclusive file lock on output SSN for writing: $!";
     };
 
-    my $writer = new XML::Writer(OUTPUT => $fh, DATA_INDENT => $self->{data_indent}, UNSAFE => 1, PREFIX_MAP => '');
+    my $writer = new XML::Writer(OUTPUT => $bufferFh, DATA_INDENT => $self->{data_indent}, UNSAFE => 1, PREFIX_MAP => '');
 
     $self->{writer} = $writer;
     $self->{output} = $fh;
+}
+
+
+# private
+sub openBuffer {
+    my $self = shift;
+    $self->{mem_buffer} = "";
+    CORE::open my $fh, ">", \$self->{mem_buffer} or die "Unable to open memory buffer for writing: $!";
+    $self->{buffer_fh} = $fh;
+    return $self->{buffer_fh};
+}
+
+
+# private
+sub checkAndWriteBuffer {
+    my $self = shift;
+    if (length($self->{mem_buffer}) > $self->{mem_buffer_size}) {
+        $self->flushBuffer();
+    }
+}
+
+
+# private
+sub flushBuffer {
+    my $self = shift;
+
+    $self->{output}->print($self->{mem_buffer});
+
+    # Clear the buffer
+    truncate($self->{buffer_fh}, 0);
+    seek($self->{buffer_fh}, 0, 0);
+}
+
+
+# private
+sub finalizeBuffer {
+    my $self = shift;
+    if (length($self->{mem_buffer}) > 0) {
+        $self->flushBuffer();
+    }
+    $self->{buffer_fh}->close();
 }
 
 
@@ -48,8 +93,9 @@ sub open {
 sub close {
     my $self = shift;
 
-    $self->{writer}->end();
-    $self->{output}->close();
+    $self->{writer}->end(); # Finish writing XML tags
+    $self->finalizeBuffer(); # Save the buffer to the primary file handle
+    $self->{output}->close(); # Close everything
 }
 
 
@@ -72,6 +118,7 @@ sub endTag {
     my $self = shift;
     $self->{writer}->endTag(@_);
     $self->{writer}->characters("\n");
+    $self->checkAndWriteBuffer();
 }
 
 
@@ -109,6 +156,7 @@ sub raw_passthrough {
     my $rawString = shift;
     $rawString =~ s/\s*xmlns(?::(?:dc|xlink|rdf|cy))?="http[^"]+"//g;
     $self->{writer}->raw($rawString);
+    $self->checkAndWriteBuffer();
 }
 
 
