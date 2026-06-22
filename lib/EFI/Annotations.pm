@@ -195,6 +195,8 @@ sub build_annotations {
         my $value = &$getValueFunc($fname);
         #next if not length $value;
         push @fieldNames, $fname;
+        # Remove invalid XML control characters
+        $value =~ s/(?![\x09\x0A\x0D<>])\p{C}//g;
         $data->{$fname} = $value;
     }
 
