@@ -8,7 +8,7 @@ use Fcntl qw(:flock);
 use IO::File;
 use XML::Writer;
 
-use constant XMLNS => "http://www.cs.rpi.edu/XGMML";
+use constant DEFAULT_XMLNS => "http://www.cs.rpi.edu/XGMML";
 
 
 sub new {
@@ -19,6 +19,7 @@ sub new {
     my $self = {};
     bless($self, $class);
 
+    $self->{xmlns} = $args{xmlns} // DEFAULT_XMLNS;
     $self->{data_indent} = $args{data_indent} // 0;
     $self->{output_file} = $args{output_file};
 
@@ -62,7 +63,7 @@ sub preamble {
 # public
 sub xmlns {
     my $self = shift;
-    return XMLNS;
+    return $self->{xmlns};
 }
 
 
@@ -105,7 +106,9 @@ sub comment {
 #
 sub raw_passthrough {
     my $self = shift;
-    $self->{writer}->raw(@_);
+    my $rawString = shift;
+    $rawString =~ s/\s*xmlns(?::(?:dc|xlink|rdf|cy))?="http[^"]+"//g;
+    $self->{writer}->raw($rawString);
 }
 
 
