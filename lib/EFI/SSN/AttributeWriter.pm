@@ -230,22 +230,15 @@ sub copyElementWithoutNamespace {
 #
 sub copyEdge {
     my $self = shift;
-    if ($self->{reader}->nodeType == XML_READER_TYPE_ELEMENT) {
-        my @attr;
-        # Add attribute to element if it exists in the reader element
-        foreach my $attrName ("id", "label", "source", "target") {
-            my $attrValue = $self->{reader}->getAttribute($attrName);
-            push @attr, $attrName => $attrValue if $attrValue;
-        }
 
-        if ($self->{reader}->isEmptyElement()) {
-            $self->emptyTag("edge", @attr);
-        } else {
-            $self->startTag("edge", @attr);
-        }
-    } elsif ($self->{reader}->nodeType == XML_READER_TYPE_END_ELEMENT) {
-        $self->endTag("edge");
-    }
+    # Read the entire edge and children without parsing it
+    my $rawString = $self->{reader}->readOuterXml();
+
+    # Send edge data straight through to the file handle without XML::Writer processing it
+    $self->raw_passthrough($rawString);
+
+    # Skip the reading of this edge and children and go to the next edge
+    $self->{reader}->next();
 }
 
 

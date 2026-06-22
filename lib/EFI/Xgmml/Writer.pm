@@ -97,6 +97,18 @@ sub comment {
 }
 
 
+#
+# raw_passthrough - protected method
+#
+# Pass XML straight through to the file handle without constructing.  Used to optimize edge
+# writing.
+#
+sub raw_passthrough {
+    my $self = shift;
+    $self->{writer}->raw(@_);
+}
+
+
 1;
 __END__
 
