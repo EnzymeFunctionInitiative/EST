@@ -81,7 +81,8 @@ sub updateForRepnode {
 
     foreach my $clusterId (keys %$clusters) {
         my $clusterNodeId = strip_domain($clusters->{$clusterId}->{representative});
-        my @clusterMembers = grep { strip_domain($_) ne $clusterNodeId } @{ $clusters->{$clusterId}->{members} };
+        my @allClusterMembers = @{ $clusters->{$clusterId}->{members} };
+        my @clusterMembers = grep { strip_domain($_) ne $clusterNodeId } @allClusterMembers;
         my @metaMembers = map { strip_domain($_) } @clusterMembers;
 
         # Update the collection to merge IDs and node attributes into a single cluster
@@ -91,6 +92,10 @@ sub updateForRepnode {
             delete $sequences->{$id};
             delete $connectivity->{$id};
         }
+
+        my $mergedSeq = $inputIds->getSequence($clusterNodeId);
+        $mergedSeq->setAttribute(FIELD_REPNODE_IDS, @allClusterMembers);
+        $mergedSeq->setAttribute(FIELD_REPNODE_SIZE, scalar @allClusterMembers);
     }
 }
 

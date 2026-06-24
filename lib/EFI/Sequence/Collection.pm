@@ -162,9 +162,6 @@ sub mergeSequences {
         my @vals = unique_attribute_values(@{ $mergedAttrs{$attrName} });
         $mergedSeq->setAttribute($attrName, \@vals);
     }
-
-    $mergedSeq->setAttribute(FIELD_REPNODE_IDS, @mergedIds ? \@mergedIds : []);
-    $mergedSeq->setAttribute(FIELD_REPNODE_SIZE, scalar @mergedIds);
 }
 
 
