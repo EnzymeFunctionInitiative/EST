@@ -23,6 +23,7 @@ sub new {
     $self->{data_indent} = $args{data_indent} // 0;
     $self->{output_file} = $args{output_file};
     $self->{mem_buffer_size} = 10 * 1024 * 1024;
+    $self->{mem_buffer} = "";
 
     return $self;
 }
@@ -31,8 +32,6 @@ sub new {
 # public
 sub open {
     my $self = shift;
-
-    my $bufferFh = $self->openBuffer();
 
     my $fh = new IO::File(">$self->{output_file}") or die "Unable to write to output SSN file '$self->{output_file}': $!";
     $fh->autoflush(0); # Enable buffering
@@ -46,16 +45,6 @@ sub open {
 
     $self->{writer} = $writer;
     $self->{output} = $fh;
-}
-
-
-# private
-sub openBuffer {
-    my $self = shift;
-    $self->{mem_buffer} = "";
-    CORE::open my $fh, ">", \$self->{mem_buffer} or die "Unable to open memory buffer for writing: $!";
-    $self->{buffer_fh} = $fh;
-    return $self->{buffer_fh};
 }
 
 
