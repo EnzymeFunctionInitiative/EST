@@ -48,8 +48,7 @@ sub getAttribute {
     my $val = $self->{attr}->{$attr};
     return "" if not $val;
     if ($doUnpack) {
-        my @vals = $self->unpackAttributeValue($val);
-        return \@vals;
+        return $self->unpackAttributeValue($val);
     } else {
         return $val;
     }
