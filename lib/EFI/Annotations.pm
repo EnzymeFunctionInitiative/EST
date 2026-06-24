@@ -171,7 +171,7 @@ sub build_annotations {
         "PFAM" => sub { my $key = shift; return merge_anno_rows(\@rows, "PFAM2", {"" => "None"}); },
         "TIGRFAMs" => sub { my $key = shift; return merge_anno_rows(\@rows, "TIGR", {"" => "None"}); },
         "gdna" => $booleanFunc,
-        "NCBI_IDs" => sub { return join(",", @$ncbiIds); },
+        "NCBI_IDs" => sub { return join(ANNO_ROW_SEP, @$ncbiIds); },
     };
     my $getValueFunc = sub {
         my $key = shift;
