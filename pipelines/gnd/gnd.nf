@@ -31,6 +31,8 @@ process create_gnd {
 }
 
 process run_blast {
+    label 'APP_blastp'
+
     input:
         path sequence_file
     output:
@@ -45,6 +47,7 @@ process run_blast {
         -b ${params.import_blast_num_matches} \
         -e ${params.import_blast_evalue} \
         -m 8 \
+        -a ${task.cpus} \
         -o init_blast.out
 
     if [[ -s init_blast.out ]]; then

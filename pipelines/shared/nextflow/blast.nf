@@ -1,5 +1,8 @@
 
 process all_by_all_blast {
+    label 'APP_blastp'
+    label 'APP_duckdb'
+
     input:
         tuple val(fid), path(blast_db_files, arity: 5), val(blast_db_name), path(frac)
 
@@ -16,6 +19,7 @@ process all_by_all_blast {
         -m 8 \
         -e ${params.blast_evalue} \
         -b ${params.blast_num_matches} \
+        -a ${task.cpus} \
         -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet

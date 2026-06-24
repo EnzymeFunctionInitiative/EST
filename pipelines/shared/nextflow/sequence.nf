@@ -141,6 +141,8 @@ process get_source_ids_accession {
 }
 
 process get_source_ids_blast {
+    label 'APP_blastp'
+
     publishDir params.final_output_dir, mode: 'copy', pattern: '{blast_hits.tab}'
     input:
         path input_file
@@ -162,6 +164,7 @@ process get_source_ids_blast {
         -m 8 \
         -e "${params.import_blast_evalue}" \
         -b "${params.import_blast_num_matches}" \
+        -a ${task.cpus} \
         -o init_blast.out
     if [[ -s init_blast.out ]]; then
         awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
