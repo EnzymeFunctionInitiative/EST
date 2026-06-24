@@ -56,7 +56,7 @@ if ($opts->{repnode_cdhit}) {
 
 
 my $writer = new EFI::SSN::XgmmlWriter(output_file => $opts->{output}, use_min_edge_attr => $opts->{use_min_edge_attr}, db_version => $dbVersion, seq_type => $seqType);
-$writer->write($inputIds, $sequences, $connectivity, $title, $edgeGenerator);
+$writer->write($inputIds, $sequences, $connectivity, $title, $edgeGenerator, $opts->{repnode_cdhit} ? 1 : 0);
 
 
 my $stats = { file_stats => $writer->getStats() };
@@ -81,7 +81,8 @@ sub updateForRepnode {
 
     foreach my $clusterId (keys %$clusters) {
         my $clusterNodeId = strip_domain($clusters->{$clusterId}->{representative});
-        my @clusterMembers = grep { strip_domain($_) ne $clusterNodeId } @{ $clusters->{$clusterId}->{members} };
+        my @allClusterMembers = @{ $clusters->{$clusterId}->{members} };
+        my @clusterMembers = grep { strip_domain($_) ne $clusterNodeId } @allClusterMembers;
         my @metaMembers = map { strip_domain($_) } @clusterMembers;
 
         # Update the collection to merge IDs and node attributes into a single cluster
@@ -91,6 +92,10 @@ sub updateForRepnode {
             delete $sequences->{$id};
             delete $connectivity->{$id};
         }
+
+        my $mergedSeq = $inputIds->getSequence($clusterNodeId);
+        $mergedSeq->setAttribute(FIELD_REPNODE_IDS, @allClusterMembers);
+        $mergedSeq->setAttribute(FIELD_REPNODE_SIZE, scalar @allClusterMembers);
     }
 }
 

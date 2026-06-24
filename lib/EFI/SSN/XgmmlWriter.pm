@@ -45,6 +45,7 @@ sub write {
     my $connectivity = shift;
     my $title = shift;
     my $edgeGenerator = shift;
+    my $isRepnode = shift;
 
     $self->{sequences} = $sequences;
     $self->{metadata} = $metadata;
@@ -53,7 +54,7 @@ sub write {
 
     my @ids = sort keys %$sequences;
 
-    my $attrs = $self->getNodeAttributes(\@ids);
+    my $attrs = $self->getNodeAttributes(\@ids, $isRepnode);
 
     # From EFI::Xgmml::Writer
     $self->open();
@@ -160,14 +161,12 @@ sub writeNode {
 
             my @values;
             if (ref $value eq "ARRAY") {
-                @values = map { ref $_ eq "ARRAY" ? @$_ : $_ } @$value;
+                @values = @$value;
             } else {
                 @values = ($value);
             }
 
-            # Only write out unique values
-            my %values = map { $_ => 1 } @values;
-            foreach my $val (sort keys %values) {
+            foreach my $val (@values) {
                 $self->emptyTag("att", "type" => $field->{type}, "name" => $field->{display}, "value" => $val);
             }
 
@@ -241,6 +240,7 @@ sub writeEdge {
 #
 # Parameters:
 #    $ids - list of IDs in array ref; contain domain data if the input is a domain dataset
+#    $isRepnode - true if the network is supposed to be a repnode network
 #
 # Returns:
 #    hash ref that maps IDs to hash refs containing attributes for the sequence
@@ -248,6 +248,7 @@ sub writeEdge {
 sub getNodeAttributes {
     my $self = shift;
     my $ids = shift;
+    my $isRepnode = shift || 0;
 
     my $anno = new EFI::Annotations;
 
@@ -259,7 +260,7 @@ sub getNodeAttributes {
     }
 
     foreach my $id (@$ids) {
-        my $nodeAttr = $self->makeNodeAttributes($id, \%fieldMeta);
+        my $nodeAttr = $self->makeNodeAttributes($id, \%fieldMeta, $isRepnode);
         $attrs->{$id} = $nodeAttr;
     }
 
@@ -273,6 +274,12 @@ sub getNodeAttributes {
         $fieldMeta{&FIELD_NB_CONN} = $self->getFieldMetadata(FIELD_NB_CONN, $anno);
         $fieldMeta{&FIELD_NB_CONN_COLOR} = $self->getFieldMetadata(FIELD_NB_CONN_COLOR, $anno);
         $fieldMeta{&FIELD_NB_CONN_PRIMARY_COLOR} = $self->getFieldMetadata(FIELD_NB_CONN_PRIMARY_COLOR, $anno);
+    }
+
+    # Add repnode network attributes if necessary
+    if ($isRepnode) {
+        $fieldMeta{&FIELD_REPNODE_IDS} = $self->getFieldMetadata(FIELD_REPNODE_IDS, $anno);
+        $fieldMeta{&FIELD_REPNODE_SIZE} = $self->getFieldMetadata(FIELD_REPNODE_SIZE, $anno);
     }
 
     my @fields = $anno->sort_annotations(keys %fieldMeta);
@@ -332,6 +339,7 @@ sub makeNodeAttributes {
     my $self = shift;
     my $id = shift;
     my $fields = shift;
+    my $isRepnode = shift;
 
     my $uniprotId = strip_domain($id);
 
@@ -346,15 +354,9 @@ sub makeNodeAttributes {
         $value = MISSING_VALUE if not $value;
         $source = $value if $field eq FIELD_SEQ_SRC_KEY;
 
-        # If the value is a scalar, but the field type is a list, then split the value into pieces
-        # to force the values into a XGMML list.  This is done because database fields with
-        # multiple values are separated by commas.
-        if ($fields->{$field}->{is_list}) {
-            my @vals = ref $value ? @$value : ($value);
-            $value = [ map { split(m/[,]/) } @vals ];
         # If the value is an array, and is only one, then save it as a scalar because we only want
         # to force XGMML list type if it is a true array
-        } elsif (ref $value eq "ARRAY" and @$value == 1) {
+        if (not $fields->{$field}->{is_list} and (ref $value eq "ARRAY" and @$value == 1)) {
             $value = $value->[0];
         }
 
@@ -375,6 +377,12 @@ sub makeNodeAttributes {
             $nodeAttr->{&FIELD_NB_CONN_COLOR} = $nc->{color};
             $nodeAttr->{&FIELD_NB_CONN_PRIMARY_COLOR} = $nc->{color};
         }
+    }
+
+    # Add repnode network attributes if necessary
+    if ($isRepnode) {
+        $nodeAttr->{&FIELD_REPNODE_IDS} = $self->{metadata}->getSequence($uniprotId)->getAttribute(FIELD_REPNODE_IDS, 1);
+        $nodeAttr->{&FIELD_REPNODE_SIZE} = $self->{metadata}->getSequence($uniprotId)->getAttribute(FIELD_REPNODE_SIZE, 1);
     }
 
     return $nodeAttr;

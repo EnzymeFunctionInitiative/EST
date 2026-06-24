@@ -33,6 +33,14 @@ our %EXPORT_TAGS = (interpro => ['INTERPRO_DOMAIN', 'INTERPRO_FAMILY', 'INTERPRO
 Exporter::export_ok_tags('interpro');
 
 
+# Precompile regexs for performance
+my $RE_TRAILING_SEMI = qr/[;\s]+$/;
+my $RE_XML_CONTROL   = qr/(?![\x09\x0A\x0D<>])\p{C}/;
+
+# For optimization so we don't create this hundreds of thousands of times
+my %SPECIAL_FIELDS = map { $_ => 1 } ( qw(IPRO_DOM IPRO_FAM IPRO_SUP IPRO swissprot_status swissprot_description is_fragment PFAM TIGRFAMs gdna NCBI_IDs) );
+
+
 sub new {
     my ($class, %args) = @_;
 
@@ -132,73 +140,116 @@ sub build_annotations {
     my $ncbiIds = shift;
     my $annoSpec = shift // undef;
 
-    my @rows = ($row);
-    if (ref $row eq "ARRAY") {
-        @rows = @$row;
-    }
+    my @rows = ref $row eq "ARRAY" ? @$row : ($row);
 
     my ($iproDom, $iproFam, $iproSup, $iproOther) = parse_interpro(\@rows);
 
-    my $swissprotDescFunc = sub {
-        my @spDesc;
-        foreach my $row (@rows) {
-            if ($row->{swissprot_status}) {
-                (my $desc = $row->{description}) =~ s/;\s*$//;
-                push @spDesc, $desc;
-            } else {
-                push @spDesc, "NA";
-            }
-        }
-        return join(ANNO_ROW_SEP, @spDesc);
-    };
-
-    my $attrFunc = sub {
-        return 1 if not $annoSpec;
-        return exists $annoSpec->{$_[0]};
-    };
-    my $booleanFunc = sub { my $key = shift; return merge_anno_rows(\@rows, $key, {1 => "True", "" => "False"}); };
-    my $specialValueFunc = {
-        "IPRO_DOM" => sub { return join(ANNO_ROW_SEP, @$iproDom); },
-        "IPRO_FAM" => sub { return join(ANNO_ROW_SEP, @$iproFam); },
-        "IPRO_SUP" => sub { return join(ANNO_ROW_SEP, @$iproSup); },
-        "IPRO" => sub { return join(ANNO_ROW_SEP, @$iproOther); },
-        "swissprot_status" => sub { return join(ANNO_ROW_SEP, map { $_->{swissprot_status} ? "SwissProt" : "TrEMBL" } @rows); },
-        "swissprot_description" => $swissprotDescFunc,
-        "is_fragment" => sub { my $key = shift; return merge_anno_rows(\@rows, $key, {0 => "complete", 1 => "fragment"}); },
-        #"description" => sub { my $key = shift; return merge_anno_rows(\@rows, $key, {"" => "None"}); },
-        #"hmp_oxygen" => sub { my $key = shift; return merge_anno_rows(\@rows, $key, {"" => "None"}); },
-        #"hmp_site" => sub { my $key = shift; return merge_anno_rows(\@rows, $key, {"" => "None"}); },
-        "PFAM" => sub { my $key = shift; return merge_anno_rows(\@rows, "PFAM2", {"" => "None"}); },
-        "TIGRFAMs" => sub { my $key = shift; return merge_anno_rows(\@rows, "TIGR", {"" => "None"}); },
-        "gdna" => $booleanFunc,
-        "NCBI_IDs" => sub { return join(",", @$ncbiIds); },
-    };
-    my $getValueFunc = sub {
-        my $key = shift;
-        return "" if not &$attrFunc($key);
-        my $val = "";
-        if ($specialValueFunc->{$key}) {
-            $val = &{$specialValueFunc->{$key}}($key);
-        } else {
-            $val = merge_anno_rows(\@rows, $key, {"" => "None"});
-            $val = "None" if not $val;
-            $val =~ s/;\s*$//;
-        }
-        return $val;
-    };
-
     my @fields = @{ $self->{ssn_fields} };
     my $data = {};
-    my @fieldNames;
+
     foreach my $field (@fields) {
         my $fname = $field->{name};
-        my $value = &$getValueFunc($fname);
-        #next if not length $value;
-        push @fieldNames, $fname;
-        $data->{$fname} = $value;
+        next if $annoSpec and not exists $annoSpec->{$fname}; # Skip early
+
+        my $val = "";
+
+        if ($SPECIAL_FIELDS{$fname}) {
+            if    ($fname eq "IPRO_DOM") { $val = $iproDom; }
+            elsif ($fname eq "IPRO_FAM") { $val = $iproFam; }
+            elsif ($fname eq "IPRO_SUP") { $val = $iproSup; }
+            elsif ($fname eq "IPRO")     { $val = $iproOther; }
+            elsif ($fname eq "NCBI_IDs") { $val = $ncbiIds; }
+            elsif ($fname eq "swissprot_status") {
+                $val = [ map { $_->{swissprot_status} ? "SwissProt" : "TrEMBL" } @rows ];
+            }
+            elsif ($fname eq "swissprot_description") {
+                my @spDesc;
+                foreach my $row (@rows) {
+                    if ($row->{swissprot_status}) {
+                        (my $desc = $row->{description}) =~ s/;\s*$//;
+                        push @spDesc, $desc;
+                    } else {
+                        push @spDesc, "NA";
+                    }
+                }
+                $val = \@spDesc;
+            }
+            elsif ($fname eq "is_fragment") { $val = merge_anno_rows(\@rows, $fname, {0 => "complete", 1 => "fragment"}); }
+            elsif ($fname eq "PFAM")        { $val = merge_anno_rows(\@rows, "PFAM2", {"" => "None"}); }
+            elsif ($fname eq "TIGRFAMs")    { $val = merge_anno_rows(\@rows, "TIGR", {"" => "None"}); }
+            elsif ($fname eq "gdna")        { $val = merge_anno_rows(\@rows, $fname, {1 => "True", "" => "False"}); }
+        } else {
+            my $values = merge_anno_rows(\@rows, $fname, {"" => "None"});
+            if (@$values) {
+                # If there is only one value and it is the empty string or not defined, then we
+                # return "None" for the value rather than an empty array
+                if (not @$values or (@$values == 1 and (not defined $values->[0] or not length $values->[0]))) {
+                    $val = "None";
+                } else {
+                    $val = $values;
+                }
+            } else {
+                $val = "None";
+            }
+        }
+
+        $data->{$fname} = clean_attribute_value($val);
     }
 
     return $data;
+}
+
+
+sub clean_attribute_values {
+    my $value = shift;
+
+    if (ref $value eq "ARRAY") {
+        return [ map { clean_attribute_value($_) } @$value ];
+    }
+    return clean_attribute_value($value);
+}
+
+
+sub clean_attribute_value {
+    my $value = shift;
+    return "" if not defined $value;
+    $value =~ s/$RE_TRAILING_SEMI//;
+    # Remove invalid XML control characters
+    $value =~ s/$RE_XML_CONTROL//g;
+    return $value;
+}
+
+
+#
+# merge_anno_rows - internal function
+#
+# Merges values from multiple rows (e.g. UniRef) into one array and cleans up the data.
+#
+# Parameters:
+#     $rows - an array ref containing one or more hash refs of database retrieval rows (one hash
+#         ref for a UniProt retrieval, multiple for UniRef retrieval).
+#     $field - the field in the row(s) to merge
+#     $typeSpec (optional) - display specific values differently;
+#         e.g. if the value is empty, replace with 'None', or if the value is '0', replace with 'complete'
+#
+# Returns:
+#     an array ref with all of the values
+#
+sub merge_anno_rows {
+    my ($rows, $field, $typeSpec) = @_; # For optimization
+    $typeSpec //= {};
+
+    my @vals;
+    foreach my $row (@$rows) {
+        my $val = "";
+        if (defined $row->{$field}) {
+            my $rawValue = $row->{$field}; # For optimization
+            $val = exists $typeSpec->{$rawValue} ? $typeSpec->{$rawValue} : $rawValue;
+        }
+        push @vals, $val;
+    }
+
+    return \@vals;
 }
 
 
@@ -267,42 +318,6 @@ sub parse_interpro {
     }
 
     return \@dom, \@fam, \@sup, \@other;
-}
-
-
-#
-# merge_anno_rows - internal function
-#
-# Merges values from multiple rows (e.g. UniRef) into one string.
-#
-# Parameters:
-#     $rows - an array ref containing one or more hash refs of database retrieval rows (one hash
-#         ref for a UniProt retrieval, multiple for UniRef retrieval).
-#     $field - the field in the row(s) to merge
-#     $typeSpec (optional) - display specific values differently;
-#         e.g. if the value is empty, replace with 'None', or if the value is '0', replace with 'complete'
-#
-# Returns:
-#     a scalar value with all of the values joined together using the row separator character
-#
-sub merge_anno_rows {
-    my $rows = shift;
-    my $field = shift;
-    my $typeSpec = shift || {};
-
-    my @vals;
-    foreach my $row (@$rows) {
-        my $val = "";
-        if (defined $row->{$field}) {
-            $val = exists $typeSpec->{$row->{$field}} ? $typeSpec->{$row->{$field}} : $row->{$field};
-            $val =~ s/;\s*$//;
-        }
-        push @vals, $val;
-    }
-
-    my $value = join(ANNO_ROW_SEP, @vals);
-
-    return $value;
 }
 
 
