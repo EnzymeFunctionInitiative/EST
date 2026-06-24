@@ -31,7 +31,7 @@ process all_by_all_blast {
         --blast-output ${frac}.tab.parquet \
         --sql-template $projectDir/../shared/templates/prereduce-template.sql \
         --output-file ${frac}.tab.sorted.parquet \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-memory-limit ${task.memory.toGiga()} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file prereduce.sql
     duckdb < prereduce.sql
