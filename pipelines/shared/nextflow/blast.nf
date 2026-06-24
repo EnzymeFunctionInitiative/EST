@@ -96,6 +96,8 @@ process blastreduce_transcode_fasta {
 
 // Formerly known as multiplex
 process condense_redundant {
+    label 'APP_cd_hit'
+
     input:
         tuple val(fid), path(fasta_file)
 
@@ -105,11 +107,11 @@ process condense_redundant {
 
     script:
     """
-    cd-hit \
-        -d 0 -c 1 -s 1 \
-        -i ${fasta_file} \
-        -o sequences.fasta \
-        -M "${params.cdhit_memory_limit}"
+    cd-hit -d 0 -c 1 -s 1 \
+           -i ${fasta_file} \
+           -o sequences.fasta \
+           -M ${task.memory.toMega()} \
+           -T ${task.cpus}
     """
 }
 

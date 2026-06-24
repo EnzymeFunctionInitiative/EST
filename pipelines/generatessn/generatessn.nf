@@ -111,6 +111,8 @@ process get_annotations {
 }
 
 process create_full_ssn {
+    label 'TASK_create_ssn'
+
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
 
     input:
@@ -153,6 +155,8 @@ process create_full_ssn {
 }
 
 process create_repnode_ssns {
+    label 'TASK_create_ssn'
+
     publishDir params.final_output_dir, mode: 'copy', pattern: "*.{zip}"
 
     input:
@@ -195,6 +199,8 @@ process create_repnode_ssns {
 }
 
 process compute_repnode_cdhit {
+    label 'APP_cd_hit'
+
     input:
         path all_fasta
         val repnode_pct
@@ -217,7 +223,14 @@ process compute_repnode_cdhit {
     //else { word_opt = 5 }
 
     """
-    cd-hit -n ${word_opt} ${length_overlap_opt} -i ${all_fasta} -o cdhit_${repnode_pct} -c ${cdhit_pct} -d 0 ${algo_opt} ${bandwidth_opt}
+    cd-hit -d 0 -c ${cdhit_pct} \
+           ${length_overlap_opt} \
+           -n ${word_opt} \
+           -i ${all_fasta} \
+           -o cdhit_${repnode_pct} \
+           ${algo_opt} ${bandwidth_opt} \
+           -M ${task.memory.toMega()} \
+           -T ${task.cpus}
     """
 }
 

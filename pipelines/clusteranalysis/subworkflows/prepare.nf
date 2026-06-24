@@ -37,6 +37,7 @@ process count_fasta {
 }
 
 process cdhit_reduce {
+    label 'APP_cd_hit'
     tag "ca_cdhit_${id}"
 
     input:
@@ -50,7 +51,12 @@ process cdhit_reduce {
 
     """
     # Using legacy parameters: -c 1 -s 1 -M 14900
-    cd-hit -c 1 -s 1 -i ${fasta} -o ${id}_cdhit.fasta -M ${params.cdhit_memory_limit}
+    # ^^^ not using the -M memory setting
+    cd-hit -c 1 -s 1 \
+           -i ${fasta} \
+           -o ${id}_cdhit.fasta \
+           -M ${task.memory.toMega()} \
+           -T ${task.cpus}
     """
 }
 
