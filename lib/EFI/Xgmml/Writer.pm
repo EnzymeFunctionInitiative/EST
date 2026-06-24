@@ -52,7 +52,10 @@ sub open {
 # print - private
 #
 # This method is used to interface XML::Writer with the string buffer.  XML::Writer calls 'print'
-# on the handle it was provided, meaning this function gets called.  Here we add the buffer 
+# on the handle it was provided, meaning this function gets called.  Here we append the XML string
+# that XML::Writer passes to print() onto the string buffer.  Then, if it's greater than the max
+# buffer size, it gets written to the actual output buffer.
+#
 sub print {
     my $self = shift;
 
@@ -64,7 +67,11 @@ sub print {
 }
 
 
-# private
+#
+# flushBuffer - private
+#
+# This method flushes the string buffer to the actual file handle.
+#
 sub flushBuffer {
     my $self = shift;
 
