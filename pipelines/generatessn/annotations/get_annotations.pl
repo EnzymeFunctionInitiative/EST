@@ -12,7 +12,7 @@ use EFI::Database;
 use EFI::Database::Schema qw(:dbi);
 use EFI::IdMapping::Util;
 use EFI::Annotations;
-use EFI::Annotations::Fields qw(:annotations);
+use EFI::Annotations::Fields qw(:annotations ANNO_ROW_SEP);
 use EFI::IdMapping::Util qw(:ids);
 use EFI::Sequence::Collection;
 use EFI::Sequence::Type qw(is_unknown_sequence :types);
@@ -186,7 +186,7 @@ sub formatAnnoData {
         # Set the UniRef cluster sequence IDs
         if ($field eq $clusterField) {
             my @ids = map { $_->[0] } @{$unirefIds->{$accession}};
-            $data->{$field} = join(",", $accession, @ids);
+            $data->{$field} = join(ANNO_ROW_SEP, $accession, @ids);
 
         # Set the UniRef cluster size field
         } elsif ($field eq $clusterSizeField) {
@@ -197,7 +197,7 @@ sub formatAnnoData {
         # If the field doesn't exist in the database attributes but exists in the existing metadata
         # then use the existing value
         } elsif (not $data->{$field}) {
-            my $value = $inputIds->getSequence($accession)->getAttribute($field);
+            my $value = $inputIds->getSequence($accession)->getAttribute($field, 1);
             $data->{$field} = $value;
         }
     }
