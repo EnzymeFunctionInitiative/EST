@@ -46,6 +46,7 @@ sub getAttribute {
     my $attr = shift || die "Require attribute name";
     my $doUnpack = shift || 0;
     my $val = $self->{attr}->{$attr};
+    return "" if not $val;
     if ($doUnpack) {
         my @vals = $self->unpackAttributeValue($val);
         return \@vals;
