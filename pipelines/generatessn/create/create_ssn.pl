@@ -56,7 +56,7 @@ if ($opts->{repnode_cdhit}) {
 
 
 my $writer = new EFI::SSN::XgmmlWriter(output_file => $opts->{output}, use_min_edge_attr => $opts->{use_min_edge_attr}, db_version => $dbVersion, seq_type => $seqType);
-$writer->write($inputIds, $sequences, $connectivity, $title, $edgeGenerator);
+$writer->write($inputIds, $sequences, $connectivity, $title, $edgeGenerator, $opts->{repnode_cdhit} ? 1 : 0);
 
 
 my $stats = { file_stats => $writer->getStats() };

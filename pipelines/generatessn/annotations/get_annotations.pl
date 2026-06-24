@@ -14,7 +14,7 @@ use EFI::IdMapping::Util;
 use EFI::Annotations;
 use EFI::Annotations::Fields qw(:annotations ANNO_ROW_SEP);
 use EFI::IdMapping::Util qw(:ids);
-use EFI::Sequence::Collection;
+use EFI::Sequence::Collection qw(unique_attribute_values);
 use EFI::Sequence::Type qw(is_unknown_sequence :types);
 
 
@@ -200,6 +200,20 @@ sub formatAnnoData {
             my $value = $inputIds->getSequence($accession)->getAttribute($field, 1);
             $data->{$field} = $value;
         }
+    }
+
+    # Clean up the attributes by making them unique and removing empty ones
+    foreach my $field (keys %$data) {
+        my @values;
+        if (ref $data->{$field} eq "ARRAY") {
+            @values = @{ $data->{$field} };
+        } else {
+            @values = split(ANNO_ROW_SEP, $data->{$field});
+        }
+
+        my @finalValues = unique_attribute_values(@values);
+
+        $data->{$field} = @finalValues > 1 ? \@finalValues : $finalValues[0];
     }
 
     return $data;
