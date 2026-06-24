@@ -346,15 +346,9 @@ sub makeNodeAttributes {
         $value = MISSING_VALUE if not $value;
         $source = $value if $field eq FIELD_SEQ_SRC_KEY;
 
-        # If the value is a scalar, but the field type is a list, then split the value into pieces
-        # to force the values into a XGMML list.  This is done because database fields with
-        # multiple values are separated by commas.
-        if ($fields->{$field}->{is_list}) {
-            my @vals = ref $value ? @$value : ($value);
-            $value = [ map { split(m/[,]/) } @vals ];
         # If the value is an array, and is only one, then save it as a scalar because we only want
         # to force XGMML list type if it is a true array
-        } elsif (ref $value eq "ARRAY" and @$value == 1) {
+        if (not $fields->{$field}->{is_list} and (ref $value eq "ARRAY" and @$value == 1)) {
             $value = $value->[0];
         }
 
