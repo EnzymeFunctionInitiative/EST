@@ -2,8 +2,8 @@
 use strict;
 use warnings;
 
-use Getopt::Long;
 use FindBin;
+use Getopt::Long;
 
 use lib "$FindBin::Bin/../../../lib";
 
@@ -22,10 +22,7 @@ my $opts = validateAndProcessOptions();
 
 my $parser = EFI::SSN::XgmmlReader::IdList->new(xgmml_file => $opts->{ssn});
 
-$parser->parse();
-
-my $edgelist = $parser->getEdgeList();
-saveEdgelist($edgelist, $opts->{edgelist});
+$parser->parse(edgelist_file => $opts->{edgelist});
 
 my $indexSeqIdMap = $parser->getIndexSeqIdMap();
 my $nodeSizeMap = $parser->getMetanodeSizes();
@@ -41,8 +38,8 @@ my $metanodeMap = $parser->getMetanodes();
 saveMetanodeMapping($opts->{seqid_source_map}, $metanodeMap, $metanodeType);
 
 if ($opts->{ssn_sequences}) {
-    my $metadata = $parser->getMetadata();
-    saveSsnSequences($opts->{ssn_sequences}, $metadata);
+    my $sequences = $parser->getSequences();
+    saveSsnSequences($opts->{ssn_sequences}, $sequences);
 }
 
 my $domainMap = $parser->getDomainIndexMap();
@@ -73,18 +70,16 @@ saveDomainMap($opts->{domain_id_map}, $domainMap);
 #
 # Parameters:
 #    $sequenceFile - path to the FASTA file to store sequences in
-#    $metadata - metadata hash ref that comes from EFI::SSN::XgmmlReader::IdList
+#    $sequences - metadata hash ref that comes from EFI::SSN::XgmmlReader::IdList
 #
 sub saveSsnSequences {
     my $sequenceFile = shift;
-    my $metadata = shift;
+    my $sequences = shift;
 
     open my $fh, ">", $sequenceFile or die "Unable to write to SSN sequence file '$sequenceFile': $!";
 
-    foreach my $id (keys %$metadata) {
-        if ($metadata->{$id}->{sequence}) {
-            $fh->print(format_sequence($id, $metadata->{$id}->{sequence}), "\n");
-        }
+    foreach my $id (keys %$sequences) {
+        $fh->print(format_sequence($id, $sequences->{$id}), "\n");
     }
 
     close $fh;
@@ -117,31 +112,6 @@ sub saveMetanodeMapping {
     }
 
     close $mmfh;
-}
-
-
-#
-# saveEdgelist
-#
-# Saves an edgelist to a file; the file has no header and takes the format of
-#     node1_index\tnode2_index
-#     ...
-#
-# Parameters:
-#    $edgelist - array ref of node indices for each edge
-#    $file - path to file to store edgelist in
-#
-sub saveEdgelist {
-    my $edgelist = shift;
-    my $file = shift;
-
-    open my $fh, ">", $file or die "Unable to write to edgelist file '$file': $!";
-
-    foreach my $edge (@$edgelist) {
-        $fh->print(join(" ", @$edge), "\n");
-    }
-
-    close $fh;
 }
 
 
