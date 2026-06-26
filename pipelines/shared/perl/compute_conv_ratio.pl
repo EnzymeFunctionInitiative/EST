@@ -2,8 +2,8 @@
 use strict;
 use warnings;
 
-use Getopt::Long;
 use FindBin;
+use Getopt::Long;
 
 use lib "$FindBin::Bin/../../../lib";
 
@@ -25,14 +25,14 @@ my ($clusterToId) = parse_cluster_map_file($opts->{cluster_map});
 # Get the metanode data (mapping of repnode/UniRef to UniProt)
 my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});
 
-# Get the edgelist
-my $edgelist = parseEdgelist($opts->{edgelist});
+# Get the node degrees from the edgelist
+my $nodeDegrees = computeNodeDegreesFromEdgelist($opts->{edgelist});
 
 # Get the mapping of node index to node sequence ID
 my $indexMap = parseIndexSeqidMap($opts->{index_seqid_map});
 
 # Compute degrees, metanode only
-my $degrees = computeDegrees($edgelist, $indexMap);
+my $degrees = computeDegrees($nodeDegrees, $indexMap);
 
 # Expand the metanodes
 my $fullClusterToId = resolve_mapping($clusterToId, $idType, $sourceIdMap);
@@ -129,25 +129,19 @@ sub computeConvRatio {
 # Compute the node degrees (the degree of connectivity of each node)
 #
 # Parameters:
-#    $edgelist - the edgelist that comes from parseEdgelist
+#    $nd - node degrees computed from the edgelist
 #    $indexMap - the mapping that comes from parseIndexSeqidMap
 #
 # Returns:
 #    hash ref of sequence ID to degree
 #
 sub computeDegrees {
-    my $edgelist = shift;
+    my $nd = shift;
     my $indexMap = shift;
 
-    my %nd;
-    foreach my $edge (@$edgelist) {
-        $nd{$edge->[0]}++;
-        $nd{$edge->[1]}++;
-    }
-
     my %degrees;
-    foreach my $idx (keys %nd) {
-        $degrees{$indexMap->{$idx}} = $nd{$idx};
+    foreach my $idx (keys %$nd) {
+        $degrees{$indexMap->{$idx}} = $nd->{$idx};
     }
 
     return \%degrees;
@@ -188,34 +182,34 @@ sub parseIndexSeqidMap {
 
 
 #
-# parseEdgeList
+# computeNodeDegreesFromEdgelist
 #
 # Read the edgelist file, where each line is an edge with the start and node indices
-# being the columns
+# being the columns and compute the degrees for each node index
 #
 # Parameters:
 #    $file - path to edgelist file
 #
 # Returns:
-#    array ref of edgelists, with each element being an array ref of start-end pairs
+#    hash ref of node degrees
 #
-sub parseEdgelist {
+sub computeNodeDegreesFromEdgelist {
     my $file = shift;
 
     open my $fh, "<", $file or die "Unable to open edgelist file '$file' for reading: $!";
 
-    my @edgelist;
-
+    my %nd;
     while (my $line = <$fh>) {
         chomp $line;
         next if not $line;
         my ($n1, $n2) = split(m/[\t ]/, $line);
-        push @edgelist, [$n1, $n2];
+        $nd{$n1}++;
+        $nd{$n2}++;
     }
 
     close $fh;
 
-    return \@edgelist;
+    return \%nd;
 }
 
 

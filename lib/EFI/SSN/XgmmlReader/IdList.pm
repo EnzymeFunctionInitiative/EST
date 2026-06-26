@@ -24,7 +24,7 @@ sub new {
     $self->{anno} = new EFI::Annotations;
     my ($attrNames, $attrDisplay) = $self->{anno}->get_expandable_attr();
     $self->{id_list_fields} = { map { $attrDisplay->{$_} => $_ } @$attrNames };
-    $self->{id_metadata} = {}; # any node metadata that we are to store (e.g. swissprot)
+    $self->{sequences} = {}; # any custom sequences to store
     $self->{meta_map} = undef; # Metanode -> IDs in metanode mapping
     $self->{id_type} = SEQ_UNIPROT;
 
@@ -71,26 +71,9 @@ sub getMetanodes {
 }
 
 
-sub getMetadata {
+sub getSequences {
     my $self = shift;
-    return $self->{id_metadata};
-}
-
-
-#
-# initializeNode - protected method
-#
-# Executes any code necessary to initialize internal node structures.
-#
-# Parameters:
-#    $seqId - sequence ID (e.g. the node label)
-#
-sub initializeNode {
-    my $self = shift;
-    my $seqId = shift;
-    # Initialize the list of sequences in the meta node (in the case that the network is a meta network).
-    # The meta node always includes itself
-    $self->{meta_map}->{$seqId}->{$seqId} = 1;
+    return $self->{sequences};
 }
 
 
@@ -134,12 +117,10 @@ sub processNodeAttribute {
 
         # Store the value in a hash ref in the case that the network is UniRef+RepNode
         # (in that case there will be duplicates because of the FIELD_REPNODE_IDS values)
-        $self->{meta_map}->{$seqId}->{$value} = 1;
-    # SwissProt
-    } elsif ($fieldName eq FIELD_SWISSPROT_DESC) {
-        $self->{id_metadata}->{$seqId}->{swissprot} = $value if $value;
+        $self->{meta_map}->{$seqId}->{$value} = undef;
+
     } elsif ($fieldName eq FIELD_SEQ_KEY) {
-        $self->{id_metadata}->{$seqId}->{sequence} = $value if $value;
+        $self->{sequences}->{$seqId} = $value if $value;
     }
 }
 
@@ -242,44 +223,6 @@ network then this hash is empty.
     my $metanodeMap = $parser->getMetanodes();
     foreach my $metanode (sort keys %$metanodeMap) {
         map { print join("\t", $metanode, $_), "\n"; } @{ $metanodeMap->{$metanode} };
-    }
-
-
-
-=head3 C<getMetadata()>
-
-Gets the metadata (node attributes) that is saved during parsing (currently only SwissProt
-description).  This is primarily used in the case that the network is UniProt; in that
-case the EFI database is not queried to obtain metadata information.  If the network is
-UniRef, then the database is queried and the SwissProt information from the queries is
-used instead of the saved node attribute.
-
-=head4 Returns
-
-A hash ref with keys being the sequence ID (metanode ID), with each value being another
-hash ref with each saved node attribute.  Currently the C<swissprot> and C<sequence> hash
-ref keys are supported.  Only sequence IDs with attribute values are in the hash ref.
-The C<sequence> key will only be present if a protein sequence was included; this is used
-when unidentified sequences are included in the analysis.
-
-    {
-        "UNIPROT_ID" => {
-            "swissprot" => "Description",
-            "sequence" => "ABC"
-        },
-        "UNIPROT_ID2" => {},
-        "UNIPROT_ID3" => {
-            "swissprot" => "Description"
-        }
-    }
-
-=head4 Example Usage
-
-    my $metadata = $parser->getMetadata();
-    foreach my $id (keys %$metadata) {
-        foreach my $md (keys %{ $metadata->{$id} }) {
-            print "$id\t$md\t$metadata->{$id}->{$md}\n";
-        }
     }
 
 =cut
