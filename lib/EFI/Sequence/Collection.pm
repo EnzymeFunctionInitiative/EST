@@ -12,6 +12,10 @@ use EFI::Annotations::Fields qw(:annotations);
 use EFI::Sequence;
 use EFI::Sequence::Type qw(:types);
 
+use Exporter qw(import);
+
+our @EXPORT_OK = qw(unique_attribute_values);
+
 
 sub new {
     my $class = shift;
@@ -155,11 +159,9 @@ sub mergeSequences {
 
     foreach my $attrName (keys %mergedAttrs) {
         # Save array reference
-        $mergedSeq->setAttribute($attrName, $mergedAttrs{$attrName});
+        my @vals = unique_attribute_values(@{ $mergedAttrs{$attrName} });
+        $mergedSeq->setAttribute($attrName, \@vals);
     }
-
-    $mergedSeq->setAttribute(FIELD_REPNODE_IDS, @mergedIds);
-    $mergedSeq->setAttribute(FIELD_REPNODE_SIZE, scalar @mergedIds);
 }
 
 
@@ -391,7 +393,7 @@ sub loadIdFile {
     while (my $line = <$fh>) {
         chomp $line;
         my ($uniprot, $uniref90, $uniref50) = split(m/\t/, $line);
-        $self->associateUnirefIds($uniprot, $uniref90, $uniref50) if $uniref90 and $uniref50;
+        $self->associateUnirefIds($uniprot, $uniref90 // "", $uniref50 // "");
     }
 
     $fh->close();
@@ -478,6 +480,23 @@ sub saveIdFile {
     }
 
     $fh->close();
+}
+
+
+# public, static
+sub unique_attribute_values {
+    my $count = 0; # For sort later
+    my %uniqueValues = map { $_ => $count++ } @_;
+
+    # If there is one empty value and at least one non-empty, then delete the empty value
+    if (keys %uniqueValues > 1 and exists $uniqueValues{""}) {
+        delete $uniqueValues{""};
+    }
+
+    # Sort in original order
+    my @finalValues = sort { $uniqueValues{$a} <=> $uniqueValues{$b} } keys %uniqueValues;
+
+    return @finalValues;
 }
 
 
@@ -997,6 +1016,36 @@ An array ref containing all of the metadata fields in the file.
 
     my $fields = $seqs->getFields();
     map { print "Field $_\n"; } @$fields;
+
+
+=head3 C<unique_attribute_values(@values)>
+
+Static method for making a unique set of attribute values.  Takes an array of values, makes
+them unique, and removes empty value if non-empty values exist in the array.  The output order
+is the same as the input order.
+
+=head4 Parameters
+
+=over
+
+=item C<@values>
+
+The list of values to clean up
+
+=back
+
+=head4 Returns
+
+Array of values that is unique and cleaned.
+
+=head4 Example Usage
+
+    use EFI::Sequence::Collection qw(unique_attribute_values);
+
+    my @vals = unique_attribute_values("", "1", "5", "1", "1", "3");
+
+    print join(",", @vals), "\n";
+    # Output is: 1, 3, 5
 
 
 =cut

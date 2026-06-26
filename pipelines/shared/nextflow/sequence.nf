@@ -27,6 +27,7 @@ process filter_ids {
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
         path 'import_stats.json', emit: 'import_stats'          // final statistics of source and filter import processes
         path 'retrieval_ids.tab', emit: 'retrieval_ids'         // list of IDs that came from the database, as opposed to user-specified FASTA files, including domain data
+        path 'master_ids.tab', emit: 'master_ids'               // list of all primary IDs in the dataset
     script:
     def xids_file = explicit_ids_file ? "--filter explicit-ids-file=${explicit_ids_file}" : ""
     def filter_args = formatFilterArgs(params.filter)
@@ -42,6 +43,7 @@ process filter_ids {
         --accession-table-file accession_table.tab \
         --sequence-meta-file sequence_metadata.tab \
         --retrieval-ids-file retrieval_ids.tab \
+        --master-ids-file master_ids.tab \
         --stats-file import_stats.json \
         ${filter_args} ${user_filter_arg} \
         ${xids_file}

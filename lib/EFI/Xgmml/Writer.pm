@@ -8,7 +8,7 @@ use Fcntl qw(:flock);
 use IO::File;
 use XML::Writer;
 
-use constant XMLNS => "http://www.cs.rpi.edu/XGMML";
+use constant DEFAULT_XMLNS => "http://www.cs.rpi.edu/XGMML";
 
 
 sub new {
@@ -19,8 +19,11 @@ sub new {
     my $self = {};
     bless($self, $class);
 
+    $self->{xmlns} = $args{xmlns} // DEFAULT_XMLNS;
     $self->{data_indent} = $args{data_indent} // 0;
     $self->{output_file} = $args{output_file};
+    $self->{mem_buffer_size} = 10 * 1024 * 1024;
+    $self->{mem_buffer} = "";
 
     return $self;
 }
@@ -31,15 +34,54 @@ sub open {
     my $self = shift;
 
     my $fh = new IO::File(">$self->{output_file}") or die "Unable to write to output SSN file '$self->{output_file}': $!";
+    $fh->autoflush(0); # Enable buffering
 
     eval {
         flock($fh, LOCK_EX) or warn "Unable to obtain exclusive file lock on output SSN for writing: $!";
     };
 
-    my $writer = new XML::Writer(OUTPUT => $fh, DATA_INDENT => $self->{data_indent}, UNSAFE => 1, PREFIX_MAP => '');
+    # Pass $self into the writer, which will call print on the handle (see below)
+    my $writer = new XML::Writer(OUTPUT => $self, DATA_INDENT => $self->{data_indent}, UNSAFE => 1, PREFIX_MAP => '');
 
     $self->{writer} = $writer;
     $self->{output} = $fh;
+}
+
+
+#
+# print - private
+#
+# This method is used to interface XML::Writer with the string buffer.  XML::Writer calls 'print'
+# on the handle it was provided, meaning this function gets called.  Here we append the XML string
+# that XML::Writer passes to print() onto the string buffer.  Then, if it's greater than the max
+# buffer size, it gets written to the actual output buffer.
+#
+sub print {
+    my $self = shift;
+
+    $self->{mem_buffer} .= join('', @_);
+
+    if (length($self->{mem_buffer}) > $self->{mem_buffer_size}) {
+        $self->flushBuffer();
+    }
+}
+
+
+#
+# flushBuffer - private
+#
+# This method flushes the string buffer to the actual file handle.
+#
+sub flushBuffer {
+    my $self = shift;
+
+    if (length($self->{mem_buffer}) > 0) {
+        # Write the buffer to the file in one big chunk (to help with NFS latency)
+        $self->{output}->print($self->{mem_buffer});
+
+        # Erase the buffer for the next print call
+        $self->{mem_buffer} = "";
+    }
 }
 
 
@@ -47,8 +89,9 @@ sub open {
 sub close {
     my $self = shift;
 
-    $self->{writer}->end();
-    $self->{output}->close();
+    $self->{writer}->end(); # Finish writing XML tags
+    $self->flushBuffer(); # Save the buffer to the primary file handle
+    $self->{output}->close(); # Close everything
 }
 
 
@@ -62,7 +105,7 @@ sub preamble {
 # public
 sub xmlns {
     my $self = shift;
-    return XMLNS;
+    return $self->{xmlns};
 }
 
 
@@ -94,6 +137,20 @@ sub comment {
     my $self = shift;
     $self->{writer}->comment(@_);
     $self->{writer}->characters("\n");
+}
+
+
+#
+# raw_passthrough - protected method
+#
+# Pass XML straight through to the file handle without constructing.  Used to optimize edge
+# writing.
+#
+sub raw_passthrough {
+    my $self = shift;
+    my $rawString = shift;
+    $rawString =~ s/\s*xmlns(?::(?:dc|xlink|rdf|cy))?="http[^"]+"//g;
+    $self->{writer}->raw($rawString);
 }
 
 

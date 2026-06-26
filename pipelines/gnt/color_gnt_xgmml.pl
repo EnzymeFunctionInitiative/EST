@@ -112,30 +112,13 @@ sub getGntData {
     my $gnd = new EFI::GNT::GND::Reader();
     $gnd->load($gndFile);
 
-    my $gntData = {};
-    foreach my $cluster ($gnd->getClusterNums()) {
-        my @queryIds = $gnd->getQueryIds($cluster);
-        foreach my $queryId (@queryIds) {
-            my $data = {};
-            $data->{ena_id} = $gnd->getAttribute($queryId, ATTR_QUERY|ATTR_ENA_ID);
+    my $gntData = $gnd->getAllGntNeighborData();
 
-            my @nb = $gnd->getNeighborIds($queryId);
-            $data->{has_neighbors} = @nb > 0;
-
-            my @pfam;
-            my @interpro;
-            foreach my $nb (@nb) {
-                my $pfam = $gnd->getAttribute($nb, ATTR_NEIGHBOR|ATTR_PFAM);
-                push @pfam, sort split(m/\-/, $pfam);
-                my $interpro = $gnd->getAttribute($nb, ATTR_NEIGHBOR|ATTR_INTERPRO);
-                push @interpro, sort split(m/\-/, $interpro);
-            }
-
-            $data->{neighbor_pfam} = \@pfam;
-            $data->{neighbor_interpro} = \@interpro;
-
-            $gntData->{$queryId} = $data;
-        }
+    foreach my $node (values %$gntData) {
+        $node->{has_neighbors} = $node->{num_neighbors} > 0;
+        $node->{neighbor_pfam} = split(m/,/, $node->{neighbor_pfam} // "");
+        $node->{neighbor_interpro} = split(m/,/, $node->{neighbor_interpro} // "");
+        delete @{$node}{ qw(accession num_neighbors) };
     }
 
     return $gntData;

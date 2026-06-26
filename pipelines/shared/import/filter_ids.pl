@@ -127,6 +127,12 @@ map { $rfh->print("$_\n"); } @retrievalIds;
 close $rfh;
 
 
+# Save master ID list, of all "primary" IDs (e.g. if input is UniRef, UniRef IDs).  Needed by
+# SSN pipeline
+my @masterIds = $seqData->getSequenceIds();
+open my $mfh, ">", $opts->{master_ids_file} or die "Unable to write to master IDs file '$opts->{master_ids_file}': $!";
+map { $mfh->print("$_\n"); } @masterIds;
+close $mfh;
 
 
 $stats->save($opts->{stats_file});
@@ -224,6 +230,7 @@ B<filter_ids.pl> - filter IDs from the original input files and create a ID retr
     #     --sequence-meta-file sequence_metadata.tab    # output
     #     --stats-file import_stats.tab                 # output
     #     --retrieval-ids-file retrieval_ids.tab        # output
+    #     --master-ids-file master_ids.tab              # output
 
     
 

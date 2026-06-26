@@ -22,6 +22,7 @@ my %files = (
     accession_table => "accession_table.tab",
     import_stats => "import_stats.json",
     retrieval_ids => "retrieval_ids.tab",
+    master_ids => "master_ids.tab",
 
     # output from get_sunburst_data.pl
     sunburst_ids => "sunburst_ids.tab",

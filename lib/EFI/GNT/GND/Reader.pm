@@ -27,7 +27,7 @@ sub new {
     my $class = shift;
     my %args = @_;
 
-    my $self = {};
+    my $self = { _sth => {} };
     bless $self, $class;
 
     return $self;
@@ -39,6 +39,9 @@ sub load {
     my $self = shift;
     my $dbFile = shift;
     $self->{dbh} = DBI->connect("DBI:SQLite:dbname=$dbFile", "", "");
+    $self->{dbh}->do("PRAGMA mmap_size = 2000000000;"); # Memory-mapped I/O, bytes
+    $self->{dbh}->do("PRAGMA cache_size = -1000000;"); # Kbytes
+    $self->{dbh}->do("PRAGMA query_only = ON;"); # Tell SQLite to not lock the file
     die "Unable to connect to database $dbFile" if not $self->{dbh};
 }
 
@@ -113,7 +116,10 @@ sub getAttribute {
     my ($colName, $sql) = $self->getAttributeSql($attr);
     return "" if not $colName;
 
-    my $sth = $self->{dbh}->prepare($sql);
+    my $sth = $self->{_sth}->{$sql};
+    if (not $sth) {
+        $sth = $self->{_sth}->{$sql} = $self->{dbh}->prepare($sql);
+    }
     $sth->execute($sequenceId);
 
     my $row = $sth->fetchrow_hashref();
@@ -121,6 +127,34 @@ sub getAttribute {
 
     my $value = $row->{$colName};
     return $value;
+}
+
+
+# public
+sub getAllGntNeighborData {
+    my $self = shift;
+
+    my $nbTable = NEIGHBOR_TABLE;
+    my $queryTable = QUERY_TABLE;
+    my $sql = "
+    SELECT
+        Q.accession AS accession,
+        Q.id AS ena_id,
+        COUNT(DISTINCT N.accession) AS num_neighbors,
+        GROUP_CONCAT(DISTINCT NULLIF(N.family, '')) AS neighbor_pfam,
+        GROUP_CONCAT(DISTINCT NULLIF(N.ipro_family, '')) AS neighbor_interpro 
+    FROM $queryTable AS Q
+    LEFT JOIN $nbTable AS N
+        ON Q.sort_key = N.query_key
+    GROUP BY Q.accession
+    ";
+
+    my $sth = $self->{dbh}->prepare($sql);
+    $sth->execute();
+
+    my $rows = $sth->fetchall_hashref("accession");
+
+    return $rows;
 }
 
 
@@ -159,7 +193,7 @@ sub getAttributeSql {
     }
 
     my $sql = "SELECT $colName FROM $table WHERE $idCol = ?";
-    return $colName, $sql;
+    return $colName, $sql, $idCol;
 }
 
 
@@ -332,6 +366,34 @@ separated by a dash C<->.
     my $nbId = "B0SS79";
     my $nbFamily = $gnd->getAttribute(ATTR_NEIGHBOR|ATTR_PFAM);
     print "Neighbor $nbId family: $nbFamily\n";
+
+
+=head3 C<getAllGntNeighborData()>
+
+Retrieves all of the data necessary to color SSNs in the GNT pipeline.  This is a bulk
+retrieval for performance reasons.  The return is a hash ref, with the key being the
+query accession ID and the value being a hash ref of C<ena_id>, C<num_neighbors>,
+C<neighbor_pfam>, and C<neighbor_interpro>.
+
+=head4 Returns
+
+A hash ref
+
+=head4 Example Usage
+
+    my $gntData = $gnd->getAllGntNeighborData();
+    print Dumper($gntData);
+
+    # {
+    #     'A0A953SAC4' => {
+    #         'ena_id' => 'JAIQES010000050',
+    #         'accession' => 'A0A953SAC4',
+    #         'neighbor_pfam' => ',PF00343,PF01161,PF05690,PF02517,PF07786,PF04977,PF00408-PF02878-PF02879-PF02880,PF03091,PF08309,PF01053,PF02687-PF12704,PF00175-PF00970,PF00128-PF02806-PF02922-PF22019,PF04055-PF19288,PF01933,PF01983,PF00890-PF10518,PF07238,PF19571',
+    #         'neighbor_interpro' => ',IPR000811-IPR052182-IPR011834,IPR036610-IPR008914-IPR005247,IPR013785-IPR008867-IPR033983,IPR003675,IPR012429,IPR007060-IPR023081,IPR005843-IPR005844-IPR005845-IPR005846-IPR005841-IPR016055-IPR036900,IPR015867-IPR004323-IPR011322,IPR015421-IPR015422-IPR000277-IPR015424,IPR003838-IPR025857-IPR051125,IPR039261-IPR001433-IPR008333-IPR017927-IPR051930-IPR017938-IPR033892,IPR013783-IPR013780-IPR006407-IPR006047-IPR006048-IPR004193-IPR054169-IPR037439-IPR017853-IPR014756-IPR044143,IPR013785-IPR019940-IPR007197-IPR045567-IPR034405-IPR006638-IPR020050,IPR038136-IPR010115-IPR002882,IPR029044-IPR002835,IPR036188-IPR027477-IPR003953-IPR050315,IPR009875,IPR045739',
+    #         'num_neighbors' => 24
+    #     },
+    #     #...
+    # }
 
 
 =head2 SCHEMA
