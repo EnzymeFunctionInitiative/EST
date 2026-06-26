@@ -360,6 +360,14 @@ sub makeNodeAttributes {
             $value = $value->[0];
         }
 
+        # In the case of UniRef or Repnode networks, we need to force a list for all node
+        # attributes that for which at least one node has more than one value, because otherwise
+        # Cytoscape only renders attribute cells as lists if the first one is a list (e.g. it is
+        # not possible to mix and match list and non-list attribute types)
+        if (ref $value eq "ARRAY" and @$value > 1) {
+            $fields->{$field}->{is_list} = 1;
+        }
+
         $nodeAttr->{$field} = $value;
     }
 
