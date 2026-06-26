@@ -35,7 +35,7 @@ Exporter::export_ok_tags('interpro');
 
 # Precompile regexs for performance
 my $RE_TRAILING_SEMI = qr/[;\s]+$/;
-my $RE_XML_CONTROL   = qr/(?![\x09\x0A\x0D<>])\p{C}/;
+my $RE_XML_INVALID   = qr/[^\x09\x0A\x0D\x20-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/;
 
 # For optimization so we don't create this hundreds of thousands of times
 my %SPECIAL_FIELDS = map { $_ => 1 } ( qw(IPRO_DOM IPRO_FAM IPRO_SUP IPRO swissprot_status swissprot_description is_fragment PFAM TIGRFAMs gdna NCBI_IDs) );
@@ -215,7 +215,7 @@ sub clean_attribute_value {
     return "" if not defined $value;
     $value =~ s/$RE_TRAILING_SEMI//;
     # Remove invalid XML control characters
-    $value =~ s/$RE_XML_CONTROL//g;
+    $value =~ s/$RE_XML_INVALID//g;
     return $value;
 }
 
