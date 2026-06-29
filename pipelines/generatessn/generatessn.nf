@@ -2,7 +2,7 @@
 include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids } from "../shared/nextflow/sequence.nf"
-include { prepareJobName; prepareSsnFilename; merge_stats; zip_files } from "../shared/nextflow/util.nf"
+include { prepareJobName; prepareSsnFilename; merge_stats } from "../shared/nextflow/util.nf"
 
 process import_data {
     input:

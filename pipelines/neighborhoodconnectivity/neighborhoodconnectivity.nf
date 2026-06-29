@@ -1,5 +1,5 @@
 
-include { prepareSsnFilename; unzip_ssn; zip_files } from "../shared/nextflow/util.nf"
+include { prepareSsnFilename; unzip_ssn } from "../shared/nextflow/util.nf"
 
 process compute_connectivity_from_ssn {
     publishDir params.final_output_dir, mode: "copy", pattern: "{nc.tab}"
@@ -39,6 +39,7 @@ process color_by_connectivity {
         --color-map ${nc_table} \
         --primary-color \
         --stats stats.json
+    zip color_ssn.xgmml.zip "${file_name}"
     """
 }
 
@@ -71,7 +72,5 @@ workflow {
     colored = color_by_connectivity(ssn_file, nc_table)
 
     legend = make_nc_legend(nc_table)
-
-    zipped_files = zip_files(colored.ssn)
 }
 
