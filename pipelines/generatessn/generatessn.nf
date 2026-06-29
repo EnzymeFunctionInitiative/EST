@@ -38,6 +38,8 @@ process import_data {
 }
 
 process threshold_blast {
+    label APP_duckdb
+
     input:
         path blast_parquet
         path filtered_ids
@@ -54,7 +56,8 @@ process threshold_blast {
         --min-length ${params.min_length} \
         --max-length ${params.max_length} \
         --sql-template $projectDir/templates/thresholdblast-template.sql \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --output-file 2.out \
         --sql-output-file thresholded_blast.sql \
