@@ -21,9 +21,10 @@ my $seqData = new EFI::Sequence::Collection();
 $seqData->load($opts->{source_meta_file}, $opts->{source_ids_file}, sequence_version => $opts->{sequence_version});
 
 
-my @ids = $seqData->getSequenceIds();
+# UniRef IDs get expanded to UniProt here; the UniRef is accounted for in a later process
+my @uniprotIds = $seqData->getAllSequenceIds();
 
-save_cluster_map_file({ 1 => \@ids }, $opts->{cluster_id_mapping});
+save_cluster_map_file({ 1 => \@uniprotIds }, $opts->{cluster_id_mapping});
 
 
 
