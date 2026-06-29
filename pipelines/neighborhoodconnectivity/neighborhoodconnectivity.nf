@@ -19,14 +19,14 @@ process compute_connectivity_from_ssn {
 }
 
 process color_by_connectivity {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{stats.json}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{stats.json,ssn.xgmml.zip}"
 
     input:
         path ssn_file
         path nc_table
 
     output:
-        path "*NC_Colored_SSN.xgmml", emit: "ssn"
+        path "ssn.xgmml.zip", emit: "ssn"
         path "stats.json", emit: "stats"
 
     script:
@@ -35,11 +35,11 @@ process color_by_connectivity {
     """
     perl $projectDir/color/color_ssn.pl \
         --input ${ssn_file} \
-        --output ssn.xgmml \
+        --output ${file_name} \
         --color-map ${nc_table} \
         --primary-color \
         --stats stats.json
-    zip color_ssn.xgmml.zip "${file_name}"
+    zip ssn.xgmml.zip "${file_name}"
     """
 }
 

@@ -1,12 +1,12 @@
 
 include { COLOR_AND_RETRIEVE } from "../shared/nextflow/color_workflow.nf"
-include { prepareSsnFilename; merge_stats; unzip_ssn; zip_files } from "../shared/nextflow/util.nf"
+include { prepareSsnFilename; merge_stats; unzip_ssn } from "../shared/nextflow/util.nf"
 
 cluster_data_dir = "cluster-data"
 
 
 process create_gnns {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{hub_count.txt,cooc_table.txt,nomatches_noneighbors.txt,gnd.sqlite}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{hub_count.txt,cooc_table.txt,nomatches_noneighbors.txt,gnd.sqlite,*.zip}"
 
     input:
         path cluster_id_map
@@ -14,8 +14,8 @@ process create_gnns {
         path metanode_map
         path ssn_file
     output:
-        path "*SSN_Cluster_GNN.xgmml", emit: "cluster_gnn"
-        path "*Pfam_Family_GNN.xgmml", emit: "pfam_gnn"
+        path "ssn_cluster_gnn.xgmml.zip", emit: "cluster_gnn"
+        path "pfam_family_gnn.xgmml.zip", emit: "pfam_gnn"
         path "hub_count.txt", emit: "hub_count"
         path "cooc_table.txt", emit: "cooc_table"
         path "nomatches_noneighbors.txt", emit: "nomatches_noneighbors"
@@ -52,11 +52,15 @@ process create_gnns {
         --db-name ${params.efi_db} \
         --stats gnn_stats.json \
         --ssn $ssn_file
+    zip ssn_cluster_gnn.xgmml.zip "${ssn_cluster_gnn}"
+    zip pfam_family_gnn.xgmml.zip "${pfam_family_gnn}"
     """
 }
 
 
 process color_gnt_ssn {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{color_ssn.xgmml.zip}"
+
     input:
         path ssn_file
         path cluster_id_map
@@ -65,7 +69,7 @@ process color_gnt_ssn {
         path metanode_map
         path gnd
     output:
-        path "*Colored_SSN.xgmml", emit: "ssn"
+        path "color_ssn.xgmml.zip", emit: "ssn"
         path "color_ssn_stats.json", emit: "stats"
 
     script:
@@ -76,6 +80,7 @@ process color_gnt_ssn {
         --metanode-map ${metanode_map} --gnd ${gnd} --cluster-map $cluster_id_map \
         --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt \
         --stats color_ssn_stats.json
+    zip color_ssn.xgmml.zip "${color_ssn_file}"
     """
 }
 
@@ -118,12 +123,6 @@ workflow {
                                        gnn_data.nb_all_pfam_split,
                                        gnn_data.nb_no_pfam)
     zipped_dirs = zip_directories(dirs_to_zip)
-
-    // Zip other output files
-    files_to_zip = colored_ssn.ssn.mix(gnn_data.cluster_gnn,
-                                       gnn_data.pfam_gnn,
-                                       gnn_data.gnd)
-    zipped_files = zip_files(files_to_zip)
 
     // Merge statistics from all of the various job types into one file
     files_to_merge_stream = gnn_data.stats.mix(colored_ssn.stats, color_work.cluster_stats)
