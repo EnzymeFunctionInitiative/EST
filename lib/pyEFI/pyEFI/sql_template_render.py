@@ -4,7 +4,15 @@ import string
 
 from typing import Any
 
-def create_sql_template_render_parser(sql_template_file_default: str, desc: str, sql_output_file: str = "statements.sql", duckdb_mem_limit: str = "4GB", duckdb_temp_dir: str = "./duckdb") -> argparse.ArgumentParser:
+def create_sql_template_render_parser(
+        sql_template_file_default: str,
+        desc: str,
+        sql_output_file: str = "statements.sql",
+        /,
+        duckdb_mem_limit: str = "4GB",
+        duckdb_n_threads: int = 1,
+        duckdb_temp_dir: str = "./duckdb"
+    ) -> argparse.ArgumentParser:
     """
     Returns an `<argparse.ArgumentParser>_` that parses the following
     options:
@@ -12,6 +20,7 @@ def create_sql_template_render_parser(sql_template_file_default: str, desc: str,
     * ``--sql-template``
     * ``--sql-output-file``
     * ``--duckdb-memory-limit``
+    * ``--duckdb-n-threads``
     * ``--duckdb-temp-dir``
 
     These options are common to all DuckDB SQL templates. The intention is
@@ -19,9 +28,14 @@ def create_sql_template_render_parser(sql_template_file_default: str, desc: str,
 
     Parameters
     ----------
+        sql_template_file_default
+            Path string to the template file to be used to generate duckdb
+            commands.
         desc
             Description to be passed to the ``description`` parameter of
             the ``ArgumentParser`` constructor
+        sql_output_file
+            Path string to write the templated file to.
 
     Returns
     -------
@@ -40,7 +54,18 @@ def create_sql_template_render_parser(sql_template_file_default: str, desc: str,
         default=sql_output_file,
         help="Location to write the reduce SQL commands to",
     )
-    parser.add_argument("--duckdb-memory-limit", type=str, default=duckdb_mem_limit, help="Soft limit on DuckDB memory usage")
+    parser.add_argument(
+        "--duckdb-memory-limit",
+        type=str,
+        default=duckdb_mem_limit,
+        help="Soft limit on DuckDB memory usage"
+    )
+    parser.add_argument(
+        "--duckdb-n-threads",
+        type=int,
+        default=duckdb_n_threads,
+        help="Set the number of threads to be used by duckdb"
+    )
     parser.add_argument(
         "--duckdb-temp-dir",
         type=str,
