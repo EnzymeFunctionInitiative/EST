@@ -1,6 +1,6 @@
 SET memory_limit = '$mem_limit';
 SET temp_directory = '$duckdb_temp_dir';
-SET threads TO 1;
+SET threads TO '$n_threads';
 SET preserve_insertion_order = false;
 
 -- read BLAST data from transcoded parquet files, ignore sequences aligned
