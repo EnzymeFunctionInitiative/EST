@@ -359,10 +359,4 @@ workflow {
 
     // Merge full and repnode SSN stats into one file
     final_stats = merge_stats(full_ssn.stats.mix(final_ids.import_stats, repnode_stats).collect())
-
-    if (params.color_ssn) {
-        computed = COMPUTE_COLOR_CLUSTER_WORKFLOW(full_ssn.ssn_unzipped)
-        colored_ssn = color_ssn(full_ssn.ssn_unzipped, computed.cluster_id_map, computed.cluster_num_map, computed.cluster_colors)
-        zipped_full_ssn = zip_files(colored_ssn.ssn)
-    }
 }
