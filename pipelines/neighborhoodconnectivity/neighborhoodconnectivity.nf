@@ -1,5 +1,5 @@
 
-include { zip_files; unzip_ssn } from "../shared/nextflow/util.nf"
+include { prepareSsnFilename; unzip_ssn; zip_files } from "../shared/nextflow/util.nf"
 
 process compute_connectivity_from_ssn {
     publishDir params.final_output_dir, mode: "copy", pattern: "{nc.tab}"
@@ -26,10 +26,12 @@ process color_by_connectivity {
         path nc_table
 
     output:
-        path "ssn.xgmml", emit: "ssn"
+        path "*NC_Colored_SSN.xgmml", emit: "ssn"
         path "stats.json", emit: "stats"
 
     script:
+    def default_name = "NC Colored SSN"
+    def file_name = prepareSsnFilename(default_name)
     """
     perl $projectDir/color/color_ssn.pl \
         --input ${ssn_file} \

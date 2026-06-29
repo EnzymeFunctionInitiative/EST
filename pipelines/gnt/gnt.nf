@@ -1,12 +1,11 @@
 
 include { COLOR_AND_RETRIEVE } from "../shared/nextflow/color_workflow.nf"
-include { merge_stats; unzip_ssn; zip_files } from "../shared/nextflow/util.nf"
+include { prepareSsnFilename; merge_stats; unzip_ssn; zip_files } from "../shared/nextflow/util.nf"
 
 cluster_data_dir = "cluster-data"
 
 
 process create_gnns {
-    //publishDir params.final_output_dir, mode: "copy", pattern: "{cluster_gnn.xgmml,pfam_gnn.xgmml,hub_count.txt,cooc_table.txt,nomatches_noneighbors.txt,gnd.sqlite}"
     publishDir params.final_output_dir, mode: "copy", pattern: "{hub_count.txt,cooc_table.txt,nomatches_noneighbors.txt,gnd.sqlite}"
 
     input:
@@ -14,10 +13,9 @@ process create_gnns {
         path singletons
         path metanode_map
         path ssn_file
-
     output:
-        path "ssn_cluster_gnn.xgmml", emit: "cluster_gnn"
-        path "pfam_family_gnn.xgmml", emit: "pfam_gnn"
+        path "*SSN_Cluster_GNN.xgmml", emit: "cluster_gnn"
+        path "*Pfam_Family_GNN.xgmml", emit: "pfam_gnn"
         path "hub_count.txt", emit: "hub_count"
         path "cooc_table.txt", emit: "cooc_table"
         path "nomatches_noneighbors.txt", emit: "nomatches_noneighbors"
@@ -30,6 +28,10 @@ process create_gnns {
         path "gnn_stats.json", emit: "stats"
 
     script:
+    def ssn_cluster_gnn_base_name = "SSN Cluster GNN"
+    def ssn_cluster_gnn = prepareSsnFilename(ssn_cluster_gnn_base_name)
+    def pfam_family_gnn_base_name = "Pfam Family GNN"
+    def pfam_family_gnn = prepareSsnFilename(pfam_family_gnn_base_name)
     """
     id_map_file="merged_ids.txt"
     cat ${cluster_id_map} > \$id_map_file
@@ -37,8 +39,8 @@ process create_gnns {
     perl $projectDir/create_gnns.pl \
         --cluster-map \$id_map_file \
         --metanode-map $metanode_map \
-        --cluster-gnn ssn_cluster_gnn.xgmml \
-        --pfam-gnn pfam_family_gnn.xgmml \
+        --cluster-gnn ${ssn_cluster_gnn} \
+        --pfam-gnn ${pfam_family_gnn} \
         --gnd gnd.sqlite \
         --cooc-table cooc_table.txt \
         --hub-count hub_count.txt \
@@ -62,14 +64,15 @@ process color_gnt_ssn {
         path cluster_colors
         path metanode_map
         path gnd
-
     output:
-        path "color_ssn.xgmml", emit: "ssn"
+        path "*Colored_SSN.xgmml", emit: "ssn"
         path "color_ssn_stats.json", emit: "stats"
 
     script:
+    def default_name = "Colored SSN"
+    def color_ssn_file = prepareSsnFilename(default_name)
     """
-    perl $projectDir/color_gnt_xgmml.pl --ssn $ssn_file --color-gnt-ssn color_ssn.xgmml \
+    perl $projectDir/color_gnt_xgmml.pl --ssn $ssn_file --color-gnt-ssn ${color_ssn_file} \
         --metanode-map ${metanode_map} --gnd ${gnd} --cluster-map $cluster_id_map \
         --cluster-num-map $cluster_num_map --cluster-color-map cluster_colors.txt \
         --stats color_ssn_stats.json
@@ -82,7 +85,6 @@ process zip_directories {
 
     input:
         path dir_to_zip
-
     output:
         path "*.zip"
 
