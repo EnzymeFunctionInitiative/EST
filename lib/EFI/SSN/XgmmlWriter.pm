@@ -351,7 +351,14 @@ sub makeNodeAttributes {
         next if $field eq FIELD_SEQ_KEY;
 
         my $value = $self->{metadata}->getSequence($uniprotId)->getAttribute($field, 1);
-        $value = MISSING_VALUE if not $value;
+        # Ensure that the XGMML get a number if the value is not defined or is not a number --
+        # otherwise Cytoscape crashes
+        if ($fields->{$field}->{type} eq "integer" and (not defined $value or not looks_like_number($value))) {
+            $value = 0;
+        } elsif (not defined $value) {
+            $value = MISSING_VALUE;
+        }
+
         $source = $value if $field eq FIELD_SEQ_SRC_KEY;
 
         # If the value is an array, and is only one, then save it as a scalar because we only want
