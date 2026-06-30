@@ -6,6 +6,7 @@ use warnings;
 
 use Cwd qw(abs_path);
 use File::Basename;
+use Scalar::Util qw(looks_like_number);
 use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::Annotations;
@@ -353,7 +354,7 @@ sub makeNodeAttributes {
         my $value = $self->{metadata}->getSequence($uniprotId)->getAttribute($field, 1);
         # Ensure that the XGMML get a number if the value is not defined or is not a number --
         # otherwise Cytoscape crashes
-        if ($fields->{$field}->{type} eq "integer" and not defined $value) {
+        if ($fields->{$field}->{type} eq "integer" and not ref $value and (not defined $value or not looks_like_number($value))) {
             $value = 0;
         } elsif (not defined $value) {
             $value = MISSING_VALUE;
