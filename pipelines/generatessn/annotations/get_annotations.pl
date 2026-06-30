@@ -95,6 +95,10 @@ my %unirefClusterIdSeqLen;
 foreach my $accession (sort @$accessions){
     if (is_unknown_sequence($accession)) {
         my $data = formatAnnoData($accession, [], [], {}, {});
+        my $attributes = $inputIds->getSequence($accession)->getAllAttributes();
+        foreach my $attr (keys %$attributes) {
+            $data->{$attr} = $attributes->{$attr};
+        }
         $outputIds->addSequence($accession, $data);
         next;
     }
@@ -196,7 +200,7 @@ sub formatAnnoData {
 
         # If the field doesn't exist in the database attributes but exists in the existing metadata
         # then use the existing value
-        } elsif (not $data->{$field}) {
+        } elsif (not exists $data->{$field}) {
             my $value = $inputIds->getSequence($accession)->getAttribute($field, 1);
             $data->{$field} = $value;
         }

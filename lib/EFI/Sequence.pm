@@ -67,6 +67,12 @@ sub getAttributeNames {
 }
 
 
+sub getAllAttributes {
+    my $self = shift;
+    return $self->{attr};
+}
+
+
 # public
 sub setAttribute {
     my $self = shift;
