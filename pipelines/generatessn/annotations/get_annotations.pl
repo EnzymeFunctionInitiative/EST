@@ -99,6 +99,7 @@ foreach my $accession (sort @$accessions){
         foreach my $attr (keys %$attributes) {
             $data->{$attr} = $attributes->{$attr};
         }
+        $data->{&FIELD_UNIREF_CLUSTER_ID_SEQ_LEN_KEY} = $unirefClusterIdSeqLen{$accession} ? $unirefClusterIdSeqLen{$accession} : $attributes->{&FIELD_SEQ_LEN_KEY};
         $outputIds->addSequence($accession, $data);
         next;
     }
