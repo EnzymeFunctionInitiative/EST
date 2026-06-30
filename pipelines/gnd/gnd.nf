@@ -130,7 +130,8 @@ process convert_to_id_list {
     perl $projectDir/convert_metadata_to_id_list.pl \
         --cluster-id-mapping cluster_id_mapping.tab \
         --source-ids-file "${source_ids}" \
-        --source-meta-file "${source_meta}"
+        --source-meta-file "${source_meta}" \
+        --sequence-version ${params.sequence_version}
     """
 }
 
