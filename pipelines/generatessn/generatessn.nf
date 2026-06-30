@@ -2,17 +2,7 @@
 include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids } from "../shared/nextflow/sequence.nf"
-include { merge_stats; zip_files } from "../shared/nextflow/util.nf"
-
-def getCleanFilename(job_name, default_name) {
-    // Create a clean job name for the file
-    def clean_file_name = job_name
-        .replaceAll(/[^\p{ASCII}]/, "")
-        .replaceAll(/[^a-zA-Z0-9_\-\.]/, "_")
-        .replaceAll(/^[_-]+|[_-]+$/, "");
-    def file_name = (clean_file_name ?: default_name) + ".xgmml"
-    return file_name
-}
+include { prepareJobName; prepareSsnFilename; merge_stats } from "../shared/nextflow/util.nf"
 
 process import_data {
     input:
@@ -122,14 +112,13 @@ process create_full_ssn {
         path nc_table // Optional (can be empty)
     output:
         path "full_ssn.xgmml.zip", emit: "ssn"
-        path "full_ssn.xgmml", emit: "ssn_unzipped"
         path "full_stats.json", emit: "stats"
 
     script:
     // If there was no job name specified, then assign a default
     def default_name = "Full SSN"
-    def final_job_name = params.job_name ?: default_name
-    def file_name = getCleanFilename(final_job_name, default_name)
+    def final_job_name = prepareJobName(default_name)
+    def file_name = prepareSsnFilename(default_name)
     def temp_name = "full_ssn.xgmml"
 
     """
@@ -171,8 +160,8 @@ process create_repnode_ssns {
     script:
     // If there was no job name specified, then assign a default
     def default_name = "repnode-${repnode_pct}"
-    def final_job_name = params.job_name ? params.job_name + " " + default_name : default_name
-    def file_name = getCleanFilename(final_job_name, default_name)
+    def final_job_name = prepareJobName(default_name)
+    def file_name = prepareSsnFilename(default_name)
     def temp_name = "repnode_${repnode_pct}_ssn.xgmml"
 
     """
@@ -359,10 +348,4 @@ workflow {
 
     // Merge full and repnode SSN stats into one file
     final_stats = merge_stats(full_ssn.stats.mix(final_ids.import_stats, repnode_stats).collect())
-
-    if (params.color_ssn) {
-        computed = COMPUTE_COLOR_CLUSTER_WORKFLOW(full_ssn.ssn_unzipped)
-        colored_ssn = color_ssn(full_ssn.ssn_unzipped, computed.cluster_id_map, computed.cluster_num_map, computed.cluster_colors)
-        zipped_full_ssn = zip_files(colored_ssn.ssn)
-    }
 }

@@ -1,4 +1,29 @@
 
+def getCleanFilename(job_name, default_name) {
+    // Create a clean job name for the file
+    def clean_file_name = job_name
+        .replaceAll(/[^\p{ASCII}]/, "")
+        .replaceAll(/[^a-zA-Z0-9_\-\.]/, "_")
+        .replaceAll(/^[_-]+|[_-]+$/, "");
+    def file_name = (clean_file_name ?: default_name) + ".xgmml"
+    return file_name
+}
+
+
+def prepareSsnFilename(default_name) {
+    def final_job_name = prepareJobName(default_name)
+    def file_name = getCleanFilename(final_job_name, default_name)
+    return file_name
+}
+
+
+def prepareJobName(default_name) {
+    def job_name = params.job_name ? params.job_name + " " + default_name : default_name
+    def final_job_name = params.job_id ? params.job_id + "_" + job_name : job_name
+    return final_job_name
+}
+
+
 process unzip_ssn {
     input:
         path ssn_zipped
