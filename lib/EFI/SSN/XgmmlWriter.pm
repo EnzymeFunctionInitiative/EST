@@ -353,7 +353,7 @@ sub makeNodeAttributes {
         my $value = $self->{metadata}->getSequence($uniprotId)->getAttribute($field, 1);
         # Ensure that the XGMML get a number if the value is not defined or is not a number --
         # otherwise Cytoscape crashes
-        if ($fields->{$field}->{type} eq "integer" and (not defined $value or not looks_like_number($value))) {
+        if ($fields->{$field}->{type} eq "integer" and not defined $value) {
             $value = 0;
         } elsif (not defined $value) {
             $value = MISSING_VALUE;
