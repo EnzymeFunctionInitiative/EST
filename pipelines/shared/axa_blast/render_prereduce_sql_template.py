@@ -17,7 +17,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = sql_template_render.create_sql_template_render_parser(
         "../templates/prereduce-template.sql",
         "Render the DuckDB SQL template for alphabetizing IDs",
-        sql_output_file="prereduce.sql"
+        "prereduce.sql"
     )
     return parser
 
