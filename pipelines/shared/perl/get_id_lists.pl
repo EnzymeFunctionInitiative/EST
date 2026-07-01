@@ -121,10 +121,12 @@ sub saveClusterSizes {
         # (e.g. an older network is being used).  In this case, skip the cluster.
         next if not $clusterToId->{$cnum};
 
+        my $clusterId = "Cluster_${cnum}";
+
         my $uniprotSize = @{ $clusterToId->{$cnum} };
         my $uniref90Size = @{ $unirefMap->{uniref90}->{$cnum} // [] } if $unirefMap->{uniref90};
         my $uniref50Size = @{ $unirefMap->{uniref50}->{$cnum} // [] } if $unirefMap->{uniref50};
-        my @row = ($cnum, $uniprotSize);
+        my @row = ($clusterId, $uniprotSize);
         push @row, $uniref90Size if $uniref90Size;
         push @row, $uniref50Size if $uniref50Size;
 
