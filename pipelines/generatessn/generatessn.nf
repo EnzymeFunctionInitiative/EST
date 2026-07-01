@@ -28,7 +28,7 @@ process import_data {
 }
 
 process threshold_blast {
-    label APP_duckdb
+    label 'APP_duckdb'
 
     input:
         path blast_parquet

@@ -3,7 +3,7 @@ include { visualize_length_histograms } from "../../shared/nextflow/reporting.nf
 include { merge_stats } from "../../shared/nextflow/util.nf"
 
 process compute_stats {
-    label APP_duckdb
+    label 'APP_duckdb'
 
     publishDir params.final_output_dir, mode: 'copy'
 
