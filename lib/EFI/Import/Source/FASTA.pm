@@ -11,10 +11,9 @@ use Data::Dumper;
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
-use lib dirname(abs_path(__FILE__)) . "/../../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
-use EFI::Annotations::Fields ':source';
+use EFI::Annotations::Fields qw(FIELD_SEQ_LEN_KEY :source);
 
 use EFI::Sequence::Type qw(make_unknown_sequence);
 use EFI::Util::FASTA::Headers;
@@ -229,7 +228,10 @@ sub makeMetadata {
     my $destSeqData = shift;
 
     foreach my $id (keys %$seq) {
-        my $attr = { &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FASTA };
+        my $attr = {
+            &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_VALUE_FASTA,
+            &FIELD_SEQ_LEN_KEY => length($seq->{$id}),
+        };
         foreach my $metaKey (keys %{ $seqMeta->{$id} }) {
             $attr->{$metaKey} = $seqMeta->{$id}->{$metaKey};
         }

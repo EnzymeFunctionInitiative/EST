@@ -4,6 +4,7 @@ use warnings;
 
 use Getopt::Long;
 use FindBin;
+use Time::HiRes qw(gettimeofday tv_interval);
 
 use lib "$FindBin::Bin/../../lib";
 
@@ -32,8 +33,13 @@ my ($clusterMapBySize, $clusterMapByNode) = parse_cluster_map_file($opts->{clust
 # Get the metanode data (mapping of repnode/UniRef to UniProt)
 my ($idType, $metanodeMap) = parse_metanode_map_file($opts->{metanode_map});
 
+my $timeGntStart = [gettimeofday];
+
 # Get the GNT data
 my $gntData = getGntData($opts->{gnd}, $idType, $metanodeMap);
+
+my $timeGntEnd = [gettimeofday];
+print "GND processing time: ", tv_interval($timeGntStart, $timeGntEnd), "\n";
 
 
 my $xwriter = new EFI::SSN::AttributeWriter(ssn => $opts->{ssn}, output_file => $opts->{color_gnt_ssn});
@@ -47,6 +53,8 @@ $xwriter->addAttributeHandler($gntHandler);
 
 $xwriter->write();
 
+my $timeSsnWriteFinished = [gettimeofday];
+print "SSN write time: ", tv_interval($timeGntEnd, $timeSsnWriteFinished), "\n";
 
 my $stats = $xwriter->getStats();
 my ($filename) = keys %$stats;

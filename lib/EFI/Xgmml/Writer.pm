@@ -22,8 +22,6 @@ sub new {
     $self->{xmlns} = $args{xmlns} // DEFAULT_XMLNS;
     $self->{data_indent} = $args{data_indent} // 0;
     $self->{output_file} = $args{output_file};
-    $self->{mem_buffer_size} = 10 * 1024 * 1024;
-    $self->{mem_buffer} = "";
 
     return $self;
 }
@@ -40,48 +38,10 @@ sub open {
         flock($fh, LOCK_EX) or warn "Unable to obtain exclusive file lock on output SSN for writing: $!";
     };
 
-    # Pass $self into the writer, which will call print on the handle (see below)
-    my $writer = new XML::Writer(OUTPUT => $self, DATA_INDENT => $self->{data_indent}, UNSAFE => 1, PREFIX_MAP => '');
+    my $writer = new XML::Writer(OUTPUT => $fh, DATA_INDENT => $self->{data_indent}, UNSAFE => 1, PREFIX_MAP => '');
 
     $self->{writer} = $writer;
     $self->{output} = $fh;
-}
-
-
-#
-# print - private
-#
-# This method is used to interface XML::Writer with the string buffer.  XML::Writer calls 'print'
-# on the handle it was provided, meaning this function gets called.  Here we append the XML string
-# that XML::Writer passes to print() onto the string buffer.  Then, if it's greater than the max
-# buffer size, it gets written to the actual output buffer.
-#
-sub print {
-    my $self = shift;
-
-    $self->{mem_buffer} .= join('', @_);
-
-    if (length($self->{mem_buffer}) > $self->{mem_buffer_size}) {
-        $self->flushBuffer();
-    }
-}
-
-
-#
-# flushBuffer - private
-#
-# This method flushes the string buffer to the actual file handle.
-#
-sub flushBuffer {
-    my $self = shift;
-
-    if (length($self->{mem_buffer}) > 0) {
-        # Write the buffer to the file in one big chunk (to help with NFS latency)
-        $self->{output}->print($self->{mem_buffer});
-
-        # Erase the buffer for the next print call
-        $self->{mem_buffer} = "";
-    }
 }
 
 
@@ -90,7 +50,6 @@ sub close {
     my $self = shift;
 
     $self->{writer}->end(); # Finish writing XML tags
-    $self->flushBuffer(); # Save the buffer to the primary file handle
     $self->{output}->close(); # Close everything
 }
 
