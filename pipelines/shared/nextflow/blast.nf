@@ -1,7 +1,6 @@
 
 process all_by_all_blast {
-    label 'APP_blastp'
-    label 'APP_duckdb'
+    label 'TASK_axa'
 
     input:
         tuple val(fid), path(blast_db_files, arity: 5), val(blast_db_name), path(frac)
