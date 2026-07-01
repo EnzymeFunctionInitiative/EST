@@ -7,10 +7,9 @@ use warnings;
 use Cwd qw(abs_path);
 use File::Basename qw(dirname);
 use lib dirname(abs_path(__FILE__)) . "/../../../"; # Import libs
-use lib dirname(abs_path(__FILE__)) . "/../../../../../../lib"; # Global libs
 use parent qw(EFI::Import::Source);
 
-use EFI::Annotations::Fields ':source';
+use EFI::Annotations::Fields qw(FIELD_SEQ_LEN_KEY :source);
 
 
 our $TYPE_NAME = "blast";
@@ -106,7 +105,7 @@ sub makeMetadata {
     my $inputAttr = {
         &FIELD_SEQ_SRC_KEY => FIELD_SEQ_SRC_BLAST_INPUT,
         Description => "Input Sequence",
-        seq_len => length($querySeq),
+        &FIELD_SEQ_LEN_KEY => length($querySeq),
     };
 
     $destSeqData->addSequence(INPUT_SEQ_ID, $inputAttr);

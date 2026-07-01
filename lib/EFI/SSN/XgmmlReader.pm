@@ -14,7 +14,6 @@ sub new {
     bless($self, $class);
 
     $self->{domain_idx} = {};
-    $self->{edgelist} = [];
     $self->{input} = $args{xgmml_file};
     $self->{id_idx} = {};
     $self->{idx_seqid} = {};
@@ -24,12 +23,6 @@ sub new {
     $self->{metadata_only} = $args{metadata_only} // 0;
 
     return $self;
-}
-
-
-sub getEdgeList {
-    my $self = shift;
-    return $self->{edgelist};
 }
 
 
@@ -59,56 +52,44 @@ sub getDomainIndexMap {
 
 sub parse {
     my $self = shift;
+    my %args = @_;
 
     my $reader = XML::LibXML::Reader->new(location => $self->{input}) or die "cannot read $self->{input}\n";
     $self->{current_node_id} = "";
-    while ($reader->read) {
-        my $continueParsing = $self->processXmlNode($reader);
-        last if not $continueParsing;
+
+    my $id_idx = $self->{id_idx};
+
+    my $edgelistFh;
+    if ($args{edgelist_file}) {
+        open $edgelistFh, ">", $args{edgelist_file} or die "Unable to open edgelist file '$args{edgelist_file}' for writing: $!";
     }
-}
 
+    my $TYPE_ELEMENT = XML_READER_TYPE_ELEMENT;
 
-#
-# processXmlNode - private method
-#
-# Processes a XML node (a XGMML 'edge', 'node', or 'att' tag). Called for every
-# type of XML element encountered, but only the start node or empty nodes are
-# processed.
-#
-# Parameters:
-#    $reader - XML::LibXML::Reader object (points to current XML node)
-#
-# Returns:
-#    non-zero if ok to continue parsing, zero to terminate parsing
-#
-sub processXmlNode {
-    my $self = shift;
-    my $reader = shift;
-    my $ntype = $reader->nodeType;
-    my $nname = $reader->name;
+    while ($reader->read) {
+        my $ntype = $reader->nodeType;
+        next if $ntype != $TYPE_ELEMENT;
 
-    return 1 if $ntype == XML_READER_TYPE_WHITESPACE || $ntype == XML_READER_TYPE_SIGNIFICANT_WHITESPACE;
+        my $nname = $reader->name;
 
-    if ($ntype == XML_READER_TYPE_ELEMENT) {
-        if ($nname eq "node") {
+        if ($nname eq "edge") {
+            my $source = $reader->getAttribute("source");
+            my $target = $reader->getAttribute("target");
+            $edgelistFh->print($id_idx->{$source}, " ", $id_idx->{$target}, "\n");
+        } elsif ($nname eq "node") {
             $self->processNode($reader);
         } elsif ($nname eq "att") {
             # An 'empty' element is a leaf (e.g. no child elements; <att X="Y" /> is empty)
             if ($reader->isEmptyElement()) {
                 $self->processAtt($reader);
             }
-        } elsif ($nname eq "edge") {
-            $self->processEdge($reader);
         } elsif ($nname eq "graph") {
             $self->processGraph($reader);
-            if ($self->{metadata_only}) {
-                return 0;
-            }
+            last if $self->{metadata_only};
         }
     }
 
-    return 1;
+    close $edgelistFh if $edgelistFh;
 }
 
 
@@ -151,28 +132,6 @@ sub processGraph {
     my $reader = shift;
     my $label = $reader->getAttribute("label") // "";
     $self->{ssn_metadata}->{title} = $label;
-}
-
-
-#
-# processEdge - private method
-#
-# Processes a XGMML 'edge' element by extracting the source and target node IDs.
-# Adds the edge (which consists of a source and target node) to the edgelist.
-# Note that this is the node 'id' attribute which is not necessarily the
-# sequence ID (e.g. label). 
-#
-# Parameters:
-#    $reader - XML::LibXML::Reader object (points to current XML node)
-#
-sub processEdge {
-    my $self = shift;
-    my $reader = shift;
-    my $source = $reader->getAttribute("source");
-    my $target = $reader->getAttribute("target");
-    my $sidx = $self->{id_idx}->{$source};
-    my $tidx = $self->{id_idx}->{$target};
-    push @{ $self->{edgelist} }, [$sidx, $tidx];
 }
 
 
@@ -238,11 +197,9 @@ EFI::SSN::XgmmlReader - Perl utility module for extracting network information f
     my $parser = EFI::SSN::XgmmlReader->new(xgmml_file => $ssnFile);
     $parser->parse();
 
-    my $edgelist = $parser->getEdgeList();
     my $indexSeqIdMap = $parser->getIndexSeqIdMap();
     my $idIndexMap = $parser->getIdIndexMap();
 
-    map { print join(" ", @$_), "\n"; } @$edgelist;
     map { print join("\t", $_, $indexSeqIdMap->{$_}), "\n"; } keys %$indexSeqIdMap;
     map { print join("\t", $_, $idIndexMap->{$_}), "\n"; } sort keys %$idIndexMap;
 
@@ -307,22 +264,6 @@ immediately after obtaining SSN metadata.
 =head4 Example Usage
 
     $parser->parse();
-
-
-=head3 C<getEdgeList()>
-
-Gets the edgelist, which is a list of edges where each edge is defined as
-a pair of node indices.
-
-=head4 Returns
-
-An array ref with each element being a two-element array ref of the source
-and target node indices.
-
-=head4 Example Usage
-
-    my $edgelist = $parser->getEdgeList();
-    map { print join(" ", @$_), "\n"; } @$edgelist;
 
 
 =head3 C<getIndexSeqIdMap()>

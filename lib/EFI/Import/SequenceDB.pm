@@ -170,8 +170,6 @@ file.  Domain regions can be optionally specified.
 
 =head3 C<new(fasta_db =E<gt> $fastaDbPath)>
 
-Creates a new B<EFI::SSN::XgmmlReader> object.
-
 =head4 Parameters
 
 =over

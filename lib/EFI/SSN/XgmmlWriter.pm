@@ -6,6 +6,7 @@ use warnings;
 
 use Cwd qw(abs_path);
 use File::Basename;
+use Scalar::Util qw(looks_like_number);
 use lib dirname(abs_path(__FILE__)) . "/../..";
 
 use EFI::Annotations;
@@ -351,13 +352,28 @@ sub makeNodeAttributes {
         next if $field eq FIELD_SEQ_KEY;
 
         my $value = $self->{metadata}->getSequence($uniprotId)->getAttribute($field, 1);
-        $value = MISSING_VALUE if not $value;
+        # Ensure that the XGMML get a number if the value is not defined or is not a number --
+        # otherwise Cytoscape crashes
+        if ($fields->{$field}->{type} eq "integer" and not ref $value and (not defined $value or not looks_like_number($value))) {
+            $value = 0;
+        } elsif (not defined $value) {
+            $value = MISSING_VALUE;
+        }
+
         $source = $value if $field eq FIELD_SEQ_SRC_KEY;
 
         # If the value is an array, and is only one, then save it as a scalar because we only want
         # to force XGMML list type if it is a true array
         if (not $fields->{$field}->{is_list} and (ref $value eq "ARRAY" and @$value == 1)) {
             $value = $value->[0];
+        }
+
+        # In the case of UniRef or Repnode networks, we need to force a list for all node
+        # attributes that for which at least one node has more than one value, because otherwise
+        # Cytoscape only renders attribute cells as lists if the first one is a list (e.g. it is
+        # not possible to mix and match list and non-list attribute types)
+        if (ref $value eq "ARRAY" and @$value > 1) {
+            $fields->{$field}->{is_list} = 1;
         }
 
         $nodeAttr->{$field} = $value;
