@@ -50,7 +50,11 @@ def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = sql_template_render.create_sql_template_render_parser("../templates/thresholdblast-template.sql", "Filter reduced BLAST output on specified parameter", "thresholdblast.sql")
+    parser = sql_template_render.create_sql_template_render_parser(
+        "../templates/thresholdblast-template.sql",
+        "Filter reduced BLAST output on specified parameter",
+        "thresholdblast.sql"
+    )
     return parser
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:

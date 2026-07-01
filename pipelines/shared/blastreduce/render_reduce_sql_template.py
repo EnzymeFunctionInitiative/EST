@@ -18,7 +18,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = sql_template_render.create_sql_template_render_parser(
         "../templates/reduce-template.sql",
         "Render the DuckDB SQL template for eliminating duplicate and self edges",
-        sql_output_file="reduce.sql"
+        "reduce.sql"
     )
     return parser
 
