@@ -144,8 +144,9 @@ process get_source_ids_accession {
 
 process get_source_ids_blast {
     label 'TASK_import_BLAST'
-    memory { params.sequence_version == "uniprot" ? '70.GB' : { params.sequence_version == "uniref90" ? '50.GB' : '20.GB' } }
-    cpus   { params.sequence_version == "uniprot" ? '4' : { params.sequence_version == "uniref90" ? '2' : '1' } }
+    memory { params.sequence_version == "uniprot" ? params.uniprot_db_size : { params.sequence_version == "uniref90" ? params.uniref90_db_size : params.uniref50_db_size } }
+    def nCPUs = { task.memory.toGiga() / params.memory_cpu_ratio }
+    cpus { nCPUs ? nCPUs.toInteger() + 1 : 1 }
 
     publishDir params.final_output_dir, mode: 'copy', pattern: '{blast_hits.tab}'
     input:
