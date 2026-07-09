@@ -27,7 +27,7 @@ def create_parser():
     parser = sql_template_render.create_sql_template_render_parser(
         "../templates/boxplotstats-template.sql",
         "Render sql to compute boxplot stats and produce evalue.tab",
-        "boxplotstats.sql"
+        sql_output_file = "boxplotstats.sql"
     )
     return parser
 

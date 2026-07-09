@@ -11,7 +11,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = sql_template_render.create_sql_template_render_parser(
         "../templates/restore-template.sql",
         "Render the DuckDB SQL template for restoring all blast edges from the condensed sequence set",
-        "restore.sql"
+        sql_output_file = "restore.sql"
     )
     return parser
 

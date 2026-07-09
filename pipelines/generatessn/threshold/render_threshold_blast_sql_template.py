@@ -53,7 +53,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = sql_template_render.create_sql_template_render_parser(
         "../templates/thresholdblast-template.sql",
         "Filter reduced BLAST output on specified parameter",
-        "thresholdblast.sql"
+        sql_output_file = "thresholdblast.sql"
     )
     return parser
 
