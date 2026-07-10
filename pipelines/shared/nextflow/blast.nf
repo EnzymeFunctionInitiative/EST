@@ -1,5 +1,7 @@
 
 process all_by_all_blast {
+    label 'TASK_axa'
+
     input:
         tuple val(fid), path(blast_db_files, arity: 5), val(blast_db_name), path(frac)
 
@@ -16,6 +18,7 @@ process all_by_all_blast {
         -m 8 \
         -e ${params.blast_evalue} \
         -b ${params.blast_num_matches} \
+        -a ${task.cpus} \
         -o ${frac}.tab
 
     # transcode to parquet for speed, creates frac.tab.parquet
@@ -27,7 +30,8 @@ process all_by_all_blast {
         --blast-output ${frac}.tab.parquet \
         --sql-template $projectDir/../shared/templates/prereduce-template.sql \
         --output-file ${frac}.tab.sorted.parquet \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file prereduce.sql
     duckdb < prereduce.sql
@@ -36,6 +40,8 @@ process all_by_all_blast {
 }
 
 process blastreduce_old {
+    label 'APP_duckdb'
+
     publishDir params.final_output_dir, mode: 'copy', enabled: (!params.multiplex || params.sequence_version != "uniprot")
 
     input:
@@ -51,7 +57,8 @@ process blastreduce_old {
         --blast-output $blast_files \
         --sql-template $projectDir/../shared/templates/reduce-template.sql \
         --fasta-length-parquet $fasta_length_parquet \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file allreduce.sql
     duckdb < allreduce.sql
@@ -60,6 +67,8 @@ process blastreduce_old {
 }
 
 process blastreduce {
+    label 'APP_duckdb'
+
     input:
         tuple val(fid), path(blast_files), path(fasta_length_parquet)
 
@@ -72,7 +81,8 @@ process blastreduce {
     python $projectDir/../shared/blastreduce/map_blast_reduce.py \
         --blast-output ${blast_files} \
         --fasta-length-parquet ${fasta_length_parquet} \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --output-file 1.out.parquet
     rm -Rf \${DUCKDB_TEMP}
@@ -134,6 +144,8 @@ process create_blast_db {
 
 // Formerly known as demultiplex
 process restore_condensed_old {
+    label 'APP_duckdb'
+
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
 
     input:
@@ -148,7 +160,8 @@ process restore_condensed_old {
     python $projectDir/../shared/condense/render_restore_sql_template.py \
         --blast-parquet $blast_parquet \
         --sql-template $projectDir/../shared/templates/restore-template.sql \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
+        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file restore.sql
     duckdb < restore.sql
@@ -163,6 +176,8 @@ process restore_condensed_old {
 }
 
 process restore_condensed {
+    label 'APP_duckdb'
+
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
 
     input:
@@ -179,14 +194,16 @@ process restore_condensed {
         --cd-hit-cluster ${condensed} \
         --condensed-blast reduced.parquet \
         --output-file 1.out.parquet \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
-        --duckdb-threads 1 \
+        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP}
     rm -Rf \${DUCKDB_TEMP}
     """
 }
 
 process remove_self_alignments {
+    label 'APP_duckdb'
+
     publishDir params.final_output_dir, mode: 'copy', overwrite: true
 
     input:
@@ -202,8 +219,8 @@ process remove_self_alignments {
     python $projectDir/../shared/condense/remove_self_alignments.py \
         --condensed-blast reduced.parquet \
         --output-file 1.out.parquet \
-        --duckdb-memory-limit ${params.duckdb_memory_limit} \
-        --duckdb-threads 1 \
+        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP}
     rm -Rf \${DUCKDB_TEMP}
     """

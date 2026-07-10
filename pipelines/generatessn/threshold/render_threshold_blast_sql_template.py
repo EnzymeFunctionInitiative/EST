@@ -50,7 +50,11 @@ def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = sql_template_render.create_sql_template_render_parser("../templates/thresholdblast-template.sql", "Filter reduced BLAST output on specified parameter", "thresholdblast.sql")
+    parser = sql_template_render.create_sql_template_render_parser(
+        "../templates/thresholdblast-template.sql",
+        "Filter reduced BLAST output on specified parameter",
+        sql_output_file = "thresholdblast.sql"
+    )
     return parser
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -73,6 +77,7 @@ if __name__ == "__main__":
     args = check_args(args)
     mapping = {
         "mem_limit": args.duckdb_memory_limit,
+        "n_threads": args.duckdb_n_threads,
         "duckdb_temp_dir": args.duckdb_temp_dir,
         "blast_output": args.blast_output,
         "threshold_metric": args.threshold_metric,

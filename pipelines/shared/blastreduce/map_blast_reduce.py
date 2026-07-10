@@ -15,7 +15,7 @@ def get_args() -> argparse.ArgumentParser:
     parser.add_argument("--blast-output", type=str, nargs="+", help="Path to directory containing the BLAST output files")
     parser.add_argument("--fasta-length-parquet", type=str, help="Path to the FASTA file to transcode")
     parser.add_argument("--duckdb-memory-limit", type=str, default="4GB", help="Soft limit on DuckDB memory usage")
-    parser.add_argument("--duckdb-threads", type=int, default=1, help="Number of threads to use")
+    parser.add_argument("--duckdb-n-threads", type=int, default=1, help="Number of threads to use")
     parser.add_argument("--duckdb-compression", type=str, default="zstd", help="Type of compression to use in temporary files")
     parser.add_argument(
         "--duckdb-temp-dir",
@@ -50,7 +50,7 @@ def connect_duckdb(args: argparse.Namespace) -> duckdb.DuckDBPyConnection:
     conn = duckdb.connect(database=':memory:')
     conn.execute(f"SET memory_limit='{args.duckdb_memory_limit}';")
     conn.execute(f"SET temp_directory='{args.duckdb_temp_dir}';")
-    conn.execute(f"SET threads={args.duckdb_threads};")
+    conn.execute(f"SET threads={args.duckdb_n_threads};")
 
     return conn
 

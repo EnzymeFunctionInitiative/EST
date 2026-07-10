@@ -5,7 +5,11 @@ import string
 from pyEFI import sql_template_render
 
 def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--blast-output", type=str, help="Path to directory containing the BLAST output files")
+    parser.add_argument(
+        "--blast-output",
+        type=str,
+        help="Path to directory containing the BLAST output files"
+    )
     parser.add_argument(
         "--boxplot-stats-output",
         type=str,
@@ -20,7 +24,11 @@ def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 def create_parser():
-    parser = sql_template_render.create_sql_template_render_parser("../templates/boxplotstats-template.sql", "Render sql to compute boxplot stats and produce evalue.tab", "boxplotstats.sql")
+    parser = sql_template_render.create_sql_template_render_parser(
+        "../templates/boxplotstats-template.sql",
+        "Render sql to compute boxplot stats and produce evalue.tab",
+        sql_output_file = "boxplotstats.sql"
+    )
     return parser
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -42,6 +50,7 @@ if __name__ == "__main__":
     args = check_args(args)
     mapping = {
         "mem_limit": args.duckdb_memory_limit,
+        "n_threads": args.duckdb_n_threads,
         "duckdb_temp_dir": args.duckdb_temp_dir,
         "blast_parquet": args.blast_output,
         "boxplot_stats_file": args.boxplot_stats_output,

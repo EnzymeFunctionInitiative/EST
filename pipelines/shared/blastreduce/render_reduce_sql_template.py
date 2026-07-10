@@ -15,7 +15,11 @@ def add_custom_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = sql_template_render.create_sql_template_render_parser("../templates/reduce-template.sql", "Render the DuckDB SQL template for eliminating duplicate and self edges", sql_output_file="reduce.sql")
+    parser = sql_template_render.create_sql_template_render_parser(
+        "../templates/reduce-template.sql",
+        "Render the DuckDB SQL template for eliminating duplicate and self edges",
+        sql_output_file = "reduce.sql"
+    )
     return parser
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -41,6 +45,7 @@ if __name__ == "__main__":
     args = check_args(args)
     mapping = {
         "mem_limit": args.duckdb_memory_limit,
+        "n_threads": args.duckdb_n_threads,
         "duckdb_temp_dir": args.duckdb_temp_dir,
         "transcoded_blast_output_glob": str(args.blast_output),
         "fasta_lengths_parquet": args.fasta_length_parquet,

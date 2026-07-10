@@ -46,7 +46,7 @@ def get_args() -> argparse.ArgumentParser:
         help="Soft limit on DuckDB memory usage"
     )
     parser.add_argument(
-        "--duckdb-threads",
+        "--duckdb-n-threads",
         type=int,
         default=1,
         help="Number of threads to use"
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     conn = connect_duckdb(
         memory_limit = args.duckdb_memory_limit,
         temp_dir = args.duckdb_temp_dir,
-        n_threads = args.duckdb_threads
+        n_threads = args.duckdb_n_threads
     )
 
     # process the condensed blast result file along with CD-HIT cluster database
