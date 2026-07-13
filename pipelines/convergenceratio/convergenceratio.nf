@@ -1,7 +1,7 @@
 
 include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; sort_and_split_fasta } from "../shared/nextflow/blast.nf"
 include { unzip_ssn } from "../shared/nextflow/util.nf"
-include { compute_clusters; get_conv_ratio_table; get_id_list; get_ssn_id_info } from "../shared/nextflow/color_workflow.nf"
+include { compute_clusters; get_id_list; get_ssn_id_info } from "../shared/nextflow/color_workflow.nf"
 
 process compute_blast_conv_ratio {
     input:
@@ -56,25 +56,45 @@ process get_fasta_files {
     """
 }
 
-process get_selected_id_lists {
+process compute_ssn_conv_ratio {
     input:
-        path uniprot_dir
-        path uniref90_dir
-        path uniref50_dir
-
+        path edgelist
+        path index_seqid_map
+        path cluster_id_map
+        path seqid_source_map
     output:
-        path "selected_ids/*.txt", emit: "id_files"
+        path "conv_ratio.txt", emit: conv_ratio
 
     script:
     """
-    mkdir -p selected_ids
+    perl $projectDir/../shared/perl/compute_conv_ratio.pl \
+        --cluster-map $cluster_id_map \
+        --index-seqid-map $index_seqid_map \
+        --edgelist $edgelist \
+        --seqid-source-map $seqid_source_map \
+        --conv-ratio conv_ratio.txt \
+        --use-metanodes
+    """
+}
 
-    if ls ${uniref50_dir}/*.txt 1> /dev/null 2>&1; then
-        cp ${uniref50_dir}/*.txt selected_ids/
-    elif ls ${uniref90_dir}/*.txt 1> /dev/null 2>&1; then
-        cp ${uniref90_dir}/*.txt selected_ids/
+process count_fasta {
+    tag "ca_count_fasta_${id}"
+
+    input:
+        tuple val(id), path(fasta)
+
+    output:
+        // We emit the same tuple structure so it can mix back easily later, and add the number
+        // of sequences in the input file to the tuple
+        tuple val(id), path(fasta), env(COUNT)
+
+    script:
+
+    """
+    if [ -s "${fasta}" ]; then
+        COUNT=\$(grep -c "^>" ${fasta})
     else
-        cp ${uniprot_dir}/*.txt selected_ids/
+        COUNT=0
     fi
     """
 }
@@ -99,15 +119,13 @@ workflow {
 
     id_list_data = get_id_list(compute_info.cluster_id_map, compute_info.singletons, ssn_data.seqid_source_map, sequence_type_val)
 
-    // Get the ID lists that will be used, e.g. the original sequences from the SSN
-    input_seq_type_id_lists = get_selected_id_lists(id_list_data.uniprot_dir, id_list_data.uniref90_dir, id_list_data.uniref50_dir)
-
     //
     // STEP 2: OBTAIN THE FASTA FILES
     //
 
     // Get the cluster IDs from the file names
-    cluster_id_lists = input_seq_type_id_lists 
+    cluster_id_lists = id_list_data.uniprot_tuples
+            .map { id_type, file -> file }
             .flatten()
             .filter { file -> !file.name.contains("_All") }          // Don"t include the file with all sequences in the analysis
             .filter { file -> !file.name.contains("singleton") }     // Don"t include singletons in the analysis
@@ -119,7 +137,18 @@ workflow {
             }
 
     // Get FASTA files; the return value is a channel of tuples of [clusterId, file]
-    cluster_fasta = get_fasta_files(cluster_id_lists)
+    all_fasta_files = get_fasta_files(cluster_id_lists)
+
+    // Because some sequences may be removed from future databases, we need to count how many
+    // sequences were retrieved and ensure we're only doing BLAST for clusters that have at least
+    // one sequence
+    counted_fasta = count_fasta(all_fasta_files)
+    counted_fasta.branch {
+        valid: it[2].toInteger() >= 1
+        ignored: true
+    }.set { complete_fasta }
+
+    cluster_fasta = complete_fasta.valid.map { id, file, size -> tuple(id, file) }
 
     //
     // STEP 3: RUN THE EST-BASED ALL-BY-ALL WORKFLOW
@@ -149,7 +178,7 @@ workflow {
     //
 
     // Compute the convergence ratio based on the edges and nodes in each cluster
-    cr_table = get_conv_ratio_table(ssn_data.edgelist, ssn_data.index_seqid_map, compute_info.cluster_id_map, ssn_data.seqid_source_map)
+    cr_table = compute_ssn_conv_ratio(ssn_data.edgelist, ssn_data.index_seqid_map, compute_info.cluster_id_map, ssn_data.seqid_source_map)
 
     // Compute the convergence ratio based on the BLAST results
     //stats_files = compute_blast_conv_ratio(blast_parquet.combine(fasta_lengths_parquet, by: 0))

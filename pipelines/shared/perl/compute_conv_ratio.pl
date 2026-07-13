@@ -34,10 +34,9 @@ my $indexMap = parseIndexSeqidMap($opts->{index_seqid_map});
 # Compute degrees, metanode only
 my $degrees = computeDegrees($nodeDegrees, $indexMap);
 
-# Expand the metanodes
-my $fullClusterToId = resolve_mapping($clusterToId, $idType, $sourceIdMap);
+my $fullNetworkIds = resolve_mapping($clusterToId, $idType, $sourceIdMap);
 
-my $convRatios = computeConvRatio($clusterToId, $fullClusterToId, $degrees);
+my $convRatios = computeConvRatio($clusterToId, $fullNetworkIds, $degrees, $opts->{use_metanodes});
 
 saveConvRatioData($opts->{conv_ratio}, $convRatios);
 
@@ -88,6 +87,7 @@ sub saveConvRatioData {
 #    $clusterToId - mapping of cluster to SSN nodes (e.g. metanodes/IDs)
 #    $fullClusterToId - mapping of cluster to sequences (expanded from metanodes, if relevant)
 #    $degrees - node degree hash ref
+#    $useMetanodes - true to use metanodes for the computation rather than full expanded UniProt IDs
 #
 # Returns:
 #    array ref of data rows
@@ -96,6 +96,7 @@ sub computeConvRatio {
     my $clusterToId = shift;
     my $fullClusterToId = shift;
     my $degrees = shift;
+    my $useMetanodes = shift || 0;
 
     # cluster to conv ratio
     my @data;
@@ -106,13 +107,14 @@ sub computeConvRatio {
         my $numNodes = @{ $clusterToId->{$cnum} };
         my $numIds = @fullIds;
 
+        my @clusterIds = $useMetanodes ? @{ $clusterToId->{$cnum} } : @{ $fullClusterToId->{$cnum} };
         my $numDegree = 0;
-        foreach my $id (@fullIds) {
+        foreach my $id (@clusterIds) {
             next if not $degrees->{$id};
             $numDegree += $degrees->{$id};
         }
 
-        my $denom = $numIds * ($numIds - 1);
+        my $denom = $useMetanodes ? $numNodes * ($numNodes - 1) : $numIds * ($numIds - 1);
         my $convRatio = 0;
         $convRatio = $numDegree / $denom if $denom > 0;
         $convRatio = sprintf("%.2e", $convRatio);
@@ -222,6 +224,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("edgelist=s", 1, "path to a file with the edgelist", OPT_FILE);
     $optParser->addOption("conv-ratio=s", 1, "path to an output file to save convergence ratios", OPT_FILE);
     $optParser->addOption("seqid-source-map=s", 0, "path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)", OPT_FILE);
+    $optParser->addOption("use-metanodes", 0, "use metanodes (e.g. SSN/UniRef nodes) to compute convergence ratio; otherwise use the full UniProt set of sequences in the cluster");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();
@@ -275,6 +278,12 @@ Path to an output file to store the convergence ratios in
 Optional path to a file that maps metanodes (e.g. RepNodes or UniRef IDs) that are in the SSN
 to sequence IDs that are within the metanode. If present the convergence ratio is calculated
 by taking into account the full cluster size.
+
+=item C<--use-metanodes>
+
+If the input is an UniRef SSN and this flag is provided, then metanodes (e.g. SSN nodes) are used
+to compute the convergence ratio.  Otherwise the UniProt sequences in the cluster are used.  If
+the input is UniProt, then the number of sequences are equivalent to the number of nodes.
 
 =back
 
