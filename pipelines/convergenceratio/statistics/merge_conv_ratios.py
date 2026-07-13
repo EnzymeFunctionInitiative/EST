@@ -21,7 +21,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         exit(1)
     return args
 
-def load_blast_conv_files(input_files: List) -> Dict[str, Dict[str, str]]:
+def load_blast_conv_files(input_files: List) -> Dict[int, Dict[str, str]]:
     """
     Load the BLAST-based convergence ratios from the given files.
 
@@ -42,7 +42,7 @@ def load_blast_conv_files(input_files: List) -> Dict[str, Dict[str, str]]:
         # Extract the cluster number
         match = re.search(r'Cluster_(\d+)_conv_ratio\.json', filename)
         if match:
-            cluster_id = match.group(1)
+            cluster_num = int(match.group(1))
         else:
             # Terminate because something bad happened, if the files aren't in the specified format
             raise Exception(f"Invalid filename format '{filename}'")
@@ -63,7 +63,7 @@ def load_blast_conv_files(input_files: List) -> Dict[str, Dict[str, str]]:
         except Exception as e:
             print(f"Error processing file {json_file}: {e}", file=sys.stderr)
 
-        blast_data[cluster_id] = {
+        blast_data[cluster_num] = {
             'ratio': conv_ratio,
             'edges': edges,
             'nodes': nodes
@@ -71,7 +71,7 @@ def load_blast_conv_files(input_files: List) -> Dict[str, Dict[str, str]]:
 
     return blast_data
 
-def load_ssn_conv_data(data_file: str) -> Dict[str, Dict[str, str]]:
+def load_ssn_conv_data(data_file: str) -> Dict[int, Dict[str, str]]:
     """
     Load the convergence ratio data from the SSN-based table.
 
@@ -92,7 +92,7 @@ def load_ssn_conv_data(data_file: str) -> Dict[str, Dict[str, str]]:
 
             for line in fh:
                 cluster_num, conv_ratio, num_nodes, num_ids, num_edges = re.split(r'\t', line.strip())
-                ssn_data[cluster_num] = {
+                ssn_data[int(cluster_num)] = {
                     'ratio': conv_ratio,
                     'edges': num_edges,
                     'nodes': num_nodes,
@@ -104,7 +104,7 @@ def load_ssn_conv_data(data_file: str) -> Dict[str, Dict[str, str]]:
 
     return ssn_data
 
-def calc_sig_figs(blast_conv_data: Dict[Any, Any]) -> int:
+def calc_sig_figs(blast_conv_data: Dict[int, Any]) -> int:
     """
     Compute the number of significant figures that are used for formatting.
 
@@ -134,7 +134,7 @@ def calc_sig_figs(blast_conv_data: Dict[Any, Any]) -> int:
 
     return digits
 
-def save_merged_data(output: str, blast_conv_data: Dict[Any, Any], ssn_conv_data: Dict[Any, Any], digits: int):
+def save_merged_data(output: str, blast_conv_data: Dict[int, Any], ssn_conv_data: Dict[int, Any], digits: int):
     """
     Merge the individual convergence ratio data into one file.
 
@@ -155,16 +155,16 @@ def save_merged_data(output: str, blast_conv_data: Dict[Any, Any], ssn_conv_data
             f_out.write("\t".join(["Cluster Number", "Convergence Ratio", "Number of IDs", "Number of BLAST Matches", "SSN Cluster Convergence Ratio", "Number of Nodes", "Number of Edges"]) + "\n")
 
             # Iterate through the dictionary and write the formatted rows
-            for cluster_id, metrics in blast_conv_data.items():
+            for cluster_num, metrics in sorted(blast_conv_data.items()):
                 blast_conv_ratio = metrics['ratio']
                 blast_conv_ratio_fmt = f"{blast_conv_ratio:.{digits}e}" if isinstance(blast_conv_ratio, float) else str(blast_conv_ratio)
 
-                ssn_metrics = ssn_conv_data.get(cluster_id)
+                ssn_metrics = ssn_conv_data.get(cluster_num)
                 ssn_conv_ratio = ssn_metrics['ratio']
                 ssn_conv_ratio_fmt = f"{ssn_conv_ratio:.{digits}e}" if isinstance(ssn_conv_ratio, float) else str(ssn_conv_ratio)
 
                 # Write all four columns separated by tabs
-                f_out.write("\t".join([cluster_id, blast_conv_ratio_fmt, str(metrics['nodes']), str(metrics['edges']), ssn_conv_ratio_fmt, str(ssn_metrics['nodes']), str(ssn_metrics['edges'])]) + "\n")
+                f_out.write("\t".join([str(cluster_num), blast_conv_ratio_fmt, str(metrics['nodes']), str(metrics['edges']), ssn_conv_ratio_fmt, str(ssn_metrics['nodes']), str(ssn_metrics['edges'])]) + "\n")
 
     except KeyError as e:
         print(f"Unable to find cluster ID {e.args[0]} in SSN convergence ratio data", file=sys.stderr)
