@@ -6,6 +6,8 @@ cluster_data_dir = "cluster-data"
 
 
 process create_gnns {
+    label 'TASK_create_ssn'
+
     publishDir params.final_output_dir, mode: "copy", pattern: "{hub_count.txt,cooc_table.txt,nomatches_noneighbors.txt,gnd.sqlite,*.zip}"
 
     input:
