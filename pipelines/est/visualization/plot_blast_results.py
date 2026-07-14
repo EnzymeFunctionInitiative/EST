@@ -90,10 +90,18 @@ def main(
     print(f"Removing {len(groups_to_delete)} groups")
     df = delete_outlying_groups(df, groups_to_delete)
 
+    if df.empty:
+        print("Warning: all data groups were filtered out.  Generating empty plots")
+
     # Plot alignment_length
     print("Plotting alignment length")
-    length_dd = df[["al_whislo", "al_q1", "al_med", "al_q3", "al_whishi","_label"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
-    length_xpos = sorted(df["alignment_score"])
+
+    if not df.empty:
+        length_dd = df[["al_whislo", "al_q1", "al_med", "al_q3", "al_whishi","_label"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
+        length_xpos = sorted(df["alignment_score"])
+    else:
+        length_dd, length_xpos = [], []
+
     draw_boxplot(
         length_dd,
         length_xpos,
@@ -107,8 +115,13 @@ def main(
 
     # Percent identical box plot data
     print("Plotting percent identical")
-    pident_dd = df[["pident_whislo", "pident_q1", "pident_med", "pident_q3", "pident_whishi"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
-    pident_xpos = sorted(df["alignment_score"])
+
+    if not df.empty:
+        pident_dd = df[["pident_whislo", "pident_q1", "pident_med", "pident_q3", "pident_whishi"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
+        pident_xpos = sorted(df["alignment_score"])
+    else:
+        pident_dd, pident_xpos = [], []
+
     draw_boxplot(
         pident_dd,
         pident_xpos,
@@ -122,7 +135,12 @@ def main(
 
     # Draw edge length histogram
     print("Extracting histogram data")
-    xpos, heights = df["alignment_score"], df["edge_count"]
+
+    if not df.empty:
+        xpos, heights = df["alignment_score"], df["edge_count"]
+    else:
+        xpos, heights = [], []
+
     draw_histogram(
         xpos,
         heights,
