@@ -134,6 +134,7 @@ process zip_weblogos {
 }
 
 process run_clustal_omega {
+    label "APP_clustalo"
     tag "ca_clustal_${id}"
 
     // Ignore any clustal computations because we don't want a failure to block the pipeline.
@@ -147,7 +148,7 @@ process run_clustal_omega {
 
     script:
     """
-    clustalo -i ${msa} --percent-id --distmat-out=${id}_pim.txt --full --force
+    clustalo -i ${msa} --percent-id --distmat-out=${id}_pim.txt --full --force --threads=${task.cpus}
     """
 }
 
