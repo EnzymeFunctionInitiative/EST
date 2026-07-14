@@ -26,14 +26,14 @@ process muscle3_align {
     label "muscle_align"
     publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
-    // MUSCLE can crash due to out of memory errors, or invalid data.  If we crash due to OOM,
-    // retry twice with larger amounts of RAM.  Otherwise, ignore the failure and proceed with
-    // the other clusters.
-    memory { 2.GB * task.attempt }
-    maxRetries 2
+    // MUSCLE can crash due to out of memory errors; it also might run for extended time
+    // especially for large sequence sets. Set the max time this process block can run in
+    // the config file. If a process runs beyond this time, a timeout error is thrown.
+    // Ignore these failures, skip the cluster being analyzed, and proceed with
+    // the other clusters. Any other errors should cause a terminate message to nextflow.
     errorStrategy {
         // 137 == OOM, 140 == timeout
-        task.exitStatus in [137, 140] ? 'retry' : 'ignore'
+        task.exitStatus in [137, 140] ? 'ignore' : 'terminate'
     }
 
     input:
@@ -43,7 +43,8 @@ process muscle3_align {
 
     script:
     """
-    muscle3 -in ${fasta} -out ${id}.afa
+    # -maxhours h  -- Maximum time. If h hours have elpased, then complete the current iteration and stop. Default no time limit.
+    muscle3 -in ${fasta} -out ${id}.afa -maxhours ${task.time.toHours() - 2}
     """
 }
 
