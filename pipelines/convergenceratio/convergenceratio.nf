@@ -6,7 +6,6 @@ include { compute_clusters; get_id_list; get_ssn_id_info } from "../shared/nextf
 process compute_blast_conv_ratio {
     input:
         tuple val(cluster_id), path(blast_parquet), path(fasta_file)
-
     output:
         path("${cluster_id}_conv_ratio.json")
 
@@ -25,7 +24,6 @@ process merge_conv_ratios {
     input:
         path stats_files
         path cr_table
-
     output:
         path "conv_ratio.tab", emit: "conv_ratio"
         path "stats.json", emit: "stats"
@@ -43,7 +41,6 @@ process merge_conv_ratios {
 process get_fasta_files {
     input:
         tuple val(cluster_id), path(id_file)
-
     output:
         tuple val(cluster_id), path("*.fasta", arity: "1")
 
@@ -78,14 +75,10 @@ process compute_ssn_conv_ratio {
 }
 
 process count_fasta {
-    tag "ca_count_fasta_${id}"
-
     input:
         tuple val(id), path(fasta)
-
     output:
-        // We emit the same tuple structure so it can mix back easily later, and add the number
-        // of sequences in the input file to the tuple
+        // We add the number of sequences in the input file to the tuple
         tuple val(id), path(fasta), env(COUNT)
 
     script:

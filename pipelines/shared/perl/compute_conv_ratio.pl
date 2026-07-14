@@ -34,6 +34,7 @@ my $indexMap = parseIndexSeqidMap($opts->{index_seqid_map});
 # Compute degrees, metanode only
 my $degrees = computeDegrees($nodeDegrees, $indexMap);
 
+# Expand the metanodes
 my $fullNetworkIds = resolve_mapping($clusterToId, $idType, $sourceIdMap);
 
 my $convRatios = computeConvRatio($clusterToId, $fullNetworkIds, $degrees, $opts->{use_metanodes});
