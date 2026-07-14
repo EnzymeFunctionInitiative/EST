@@ -1,7 +1,7 @@
 
 process muscle5_align {
     tag "ca_muscle5_${id}"
-    label "muscle_align"
+    label "APP_muscle"
     publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     input:
@@ -23,7 +23,7 @@ process muscle5_align {
 
 process muscle3_align {
     tag "ca_muscle3_${id}"
-    label "muscle_align"
+    label "APP_muscle"
     publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     // MUSCLE can crash due to out of memory errors; it also might run for extended time
