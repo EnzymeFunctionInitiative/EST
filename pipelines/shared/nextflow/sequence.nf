@@ -33,6 +33,8 @@ process filter_ids {
     def xids_file = explicit_ids_file ? "--filter explicit-ids-file=${explicit_ids_file}" : ""
     def filter_args = formatFilterArgs(params.filter)
     def user_filter_arg = user_filter_file ? "--filter user-filter=${user_filter_file}" : ""
+    def min_len_arg = params.min_length != 0 ? "--filter min-seq-length=${params.min_length}" : ""
+    def max_len_arg = params.max_length != 65000 ? "--filter max-seq-length=${params.max_length}" : ""
     """
     perl $projectDir/../shared/import/filter_ids.pl \
         --efi-config ${params.efi_config} \
@@ -47,7 +49,7 @@ process filter_ids {
         --master-ids-file master_ids.tab \
         --stats-file import_stats.json \
         ${filter_args} ${user_filter_arg} \
-        ${xids_file}
+        ${xids_file} ${min_len_arg} ${max_len_arg}
     """
 }
 

@@ -298,7 +298,7 @@ workflow {
 
     // Explicitly specify the IDs that will be passed through, by computing the lengths of the
     // sequences and returning a file containing IDs for all of the sequences that fit the length
-    // criteria.
+    // criteria.  This is necessary due to unknown IDs that come from FASTA jobs.
     explicit_ids_file = (params.min_length != 0 || params.max_length != 65000)
         ? compute_fasta_lengths(input_data.fasta)
         : Channel.value([])
