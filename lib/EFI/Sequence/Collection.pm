@@ -303,8 +303,6 @@ sub updateUnirefMetadata {
     foreach my $unirefId (keys %uniprotIds) {
         my @ids = sort @{ $uniprotIds{$unirefId} };
         my $size = @ids;
-        print "Setting metadata for $unirefId:\n";
-        print "\t", join(",", @ids), " $size\n";
         $self->{seq}->{$unirefId}->setAttribute($attrName, \@ids);
         $self->{seq}->{$unirefId}->setAttribute($sizeAttrName, $size);
     }

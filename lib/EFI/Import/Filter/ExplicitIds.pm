@@ -46,7 +46,11 @@ sub applyFilter {
 
     my $explicitIds = $self->parseIdList();
 
-    my @ids = $seqs->getAllSequenceIds();
+    # For this filter we only remove the primary IDs (e.g. if the input is UniRef50, then only
+    # filter out the UniRef50 IDs, not children).  This filter is only useful for the sequences
+    # that were used in the EST computation, for applying a length filter to those sequences
+    # when performing SSN filtering.
+    my @ids = $seqs->getSequenceIds();
 
     my $numRemoved = 0;
     foreach my $id (@ids) {
