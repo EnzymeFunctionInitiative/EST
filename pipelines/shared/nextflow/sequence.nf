@@ -22,6 +22,7 @@ process filter_ids {
         path explicit_ids_file  // manually specify which IDs pass through; this may be empty (e.g. Channel.value([]))
         path user_filter_file   // path to user taxonomy filter file; this may be empty (e.g. Channel.value([]));
                                 //     this is necessary to stage the filter file so it can be read inside this process
+        val sequence_version    // One of the types defined in EFI::Sequence::Type (e.g. uniprot, auto)
     output:
         path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
@@ -36,7 +37,7 @@ process filter_ids {
     perl $projectDir/../shared/import/filter_ids.pl \
         --efi-config ${params.efi_config} \
         --efi-db ${params.efi_db} \
-        --sequence-version ${params.sequence_version} \
+        --sequence-version ${sequence_version} \
         --source-ids-file ${source_ids} \
         --source-meta-file ${source_meta} \
         --source-stats-file ${source_stats} \
