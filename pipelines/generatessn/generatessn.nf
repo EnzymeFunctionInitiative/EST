@@ -95,8 +95,6 @@ process get_annotations {
     """
     perl $projectDir/annotations/get_annotations.pl \
         --ssn-anno-out ssn_metadata.tab \
-        --min-len ${params.min_length} \
-        --max-len ${params.max_length} \
         --seq-meta-in $filtered_seq_meta_file \
         --config ${params.efi_config} \
         --db-name ${params.efi_db}

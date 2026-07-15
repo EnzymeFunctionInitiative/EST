@@ -18,14 +18,12 @@ use EFI::Sequence::Collection qw(unique_attribute_values);
 use EFI::Sequence::Type qw(is_unknown_sequence :types);
 
 
-my ($annoOut, $metaFileIn, $configFile, $dbName, $minLen, $maxLen, $annoSpecFile, $idListFile);
+my ($annoOut, $metaFileIn, $configFile, $dbName, $annoSpecFile, $idListFile);
 my $result = GetOptions(
     "ssn-anno-out=s"        => \$annoOut,
     "seq-meta-in=s"         => \$metaFileIn,
     "config=s"              => \$configFile,
     "db-name=s"             => \$dbName,
-    "min-len=i"             => \$minLen,
-    "max-len=i"             => \$maxLen,
     "anno-spec-file=s"      => \$annoSpecFile,      # if this is specified we only write out the attributes listed in the file
     "filter-id-list=s"      => \$idListFile,
 );
@@ -48,10 +46,6 @@ if (not $dbh) {
 }
 
 
-
-
-$minLen = 0 if not $minLen or $minLen =~ m/\D/;
-$maxLen = 0 if not $maxLen or $maxLen =~ m/\D/;
 
 
 my %idTypes;
@@ -84,7 +78,6 @@ if (grep { $_ eq FIELD_UNIREF90_IDS } @{ $metaAttrs }) {
 }
 
 
-my $unirefLenFiltWhere = getUnirefLenFiltWhere();
 my $annoSpec = readAnnoSpec($annoSpecFile);
 
 
@@ -227,17 +220,6 @@ sub formatAnnoData {
 }
 
 
-sub getUnirefLenFiltWhere {
-    my $sqlLenField = FIELD_SEQ_LEN_KEY;
-    if ($minLen) {
-        $unirefLenFiltWhere .= "A.$sqlLenField >= $minLen";
-    }
-    if ($maxLen) {
-        $unirefLenFiltWhere .= "A.$sqlLenField <= $maxLen";
-    }
-}
-
-
 #
 # getNcbiIds
 #
@@ -348,7 +330,7 @@ sub getUnirefQuerySql {
     my @allIds = ref($clusterIds) eq "ARRAY" ? @$clusterIds : $clusterIds;
     my @idList = grep(!m/^$accession$/, @allIds); #remove main accession ID
     while (my @chunk = splice(@idList, 0, 200)) {
-        my $sql = $anno->build_query_string(\@chunk, $unirefLenFiltWhere);
+        my $sql = $anno->build_query_string(\@chunk);
         push @sql, $sql;
     }
 
