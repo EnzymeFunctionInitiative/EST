@@ -108,33 +108,44 @@ sub removeSequence {
     # Now remove from the accession ID table.  Primary sequence type refers to the sequence
     # type of the sequence version (e.g. UniProt, UniRef)
 
-    # If the primary sequence type is UniRef50 and this ID is a UniRef50 ID then delete all
-    # UniRef90 and UniProt IDs that are in that UniRef50 cluster
-    if ($self->{sequence_version} eq SEQ_UNIREF50 and $self->{uniref50}->{$sequenceId}) {
+    # If this ID is a UniRef50 ID then delete all UniRef90 and UniProt IDs that are in that
+    # UniRef50 cluster
+    if ($self->{uniref50}->{$sequenceId}) {
         foreach my $ur90 (keys %{ $self->{uniref50}->{$sequenceId} }) {
             if ($self->{uniref90}->{$ur90}) {
                 foreach my $up (keys %{ $self->{uniref90}->{$ur90} }) {
                     delete $self->{uniprot}->{$up};
+                    delete $self->{seq}->{$up} if $self->{seq}->{$up};
                 }
             } else {
                 delete $self->{uniprot}->{$ur90};
+                delete $self->{seq}->{$ur90} if $self->{seq}->{$ur90};
             }
             delete $self->{uniref90}->{$ur90};
         }
         delete $self->{uniref50}->{$sequenceId};
     }
-    
-    # If the primary sequence type is UniRef90 and this ID is a UniRef90 ID then delete all
-    # UniProt IDs that are in that UniRef90 cluster
-    if ($self->{sequence_version} eq SEQ_UNIREF90 and $self->{uniref90}->{$sequenceId}) {
+
+    # If this ID is a UniRef90 ID then delete all UniProt IDs that are in that UniRef90 cluster
+    elsif ($self->{uniref90}->{$sequenceId}) {
+        my $parentUniref50 = $self->{uniprot}->{$sequenceId}->[1];
         foreach my $up (keys %{ $self->{uniref90}->{$sequenceId} }) {
             delete $self->{uniprot}->{$up};
+            delete $self->{seq}->{$up} if $self->{seq}->{$up};
         }
         delete $self->{uniref90}->{$sequenceId};
+        # Remove from the parent UniRef50 cluster if it exists
+        delete $self->{uniref50}->{$parentUniref50}->{$sequenceId} if $parentUniref50 and exists $self->{uniref50}->{$parentUniref50}->{$sequenceId};
     }
 
     # Remove the UniProt regardless of primary sequence type
-    if ($self->{uniprot}->{$sequenceId}) {
+    else {
+        my $parentUniref50 = $self->{uniprot}->{$sequenceId}->[1];
+        my $parentUniref90 = $self->{uniprot}->{$sequenceId}->[0];
+        # Remove from the parent UniRef90 cluster if it exists
+        delete $self->{uniref90}->{$parentUniref90}->{$sequenceId} if $parentUniref90 and exists $self->{uniref90}->{$parentUniref90}->{$sequenceId};
+        # Remove from the parent UniRef50 cluster if it exists
+        delete $self->{uniref50}->{$parentUniref50}->{$sequenceId} if $parentUniref50 and exists $self->{uniref50}->{$parentUniref50}->{$sequenceId};
         delete $self->{uniprot}->{$sequenceId};
     }
 }
@@ -149,7 +160,7 @@ sub mergeSequences {
     my $mergedSeq = $self->getSequence($targetId);
 
     my %mergedAttrs;
-    map { push @{ $mergedAttrs{$_} }, $mergedSeq->getAttribute($_, 1); } $mergedSeq->getAttributeNames();
+    push @{ $mergedAttrs{$_} }, $mergedSeq->getAttribute($_, 1) for $mergedSeq->getAttributeNames();
 
     foreach my $id (@mergedIds) {
         my $seq = $self->getSequence($id);
@@ -286,7 +297,6 @@ sub updateUnirefMetadata {
             }
         }
     }
-    
 
     my $attrName = $self->{sequence_version} eq SEQ_UNIREF90 ? FIELD_UNIREF90_IDS : FIELD_UNIREF50_IDS;
     my $sizeAttrName = $self->{sequence_version} eq SEQ_UNIREF90 ? FIELD_UNIREF90_CLUSTER_SIZE : FIELD_UNIREF50_CLUSTER_SIZE;
@@ -365,6 +375,17 @@ sub loadMetadataFile {
 
     foreach my $id (keys %data) {
         $self->addSequence($id, $data{$id});
+    }
+
+    # If the version is 'auto', then check for UniRef cluster ID fields to determine the version
+    if ($self->{sequence_version} eq SEQ_AUTO) {
+        if (exists $fields{&FIELD_UNIREF90_IDS}) {
+            $self->{sequence_version} = SEQ_UNIREF90;
+        } elsif (exists $fields{&FIELD_UNIREF50_IDS}) {
+            $self->{sequence_version} = SEQ_UNIREF50;
+        } else {
+            $self->{sequence_version} = SEQ_UNIPROT;
+        }
     }
 
     return 1;
@@ -468,7 +489,7 @@ sub saveIdFile {
     # Some sequences do not have UniRef info (e.g. unknown FASTA sequences), so we need to keep
     # track of those. We do that by using this hash and removing elements from it as we process
     # an ID. The remainder are written to the file in the next step.
-    my %seqIds = map { $_ => 1 } $self->getSequenceIds();
+    my %seqIds = map { $_ => undef } $self->getSequenceIds();
     foreach my $id (keys %{ $self->{uniprot} }) {
         $fh->print(join("\t", $id, $self->{uniprot}->{$id}->[0] // "", $self->{uniprot}->{$id}->[1] // ""), "\n");
         delete $seqIds{$id};
@@ -593,7 +614,9 @@ If specified, load the ID mapping, otherwise only metadata is loaded.
 =item C<sequence_version> (optional)
 
 If specified, used instead of sequence version defined at object creation.  One of C<SEQ_UNIPROT>,
-C<SEQ_UNIREF90>, or C<SEQ_UNIREF50> from B<EFI::Sequence::Type>.
+C<SEQ_UNIREF90>, C<SEQ_UNIREF50>, or C<SEQ_AUTO> from B<EFI::Sequence::Type>.  If C<SEQ_AUTO> is
+used, the metadata file is examined for the presence of UniRef attributes and if so, the proper
+sequence version is automatically determined.
 
 =back
 

@@ -298,13 +298,15 @@ workflow {
 
     // Explicitly specify the IDs that will be passed through, by computing the lengths of the
     // sequences and returning a file containing IDs for all of the sequences that fit the length
-    // criteria.
+    // criteria.  This is necessary due to unknown IDs that come from FASTA jobs.
     explicit_ids_file = (params.min_length != 0 || params.max_length != 65000)
         ? compute_fasta_lengths(input_data.fasta)
         : Channel.value([])
 
-    // Filter sequences out by length or other criteria (e.g. fragment, taxonomy)
-    final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, Channel.value([]))
+    // Filter sequences out by length or other criteria (e.g. fragment, taxonomy).
+    // 'auto' is used as the sequence version so that the code automatically detects what
+    // the type is based on the attributes present in the sequence metadata file.
+    final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, Channel.value([]), 'auto')
 
     filtered_fasta = filter_fasta(input_data.fasta, final_ids.master_ids)
 

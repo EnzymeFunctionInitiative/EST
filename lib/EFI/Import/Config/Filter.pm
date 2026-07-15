@@ -76,8 +76,8 @@ sub validateOptions {
     $opts->{fraction} = ($filter->{fraction} and $filter->{fraction} =~ m/^\d+$/) ? $filter->{fraction} : 1;
     $opts->{remove_fragments} = exists $filter->{fragments} ? 1 : 0;
     $opts->{family_filter} = $filter->{family};
-    $opts->{min_seq_length} = ($filter->{min_seq_length} and $filter->{min_seq_length} =~ m/^\d+$/) ? $filter->{min_seq_length} : DEFAULT_MIN_SEQ_LENGTH;
-    $opts->{max_seq_length} = ($filter->{max_seq_length} and $filter->{max_seq_length} =~ m/^\d+$/) ? $filter->{max_seq_length} : DEFAULT_MAX_SEQ_LENGTH;
+    $opts->{min_seq_length} = ($filter->{"min-seq-length"} and $filter->{"min-seq-length"} =~ m/^\d+$/) ? $filter->{"min-seq-length"} : DEFAULT_MIN_SEQ_LENGTH;
+    $opts->{max_seq_length} = ($filter->{"max-seq-length"} and $filter->{"max-seq-length"} =~ m/^\d+$/) ? $filter->{"max-seq-length"} : DEFAULT_MAX_SEQ_LENGTH;
     my @taxFilterErrors = $self->parseTaxonomyFilterOptions($filter, $opts);
     push @errors, @taxFilterErrors;
 

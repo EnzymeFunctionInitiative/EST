@@ -63,7 +63,7 @@ workflow {
 
     // Filter on all sequence IDs including UniRef, and including IDs in FASTA files.
     // The last parameter is empty (used only for generatessn)
-    sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats, Channel.value([]), user_filter_file)
+    sequence_id_files = filter_ids(source_data.source_ids, source_data.source_meta, source_data.source_stats, Channel.value([]), user_filter_file, params.sequence_version)
 
     // Get sunburst data for all sequence IDs, after filtering
     sunburst_data = get_sunburst_data(sequence_id_files.accession_table, sequence_id_files.sequence_metadata)

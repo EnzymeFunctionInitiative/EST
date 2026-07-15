@@ -88,12 +88,20 @@ def main(
     groups_to_delete = compute_outlying_groups(df[["alignment_score", "edge_count"]], min_edges, min_groups)
 
     print(f"Removing {len(groups_to_delete)} groups")
-    df = delete_outlying_groups(df, groups_to_delete)
+    filtered_df = delete_outlying_groups(df, groups_to_delete)
+
+    # If the filtered frame is not empty, then we use it to plot; otherwise use the original data
+    if not filtered_df.empty:
+        df = filtered_df
+    else:
+        print("Warning: all data groups were filtered out.  Using entire dataset for plots.")
 
     # Plot alignment_length
     print("Plotting alignment length")
+
     length_dd = df[["al_whislo", "al_q1", "al_med", "al_q3", "al_whishi","_label"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
     length_xpos = sorted(df["alignment_score"])
+
     draw_boxplot(
         length_dd,
         length_xpos,
@@ -107,8 +115,10 @@ def main(
 
     # Percent identical box plot data
     print("Plotting percent identical")
+
     pident_dd = df[["pident_whislo", "pident_q1", "pident_med", "pident_q3", "pident_whishi"]].rename(columns=lambda x: x.split("_")[1]).to_dict(orient="records")
     pident_xpos = sorted(df["alignment_score"])
+
     draw_boxplot(
         pident_dd,
         pident_xpos,
@@ -122,7 +132,9 @@ def main(
 
     # Draw edge length histogram
     print("Extracting histogram data")
+
     xpos, heights = df["alignment_score"], df["edge_count"]
+
     draw_histogram(
         xpos,
         heights,

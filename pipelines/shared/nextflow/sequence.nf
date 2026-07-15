@@ -22,6 +22,7 @@ process filter_ids {
         path explicit_ids_file  // manually specify which IDs pass through; this may be empty (e.g. Channel.value([]))
         path user_filter_file   // path to user taxonomy filter file; this may be empty (e.g. Channel.value([]));
                                 //     this is necessary to stage the filter file so it can be read inside this process
+        val sequence_version    // One of the types defined in EFI::Sequence::Type (e.g. uniprot, auto)
     output:
         path 'accession_table.tab', emit: 'accession_table'     // table of all sequence IDs, including UniRef IDs, filtered
         path 'sequence_metadata.tab', emit: 'sequence_metadata' // sequence metdata in metadata format
@@ -32,11 +33,13 @@ process filter_ids {
     def xids_file = explicit_ids_file ? "--filter explicit-ids-file=${explicit_ids_file}" : ""
     def filter_args = formatFilterArgs(params.filter)
     def user_filter_arg = user_filter_file ? "--filter user-filter=${user_filter_file}" : ""
+    def min_len_arg = params.min_length != 0 ? "--filter min-seq-length=${params.min_length}" : ""
+    def max_len_arg = params.max_length != 65000 ? "--filter max-seq-length=${params.max_length}" : ""
     """
     perl $projectDir/../shared/import/filter_ids.pl \
         --efi-config ${params.efi_config} \
         --efi-db ${params.efi_db} \
-        --sequence-version ${params.sequence_version} \
+        --sequence-version ${sequence_version} \
         --source-ids-file ${source_ids} \
         --source-meta-file ${source_meta} \
         --source-stats-file ${source_stats} \
@@ -46,7 +49,7 @@ process filter_ids {
         --master-ids-file master_ids.tab \
         --stats-file import_stats.json \
         ${filter_args} ${user_filter_arg} \
-        ${xids_file}
+        ${xids_file} ${min_len_arg} ${max_len_arg}
     """
 }
 

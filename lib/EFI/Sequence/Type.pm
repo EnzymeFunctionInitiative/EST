@@ -12,16 +12,17 @@ use constant SEQ_UNIREF90 => "uniref90";
 use constant SEQ_REPNODE => "repnode";
 use constant SEQ_DOMAIN => "domain";
 use constant SEQ_FULL => "full";
+use constant SEQ_AUTO => "auto";
 
 
-our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type make_unknown_sequence strip_domain SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL SEQ_REPNODE);
-our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90', 'SEQ_DOMAIN', 'SEQ_FULL', 'SEQ_REPNODE']);
+our @EXPORT_OK = qw(is_unknown_sequence get_sequence_version get_sequence_type make_unknown_sequence strip_domain SEQ_UNIPROT SEQ_UNIREF50 SEQ_UNIREF90 SEQ_DOMAIN SEQ_FULL SEQ_REPNODE SEQ_AUTO);
+our %EXPORT_TAGS = (types => ['SEQ_UNIPROT', 'SEQ_UNIREF50', 'SEQ_UNIREF90', 'SEQ_DOMAIN', 'SEQ_FULL', 'SEQ_REPNODE', 'SEQ_AUTO']);
 Exporter::export_ok_tags('types');
 
 
 sub get_sequence_version {
     my $param = lc (shift // "");
-    if ($param ne SEQ_UNIREF90 and $param ne SEQ_UNIREF50 and $param ne SEQ_REPNODE) {
+    if ($param ne SEQ_UNIREF90 and $param ne SEQ_UNIREF50 and $param ne SEQ_REPNODE and $param ne SEQ_AUTO) {
         return SEQ_UNIPROT;
     }
     return $param;
