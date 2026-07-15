@@ -1,7 +1,7 @@
 
 process muscle5_align {
     tag "ca_muscle5_${id}"
-    label "muscle_align"
+    label "APP_muscle"
     publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     input:
@@ -23,7 +23,7 @@ process muscle5_align {
 
 process muscle3_align {
     tag "ca_muscle3_${id}"
-    label "muscle_align"
+    label "APP_muscle"
     publishDir "${params.final_output_dir}/data/msa/${seq_type}", mode: "copy", pattern: "*.afa"
 
     // MUSCLE can crash due to out of memory errors; it also might run for extended time
@@ -135,6 +135,7 @@ process zip_weblogos {
 
 process run_clustal_omega {
     tag "ca_clustal_${id}"
+    label "APP_clustalo"
 
     // Ignore any clustal computations because we don't want a failure to block the pipeline.
     // This output isn't crucial.
@@ -147,7 +148,7 @@ process run_clustal_omega {
 
     script:
     """
-    clustalo -i ${msa} --percent-id --distmat-out=${id}_pim.txt --full --force
+    clustalo -i ${msa} --percent-id --distmat-out=${id}_pim.txt --full --force --threads=${task.cpus}
     """
 }
 
