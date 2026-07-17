@@ -1,24 +1,7 @@
 
-include { filter_ids; GET_SOURCE_IDS; get_user_filter_file; get_sequences } from "../shared/nextflow/sequence.nf"
+include { filter_ids; GET_SOURCE_IDS; get_user_filter_file; get_sequences; get_sunburst_data } from "../shared/nextflow/sequence.nf"
 include { create_blast_db } from "../shared/nextflow/blast.nf"
 include { visualize_length_histograms } from "../shared/nextflow/reporting.nf"
-
-process get_sunburst_data {
-    publishDir params.final_output_dir, mode: 'copy'
-    input:
-        path accession_table
-        path sequence_metadata
-    output:
-        path 'sunburst_tax.json', emit: 'taxon_file'
-        path 'sunburst_stats.json', emit: 'stats_file'
-    script:
-    """
-    perl $projectDir/../shared/import/get_sunburst_data.pl \
-        --efi-config ${params.efi_config} \
-        --efi-db ${params.efi_db} \
-        --sunburst-stats-file sunburst_stats.json
-    """
-}
 
 process process_sunburst_stats {
     publishDir params.final_output_dir, mode: 'copy'
