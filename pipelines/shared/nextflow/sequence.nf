@@ -15,6 +15,7 @@ def get_user_filter_file() {
 
 process filter_ids {
     publishDir params.final_output_dir, mode: 'copy'
+
     input:
         path source_ids         // table of all sequence IDs, including UniRef IDs
         path source_meta        // sequence metdata
@@ -29,6 +30,7 @@ process filter_ids {
         path 'import_stats.json', emit: 'import_stats'          // final statistics of source and filter import processes
         path 'retrieval_ids.tab', emit: 'retrieval_ids'         // list of IDs that came from the database, as opposed to user-specified FASTA files, including domain data
         path 'master_ids.tab', emit: 'master_ids'               // list of all primary IDs in the dataset
+
     script:
     def xids_file = explicit_ids_file ? "--filter explicit-ids-file=${explicit_ids_file}" : ""
     def filter_args = formatFilterArgs(params.filter)
@@ -59,6 +61,8 @@ process get_sequences {
         val fasta_db
     output:
         path "${accession_ids}.fasta"
+
+    script:
     """
     if [[ -s "${accession_ids}" ]]; then
         perl $projectDir/../shared/import/get_sequences.pl \
@@ -134,8 +138,8 @@ process get_source_ids_accession {
         path 'source_ids.tab', emit: 'source_ids'
         path 'source_seq.tab', emit: 'source_meta'
         path 'source_stats.json', emit: 'source_stats'
-    script:
 
+    script:
     def common_args = get_import_args()
 
     """
@@ -147,8 +151,8 @@ process get_source_ids_accession {
 
 process get_source_ids_blast {
     label 'TASK_import_BLAST'
-
     publishDir params.final_output_dir, mode: 'copy', pattern: '{blast_hits.tab}'
+
     input:
         path input_file
     output:
@@ -156,8 +160,8 @@ process get_source_ids_blast {
         path 'source_seq.tab', emit: 'source_meta'
         path 'source_stats.json', emit: 'source_stats'
         path 'blast_hits.tab'
-    script:
 
+    script:
     def common_args = get_import_args()
 
     // blast_hits.tab is provided as an output to the user
@@ -189,8 +193,8 @@ process get_source_ids_family {
         path 'source_ids.tab', emit: 'source_ids'
         path 'source_seq.tab', emit: 'source_meta'
         path 'source_stats.json', emit: 'source_stats'
-    script:
 
+    script:
     def common_args = get_import_args()
 
     """
@@ -206,8 +210,8 @@ process get_source_ids_fasta {
         path 'source_seq.tab', emit: 'source_meta'
         path 'source_stats.json', emit: 'source_stats'
         path 'seq_mapping.tab', emit: 'seq_mapping'
-    script:
 
+    script:
     def common_args = get_import_args()
 
     """
@@ -215,6 +219,25 @@ process get_source_ids_fasta {
         ${common_args} \
         --fasta ${input_file} \
         --sequence-mapping-file seq_mapping.tab
+    """
+}
+
+process get_sunburst_data {
+    publishDir params.final_output_dir, mode: 'copy', pattern: '{sunburst_tax.json}'
+
+    input:
+        path accession_table
+        path sequence_metadata
+    output:
+        path 'sunburst_tax.json', emit: 'taxon_file'
+        path 'sunburst_stats.json', emit: 'stats_file'
+
+    script:
+    """
+    perl $projectDir/../shared/import/get_sunburst_data.pl \
+        --efi-config ${params.efi_config} \
+        --efi-db ${params.efi_db} \
+        --sunburst-stats-file sunburst_stats.json
     """
 }
 
