@@ -1,7 +1,7 @@
 
 include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
-include { filter_ids } from "../shared/nextflow/sequence.nf"
+include { filter_ids; get_user_filter_file } from "../shared/nextflow/sequence.nf"
 include { prepareJobName; prepareSsnFilename; merge_stats } from "../shared/nextflow/util.nf"
 
 process import_data {
@@ -301,10 +301,12 @@ workflow {
         ? compute_fasta_lengths(input_data.fasta)
         : Channel.value([])
 
+    user_filter_file = get_user_filter_file()
+
     // Filter sequences out by length or other criteria (e.g. fragment, taxonomy).
     // 'auto' is used as the sequence version so that the code automatically detects what
     // the type is based on the attributes present in the sequence metadata file.
-    final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, Channel.value([]), 'auto')
+    final_ids = filter_ids(input_data.source_ids, input_data.seq_meta_file, input_data.stats, explicit_ids_file, user_filter_file, 'auto')
 
     filtered_fasta = filter_fasta(input_data.fasta, final_ids.master_ids)
 
