@@ -25,9 +25,6 @@
 #####################################################################################
 
 import Bio
-#from Bio.Seq import Seq
-from Bio.Alphabet import IUPAC
-from Bio.Data import CodonTable
 from Bio import SeqIO
 
 import re

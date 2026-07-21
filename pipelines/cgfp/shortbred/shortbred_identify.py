@@ -41,11 +41,7 @@ import math
 
 
 
-try:
-    import Bio
-except ImportError:
-    print("\nShortBRED was unable to load Biopython. Please check to make sure you have Biopython installed (http://biopython.org/wiki/Main_Page), and that its directory is in your PYTHONPATH. \n")
-    sys.exit(1)
+import Bio
 
 import shortbred_src as src
 from shortbred_src import process_blast
@@ -53,8 +49,6 @@ pb = process_blast
 
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio.Alphabet import IUPAC
-from Bio.Data import CodonTable
 from Bio import SeqIO
 
 VERSION="0.9.5"

@@ -45,7 +45,6 @@ import numpy
 import bz2
 
 import Bio
-from Bio.Seq import Seq
 from Bio import SeqIO
 
 VERSION="0.9.5"

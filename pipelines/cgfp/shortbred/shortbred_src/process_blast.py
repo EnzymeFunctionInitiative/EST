@@ -39,8 +39,6 @@ from Bio import AlignIO
 from Bio import Align
 from Bio.Align import AlignInfo
 from Bio.Seq import Seq
-from Bio.Alphabet import IUPAC
-from Bio.Data import CodonTable
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
