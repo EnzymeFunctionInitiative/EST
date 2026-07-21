@@ -282,7 +282,8 @@ workflow COMPUTE_COLOR_CLUSTER_WORKFLOW {
         cluster_id_map = compute_info.cluster_id_map
         singletons = compute_info.singletons
         cluster_num_map = compute_info.cluster_num_map
-        cluster_colors 
+        cluster_colors
+        ssn_sequences = ssn_data.ssn_sequences
 }
 
 
