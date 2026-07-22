@@ -1,38 +1,54 @@
 
 include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
 include { get_sequences } from "../shared/nextflow/sequence.nf"
-include { merge_stats; unzip_ssn } from "../shared/nextflow/util.nf"
+include { prepareJobName; prepareSsnFilename; merge_stats; unzip_ssn } from "../shared/nextflow/util.nf"
 include { condense_redundant } from "../shared/nextflow/blast.nf"
 
 process get_fasta_id_list {
     input:
         path cluster_id_map
+        path metanode_map
+        path singleton_list
     output:
         path "id_list.txt"
 
     script:
     """
-    cut -f1 ${cluster_id_map} > id_list.txt
+    perl $projectDir/prep/get_id_list.pl --cluster-map ${cluster_id_map} --seqid-source-map ${metanode_map} --singletons ${singleton_list} --id-list id_list.txt
     """
 }
 
 process create_marker_ssn {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{marker_ssn.xgmml.zip}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{marker_ssn.xgmml.zip,stats.json}"
 
     input:
         path ssn_file
         path marker_file
         path cluster_id_map
-        path cdhit_table
+        path metanode_map
+        path cdhit_file
     output:
         path "marker_ssn.xgmml.zip", emit: "marker_ssn"
-        path "marker_stats.json", emit: "stats"
+        path "stats.json", emit: "stats"
 
     script:
+    def default_name = "ShortBRED Markers"
+    def final_job_name = prepareJobName(default_name)
+    def file_name = prepareSsnFilename(default_name)
+    def temp_name = "marker_ssn.xgmml"
     """
-    #TODO: implement SSN creation
-    touch marker_ssn.xgmml.zip #DEBUG
-    echo '{}' > marker_stats.json
+    perl $projectDir/create/create_identify_ssn.pl \
+        --input ${ssn_file} \
+        --output ${temp_name} \
+        --marker-file ${marker_file} \
+        --cluster-map ${cluster_id_map} \
+        --seqid-source-map ${metanode_map} \
+        --cdhit-file ${cdhit_file} \
+        --title "${final_job_name}" \
+        --stats stats.json
+    cp ${temp_name} "${file_name}"
+    zip marker_ssn.xgmml.zip "${file_name}"
+    rm "${file_name}"
     """
 }
 
@@ -41,15 +57,32 @@ process cgfp_identify {
 
     input:
         path fasta_file
-        val ref_db /* TODO: Path to a blast database */
+        val ref_db /* Path to a BLAST database, DIAMOND database, or FASTA file */
     output:
         path "markers.faa", emit: "marker_file"
-        path "id-temp/clust/clust.faa.clstr", emit: "cdhit"
+        path "clust.faa.clstr", emit: "cdhit"
 
     script:
+    def diamond_sens    = params.sb_identify_method == "diamond"    ? "--diamond-sensitivity ${params.sb_diamond_sensitivity}"  : ""
+    def cdhit_sid       = params.sb_cdhit_sid                       ? "--clustid ${params.sb_cdhit_sid}"                        : ""
+    def cons_thresh     = params.sb_cons_thresh                     ? "--consthresh ${params.sb_cons_thresh}"                   : ""
     """
-    mkdir id-temp
-    #TODO: run shortbred
+    SB_TEMP_DIR=id-temp
+    mkdir \$SB_TEMP_DIR
+
+    python $projectDir/shortbred/shortbred_identify.py \
+        --threads ${params.sb_identify_threads} \
+        --goi ${fasta_file} \
+        --refdb ${ref_db} \
+        --markers markers.faa \
+        --tmp \$SB_TEMP_DIR \
+        --search_program ${params.sb_identify_method} \
+        ${diamond_sens} \
+        ${cdhit_sid} \
+        ${cons_thresh}
+
+    cp \$SB_TEMP_DIR}/clust/clust.faa.clstr clust.faa.clstr
+    rm -rf \$SB_TEMP_DIR
     """
 }
 
@@ -64,7 +97,9 @@ process get_merged_fasta_file {
     // Sequences in the first file are kept, while sequences in the second file with the same
     // ID are discarded; otherwise the sequences from fasta_file are merged
     """
-    seqkit rmdup -i ${ssn_seq_file} ${fasta_file} -o merged.fasta
+    seqkit rmdup \
+        -i ${ssn_seq_file} ${fasta_file} \
+        -o merged.fasta
     """
 }
 
@@ -77,7 +112,10 @@ process create_cdhit_table {
 
     script:
     """
-    perl $projectDir/prep/make_cdhit_table.pl --cdhit-file ${cdhit_file} --cluster-map ${cluster_id_map} --table-file cdhit.tab
+    perl $projectDir/prep/make_cdhit_table.pl \
+        --cdhit-file ${cdhit_file} \
+        --cluster-map ${cluster_id_map} \
+        --table-file cdhit.tab
     """
 }
 
@@ -92,7 +130,7 @@ workflow {
     color_work = COMPUTE_COLOR_CLUSTER_WORKFLOW(ssn_file)
 
     // Get the FASTA based on the sequence IDs
-    fasta_id_list_file = get_fasta_id_list(color_work.cluster_id_map)
+    fasta_id_list_file = get_fasta_id_list(color_work.cluster_id_map, color_work.seqid_source_map, color_work.singletons)
     id_fasta_file = get_sequences(fasta_id_list_file, params.fasta_db)
 
     // Get the sequences that are defined in the SSN, then merge the sequences defined in the
@@ -100,17 +138,19 @@ workflow {
     // the SSN FASTA.
     ssn_fasta_file = get_merged_fasta_file(color_work.ssn_sequences, id_fasta_file)
 
-    condensed_fasta = condense_redundant(tuple("F", fasta_file)).map { id, file -> file }.first()
-
-    //TODO: figure out what refdb is
-    results = cgfp_identify(condensed_fasta.fasta_file, refdb)
-
-    cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map)
-
-    marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.cluster_id_map, cdhit_table)
-
-    stats_merge = color_work.cluster_stats.mix(marker_ssn_data.stats)
-    stats_merge.collect().set { files_to_merge }
-    final_stats = merge_stats(files_to_merge)
+crin = tuple("F", ssn_fasta_file)
+//    crout = condense_redundant(crin)
+//crout.view()
+//    condensed_fasta = crout.map { id, file -> file }.first()
+//
+//    results = cgfp_identify(condensed_fasta.fasta_file, params.sb_search_refdb)
+//
+//    cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map)
+//
+//    marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.cluster_id_map, color_work.seqid_source_map, results.cdhit)
+//
+//    stats_merge = color_work.cluster_stats.mix(marker_ssn_data.stats)
+//    stats_merge.collect().set { files_to_merge }
+//    final_stats = merge_stats(files_to_merge)
 }
 
