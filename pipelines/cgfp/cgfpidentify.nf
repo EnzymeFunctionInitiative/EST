@@ -1,7 +1,7 @@
 
 include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
 include { get_sequences } from "../shared/nextflow/sequence.nf"
-include { prepareJobName; prepareSsnFilename; merge_stats; unzip_ssn } from "../shared/nextflow/util.nf"
+include { prepareJobName; prepareSsnFilename; unzip_ssn } from "../shared/nextflow/util.nf"
 include { condense_redundant } from "../shared/nextflow/blast.nf"
 
 process get_fasta_id_list {
@@ -63,26 +63,39 @@ process cgfp_identify {
         path "clust.faa.clstr", emit: "cdhit"
 
     script:
-    def diamond_sens    = params.sb_identify_method == "diamond"    ? "--diamond-sensitivity ${params.sb_diamond_sensitivity}"  : ""
-    def cdhit_sid       = params.sb_cdhit_sid                       ? "--clustid ${params.sb_cdhit_sid}"                        : ""
-    def cons_thresh     = params.sb_cons_thresh                     ? "--consthresh ${params.sb_cons_thresh}"                   : ""
+    def cdhit_sid       = params.sb_cdhit_sid   ? "--clustid ${params.sb_cdhit_sid}"                        : ""
+    def cons_thresh     = params.sb_cons_thresh ? "--consthresh ${params.sb_cons_thresh}"                   : ""
+    def diamond_sens    = ""
+    def search_program  = ""
+    def sb_src          = ""
+    if (params.sb_identify_method == "diamond") {
+        diamond_sens    = params.sb_diamond_sensitivity ? "--diamond-sensitivity ${params.sb_diamond_sensitivity}" : ""
+        search_program  = "--search_program blast"
+        sb_src          = "shortbred_diamond"
+    } else if (params.sb_identify_method) {
+        search_program  = "--search_program ${params.sb_identify_method}"
+        sb_src          = "shortbred_blast"
+    }
+
     """
     SB_TEMP_DIR=id-temp
     mkdir \$SB_TEMP_DIR
 
-    python $projectDir/shortbred/shortbred_identify.py \
+    python $projectDir/shortbred/${sb_src}/shortbred_identify.py \
         --threads ${params.sb_identify_threads} \
         --goi ${fasta_file} \
         --refdb ${ref_db} \
         --markers markers.faa \
         --tmp \$SB_TEMP_DIR \
-        --search_program ${params.sb_identify_method} \
+        --muscle muscle3 \
+        --usearch usearch6 \
+        ${search_program} \
         ${diamond_sens} \
         ${cdhit_sid} \
         ${cons_thresh}
 
-    cp \$SB_TEMP_DIR}/clust/clust.faa.clstr clust.faa.clstr
-    rm -rf \$SB_TEMP_DIR
+    cp \$SB_TEMP_DIR/clust/clust.faa.clstr clust.faa.clstr
+#    rm -rf \$SB_TEMP_DIR
     """
 }
 
@@ -91,7 +104,7 @@ process get_merged_fasta_file {
         path ssn_seq_file
         path fasta_file
     output:
-        path "merged.fasta"
+        tuple val("F"), path("merged.fasta")
 
     script:
     // Sequences in the first file are kept, while sequences in the second file with the same
@@ -138,19 +151,13 @@ workflow {
     // the SSN FASTA.
     ssn_fasta_file = get_merged_fasta_file(color_work.ssn_sequences, id_fasta_file)
 
-crin = tuple("F", ssn_fasta_file)
-//    crout = condense_redundant(crin)
-//crout.view()
-//    condensed_fasta = crout.map { id, file -> file }.first()
-//
-//    results = cgfp_identify(condensed_fasta.fasta_file, params.sb_search_refdb)
-//
-//    cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map)
-//
-//    marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.cluster_id_map, color_work.seqid_source_map, results.cdhit)
-//
-//    stats_merge = color_work.cluster_stats.mix(marker_ssn_data.stats)
-//    stats_merge.collect().set { files_to_merge }
-//    final_stats = merge_stats(files_to_merge)
+    condensed_out = condense_redundant(ssn_fasta_file)
+    condensed_fasta = condensed_out.fasta_file.map { id, file -> file }
+
+    results = cgfp_identify(condensed_fasta, params.sb_search_refdb)
+
+    cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map)
+
+    marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.cluster_id_map, color_work.seqid_source_map, results.cdhit)
 }
 

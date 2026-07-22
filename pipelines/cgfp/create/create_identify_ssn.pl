@@ -76,7 +76,7 @@ sub remapCdhitClusters {
         }
     }
 
-    return { clusters => [keys %clusters], members => [keys %members] };
+    return { clusters => \%clusters, members => \%members };
 }
 
 
@@ -94,7 +94,7 @@ sub parseMarkerData {
             #    >tr|UNIPROTID_TM3_
             #    >UNIPROTID_QM3_
             #    >OTHER_ID3_JM3_
-            my ($id, $type) =~ m/^>(?:(?:tr|sp)\|)?([A-Z0-9_\.]+?)_([TJQ]M)[0-9]*_/;
+            my ($id, $type) = $line =~ m/^>(?:(?:tr|sp)\|)?([A-Z0-9_\.]+?)_([TJQ]M)[0-9]*_/;
             next if not $id or not $type;
             $markerData->{$id} = {count => 0, type => $type} if not exists $markerData->{$id};
             $markerData->{$id}->{count}++;
