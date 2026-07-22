@@ -13,6 +13,7 @@ RUN apt update && apt install -y \
     libpng-dev \
     unzip \
     zip \
+    ncbi-blast+ \
     && rm -rf /var/lib/apt/lists/*
 #    libc6-i386 \
 
@@ -68,7 +69,9 @@ ENV PATH="${PATH}:/opt/muscle"
 # note: 32-bit requires libc6-i386 (installed in apt-get step above)
 RUN mkdir -p /opt/usearch && \
     curl -L -o /opt/usearch/usearch https://github.com/rcedgar/usearch12/releases/download/v12.0-beta1/usearch_linux_arch64_12.0-beta && \
-    chmod +x /opt/usearch/usearch
+    curl -L -o /opt/usearch/usearch6 https://raw.githubusercontent.com/rcedgar/usearch_old_binaries/main/bin/usearch6.1.544_i86linux64 && \
+    chmod +x /opt/usearch/usearch && \
+    chmod +x /opt/usearch/usearch6
 ENV PATH="${PATH}:/opt/usearch"
 
 # install Clustal Omega
@@ -86,5 +89,4 @@ RUN curl -o /opt/hmmer.tar.gz http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
     make && \
     make install
 ENV PATH="${PATH}:/opt/hmmer-3.4/bin"
-
 

@@ -91,6 +91,9 @@ manual installation directions below should be followed:
    to ``$EFIDEPS/cd-hit-v4.8.1-2019-0228``. Inside ``$EFIDEPS/cd-hit-v4.8.1-2019-0228``
    run ``make``, then ``mv $EFIDEPS/cd-hit-v4.8.1-2019-0228/cd-hit $EFIDEPS/bin``.
 
+4. Install NCBI-BLAST+ from
+   https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/
+
 The tools require a number of Perl and Python libraries that are not part
 of standard installations, and these are specified in ``cpanfile`` and
 ``requirements.txt``, respectively.
