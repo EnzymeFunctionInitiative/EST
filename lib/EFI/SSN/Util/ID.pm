@@ -13,7 +13,7 @@ use EFI::Sequence::Type qw(:types get_sequence_version);
 use Exporter qw(import);
 
 
-our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file save_cluster_map_file parse_cluster_map_file parse_singletons_file get_cluster_num_cols parse_cluster_num_map);
+our @EXPORT_OK = qw(resolve_mapping parse_metanode_map_file save_cluster_map_file parse_cluster_map_file parse_singletons_file get_cluster_num_cols parse_cluster_num_map invert_cluster_map);
 
 
 
@@ -129,6 +129,30 @@ sub parse_cluster_map_file {
     close $fh;
 
     return ($seqClusterToId, $nodeClusterToId);
+}
+
+
+#
+# invert_cluster_map
+#
+# Convert a cluster-to-ID mapping into an ID-to-cluster mapping.
+#
+# Parameters:
+#     $mapping - output from parse_cluster_map_file
+#
+# Returns:
+#     hash ref
+#
+sub invert_cluster_map {
+    my $clusterToIdMap = shift;
+
+    my $clusterMap = {};
+
+    foreach my $clusterNum (keys %$clusterToIdMap) {
+        $clusterMap->{$_} = $clusterNum for @{ $clusterToIdMap->{$clusterNum} };
+    }
+
+    return $clusterMap;
 }
 
 
@@ -304,6 +328,8 @@ EFI::SSN::Util::ID - Perl module for parsing and performing various sequence ID-
     # $clusterMapFile comes from another utility, the Python `compute_clusters.py` script
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
 
+    my $idToCluster = invert_cluster_map($nodeClusterToId);
+
     # Save the cluster ID -> sequence ID map to the specified file
     save_cluster_map_file($clusterIdMap, $clusterMapFile);
 
@@ -405,6 +431,39 @@ C<cluster_num_node> column in the input file).  In the example given above
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
 
     my ($seqClusterToId, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile, default_cluster_num => 1);
+
+
+=head3 C<invert_cluster_map($clusterMapping)>
+
+Converts a cluster mapping structure output from C<parse_cluster_map_file> from a cluster-to-ID
+mapping into a ID-cluster mapping.
+
+=head4 Parameters
+
+=over
+
+=item C<$clusterMapping>
+
+Hash ref output by C<invert_cluster_map>, containing a mapping of cluster number to list
+of sequence IDs in the cluster
+
+=back
+
+=head4 Returns
+
+Hash ref that maps every sequence ID to a cluster number, for example:
+
+    {
+        "UNIPROT_ID1" => 1,
+        "UNIPROT_ID2" => 1,
+        "UNIPROT_ID3" => 2,
+        ...
+    }
+
+=head4 Example Usage
+
+    my (undef, $nodeClusterToId) = parse_cluster_map_file($clusterMapFile);
+    my $idClusterMap = invert_cluster_map($nodeClusterToId);
 
 
 =head3 C<save_cluster_map_file($clusterIdMap, $clusterMapFile)>
