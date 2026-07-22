@@ -7,7 +7,7 @@ use FindBin;
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Options;
-use EFI::SSN::Util::ID qw(parse_cluster_map_file);
+use EFI::SSN::Util::ID qw(invert_cluster_map parse_cluster_map_file);
 use EFI::Util::CdHit::Parser qw(parse_cdhit_clstr);
 use EFI::Util::Colors;
 
@@ -22,7 +22,7 @@ my $opts = validateAndProcessOptions();
 my $cdhitClusters = parse_cdhit_clstr($opts->{cdhit_file});
 
 my (undef, $clusterToSeqMap) = parse_cluster_map_file($opts->{cluster_map});
-my $clusterMap = flipClusterMap($clusterToSeqMap);
+my $clusterMap = invert_cluster_map($clusterToSeqMap);
 
 
 
@@ -34,9 +34,11 @@ foreach my $cdhitClusterId (sort keys %$cdhitClusters) {
     my $color = $colors->getColor($colorIdx);
     $colorIdx++;
 
-    foreach my $member (@{ $cdhitClusters->{$cdhitClusterId}->{members} }) {
+    my $data = $cdhitClusters->{$cdhitClusterId};
+
+    foreach my $member (@{ $data->{members} }) {
         my $clusterNum = $clusterMap->{$member} // "N/A";
-        $fh->print(join("\t", $clusterNum, $cdhitClusterId, $member, $color), "\n");
+        $fh->print(join("\t", $clusterNum, $data->{representative}, $member, $color), "\n");
     }
 }
 
@@ -52,19 +54,6 @@ close $fh;
 
 
 
-
-
-sub flipClusterMap {
-    my $clusterToIdMap = shift;
-
-    my $clusterMap = {};
-
-    foreach my $clusterNum (keys %$clusterToIdMap) {
-        $clusterMap->{$_} = $clusterNum for @{ $clusterToIdMap->{$clusterNum} };
-    }
-
-    return $clusterMap;
-}
 
 
 sub validateAndProcessOptions {
