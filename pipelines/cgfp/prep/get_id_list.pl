@@ -32,8 +32,13 @@ my $singletons = parse_singletons_file($opts->{singletons});
 
 
 
+my @allIds = @$singletons;
+foreach my $clusterId (keys %$fullClusterToId) {
+    push @allIds, @{ $fullClusterToId->{$clusterId} };
+}
+
 open my $fh, ">", $opts->{id_list} or die "Unable to write to ID list file '$opts->{id_list}': $!";
-$fh->print("$_\n") for (sort (keys %$fullClusterToId, @$singletons));
+$fh->print("$_\n") for (@allIds);
 close $fh;
 
 
