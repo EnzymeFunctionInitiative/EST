@@ -70,10 +70,9 @@ process cgfp_identify {
     def sb_src          = ""
     if (params.sb_identify_method == "diamond") {
         diamond_sens    = params.sb_diamond_sensitivity ? "--diamond-sensitivity ${params.sb_diamond_sensitivity}" : ""
-        search_program  = "--search_program blast"
+        search_program  = "--search_program diamond"
         sb_src          = "shortbred_diamond"
     } else if (params.sb_identify_method) {
-        search_program  = "--search_program ${params.sb_identify_method}"
         sb_src          = "shortbred_blast"
     }
 
@@ -88,7 +87,7 @@ process cgfp_identify {
         --markers markers.faa \
         --tmp \$SB_TEMP_DIR \
         --muscle muscle3 \
-        --usearch usearch6 \
+        --usearch usearch9 \
         ${search_program} \
         ${diamond_sens} \
         ${cdhit_sid} \
