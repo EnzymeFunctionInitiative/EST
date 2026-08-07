@@ -11,7 +11,6 @@ use EFI::SSN::AttributeWriter;
 use EFI::SSN::AttributeWriter::Handler::ShortBredMarker;
 use EFI::SSN::Util::ID qw(invert_cluster_map parse_cluster_map_file parse_metanode_map_file);
 use EFI::Util::CdHit::Parser qw(parse_cdhit_clstr);
-use EFI::Util::FileStats qw(save_stats);
 
 
 # Exits if help is requested or errors are encountered
@@ -39,10 +38,6 @@ $xwriter->addAttributeHandler($markerHandler);
 $xwriter->write();
 
 
-if ($opts->{stats}) {
-    my $stats = { };
-    save_stats($opts->{stats}, $stats);
-}
 
 
 
@@ -120,7 +115,6 @@ sub validateAndProcessOptions {
     $optParser->addOption("seqid-source-map=s", 1, "path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)", OPT_FILE);
     $optParser->addOption("cdhit-file=s", 1, "path to CD-HIT .clstr file output from ShortBRED", OPT_FILE);
     $optParser->addOption("title=s", 1, "SSN title to save");
-    $optParser->addOption("stats=s", 1, "path to file to output SSN statistics to", OPT_FILE);
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
         print $optParser->printHelp();

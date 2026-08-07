@@ -1,7 +1,7 @@
 
-include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
+include { COMPUTE_COLOR_CLUSTER_WORKFLOW; get_cluster_stats } from "../shared/nextflow/color_workflow.nf"
 include { get_sequences } from "../shared/nextflow/sequence.nf"
-include { prepareJobName; prepareSsnFilename; unzip_ssn } from "../shared/nextflow/util.nf"
+include { merge_stats; prepareJobName; prepareSsnFilename; unzip_ssn } from "../shared/nextflow/util.nf"
 include { condense_redundant } from "../shared/nextflow/blast.nf"
 
 process get_fasta_id_list {
@@ -19,7 +19,7 @@ process get_fasta_id_list {
 }
 
 process create_marker_ssn {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{marker_ssn.xgmml.zip,stats.json}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{marker_ssn.xgmml.zip,marker_ssn.xgmml,stats.json}"
 
     input:
         path ssn_file
@@ -28,8 +28,8 @@ process create_marker_ssn {
         path metanode_map
         path cdhit_file
     output:
-        path "marker_ssn.xgmml.zip", emit: "marker_ssn"
-        path "stats.json", emit: "stats"
+        path "marker_ssn.xgmml.zip", emit: "marker_ssn_zip"
+        path "marker_ssn.xgmml", emit: "marker_ssn"
 
     script:
     def default_name = "ShortBRED Markers"
@@ -44,8 +44,7 @@ process create_marker_ssn {
         --cluster-map ${cluster_id_map} \
         --seqid-source-map ${metanode_map} \
         --cdhit-file ${cdhit_file} \
-        --title "${final_job_name}" \
-        --stats stats.json
+        --title "${final_job_name}"
     cp ${temp_name} "${file_name}"
     zip marker_ssn.xgmml.zip "${file_name}"
     rm "${file_name}"
@@ -61,6 +60,7 @@ process cgfp_identify {
     output:
         path "markers.faa", emit: "marker_file"
         path "clust.faa.clstr", emit: "cdhit"
+        path "identify_stats.json", emit: "stats"
 
     script:
     def cdhit_sid       = params.sb_cdhit_sid   ? "--clustid ${params.sb_cdhit_sid}"                        : ""
@@ -95,6 +95,12 @@ process cgfp_identify {
 
     cp \$SB_TEMP_DIR/clust/clust.faa.clstr clust.faa.clstr
 #    rm -rf \$SB_TEMP_DIR
+
+    perl $projectDir/prep/make_identify_stats.pl \
+        --condensed-fasta ${fasta_file} \
+        --markers markers.faa \
+        --cdhit-file clust.faa.clstr \
+        --stats identify_stats.json
     """
 }
 
@@ -158,5 +164,12 @@ workflow {
     cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map)
 
     marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.cluster_id_map, color_work.seqid_source_map, results.cdhit)
+
+    ssn_stats = get_cluster_stats(color_work.cluster_id_map, color_work.seqid_source_map, color_work.singletons)
+
+    files_to_merge_stream = ssn_stats.mix(results.stats)
+    files_to_merge = files_to_merge_stream.collect()
+
+    merge_stats(files_to_merge)
 }
 
