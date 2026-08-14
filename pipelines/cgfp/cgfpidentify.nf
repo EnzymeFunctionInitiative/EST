@@ -24,9 +24,8 @@ process create_marker_ssn {
     input:
         path ssn_file
         path marker_file
-        path cluster_id_map
         path metanode_map
-        path cdhit_file
+        path cdhit_table
     output:
         path "marker_ssn.xgmml.zip", emit: "marker_ssn_zip"
         path "marker_ssn.xgmml", emit: "marker_ssn"
@@ -41,9 +40,8 @@ process create_marker_ssn {
         --input ${ssn_file} \
         --output ${temp_name} \
         --marker-file ${marker_file} \
-        --cluster-map ${cluster_id_map} \
         --seqid-source-map ${metanode_map} \
-        --cdhit-file ${cdhit_file} \
+        --cdhit-table ${cdhit_table} \
         --title "${final_job_name}"
     cp ${temp_name} "${file_name}"
     zip marker_ssn.xgmml.zip "${file_name}"
@@ -122,11 +120,13 @@ process get_merged_fasta_file {
 }
 
 process create_cdhit_table {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{cdhit.tab}"
+
     input:
         path cdhit_file
         path cluster_id_map
     output:
-        "cdhit.tab"
+        path "cdhit.tab"
 
     script:
     """
@@ -163,7 +163,7 @@ workflow {
 
     cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map)
 
-    marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.cluster_id_map, color_work.seqid_source_map, results.cdhit)
+    marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.seqid_source_map, cdhit_table)
 
     ssn_stats = get_cluster_stats(color_work.cluster_id_map, color_work.seqid_source_map, color_work.singletons)
 

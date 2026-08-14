@@ -82,9 +82,10 @@ process get_fasta {
 
 
 process get_ssn_id_info {
+    publishDir params.final_output_dir, mode: "copy", pattern: "{seqid_source_map.txt}"
+
     input:
         path ssn_file
-
     output:
         path "edgelist.txt", emit: edgelist                     // Specifies the network, i.e. the edges between node network IDs
         path "index_seqid_map.txt", emit: index_seqid_map       // Maps node network ID to UniProt ID and the number of IDs in the metanode
@@ -179,7 +180,7 @@ process get_cluster_stats {
 
 
 process compute_clusters {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{cluster_num_map.txt}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{cluster_num_map.txt,cluster_id_map.txt}"
 
     input:
         path edgelist

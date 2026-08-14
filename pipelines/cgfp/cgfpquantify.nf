@@ -1,37 +1,11 @@
 
 include { merge_stats; prepareJobName; prepareSsnFilename; unzip_ssn } from "../shared/nextflow/util.nf"
-
-process merge_results {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{*.txt}"
-
-    input:
-        path result_files
-        path ssn_cluster_file
-        val base_name
-        val merge_type
-    output:
-        path "cluster_abundance${base_name}.txt", emit: "cluster"
-        path "protein_abundance${base_name}.txt", emit: "protein"
-
-    script:
-    def merge_type_arg = ""
-    if (merge_type == "normalized") {
-        merge_type_arg = "-n"
-    } else if (merge_type == "ags_normalized") {
-        if (params.ags_normalization_file && file(params.ags_normalization_file).exists()) {
-            merge_type_arg = "-g ${params.ags_normalization_file}"
-        }
-    }
-
-    """
-    python $projectDir/merge_shortbred.py \
-        ${result_files} \
-        -c ${ssn_cluster_file} \
-        -C "cluster_abundance${base_name}.txt" \
-        -p "protein_abundance${base_name}.txt" \
-        ${merge_type_arg}
-    """
-}
+include { merge_results as merge_median_raw }      from './helper/merge_results.nf'
+include { merge_results as merge_median_norm }     from './helper/merge_results.nf'
+include { merge_results as merge_median_ags }      from './helper/merge_results.nf'
+include { merge_results as merge_mean_raw }        from './helper/merge_results.nf'
+include { merge_results as merge_mean_norm }       from './helper/merge_results.nf'
+include { merge_results as merge_mean_ags }        from './helper/merge_results.nf'
 
 process compute_quantify_stats {
     input:
@@ -55,6 +29,8 @@ process create_quantify_ssn {
         path protein_results
         path cluster_results
         path metagenome_db_dir
+        path seqid_source_map
+        path cdhit_table
     output:
         path "quantify_ssn.xgmml.zip", emit: "quantify_ssn"
 
@@ -63,17 +39,15 @@ process create_quantify_ssn {
     def final_job_name = prepareJobName(default_name)
     def file_name = prepareSsnFilename(default_name)
     def temp_name = "quantify_ssn.xgmml"
-
-    def mg_ids = params.metagenome_ids.join(',')
     """
     perl $projectDir/create/create_quantify_ssn.pl \
         --input ${ssn_file} \
         --output ${temp_name} \
-        --protein-results ${protein_results} \
-        --cluster-results ${cluster_results} \
-        --metagenome-ids ${mg_ids} \
+        --protein-abundance ${protein_results} \
+        --cluster-abundance ${cluster_results} \
         --metagenome-db "${metagenome_db_dir}" \
-        --cdhit-file ${cdhit_file} \
+        --seqid-source-map ${seqid_source_map} \
+        --cdhit-table ${cdhit_table} \
         --title "${final_job_name}"
     cp ${temp_name} "${file_name}"
     zip quantify_ssn.xgmml.zip "${file_name}"
@@ -126,35 +100,38 @@ workflow {
         ssn_file = Channel.value(file(params.ssn_input))
     }
 
-    identify_stats = file(params.identify_stats)
-    markers = file(params.identify_markers)
-    cluster_file = file(params.identify_ssn_clusters)
+    identify_stats = file("${params.identify_dir}/stats.json")
+    markers = file("${params.identify_dir}/markers.faa")
+    cluster_file = file("${params.identify_dir}/cluster_id_map.txt")
+    cdhit_table = file("${params.identify_dir}/cdhit.tab")
+    seqid_source_map = file("${params.identify_dir}/seqid_source_map.txt")
     db_dir = file(params.metagenome_db_dir)
+    ags_normalization_file = file("${params.metagenome_db_dir}/AvgGenomeSize.txt")
 
     metagenome_ids_ch = Channel.from(params.metagenome_ids)
     metagenome_files = metagenome_ids_ch
         .map { id ->
-            def filePath = file("${params.metagenome_db_dir}/${id}")
+            def filePath = file("${params.metagenome_db_dir}/${id}.fasta")
             return tuple(id, filePath)
         }
 
     results = cgfp_quantify(metagenome_files, markers)
 
     median_results_ch       = results.results_median.collect()
-    median_results          = merge_results(median_results_ch, cluster_file, "", "")
-    median_norm_results     = merge_results(median_results_ch, cluster_file, "_normalized", "normalized")
-    median_ags_norm_results = merge_results(median_results_ch, cluster_file, "_genome_normalized", "ags_normalized")
+    median_results          = merge_median_raw(median_results_ch, cluster_file, ags_normalization_file, "", "")
+    median_norm_results     = merge_median_norm(median_results_ch, cluster_file, ags_normalization_file, "_normalized", "normalized")
+    median_ags_norm_results = merge_median_ags(median_results_ch, cluster_file, ags_normalization_file, "_genome_normalized", "ags_normalized")
 
     mean_results_ch         = results.results_mean.collect()
-    mean_results            = merge_results(mean_results_ch, cluster_file, "_mean", "")
-    mean_norm_results       = merge_results(mean_results_ch, cluster_file, "_normalized_mean", "normalized")
-    mean_ags_norm_results   = merge_results(mean_results_ch, cluster_file, "_genome_normalized_mean", "ags_normalized")
+    mean_results            = merge_mean_raw(mean_results_ch, cluster_file, ags_normalization_file, "_mean", "")
+    mean_norm_results       = merge_mean_norm(mean_results_ch, cluster_file, ags_normalization_file, "_normalized_mean", "normalized")
+    mean_ags_norm_results   = merge_mean_ags(mean_results_ch, cluster_file, ags_normalization_file, "_genome_normalized_mean", "ags_normalized")
 
-    create_quantify_ssn(ssn_file, median_ags_norm_results.protein, median_ags_norm_results.cluster, db_dir)
+    create_quantify_ssn(ssn_file, median_ags_norm_results.protein, median_ags_norm_results.cluster, db_dir, seqid_source_map, cdhit_table)
 
     stats = compute_quantify_stats(median_results.protein)
 
-    files_to_merge_stream = identify_stats.mix(stats)
+    files_to_merge_stream = Channel.of(identify_stats).mix(stats)
     files_to_merge = files_to_merge_stream.collect()
 
     merge_stats(files_to_merge)
