@@ -21,4 +21,13 @@ curl -sL $url > $local_file
 
 tar xvfz $local_file -C "$test_data_dir"
 
+mg_test_data_dir="$test_data_dir/metagenome"
+mg_sample_file="metagenome_sample.tar.gz"
+mg_url="$remote_dir/$mg_sample_file"
+mg_local_file="$test_data_dir/$mg_sample_file"
+
+echo "Fetching sample metagenome database from $mg_url to $mg_local_file"
+curl -sL $mg_url > $mg_local_file
+
+tar xvfz $mg_local_file -C "$mg_test_data_dir"
 

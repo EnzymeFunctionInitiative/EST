@@ -23,6 +23,7 @@ EFI_TEST_SSN_UNIREF50=
 EFI_TEST_SSN_REPNODE=
 EFI_TEST_SSN_COMPLETE_GRAPH=
 EFI_TEST_RESULTS_DIR=
+EFI_METAGENOME_DB=
 
 # loop over input arguments
 for (( index=1; index <= $#; index++ ))
@@ -160,4 +161,5 @@ export EFI_TEST_SSN_REPNODE="$DATA_DIR/ssn_repnode70.xgmml.zip"
 export EFI_TEST_SSN_COMPLETE_GRAPH="$DATA_DIR/complete_graph.xgmml"
 export EFI_TEST_ID_LIST_FILE="$DATA_DIR/gnd_id_list.txt"
 export EFI_TEST_RESULTS_DIR=$results_dir
+export EFI_METAGENOME_DB="$DATA_DIR/metagenome"
 
