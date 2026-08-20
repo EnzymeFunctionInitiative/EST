@@ -36,6 +36,7 @@ $xwriter->addAttributeHandler($handler);
 $xwriter->write();
 
 
+saveMetagenomeDesc($metagenomeInfo, $opts->{metagenome_desc});
 
 
 
@@ -53,6 +54,36 @@ $xwriter->write();
 
 
 
+
+
+
+sub saveMetagenomeDesc {
+    my $metagenomeInfo = shift;
+    my $descFile = shift;
+
+    open my $fh, ">", $descFile or die "Unable to write to metagenome description file '$descFile': $!";
+
+    my $headerWritten = 0;
+    foreach my $id (sort keys %$metagenomeInfo) {
+        if (!$headerWritten) {
+            my @headers = ("id");
+            push @headers, "body_site" if $metagenomeInfo->{$id}->{body_site};
+            push @headers, "gender" if $metagenomeInfo->{$id}->{gender};
+
+            $fh->print(join("\t", @headers), "\n");
+            $headerWritten = 1;
+            continue;
+        }
+
+        my @vals = ($id);
+        push @vals, $metagenomeInfo->{$id}->{body_site} if $metagenomeInfo->{$id}->{body_site};
+        push @vals, $metagenomeInfo->{$id}->{gender} if $metagenomeInfo->{$id}->{gender};
+
+        $fh->print(join("\t", @vals), "\n");
+    }
+
+    close $fh;
+}
 
 
 sub parseAbundanceData {
@@ -132,6 +163,7 @@ sub validateAndProcessOptions {
     $optParser->addOption("metagenome-db=s", 1, "path to metagenome database config file");
     $optParser->addOption("seqid-source-map=s", 1, "path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster", OPT_FILE);
     $optParser->addOption("cdhit-table=s", 1, "path to CD-HIT table file", OPT_FILE);
+    $optParser->addOption("metagenome-desc=s", 1, "path to output file containing metagenome description", OPT_FILE);
     $optParser->addOption("title=s", 1, "SSN title to save");
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {

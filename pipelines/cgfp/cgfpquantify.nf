@@ -22,7 +22,7 @@ process compute_quantify_stats {
 }
 
 process create_quantify_ssn {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{quantify_ssn.xgmml.zip}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{quantify_ssn.xgmml.zip,metagenome_desc.txt}"
 
     input:
         path ssn_file
@@ -33,6 +33,7 @@ process create_quantify_ssn {
         path cdhit_table
     output:
         path "quantify_ssn.xgmml.zip", emit: "quantify_ssn"
+        path "metagenome_desc.txt", emit: "metagenome_desc"
 
     script:
     def default_name = "ShortBRED Quantify"
@@ -48,6 +49,7 @@ process create_quantify_ssn {
         --metagenome-db "${metagenome_db_dir}" \
         --seqid-source-map ${seqid_source_map} \
         --cdhit-table ${cdhit_table} \
+        --metagenome-desc metagenome_desc.txt \
         --title "${final_job_name}"
     cp ${temp_name} "${file_name}"
     zip quantify_ssn.xgmml.zip "${file_name}"
