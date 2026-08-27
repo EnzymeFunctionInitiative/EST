@@ -22,6 +22,8 @@ process compute_quantify_stats {
 }
 
 process create_quantify_ssn {
+    label 'TASK_create_ssn'
+
     publishDir params.final_output_dir, mode: "copy", pattern: "{quantify_ssn.xgmml.zip,metagenome_desc.txt}"
 
     input:
@@ -58,6 +60,8 @@ process create_quantify_ssn {
 }
 
 process cgfp_quantify {
+    label 'APP_shortbred_quantify'
+
     publishDir params.final_output_dir, mode: "copy", pattern: "{*.results.median,*.results.mean}"
 
     input:
@@ -90,8 +94,7 @@ process cgfp_quantify {
         --tmp \$SB_TEMP_DIR \
         ${search_program}
 
-    #TODO:
-    #rm -rf \$SB_TEMP_DIR
+    rm -rf \$SB_TEMP_DIR
     """
 }
 

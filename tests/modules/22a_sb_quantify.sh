@@ -24,7 +24,7 @@ bash $OUTPUT_DIR/run_nextflow.sh
 
 ./bin/create_cgfpquantify_nextflow_params.py --output-dir $OUTPUT_DIR/quantify --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME --nextflow-config $CONFIG_FILE \
     --identify-dir $OUTPUT_DIR \
-    --metagenome-db $EFI_METAGENOME_DB \
+    --metagenome-db-dir $EFI_METAGENOME_DB \
     --metagenome-ids $mg_ids \
     --search-method diamond \
     --shortbred-src $EFI_SHORTBRED_SRC_DIR

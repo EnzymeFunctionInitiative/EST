@@ -24,6 +24,7 @@ EFI_TEST_SSN_REPNODE=
 EFI_TEST_SSN_COMPLETE_GRAPH=
 EFI_TEST_RESULTS_DIR=
 EFI_METAGENOME_DB=
+EFI_SHORTBRED_SRC_DIR=
 
 # loop over input arguments
 for (( index=1; index <= $#; index++ ))
@@ -93,6 +94,9 @@ do
 	elif [[ ${!index} == "--config-file" ]]; then
 		config_file="${!idx}"
 		echo "Using $config_file as the config file for database connections"
+	elif [[ ${!index} == "--shortbred-source-dir" ]]; then
+		sb_source_dir="${!idx}"
+		echo "Using $sb_source_dir as the base directory for ShortBRED source"
 	fi
 done
 
@@ -162,4 +166,5 @@ export EFI_TEST_SSN_COMPLETE_GRAPH="$DATA_DIR/complete_graph.xgmml"
 export EFI_TEST_ID_LIST_FILE="$DATA_DIR/gnd_id_list.txt"
 export EFI_TEST_RESULTS_DIR=$results_dir
 export EFI_METAGENOME_DB="$DATA_DIR/metagenome"
+export EFI_SHORTBRED_SRC_DIR=$sb_source_dir
 

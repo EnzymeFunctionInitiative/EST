@@ -19,6 +19,8 @@ process get_fasta_id_list {
 }
 
 process create_marker_ssn {
+    label 'TASK_create_ssn'
+
     publishDir params.final_output_dir, mode: "copy", pattern: "{marker_ssn.xgmml.zip,marker_ssn.xgmml,stats.json}"
 
     input:
@@ -50,6 +52,8 @@ process create_marker_ssn {
 }
 
 process cgfp_identify {
+    label 'APP_shortbred_identify'
+
     publishDir params.final_output_dir, mode: "copy", pattern: "{markers.faa}"
 
     input:
@@ -92,7 +96,7 @@ process cgfp_identify {
         ${cons_thresh}
 
     cp \$SB_TEMP_DIR/clust/clust.faa.clstr clust.faa.clstr
-#    rm -rf \$SB_TEMP_DIR
+    rm -rf \$SB_TEMP_DIR
 
     perl $projectDir/prep/make_identify_stats.pl \
         --condensed-fasta ${fasta_file} \

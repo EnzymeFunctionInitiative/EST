@@ -16,7 +16,7 @@ def add_args(parser: argparse.ArgumentParser):
     Add arguments for CGFP-Quantify pipeline to ``parser``
     """
     parser.add_argument("--identify-dir", required=True, type=str, help="The directory containing CGFP-Identify results")
-    parser.add_argument("--metagenome-db", required=True, type=str, help="Path to the metagenome database config file")
+    parser.add_argument("--metagenome-db-dir", required=True, type=str, help="Path to the metagenome database directory; must contain db.list and db.config files describing the database")
     parser.add_argument("--metagenome-ids", type=str, required=True, help="Comma separated list of metagenome IDs to use in quantify analysis")
     parser.add_argument("--search-method", type=str, choices=["diamond", "blast"])
     parser.add_argument("--shortbred-src", type=str, required=True, help="Path to base ShortBRED source directory, cloned from EFI repository")
@@ -43,8 +43,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"Metagenome database '{args.metagenome_db}' not found")
         fail = True
 
-    args.metagenome_db = os.path.abspath(args.metagenome_db)
-    args.metagenome_db_dir = args.metagenome_db
+    args.metagenome_db_dir = os.path.abspath(args.metagenome_db_dir)
     args.identify_dir = os.path.abspath(args.identify_dir)
 
     args.shortbred_src = os.path.abspath(args.shortbred_src)
@@ -67,7 +66,7 @@ def create_parser() -> argparse.ArgumentParser:
     add_args(parser)
     return parser
 
-def render_params(efi_config, efi_db, output_dir, metagenome_db, metagenome_db_dir,
+def render_params(efi_config, efi_db, output_dir, metagenome_db_dir,
         identify_dir, ssn_input, search_method, shortbred_src,
         **kwargs: dict):
     params = {
@@ -75,7 +74,6 @@ def render_params(efi_config, efi_db, output_dir, metagenome_db, metagenome_db_d
         "efi_config": efi_config,
         "efi_db": efi_db,
         "sb_identify_method": search_method,
-        "metagenome_db": metagenome_db,
         "metagenome_db_dir": metagenome_db_dir,
         "identify_dir": identify_dir,
         "ssn_input": ssn_input,

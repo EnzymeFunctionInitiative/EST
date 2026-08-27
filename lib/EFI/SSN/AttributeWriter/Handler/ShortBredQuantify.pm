@@ -60,7 +60,7 @@ sub getNodeInfo {
         }
 
         my $repId = $self->{cdhit}->{members}->{$id};
-        if ($repId and $self->{abundance}->{proteins}->{$repId}) {
+        if (defined $repId and $self->{abundance}->{proteins}->{$repId}) {
             my ($localMg, $localVals) = $self->getQuantifyVals($repId);
             push @repMgMarkers, map { "$repId - $_" } @$localMg;
         }

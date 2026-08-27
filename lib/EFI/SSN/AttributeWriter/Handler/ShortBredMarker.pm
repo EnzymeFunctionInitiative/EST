@@ -57,7 +57,7 @@ sub getNodeInfo {
         $seedsInNode{$id} = undef if $self->{cdhit}->{representatives}->{$id};
 
         my $seedId = $self->{cdhit}->{members}->{$id};
-        $seedsOfNode{$seedId} = undef if $seedId;
+        $seedsOfNode{$seedId} = undef if defined $seedId;
 
         next if not exists $self->{marker_data}->{$id};
 
