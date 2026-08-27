@@ -67,8 +67,8 @@ ENV PATH="${PATH}:/opt/muscle"
 
 # install USEARCH
 RUN mkdir -p /opt/usearch && \
-    curl -L -o /opt/usearch/usearch9 https://raw.githubusercontent.com/rcedgar/usearch_old_binaries/main/bin/usearch9.2.64_i86linux64 && \
-    chmod +x /opt/usearch/usearch9
+    curl -L -o /opt/usearch/usearch https://raw.githubusercontent.com/rcedgar/usearch_old_binaries/main/bin/usearch9.2.64_i86linux64 && \
+    chmod +x /opt/usearch/usearch
 ENV PATH="${PATH}:/opt/usearch"
 
 # install Clustal Omega
@@ -92,4 +92,8 @@ RUN mkdir -p /opt/diamond && \
     tar zxf /opt/diamond/diamond.tar.gz -C /opt/diamond && \
     rm /opt/diamond/diamond.tar.gz
 ENV PATH="${PATH}:/opt/diamond"
+
+RUN mkdir -p /opt/shortbred && \
+    git clone https://github.com/EnzymeFunctionInitiative/shortbred-src.git /opt/shortbred
+ENV PATH="${PATH}:/opt/shortbred"
 
