@@ -72,7 +72,7 @@ sub saveMetagenomeDesc {
 
             $fh->print(join("\t", @headers), "\n");
             $headerWritten = 1;
-            continue;
+            next;
         }
 
         my @vals = ($id);
