@@ -72,16 +72,16 @@ process cgfp_quantify {
     def sb_src          = ""
     if (params.sb_identify_method == "diamond") {
         search_program  = "--search_program diamond"
-        sb_src          = "shortbred_diamond"
+        sb_src          = "${params.shortbred_src_dir}/shortbred_diamond"
     } else if (params.sb_identify_method) {
-        sb_src          = "shortbred_blast"
+        sb_src          = "${params.shortbred_src_dir}/shortbred_blast"
     }
 
     """
     SB_TEMP_DIR=quantify-temp/${mg_id}
     mkdir -p \$SB_TEMP_DIR
 
-    python $projectDir/shortbred/${sb_src}/shortbred_quantify.py \
+    python ${sb_src}/shortbred_quantify.py \
         --threads ${params.sb_quantify_threads} \
         --markers ${marker_file} \
         --wgs ${mg_file} \
