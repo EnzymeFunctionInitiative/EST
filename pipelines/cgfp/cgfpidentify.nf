@@ -85,7 +85,7 @@ process cgfp_identify {
         --markers markers.faa \
         --tmp \$SB_TEMP_DIR \
         --muscle muscle3 \
-        --usearch usearch9 \
+        --usearch usearch \
         ${search_program} \
         ${diamond_sens} \
         ${cdhit_sid} \
