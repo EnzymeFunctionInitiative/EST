@@ -26,6 +26,7 @@ bash $OUTPUT_DIR/run_nextflow.sh
     --identify-dir $OUTPUT_DIR \
     --metagenome-db $EFI_METAGENOME_DB \
     --metagenome-ids $mg_ids \
-    --search-method diamond
+    --search-method diamond \
+    --shortbred-src $EFI_SHORTBRED_SRC_DIR
 bash $OUTPUT_DIR/quantify/run_nextflow.sh
 
