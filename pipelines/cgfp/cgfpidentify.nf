@@ -73,16 +73,16 @@ process cgfp_identify {
     if (params.sb_identify_method == "diamond") {
         diamond_sens    = params.sb_diamond_sensitivity ? "--diamond-sensitivity ${params.sb_diamond_sensitivity}" : ""
         search_program  = "--search_program diamond"
-        sb_src          = "shortbred_diamond"
+        sb_src          = "${params.shortbred_src_dir}/shortbred_diamond"
     } else if (params.sb_identify_method) {
-        sb_src          = "shortbred_blast"
+        sb_src          = "${params.shortbred_src_dir}/shortbred_blast"
     }
 
     """
     SB_TEMP_DIR=id-temp
     mkdir \$SB_TEMP_DIR
 
-    python $projectDir/shortbred/${sb_src}/shortbred_identify.py \
+    python ${sb_src}/shortbred_identify.py \
         --threads ${params.sb_identify_threads} \
         --goi ${fasta_file} \
         --refdb ${ref_db} \

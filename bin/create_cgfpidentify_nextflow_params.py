@@ -20,6 +20,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument("--search-method", type=str, choices=["diamond", "blast"])
     parser.add_argument("--cdhit-sid", type=float, required=False, default=0.85, help="The sequence identity parameter for determining ShrotBRED consensus sequence families, ranging between 0 and 1")
     parser.add_argument("--ref-fasta-db", type=str, required=True, help="Path to reference database used to evaluate markers")
+    parser.add_argument("--shortbred-src", type=str, required=True, help="Path to base ShortBRED source directory, cloned from EFI repository")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -57,6 +58,7 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         args.ssn_input = os.path.abspath(args.ssn_input)
         args.fasta_db = os.path.abspath(args.fasta_db)
         args.ref_fasta_db = os.path.abspath(args.ref_fasta_db)
+        args.shortbred_src = os.path.abspath(args.shortbred_src)
         return args
     
 def create_parser() -> argparse.ArgumentParser:
@@ -65,7 +67,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir,
-        search_method, cdhit_sid, ref_fasta_db,
+        search_method, cdhit_sid, ref_fasta_db, shortbred_src,
         **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
@@ -76,6 +78,7 @@ def render_params(ssn_input, efi_config, efi_db, fasta_db, output_dir,
         "sb_search_refdb": ref_fasta_db,
         "sb_cdhit_sid": cdhit_sid,
         "sb_identify_method": search_method,
+        "shortbred_src_dir": shortbred_src,
     }
 
     # Handle kwargs dict, assuming each entry is a parameter to be added to params

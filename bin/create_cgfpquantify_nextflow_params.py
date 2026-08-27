@@ -39,8 +39,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
         print(f"Input CGFP-Identify results dir '{args.identify_dir}' does not exist")
         fail = True
 
-    if len(glob.glob(f"{args.metagenome_db}/*")) == 0:
-        print(f"Metagenome database '{args.metagenome_db}' not found")
+    if len(glob.glob(f"{args.metagenome_db_dir}/*")) == 0:
+        print(f"Metagenome database '{args.metagenome_db_dir}' not found")
         fail = True
 
     args.metagenome_db_dir = os.path.abspath(args.metagenome_db_dir)
