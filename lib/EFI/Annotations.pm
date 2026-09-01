@@ -436,7 +436,7 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_UNIREF100_CLUSTER_SIZE,field_type => "ssn",                                    display => "UniRef100 Cluster Size",                        ssn_num_type => 1};
         push @fields, {name => "User_IDs_in_Cluster",       field_type => "ssn",                                    display => "User IDs in Cluster",                                               ssn_list_type => 1};
 
-        push @fields, {name => "is_fragment",               field_type => "db",     type_spec => "BOOL",            display => "Sequence Status",               base_ssn => 1,                                          db_primary_col => 1,index_name => "is_fragment_idx"};
+        push @fields, {name => FIELD_IS_FRAGMENT,           field_type => "db",     type_spec => "BOOL",            display => "Sequence Status",               base_ssn => 1,                                          db_primary_col => 1,index_name => "is_fragment_idx"};
         push @fields, {name => "oc_domain",                 field_type => "db",                                     display => "",                                                                                                                      json_type_spec => "str",    db_hidden => 1};
         push @fields, {name => FIELD_COLOR_SEQ_NUM,         field_type => "color",                                  display => "Sequence Count Cluster Number"};
         push @fields, {name => FIELD_COLOR_NODE_NUM,        field_type => "color",                                  display => "Node Count Cluster Number"};
@@ -455,6 +455,11 @@ sub get_annotation_fields {
         push @fields, {name => FIELD_NB_CONN_COLOR,         field_type => "nb_conn",                                display => "Neighborhood Connectivity Color"};
         push @fields, {name => FIELD_NB_CONN,               field_type => "nb_conn",                                display => "Neighborhood Connectivity"};
         push @fields, {name => FIELD_NB_CONN_PRIMARY_COLOR, field_type => "nb_conn",                                display => FIELD_CYTOSCAPE_COLOR};
+
+        push @fields, {name => "sb_identify_seed_seq",      field_type => "sb_identify",                            display => "Seed Sequence(s)"};
+        push @fields, {name => "sb_identify_seq_clusters",  field_type => "sb_identify",                            display => "Seed Sequence Cluster(s)"};
+        push @fields, {name => "sb_identify_marker_types",  field_type => "sb_identify",                            display => "Marker Types"};
+        push @fields, {name => "sb_identify_marker_count",  field_type => "sb_identify",                            display => "Number of Markers"};
 
         $self->{fields} = \@fields;
     }
@@ -683,6 +688,18 @@ sub get_gnt_info_insert_location {
 sub get_nb_connectivity_insert_location {
     my $self = shift;
     return $self->get_annotation_data()->{&FIELD_SEQ_SRC_KEY}->{display};
+}
+
+
+sub get_sb_identify_insert_location {
+    my $self = shift;
+    return $self->get_annotation_data()->{&FIELD_IS_FRAGMENT}->{display};
+}
+
+
+sub get_sb_quantify_insert_location {
+    my $self = shift;
+    return $self->get_annotation_data()->{&FIELD_IS_FRAGMENT}->{display};
 }
 
 
@@ -1259,6 +1276,44 @@ A string representing a SSN column heading (e.g. display name).
     if ($currentSsnColName eq $name) {
         # Insert a copy of the current SSN column
         # Append the neighborhood connectivity data
+    }
+
+
+=head3 C<get_sb_identify_insert_location()>
+
+Returns the name of the SSN column where the CGFP/ShortBRED identify columns should be
+inserted.  This is designed so that the new columns will be inserted immediately following
+the returned column name.
+
+=head4 Returns
+
+A string representing a SSN column heading (e.g. display name).
+
+=head4 Example Usage
+
+    my $name = $anno->get_sb_identify_insert_location();
+    if ($currentSsnColName eq $name) {
+        # Insert a copy of the current SSN column
+        # Append the data
+    }
+
+
+=head3 C<get_sb_quantify_insert_location()>
+
+Returns the name of the SSN column where the CGFP/ShortBRED quantify columns should be
+inserted.  This is designed so that the new columns will be inserted immediately following
+the returned column name.
+
+=head4 Returns
+
+A string representing a SSN column heading (e.g. display name).
+
+=head4 Example Usage
+
+    my $name = $anno->get_sb_identify_insert_location();
+    if ($currentSsnColName eq $name) {
+        # Insert a copy of the current SSN column
+        # Append the data
     }
 
 

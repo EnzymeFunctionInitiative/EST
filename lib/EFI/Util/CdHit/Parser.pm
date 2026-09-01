@@ -5,7 +5,25 @@ use strict;
 use warnings;
 
 use Exporter qw(import);
-our @EXPORT_OK = qw(parse_cdhit_clstr print_cluster_summary);
+our @EXPORT_OK = qw(parse_cdhit_clstr print_cluster_summary remap_cdhit_clusters);
+
+
+sub remap_cdhit_clusters {
+    my $cdhitClusters = shift;
+
+    my %clusters;
+    my %members;
+
+    foreach my $clusterId (keys %$cdhitClusters) {
+        my $repId = $cdhitClusters->{$clusterId}->{representative};
+        $clusters{ $repId } = undef;
+        foreach my $memberId (@{ $cdhitClusters->{$clusterId}->{members} }) {
+            $members{$memberId} = $repId if $memberId ne $repId; # Only include non-seed (i.e. representative) IDs in the members list
+        }
+    }
+
+    return { representatives => \%clusters, members => \%members };
+}
 
 
 sub parse_cdhit_clstr {

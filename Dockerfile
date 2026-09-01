@@ -13,6 +13,7 @@ RUN apt update && apt install -y \
     libpng-dev \
     unzip \
     zip \
+    ncbi-blast+ \
     && rm -rf /var/lib/apt/lists/*
 #    libc6-i386 \
 
@@ -64,10 +65,9 @@ RUN curl -L -o /opt/muscle/muscle3 https://github.com/EnzymeFunctionInitiative/M
     chmod +x /opt/muscle/muscle3
 ENV PATH="${PATH}:/opt/muscle"
 
-# install USEARCH (Free 32-bit version)
-# note: 32-bit requires libc6-i386 (installed in apt-get step above)
+# install USEARCH
 RUN mkdir -p /opt/usearch && \
-    curl -L -o /opt/usearch/usearch https://github.com/rcedgar/usearch12/releases/download/v12.0-beta1/usearch_linux_arch64_12.0-beta && \
+    curl -L -o /opt/usearch/usearch https://raw.githubusercontent.com/rcedgar/usearch_old_binaries/main/bin/usearch9.2.64_i86linux64 && \
     chmod +x /opt/usearch/usearch
 ENV PATH="${PATH}:/opt/usearch"
 
@@ -87,4 +87,13 @@ RUN curl -o /opt/hmmer.tar.gz http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
     make install
 ENV PATH="${PATH}:/opt/hmmer-3.4/bin"
 
+RUN mkdir -p /opt/diamond && \
+    curl -L -o /opt/diamond/diamond.tar.gz https://github.com/bbuchfink/diamond/releases/download/v2.2.4/diamond-linux64.tar.gz && \
+    tar zxf /opt/diamond/diamond.tar.gz -C /opt/diamond && \
+    rm /opt/diamond/diamond.tar.gz
+ENV PATH="${PATH}:/opt/diamond"
+
+RUN mkdir -p /opt/shortbred && \
+    git clone https://github.com/EnzymeFunctionInitiative/shortbred-src.git /opt/shortbred
+ENV PATH="${PATH}:/opt/shortbred"
 
