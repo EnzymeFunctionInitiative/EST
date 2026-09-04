@@ -34,7 +34,7 @@ do
 	# check if this argument matches a parameter string
 	if [[ ${!index} == '--help' ]]; then
 		echo "Usage: source tests/test_env.sh [--db-type mysql|sqlite --data-dir /path --results-dir /path]
-    [--db-name database_name_or_path --fasta-db blast_db --config-file /path/file]
+    [--db-name database_name_or_path --fasta-db blast_db --config-file /path/file --shortbred-source-dir /path/to/shortbred-src/repo]
 
     Description:
         Sets the environment variables necessary for running tests on the EFI
@@ -61,6 +61,10 @@ do
                         connect to a database; test datasets contain a default
                         configuration file, and this option can be used to
                         connect tests to external databases
+	--shortbred-source-dir
+			path to the root directory of the
+			EnzymeFunctionInitiative/shortbred-src repo, which
+			contains the updated shortbred source codes.
         --help          prints this message
 "
 		return
@@ -94,6 +98,7 @@ do
 	elif [[ ${!index} == "--config-file" ]]; then
 		config_file="${!idx}"
 		echo "Using $config_file as the config file for database connections"
+	# manually specify the global path to the shortbred-src repo directory
 	elif [[ ${!index} == "--shortbred-source-dir" ]]; then
 		sb_source_dir="${!idx}"
 		echo "Using $sb_source_dir as the base directory for ShortBRED source"
