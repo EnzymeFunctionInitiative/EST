@@ -7,7 +7,7 @@ import os
 
 import shared_args
 
-NXF_SCRIPT = "pipelines/cgfp/cgfpidentify.nf"
+NXF_SCRIPT = "pipelines/cgfpidentify/cgfpidentify.nf"
 DEFAULT_MAX_MSA_SEQ = 750
 DEFAULT_MIN_MSA_SEQ = 3
 
