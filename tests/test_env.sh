@@ -62,10 +62,10 @@ do
                         connect to a database; test datasets contain a default
                         configuration file, and this option can be used to
                         connect tests to external databases
-	--shortbred-source-dir
-			path to the root directory of the
-			EnzymeFunctionInitiative/shortbred-src repo, which
-			contains the updated shortbred source codes.
+        --shortbred-source-dir
+                        path to the root directory of the
+                        EnzymeFunctionInitiative/shortbred-src repo, which
+                        contains the updated shortbred source codes.
         --help          prints this message
 "
 		return
@@ -103,9 +103,9 @@ do
 	elif [[ ${!index} == "--shortbred-source-dir" ]]; then
 		sb_source_dir="${!idx}"
 		echo "Using $sb_source_dir as the base directory for ShortBRED source"
-    elif [[ ${!index} == "--metagenome-db-dir" ]]; then
-        metagenome_db_dir="${!idx}"
-        echo "Using $metagenome_db_dir as the metagenome database directory"
+	elif [[ ${!index} == "--metagenome-db-dir" ]]; then
+		metagenome_db_dir="${!idx}"
+		echo "Using $metagenome_db_dir as the metagenome database directory"
 	fi
 done
 
