@@ -58,14 +58,14 @@ process merge_stats {
     publishDir params.final_output_dir, mode: "copy"
 
     input:
-        path stats_files
+        path stats_files, stageAs: 'inputs/*'
 
     output:
         path "stats.json"
 
     script:
     """
-    python $projectDir/../shared/python/merge_stats.py --input ${stats_files} --output stats.json
+    python $projectDir/../shared/python/merge_stats.py --input inputs/* --output stats.json
     """
 }
 
