@@ -13,32 +13,35 @@ def add_args(parser):
     Add arguments for SSN pipeline parameters to ``parser``
     """
     # SSN creation parameters
-    ssn_args_parser = argparse.ArgumentParser(add_help=False).add_argument_group("SSN Creation Options")
-    ssn_args_parser.add_argument("--threshold-metric", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], default="alignment_score", help="Parameter to filter edges on")
-    ssn_args_parser.add_argument("--threshold-min-val", required=True, type=float, help="Retain rows where threshold metric >= this value")
-    ssn_args_parser.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
-    ssn_args_parser.add_argument("--min-length", help="Minimum required sequence length")
-    ssn_args_parser.add_argument("--max-length", help="Maximum sequence length to allow")
-    ssn_args_parser.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
-    ssn_args_parser.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
-    ssn_args_parser.add_argument("--maxfull", default=0)
-    ssn_args_parser.add_argument("--compute-ssn-nc-factor", action="store_true", help="Numbers and colors the clusters in the SSN")
+    ssn_args_parser = argparse.ArgumentParser(add_help=False)
+    ssn_args_group = ssn_args_parser.add_argument_group("SSN Creation Options")
+    ssn_args_group.add_argument("--threshold-metric", choices=["pident", "alignment_length", "bitscore", "query_length", "subject_length", "alignment_score"], default="alignment_score", help="Parameter to filter edges on")
+    ssn_args_group.add_argument("--threshold-min-val", required=True, type=float, help="Retain rows where threshold metric >= this value")
+    ssn_args_group.add_argument("--filter", action="append", type=str, help="Filter sequences, use multiple times to indicate filter types")
+    ssn_args_group.add_argument("--min-length", help="Minimum required sequence length")
+    ssn_args_group.add_argument("--max-length", help="Maximum sequence length to allow")
+    ssn_args_group.add_argument("--ssn-name", required=True, type=str, help="Name for the SSN file")
+    ssn_args_group.add_argument("--job-name", required=True, help="Title to be included as metadata in the XGMML file")
+    ssn_args_group.add_argument("--maxfull", default=0)
+    ssn_args_group.add_argument("--compute-ssn-nc-factor", action="store_true", help="Numbers and colors the clusters in the SSN")
 
     # Add a subparser for automatically populating from EST output dir
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
     # automatically pull parameters from EST results and params file
-    autoparam_parser = subparsers.add_parser("auto", help="Autopopulate SSN parameters from EST directory", parents=[ssn_args_parser]).add_argument_group("EST-related parameters")
-    autoparam_parser.add_argument("--est-output-dir", type=str, required=True, help="The EST output directory to use for parameter autopopulation")
+    autoparam_parser = subparsers.add_parser("auto", help="Autopopulate SSN parameters from EST directory", parents=[ssn_args_parser])
+    autoparam_group = autoparam_parser.add_argument_group("EST-related parameters")
+    autoparam_group.add_argument("--est-output-dir", type=str, required=True, help="The EST output directory to use for parameter autopopulation")
     shared_args.add_args(autoparam_parser, use_output_dir=False)
 
     # If not in auto mode, manually specify the location of the results files
-    manual_parser = subparsers.add_parser("manual", help="Manually specify parameters related to EST output", parents=[ssn_args_parser]).add_argument_group("EST-related parameters")
-    manual_parser.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
-    manual_parser.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
-    manual_parser.add_argument("--seq-meta-file", required=True, type=str, help="EST sequence metadata file to get basic metadata from")
-    manual_parser.add_argument("--source-ids-file", required=True, type=str, help="EST accession ID table file to get IDs from, for filtering")
-    manual_parser.add_argument("--db-version", default=100, help="Indicates the version of the EFI database that was used to generate the network")
+    manual_parser = subparsers.add_parser("manual", help="Manually specify parameters related to EST output", parents=[ssn_args_parser])
+    manual_group = manual_parser.add_argument_group("EST-related parameters")
+    manual_group.add_argument("--blast-parquet", required=True, type=str, help="Parquet file representing edges from EST pipeline, usually called 1.out.parquet")
+    manual_group.add_argument("--fasta-file", required=True, type=str, help="FASTA file to create SSN from")
+    manual_group.add_argument("--seq-meta-file", required=True, type=str, help="EST sequence metadata file to get basic metadata from")
+    manual_group.add_argument("--source-ids-file", required=True, type=str, help="EST accession ID table file to get IDs from, for filtering")
+    manual_group.add_argument("--db-version", default=100, help="Indicates the version of the EFI database that was used to generate the network")
     shared_args.add_args(manual_parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
