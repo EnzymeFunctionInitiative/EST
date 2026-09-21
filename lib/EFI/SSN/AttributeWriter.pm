@@ -66,7 +66,9 @@ sub write {
 
     my $stats = { num_nodes => 0, num_edges => 0 };
 
-    while ($reader->read) {
+    my $hasNodes = $reader->read();
+
+    while ($hasNodes) {
         my $ntype = $reader->nodeType;
         my $nname = $reader->name;
 
@@ -87,21 +89,28 @@ sub write {
                     $h->onNodeEnd();
                 }
             }
+            $hasNodes = $reader->read();
         } elsif ($nname eq "att") {
             if ($ntype == XML_READER_TYPE_ELEMENT) {
                 $self->processAttElementStart();
             } elsif ($ntype == XML_READER_TYPE_END_ELEMENT) {
                 $self->processAttElementEnd();
             }
+            $hasNodes = $reader->read();
         } elsif ($nname eq "edge") {
-            $self->copyEdge();
-            $stats->{num_edges}++ if $ntype == XML_READER_TYPE_ELEMENT; # increment if start element
+            if ($ntype == XML_READER_TYPE_ELEMENT) {
+                $self->copyEdge();
+                $stats->{num_edges}++;
+            } else {
+                $hasNodes = $reader->read();
+            }
         } else {
             if ($nname eq "graph") {
                 $self->processGraphElement($ntype);
             } else {
                 $self->copyElementWithoutNamespace($ntype);
             }
+            $hasNodes = $reader->read();
         }
     }
 

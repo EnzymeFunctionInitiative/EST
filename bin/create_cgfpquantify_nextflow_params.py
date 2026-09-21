@@ -19,7 +19,7 @@ def add_args(parser: argparse.ArgumentParser):
     parser.add_argument("--metagenome-db-dir", required=True, type=str, help="Path to the metagenome database directory; must contain db.list and db.config files describing the database")
     parser.add_argument("--metagenome-ids", type=str, required=True, help="Comma separated list of metagenome IDs to use in quantify analysis")
     parser.add_argument("--search-method", type=str, choices=["diamond", "blast"])
-    parser.add_argument("--shortbred-src", type=str, required=True, help="Path to base ShortBRED source directory, cloned from EFI repository")
+    parser.add_argument("--shortbred-src", type=str, required=False, help="Path to base ShortBRED source directory, cloned from EFI repository")
     shared_args.add_args(parser)
 
 def check_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -46,7 +46,8 @@ def check_args(args: argparse.Namespace) -> argparse.Namespace:
     args.metagenome_db_dir = os.path.abspath(args.metagenome_db_dir)
     args.identify_dir = os.path.abspath(args.identify_dir)
 
-    args.shortbred_src = os.path.abspath(args.shortbred_src)
+    if args.shortbred_src:
+        args.shortbred_src = os.path.abspath(args.shortbred_src)
 
     args.ssn_input = os.path.join(args.identify_dir, "marker_ssn.xgmml")
 
@@ -67,7 +68,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 def render_params(efi_config, efi_db, output_dir, metagenome_db_dir,
-        identify_dir, ssn_input, search_method, shortbred_src,
+        identify_dir, ssn_input, search_method, shortbred_src=None,
         **kwargs: dict):
     params = {
         "final_output_dir": output_dir,
@@ -77,8 +78,12 @@ def render_params(efi_config, efi_db, output_dir, metagenome_db_dir,
         "metagenome_db_dir": metagenome_db_dir,
         "identify_dir": identify_dir,
         "ssn_input": ssn_input,
-        "shortbred_src_dir": shortbred_src,
     }
+
+    if shortbred_src is not None:
+        params |= {
+            "shortbred_src_dir": shortbred_src,
+        }
 
     # Handle kwargs dict, assuming each entry is a parameter to be added to params
     params.update(kwargs)

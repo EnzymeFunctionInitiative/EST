@@ -8,6 +8,7 @@ db_name=
 fasta_db=
 blast_import_fasta_db=
 config_file=
+metagenome_db_dir=
 EFI_DB_NAME=
 EFI_TEST_ENV=
 EFI_TEST_DATA_DIR=
@@ -102,6 +103,9 @@ do
 	elif [[ ${!index} == "--shortbred-source-dir" ]]; then
 		sb_source_dir="${!idx}"
 		echo "Using $sb_source_dir as the base directory for ShortBRED source"
+    elif [[ ${!index} == "--metagenome-db-dir" ]]; then
+        metagenome_db_dir="${!idx}"
+        echo "Using $metagenome_db_dir as the metagenome database directory"
 	fi
 done
 
@@ -153,6 +157,10 @@ if [[ -z "$blast_import_fasta_db" ]]; then
     blast_import_fasta_db="$DATA_DIR/blastdb/uniref50.fasta"
 fi
 
+if [[ -z "$metagenome_db_dir" ]]; then
+    metagenome_db_dir="$DATA_DIR/metagenome"
+fi
+
 
 export EFI_DATA_DIR=$data_dir
 export EFI_CONFIG_FILE=$config_file
@@ -170,6 +178,6 @@ export EFI_TEST_SSN_REPNODE="$DATA_DIR/ssn_repnode70.xgmml.zip"
 export EFI_TEST_SSN_COMPLETE_GRAPH="$DATA_DIR/complete_graph.xgmml"
 export EFI_TEST_ID_LIST_FILE="$DATA_DIR/gnd_id_list.txt"
 export EFI_TEST_RESULTS_DIR=$results_dir
-export EFI_METAGENOME_DB="$DATA_DIR/metagenome"
+export EFI_METAGENOME_DB=$metagenome_db_dir
 export EFI_SHORTBRED_SRC_DIR=$sb_source_dir
 
