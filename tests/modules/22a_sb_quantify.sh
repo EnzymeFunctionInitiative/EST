@@ -12,6 +12,10 @@ CONFIG_FILE=$2
 self=$(basename "$0" .sh)
 OUTPUT_DIR="$TEST_RESULTS_DIR/$self"
 
+if [[ -n "$EFI_SHORTBRED_SRC_DIR" ]]; then
+    shortbred_src_arg="--shortbred-src $EFI_SHORTBRED_SRC_DIR"
+fi
+
 rm -rf $OUTPUT_DIR
 
 mg_ids="SRS011263,SRS011397,SRS012291,SRS014464,SRS015051,SRS016188"
@@ -20,7 +24,7 @@ mg_ids="SRS011263,SRS011397,SRS012291,SRS014464,SRS015051,SRS016188"
     --search-method diamond \
     --cdhit-sid 0.85 \
     --ref-fasta-db $EFI_FASTA_DB \
-    --shortbred-src $EFI_SHORTBRED_SRC_DIR
+    $shortbred_src_arg
 bash $OUTPUT_DIR/run_nextflow.sh
 
 ./bin/create_cgfpquantify_nextflow_params.py --output-dir $OUTPUT_DIR/quantify --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME --nextflow-config $CONFIG_FILE \
@@ -28,6 +32,6 @@ bash $OUTPUT_DIR/run_nextflow.sh
     --metagenome-db-dir $EFI_METAGENOME_DB \
     --metagenome-ids $mg_ids \
     --search-method diamond \
-    --shortbred-src $EFI_SHORTBRED_SRC_DIR
+    $shortbred_src_arg
 bash $OUTPUT_DIR/quantify/run_nextflow.sh
 
