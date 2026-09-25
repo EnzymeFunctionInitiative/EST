@@ -57,7 +57,7 @@ process cdhit_reduce {
     cd-hit -c 1 -s 1 \
            -i ${fasta} \
            -o ${id}_cdhit.fasta \
-           -M -M ${memoryBudget(task.memory, 0.9).toMega()} \
+           -M ${memoryBudget(task.memory, 0.9).toMega()} \
            -T ${task.cpus}
     """
 }

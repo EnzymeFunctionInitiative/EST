@@ -122,7 +122,7 @@ process condense_redundant {
     cd-hit -d 0 -c 1 -s 1 \
            -i ${fasta_file} \
            -o sequences.fasta \
-           -M ${task.memory.toMega()} \
+           -M ${memoryBudget(task.memory, 0.9).toMega()} \
            -T ${task.cpus}
     """
 }
