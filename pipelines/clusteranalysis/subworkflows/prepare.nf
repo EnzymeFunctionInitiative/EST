@@ -1,4 +1,6 @@
 
+include { memoryBudget } from "../../shared/nextflow/util.nf"
+
 process subset_fasta {
     tag "ca_sample_${id}"
 
@@ -55,7 +57,7 @@ process cdhit_reduce {
     cd-hit -c 1 -s 1 \
            -i ${fasta} \
            -o ${id}_cdhit.fasta \
-           -M ${task.memory.toMega()} \
+           -M -M ${memoryBudget(task.memory, 0.9).toMega()} \
            -T ${task.cpus}
     """
 }

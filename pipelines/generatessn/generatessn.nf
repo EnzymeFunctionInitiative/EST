@@ -219,7 +219,7 @@ process compute_repnode_cdhit {
            -i ${all_fasta} \
            -o cdhit_${repnode_pct} \
            ${algo_opt} ${bandwidth_opt} \
-           -M ${task.memory.toMega()} \
+           -M ${memoryBudget(task.memory, 0.9).toMega()} \
            -T ${task.cpus}
     """
 }
