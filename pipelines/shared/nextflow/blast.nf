@@ -1,3 +1,5 @@
+include { memoryBudget } from "./util.nf"
+
 
 process all_by_all_blast {
     label 'TASK_axa'
@@ -30,7 +32,7 @@ process all_by_all_blast {
         --blast-output ${frac}.tab.parquet \
         --sql-template $projectDir/../shared/templates/prereduce-template.sql \
         --output-file ${frac}.tab.sorted.parquet \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file prereduce.sql
@@ -57,7 +59,7 @@ process blastreduce_old {
         --blast-output $blast_files \
         --sql-template $projectDir/../shared/templates/reduce-template.sql \
         --fasta-length-parquet $fasta_length_parquet \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file allreduce.sql
@@ -81,7 +83,7 @@ process blastreduce {
     python $projectDir/../shared/blastreduce/map_blast_reduce.py \
         --blast-output ${blast_files} \
         --fasta-length-parquet ${fasta_length_parquet} \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --output-file 1.out.parquet
@@ -160,7 +162,7 @@ process restore_condensed_old {
     python $projectDir/../shared/condense/render_restore_sql_template.py \
         --blast-parquet $blast_parquet \
         --sql-template $projectDir/../shared/templates/restore-template.sql \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --sql-output-file restore.sql
@@ -194,7 +196,7 @@ process restore_condensed {
         --cd-hit-cluster ${condensed} \
         --condensed-blast reduced.parquet \
         --output-file 1.out.parquet \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP}
     rm -Rf \${DUCKDB_TEMP}
@@ -219,7 +221,7 @@ process remove_self_alignments {
     python $projectDir/../shared/condense/remove_self_alignments.py \
         --condensed-blast reduced.parquet \
         --output-file 1.out.parquet \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP}
     rm -Rf \${DUCKDB_TEMP}
