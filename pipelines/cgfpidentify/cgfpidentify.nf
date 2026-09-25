@@ -83,7 +83,7 @@ process cgfp_identify {
     mkdir \$SB_TEMP_DIR
 
     python ${sb_src}/shortbred_identify.py \
-        --threads ${params.sb_identify_threads} \
+        --threads ${task.cpus} \
         --goi ${fasta_file} \
         --refdb ${ref_db} \
         --markers markers.faa \
