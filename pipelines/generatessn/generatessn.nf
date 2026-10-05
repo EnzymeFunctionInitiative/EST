@@ -2,7 +2,7 @@
 include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids; get_sunburst_data; get_user_filter_file } from "../shared/nextflow/sequence.nf"
-include { prepareJobName; prepareSsnFilename; merge_stats } from "../shared/nextflow/util.nf"
+include { memoryBudget; prepareJobName; prepareSsnFilename; merge_stats } from "../shared/nextflow/util.nf"
 
 process import_data {
     input:
@@ -46,7 +46,7 @@ process threshold_blast {
         --min-length ${params.min_length} \
         --max-length ${params.max_length} \
         --sql-template $projectDir/templates/thresholdblast-template.sql \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --output-file 2.out \
@@ -219,7 +219,7 @@ process compute_repnode_cdhit {
            -i ${all_fasta} \
            -o cdhit_${repnode_pct} \
            ${algo_opt} ${bandwidth_opt} \
-           -M ${task.memory.toMega()} \
+           -M ${memoryBudget(task.memory, 0.9).toMega()} \
            -T ${task.cpus}
     """
 }
