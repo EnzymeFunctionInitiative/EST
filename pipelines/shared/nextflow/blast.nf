@@ -4,6 +4,9 @@ include { memoryBudget } from "./util.nf"
 process all_by_all_blast {
     label 'TASK_axa'
 
+    cpus params.blastp_threads
+    memory params.blastp_memory_limit
+
     input:
         tuple val(fid), path(blast_db_files, arity: 5), val(blast_db_name), path(frac)
 
