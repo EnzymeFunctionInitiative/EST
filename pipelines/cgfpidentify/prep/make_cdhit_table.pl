@@ -7,7 +7,7 @@ use FindBin;
 use lib "$FindBin::Bin/../../../lib";
 
 use EFI::Options;
-use EFI::SSN::Util::ID qw(invert_cluster_map parse_cluster_map_file);
+use EFI::SSN::Util::ID qw(invert_cluster_map parse_cluster_map_file parse_metanode_map_file parse_singletons_file resolve_mapping);
 use EFI::Util::CdHit::Parser qw(parse_cdhit_clstr);
 use EFI::Util::Colors;
 
@@ -22,8 +22,17 @@ my $opts = validateAndProcessOptions();
 my $cdhitClusters = parse_cdhit_clstr($opts->{cdhit_file});
 
 my (undef, $clusterToSeqMap) = parse_cluster_map_file($opts->{cluster_map});
-my $clusterMap = invert_cluster_map($clusterToSeqMap);
 
+my ($idType, $sourceIdMap) = parse_metanode_map_file($opts->{seqid_source_map});
+
+my $fullClusterToId = resolve_mapping($clusterToSeqMap, $idType, $sourceIdMap);
+
+my $clusterMap = invert_cluster_map($fullClusterToId);
+
+my $singletons = parse_singletons_file($opts->{singletons});
+
+my $c = 0;
+my %singletons = map { $c++; $_ => "S$c" } @$singletons;
 
 
 
@@ -37,7 +46,7 @@ foreach my $cdhitClusterId (sort keys %$cdhitClusters) {
     my $data = $cdhitClusters->{$cdhitClusterId};
 
     foreach my $member (@{ $data->{members} }) {
-        my $clusterNum = $clusterMap->{$member} // "N/A";
+        my $clusterNum = $clusterMap->{$member} // $singletons{$member} // "N/A";
         $fh->print(join("\t", $clusterNum, $data->{representative}, $member, $color), "\n");
     }
 }
@@ -61,6 +70,8 @@ sub validateAndProcessOptions {
 
     $optParser->addOption("cdhit-file=s", 1, "path to CD-HIT .clstr file output from ShortBRED", OPT_FILE);
     $optParser->addOption("cluster-map=s", 1, "path to file mapping sequence ID to cluster number", OPT_FILE);
+    $optParser->addOption("seqid-source-map=s", 1, "path to a file mapping repnode or UniRef IDs in the SSN to sequence IDs within the repnode or UniRef ID cluster (optional)", OPT_FILE);
+    $optParser->addOption("singletons=s", 1, "path to a file containing a list of singletons", OPT_FILE);
     $optParser->addOption("table-file=s", 1, "path to output file", OPT_FILE);
 
     if (not $optParser->parseOptions() or $optParser->wantHelp()) {
