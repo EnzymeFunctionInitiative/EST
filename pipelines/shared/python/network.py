@@ -9,7 +9,7 @@ class SsnNetworkGraph:
     The node indices have been numbered in the order in which they occur in the file, starting at zero.
     """
 
-    def __init__(self, idx_label_map, idx_size_map):
+    def __init__(self, idx_label_map, idx_size_map, max_node_idx):
         """
         Create an object
 
@@ -19,9 +19,13 @@ class SsnNetworkGraph:
                 a map of node indices to node labels (e.g. sequence IDs)
             idx_size_map
                 a map of node indices to node size (e.g. UniRef/repnode)
+            max_node_idx
+                the maximum node index that will be encountered; this is used to handle any
+                singletons that occur after the last numbered cluster
         """
         self.idx_label_map = idx_label_map
         self.idx_size_map = idx_size_map
+        self.max_node_idx = max_node_idx
         self.G = None
 
     def load_from_edgelist(self, edgelist_file: str):
@@ -34,6 +38,12 @@ class SsnNetworkGraph:
                 path to a file containing the edgelist
         """
         self.G = igraph.Graph.Read_Edgelist(edgelist_file, directed=False)
+
+        # Add any singletons that are numbered after the last cluster in the edgelist
+        current_vertex_count = self.G.vcount()
+
+        if self.max_node_idx >= current_vertex_count:
+            self.G.add_vertices( (self.max_node_idx + 1) - current_vertex_count )
 
     def compute_clusters(self):
         """
