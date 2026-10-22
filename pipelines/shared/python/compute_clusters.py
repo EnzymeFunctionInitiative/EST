@@ -63,10 +63,13 @@ def get_node_id_mapping(id_map_file: str) -> tuple[dict, dict]:
     -------
         dict mapping node index to sequence ID
         dict mapping node index to metanode size
+        maximum node index value
     """
 
     idx_seqid_map = {}
     idx_node_size = {}
+
+    max_index = -1
 
     with open(id_map_file) as fh:
         header = fh.readline()
@@ -79,8 +82,9 @@ def get_node_id_mapping(id_map_file: str) -> tuple[dict, dict]:
                     idx_node_size[idx] = int(parts[2])
                 else:
                     idx_node_size[idx] = 1
+                max_index = max(max_index, idx)
 
-    return idx_seqid_map, idx_node_size
+    return idx_seqid_map, idx_node_size, max_index
 
 
 
@@ -88,9 +92,9 @@ def get_node_id_mapping(id_map_file: str) -> tuple[dict, dict]:
 if __name__ == "__main__":
     args = check_args(create_parser().parse_args())
 
-    idx_seqid_map, idx_size_map = get_node_id_mapping(args.index_seqid_map)
+    idx_seqid_map, idx_size_map, max_node_idx = get_node_id_mapping(args.index_seqid_map)
 
-    net_graph = SsnNetworkGraph(idx_seqid_map, idx_size_map)
+    net_graph = SsnNetworkGraph(idx_seqid_map, idx_size_map, max_node_idx)
     net_graph.load_from_edgelist(args.edgelist)
     net_graph.compute_clusters()
     net_graph.save_clusters(args.clusters)

@@ -171,7 +171,7 @@ sub invert_cluster_map {
 sub parse_singletons_file {
     my $file = shift;
 
-    open my $fh, "<", $file or die "Unable to open cluster map file '$file' for reading: $!";
+    open my $fh, "<", $file or die "Unable to open singletons list file '$file' for reading: $!";
 
     my $header = <$fh>;
 

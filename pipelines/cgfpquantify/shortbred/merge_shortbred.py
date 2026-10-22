@@ -167,7 +167,6 @@ def write_nested_dict( dd, path, missing=0 ):
     rowheads = set( )
     for c, cdict in dd.items( ):
         rowheads.update( cdict )
-    print(rowheads)
     rowheads = sorted( rowheads, key=lambda x: strat_sort( x ) )
     with try_open( path, "w" ) as fh:
         print( "\t".join( ["Feature \ Sample"] + colheads ), file=fh )

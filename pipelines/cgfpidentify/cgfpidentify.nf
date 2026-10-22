@@ -14,7 +14,11 @@ process get_fasta_id_list {
 
     script:
     """
-    perl $projectDir/prep/get_id_list.pl --cluster-map ${cluster_id_map} --seqid-source-map ${metanode_map} --singletons ${singleton_list} --id-list id_list.txt
+    perl $projectDir/prep/get_id_list.pl \
+        --cluster-map ${cluster_id_map} \
+        --seqid-source-map ${metanode_map} \
+        --singletons ${singleton_list} \
+        --id-list id_list.txt
     """
 }
 
@@ -129,6 +133,8 @@ process create_cdhit_table {
     input:
         path cdhit_file
         path cluster_id_map
+        path metanode_map
+        path singleton_list
     output:
         path "cdhit.tab"
 
@@ -137,6 +143,8 @@ process create_cdhit_table {
     perl $projectDir/prep/make_cdhit_table.pl \
         --cdhit-file ${cdhit_file} \
         --cluster-map ${cluster_id_map} \
+        --seqid-source-map ${metanode_map} \
+        --singletons ${singleton_list} \
         --table-file cdhit.tab
     """
 }
@@ -165,7 +173,7 @@ workflow {
 
     results = cgfp_identify(condensed_fasta, params.sb_search_refdb)
 
-    cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map)
+    cdhit_table = create_cdhit_table(results.cdhit, color_work.cluster_id_map, color_work.seqid_source_map, color_work.singletons)
 
     marker_ssn_data = create_marker_ssn(ssn_file, results.marker_file, color_work.seqid_source_map, cdhit_table)
 

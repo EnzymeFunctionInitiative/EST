@@ -101,6 +101,8 @@ process cgfp_quantify {
 process get_cluster_mapping {
     input:
         path cluster_file
+        path seqid_source_map
+        path singletons
     output:
         path "cgfp_cluster_map.txt"
 
@@ -108,6 +110,8 @@ process get_cluster_mapping {
     """
     perl $projectDir/prep/get_cluster_mapping.pl \
         --cluster-map ${cluster_file} \
+        --seqid-source-map ${seqid_source_map} \
+        --singletons ${singletons} \
         --shortbred-map cgfp_cluster_map.txt
     """
 }
@@ -124,6 +128,7 @@ workflow {
     input_cluster_file = file("${params.identify_dir}/cluster_id_map.txt")
     cdhit_table = file("${params.identify_dir}/cdhit.tab")
     seqid_source_map = file("${params.identify_dir}/seqid_source_map.txt")
+    singletons = file("${params.identify_dir}/singletons.txt")
     db_dir = file(params.metagenome_db_dir)
     ags_normalization_file = file("${params.metagenome_db_dir}/AvgGenomeSize.txt")
 
@@ -136,8 +141,9 @@ workflow {
 
     results = cgfp_quantify(metagenome_files, markers)
 
-    // This converts the cluster mapping file into one that ShortBRED requires (swaps the columns)
-    cluster_file = get_cluster_mapping(input_cluster_file)
+    // This converts the cluster mapping file into one that ShortBRED requires (swaps the columns, expands
+    // metanodes, and adds singletons)
+    cluster_file = get_cluster_mapping(input_cluster_file, seqid_source_map, singletons)
 
     median_results_ch       = results.results_median.collect()
     median_results          = merge_median_raw(median_results_ch, cluster_file, ags_normalization_file, "", "")
