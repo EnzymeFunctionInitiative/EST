@@ -1,6 +1,6 @@
 
 include { visualize_length_histograms } from "../../shared/nextflow/reporting.nf"
-include { merge_stats } from "../../shared/nextflow/util.nf"
+include { memoryBudget; merge_stats } from "../../shared/nextflow/util.nf"
 
 process compute_stats {
     label 'APP_duckdb'
@@ -27,7 +27,7 @@ process compute_stats {
     DUCKDB_TEMP="${params.duckdb_temp_dir}/duckdb-${task.index}-"\$(date +%s)
     python $projectDir/statistics/render_boxplotstats_sql_template.py \
         --blast-output $blast_parquet \
-        --duckdb-memory-limit "${task.memory.toGiga()}GB" \
+        --duckdb-memory-limit "${memoryBudget(task.memory).toMega()}MiB" \
         --duckdb-n-threads ${task.cpus} \
         --duckdb-temp-dir \${DUCKDB_TEMP} \
         --boxplot-stats-output boxplot_stats.parquet \

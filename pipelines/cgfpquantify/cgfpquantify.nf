@@ -86,7 +86,7 @@ process cgfp_quantify {
     mkdir -p \$SB_TEMP_DIR
 
     python ${sb_src}/shortbred_quantify.py \
-        --threads ${params.sb_quantify_threads} \
+        --threads ${task.cpus} \
         --markers ${marker_file} \
         --wgs ${mg_file} \
         --results ${mg_id}.results.median \
