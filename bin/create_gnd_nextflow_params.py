@@ -13,7 +13,7 @@ def add_args(parser: argparse.ArgumentParser):
     """
     Add arguments for GND pipeline to ``parser``
     """
-    parser.add_argument("--import-mode", required=True, type=str, choices=["blast", "fasta", "accessions"], help="Mode corresponding to input data type")
+    parser.add_argument("--import-mode", required=True, type=str, choices=["blast", "fasta", "accessions", "view"], help="Mode corresponding to input data type")
     parser.add_argument("--input-file", required=True, type=str, help="Input file containing the sequence ID data (accession IDs, FASTA, sequence for BLAST) required for generating the GND")
     parser.add_argument("--nb-size", type=int, required=False, help="Optional number of neighbors on the left and right of the input IDs to include in the analysis, an integer > 0 and <= 20")
     parser.add_argument("--sequence-version", type=str, default="uniprot", choices=["uniprot", "uniref90", "uniref50"], help="Input sequence version used to generate GND; i.e. if input type is uniref50, then additional levels for uniref90 and uniprot will be generated in the GND")
