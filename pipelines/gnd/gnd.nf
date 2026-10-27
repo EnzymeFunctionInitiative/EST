@@ -30,6 +30,31 @@ process create_gnd {
     """
 }
 
+// This copies the input GND to the output file, used for the 'View Existing GND' functionality
+process copy_input_gnd {
+    publishDir params.final_output_dir, mode: 'copy'
+    input:
+        path input_file
+    output:
+        path "gnd.sqlite", emit: "gnd_db"
+        path "gnd.sqlite.zip", emit: "zipped_gnd_db"
+        path "stats.json", emit: "stats"
+
+    script:
+    """
+    shopt -s nocasematch
+
+    if [[ "${input_file}" == *.zip ]]; then
+        unzip -p "${input_file}" > gnd.sqlite
+    else
+        cp "${input_file}" gnd.sqlite
+    fi
+
+    zip gnd.sqlite.zip gnd.sqlite
+    echo "{}" > stats.json
+    """
+}
+
 process run_blast {
     label 'APP_blastp'
 
@@ -141,23 +166,27 @@ process convert_to_id_list {
 workflow {
     def input_file_ch = Channel.fromPath(params.input_file)
 
-    if (params.import_mode == "accessions") {
-        parse_data = parse_accession_for_ids(input_file_ch)
-        extra_metadata_file = Channel.value([])
-    } else if (params.import_mode == "blast") {
-        blast_results = run_blast(input_file_ch)
-        parse_data = parse_blast_results_for_ids(input_file_ch, blast_results.raw_blast_out)
-        extra_metadata_file = blast_results.e_values
-    } else if (params.import_mode == "fasta") {
-        parse_data = parse_fasta_for_ids(input_file_ch)
-        extra_metadata_file = Channel.value([])
-        //extra_metadata_file = Channel.empty()
+    if (params.import_mode == "view") {
+        gnd = copy_input_gnd(input_file_ch)
     } else {
-        error "Mode '${params.import_mode}' is invalid"
+        if (params.import_mode == "accessions") {
+            parse_data = parse_accession_for_ids(input_file_ch)
+            extra_metadata_file = Channel.value([])
+        } else if (params.import_mode == "blast") {
+            blast_results = run_blast(input_file_ch)
+            parse_data = parse_blast_results_for_ids(input_file_ch, blast_results.raw_blast_out)
+            extra_metadata_file = blast_results.e_values
+        } else if (params.import_mode == "fasta") {
+            parse_data = parse_fasta_for_ids(input_file_ch)
+            extra_metadata_file = Channel.value([])
+            //extra_metadata_file = Channel.empty()
+        } else {
+            error "Mode '${params.import_mode}' is invalid"
+        }
+
+        id_list = convert_to_id_list(parse_data.source_ids, parse_data.source_meta)
+
+        gnd = create_gnd(id_list, extra_metadata_file)
     }
-
-    id_list = convert_to_id_list(parse_data.source_ids, parse_data.source_meta)
-
-    gnd = create_gnd(id_list, extra_metadata_file)
 }
 
