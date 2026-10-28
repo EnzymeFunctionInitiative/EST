@@ -31,6 +31,8 @@ EOS
 ./bin/create_est_nextflow_params.py fasta --output-dir $OUTPUT_DIR --efi-config $EFI_CONFIG_FILE --fasta-db $EFI_FASTA_DB --efi-db $EFI_DB_NAME --input-file $fasta_file --nextflow-config $CONFIG_FILE
 bash $OUTPUT_DIR/run_nextflow.sh
 
+cat length_histogram_uniprot.json | python3 -c "import json,sys; s = sum(json.load(sys.stdin)['data'][0]['y']); assert s == 1507"
+
 ./bin/create_generatessn_nextflow_params.py auto --threshold-min-val 87 --ssn-name testssn --job-name test-ssn --est-output-dir $OUTPUT_DIR --nextflow-config $CONFIG_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME
 bash $OUTPUT_DIR/ssn/run_nextflow.sh
 
