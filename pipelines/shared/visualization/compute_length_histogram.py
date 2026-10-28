@@ -13,7 +13,7 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
     Parameters
     ----------
         input_file
-            path to input ID list file
+            path to input ID list file; expected format is a multi-columned tab-separated table.
         target_col
             zero-based index of the column to obtain the IDs from (e.g. 0 for UniProt,
             1 for UniRef90, 2 for UniRef50)
@@ -31,11 +31,18 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
             if has_header_line:
                 next(fh)
             for line in fh:
-                parts = line.split('\t')
+                # remove empty white spaces, including empty tab-separated columns
+                parts = line.strip().split('\t')
+                # grab the specified column if it exists
                 if len(parts) > target_col:
                     val = parts[target_col].strip()
                     if val:
                         ids.add(val)
+                # if an uniprot-level accession ID is from an unknown source (e.g.
+                # user-uploaded sequence from FASTA or BLAST input paths), include that
+                # id in the id list.
+                elif "ZZZZZZ" in parts[0] or "ZZINPUTSEQ" in parts[0]:
+                    ids.add(val)
 
     except FileNotFoundError:
         print(f"Error: input ID file not found at '{input_file}'", file=sys.stderr)
