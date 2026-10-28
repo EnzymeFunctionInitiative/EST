@@ -140,6 +140,7 @@ workflow REPORTING {
 	} else if (params.sequence_version == "uniref90") {
 	    seq_version_ch = sequence_lengths.expanded_uniprot.map { f -> tuple("uniprot", f) }
 	        .mix( sequence_lengths.fasta_lengths.map { f -> tuple("uniref90", f) } )
+	}
 
         length_histograms = get_length_histogram(accession_table, seq_version_ch)
 
