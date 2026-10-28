@@ -32,7 +32,7 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
                 next(fh)
             for line in fh:
                 # remove empty white spaces, including empty tab-separated columns
-                parts = line.strip().split('\t')
+                parts = line.rstrip().split('\t')
                 # grab the specified column if it exists
                 if len(parts) > target_col:
                     val = parts[target_col].strip()
@@ -42,7 +42,7 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
                 # user-uploaded sequence from FASTA or BLAST input paths), include that
                 # id in the id list.
                 elif "ZZZZZZ" in parts[0] or "ZZINPUTSEQ" in parts[0]:
-                    ids.add(val)
+                    ids.add(parts[0].strip())
 
     except FileNotFoundError:
         print(f"Error: input ID file not found at '{input_file}'", file=sys.stderr)
