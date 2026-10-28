@@ -69,7 +69,7 @@ foreach my $id (@tableIds) {
 }
 
 foreach my $accession (keys %$fastaLengths) {
-    if ($id =~ /^ZZ/) {
+    if (is_unknown_sequence($id)) {
     	$fh->print(join("\t", $accession, $fastaLengths->{$accession}), "\n");
     }
 }
