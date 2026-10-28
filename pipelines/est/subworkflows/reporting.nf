@@ -66,9 +66,8 @@ process visualize_boxplot_stats {
 
 process get_length_histogram {
     input:
-        path sequence_lengths
         path accession_table
-        val seq_version
+        tuple val(seq_version), path(sequence_lengths)
     output:
         tuple val(seq_version), path("${seq_version}.histogram.txt")
 
@@ -129,16 +128,17 @@ workflow REPORTING {
         sequence_metadata
 
     main:
-        seq_versions = ['uniprot']
+        sequence_lengths = compute_sequence_lengths(fasta_lengths_parquet, accession_table, sequence_metadata)
+
+        seq_versions = [['uniprot', sequence_lengths.fasta_lengths]]
         if (params.sequence_version == "uniref50") {
-            seq_versions = ["uniprot", "uniref50"]
+            seq_versions = [["uniprot", sequence_lengths.expanded_uniprot], ["uniref50", sequence_lengths.fasta_lengths]]
         } else if (params.sequence_version == "uniref90") {
-            seq_versions = ["uniprot", "uniref90"]
+            seq_versions = [["uniprot", sequence_lengths.expanded_uniprot] ["uniref90", sequence_lengths.fasta_lengths]]
         }
         seq_version_ch = Channel.fromList(seq_versions)
 
-        sequence_lengths = compute_sequence_lengths(fasta_lengths_parquet, accession_table, sequence_metadata)
-        length_histograms = get_length_histogram(sequence_lengths.fasta_lengths, accession_table, seq_version_ch)
+        length_histograms = get_length_histogram(accession_table, seq_version_ch)
 
         // Create a separate mapping file for domain lengths
         if (params.domain) {
