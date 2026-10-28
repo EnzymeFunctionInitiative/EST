@@ -130,13 +130,16 @@ workflow REPORTING {
     main:
         sequence_lengths = compute_sequence_lengths(fasta_lengths_parquet, accession_table, sequence_metadata)
 
-        seq_versions = [['uniprot', sequence_lengths.fasta_lengths]]
-        if (params.sequence_version == "uniref50") {
-            seq_versions = [["uniprot", sequence_lengths.expanded_uniprot], ["uniref50", sequence_lengths.fasta_lengths]]
-        } else if (params.sequence_version == "uniref90") {
-            seq_versions = [["uniprot", sequence_lengths.expanded_uniprot] ["uniref90", sequence_lengths.fasta_lengths]]
-        }
-        seq_version_ch = Channel.fromList(seq_versions)
+	def seq_version_ch
+	
+	if (params.sequence_version == "uniprot") {
+	    seq_version_ch = sequence_lengths.fasta_lengths.map { f -> tuple("uniprot", f) }
+	} else if (params.sequence_version == "uniref50") {
+	    seq_version_ch = sequence_lengths.expanded_uniprot.map { f -> tuple("uniprot", f) }
+	        .mix( sequence_lengths.fasta_lengths.map { f -> tuple("uniref50", f) } )
+	} else if (params.sequence_version == "uniref90") {
+	    seq_version_ch = sequence_lengths.expanded_uniprot.map { f -> tuple("uniprot", f) }
+	        .mix( sequence_lengths.fasta_lengths.map { f -> tuple("uniref90", f) } )
 
         length_histograms = get_length_histogram(accession_table, seq_version_ch)
 
