@@ -138,7 +138,7 @@ workflow REPORTING {
         seq_version_ch = Channel.fromList(seq_versions)
 
         sequence_lengths = compute_sequence_lengths(fasta_lengths_parquet, accession_table, sequence_metadata)
-        length_histograms = get_length_histogram(sequence_lengths.expanded_uniprot, accession_table, seq_version_ch)
+        length_histograms = get_length_histogram(sequence_lengths.fasta_lengths, accession_table, seq_version_ch)
 
         // Create a separate mapping file for domain lengths
         if (params.domain) {
