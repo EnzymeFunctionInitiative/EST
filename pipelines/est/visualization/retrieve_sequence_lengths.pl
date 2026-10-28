@@ -62,7 +62,6 @@ my $sqlPattern = "SELECT accession, " . FIELD_SEQ_LEN_KEY . " FROM annotations W
 my $idCol = "accession";
 my $matched = $lookupUtil->batchRetrieveIds(\@tableIds, $sqlPattern, $idCol);
 
-
 foreach my $id (@tableIds) {
     if (exists $matched->{$id}) {
         $fh->print(join("\t", $id, $matched->{$id}->{&FIELD_SEQ_LEN_KEY}), "\n");
