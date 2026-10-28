@@ -41,7 +41,7 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
                 # if an uniprot-level accession ID is from an unknown source (e.g.
                 # user-uploaded sequence from FASTA or BLAST input paths), include that
                 # id in the id list.
-                elif "ZZZZZZ" in parts[0] or "ZZINPUTSEQ" in parts[0]:
+                elif parts[0].startswith("ZZ"):
                     ids.add(parts[0].strip())
 
     except FileNotFoundError:
