@@ -96,9 +96,10 @@ workflow PREPARE_FASTA {
         // stores only the files corresponding to the input SSN sequence type.  These get stored
         // in seq_type_fasta_ch.sequence_type_files.  If the input sequence_type is domain (e.g.
         // ending in '_domain'), then we also want to include the base type (e.g. uniref90 and
-        // uniref90_domain).
+        // uniref90_domain).  If the sequence source is repnode, then we use that one for the
+        // analysis.
         color_fasta_ch.branch {
-            sequence_type_files:    it[0].replace('_domain', '') == it[3].replace('_domain', '')
+            sequence_type_files:    it[0].replace('_domain', '') == it[3].replace('_domain', '') || it[3] == 'repnode'
             ignored_files:          true
         }.set { seq_type_fasta_ch }
 
@@ -106,9 +107,10 @@ workflow PREPARE_FASTA {
         // STEP 2: APPLY CD-HIT TO REDUCE REDUNDANCY
         //
 
-        // Only apply CD-HIT to UniProt sequences
+        // Only apply CD-HIT to UniProt sequences.  Ignore UniProt sequences that are repnodes
+        // since they are already reduced in EST.
         seq_type_fasta_ch.sequence_type_files.branch {
-            needs_reduction:    it[0].contains('uniprot')
+            needs_reduction:    it[0].contains('uniprot') && it[3] != 'repnode'
             skip_reduction:     true
         }.set { reduction_set_ch }
 
@@ -134,8 +136,6 @@ workflow PREPARE_FASTA {
             // Exclude any files that are outside of the min/max range (e.g. small clusters)
             ignored: true
         }.set { split_sampled_ch }
-
-//        split_sampled_ch.ignored.view { "Dropping cluster ${it[1]} because it's small to compute an MSA for" }
 
         // Sample the FASTA files (aka subsetting)
         sampled_ch = subset_fasta(split_sampled_ch.large)

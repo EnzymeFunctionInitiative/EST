@@ -42,9 +42,10 @@ process muscle3_align {
         tuple val(id), path("${id}.afa"), val(seq_type), emit: msa
 
     script:
+    def maxHours = (task.time?.toHours() ?: 4) - 2
     """
     # -maxhours h  -- Maximum time. If h hours have elpased, then complete the current iteration and stop. Default no time limit.
-    muscle3 -in ${fasta} -out ${id}.afa -maxhours ${task.time.toHours() - 2}
+    muscle3 -in ${fasta} -out ${id}.afa -maxhours ${maxHours}
     """
 }
 
