@@ -123,7 +123,9 @@ def load_length_mapping(length_mapping_file: str, valid_ids: Set[str] = None) ->
     Parameters
     ----------
         length_mapping_file
-            path to a two-column tab-separated file containing sequence ID and sequence length
+            Path to a two-column tab-separated file containing sequence ID and sequence length.
+            The first column's sequence IDs may or may not contain domain information that needs
+            to be removed before checking membership in `valid_ids`.
         valid_ids
             Set of string IDs, or None; if None, then all sequences are included in the
             computation, otherwise only sequence IDs that are in the Set are included
@@ -137,7 +139,7 @@ def load_length_mapping(length_mapping_file: str, valid_ids: Set[str] = None) ->
         with open(length_mapping_file, 'r') as fh:
             for line in fh:
                 parts = line.strip().split('\t')
-                if valid_ids == None or parts[0] in valid_ids:
+                if valid_ids == None or parts[0].split(":")[0] in valid_ids:
                     sequence_lengths.append(parts[1])
 
     except FileNotFoundError:
