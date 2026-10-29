@@ -13,7 +13,7 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
     Parameters
     ----------
         input_file
-            path to input ID list file
+            path to input ID list file; expected format is a multi-columned tab-separated table.
         target_col
             zero-based index of the column to obtain the IDs from (e.g. 0 for UniProt,
             1 for UniRef90, 2 for UniRef50)
@@ -31,11 +31,18 @@ def parse_file(input_file: str, target_col: int, has_header_line: bool = True) -
             if has_header_line:
                 next(fh)
             for line in fh:
-                parts = line.split('\t')
+                # remove empty white spaces, including empty tab-separated columns
+                parts = line.rstrip().split('\t')
+                # grab the specified column if it exists
                 if len(parts) > target_col:
                     val = parts[target_col].strip()
                     if val:
                         ids.add(val)
+                # if an uniprot-level accession ID is from an unknown source (e.g.
+                # user-uploaded sequence from FASTA or BLAST input paths), include that
+                # id in the id list.
+                elif parts[0].startswith("ZZ"):
+                    ids.add(parts[0].strip())
 
     except FileNotFoundError:
         print(f"Error: input ID file not found at '{input_file}'", file=sys.stderr)
@@ -116,7 +123,9 @@ def load_length_mapping(length_mapping_file: str, valid_ids: Set[str] = None) ->
     Parameters
     ----------
         length_mapping_file
-            path to a two-column tab-separated file containing sequence ID and sequence length
+            Path to a two-column tab-separated file containing sequence ID and sequence length.
+            The first column's sequence IDs may or may not contain domain information that needs
+            to be removed before checking membership in `valid_ids`.
         valid_ids
             Set of string IDs, or None; if None, then all sequences are included in the
             computation, otherwise only sequence IDs that are in the Set are included
@@ -130,7 +139,7 @@ def load_length_mapping(length_mapping_file: str, valid_ids: Set[str] = None) ->
         with open(length_mapping_file, 'r') as fh:
             for line in fh:
                 parts = line.strip().split('\t')
-                if valid_ids == None or parts[0] in valid_ids:
+                if valid_ids == None or parts[0].split(":")[0] in valid_ids:
                     sequence_lengths.append(parts[1])
 
     except FileNotFoundError:

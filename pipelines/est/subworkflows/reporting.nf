@@ -66,9 +66,8 @@ process visualize_boxplot_stats {
 
 process get_length_histogram {
     input:
-        path sequence_lengths
         path accession_table
-        val seq_version
+        tuple val(seq_version), path(sequence_lengths)
     output:
         tuple val(seq_version), path("${seq_version}.histogram.txt")
 
@@ -129,16 +128,21 @@ workflow REPORTING {
         sequence_metadata
 
     main:
-        seq_versions = ['uniprot']
-        if (params.sequence_version == "uniref50") {
-            seq_versions = ["uniprot", "uniref50"]
-        } else if (params.sequence_version == "uniref90") {
-            seq_versions = ["uniprot", "uniref90"]
-        }
-        seq_version_ch = Channel.fromList(seq_versions)
-
         sequence_lengths = compute_sequence_lengths(fasta_lengths_parquet, accession_table, sequence_metadata)
-        length_histograms = get_length_histogram(sequence_lengths.expanded_uniprot, accession_table, seq_version_ch)
+
+	def seq_version_ch
+	
+	if (params.sequence_version == "uniprot") {
+	    seq_version_ch = sequence_lengths.fasta_lengths.map { f -> tuple("uniprot", f) }
+	} else if (params.sequence_version == "uniref50") {
+	    seq_version_ch = sequence_lengths.expanded_uniprot.map { f -> tuple("uniprot", f) }
+	        .mix( sequence_lengths.fasta_lengths.map { f -> tuple("uniref50", f) } )
+	} else if (params.sequence_version == "uniref90") {
+	    seq_version_ch = sequence_lengths.expanded_uniprot.map { f -> tuple("uniprot", f) }
+	        .mix( sequence_lengths.fasta_lengths.map { f -> tuple("uniref90", f) } )
+	}
+
+        length_histograms = get_length_histogram(accession_table, seq_version_ch)
 
         // Create a separate mapping file for domain lengths
         if (params.domain) {

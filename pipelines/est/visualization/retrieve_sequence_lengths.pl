@@ -45,7 +45,7 @@ if ($opts->{fasta_lengths_parquet}) {
 }
 
 
-# Save the length from the actual FASTA file used in the computation.  The takes care of domains
+# Save the length from the actual FASTA file used in the computation.  This takes care of domains.
 open my $flfh, ">", $opts->{fasta_lengths} or die "Unable to write to fasta lengths '$opts->{fasta_lengths}' file: $!";
 
 foreach my $accession (keys %$fastaLengths) {
@@ -65,6 +65,12 @@ my $matched = $lookupUtil->batchRetrieveIds(\@tableIds, $sqlPattern, $idCol);
 foreach my $id (@tableIds) {
     if (exists $matched->{$id}) {
         $fh->print(join("\t", $id, $matched->{$id}->{&FIELD_SEQ_LEN_KEY}), "\n");
+    }
+}
+
+foreach my $accession (keys %$fastaLengths) {
+    if (is_unknown_sequence($accession)) {
+    	$fh->print(join("\t", $accession, $fastaLengths->{$accession}), "\n");
     }
 }
 
