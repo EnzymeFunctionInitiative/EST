@@ -32,8 +32,8 @@ process muscle3_align {
     // Ignore these failures, skip the cluster being analyzed, and proceed with
     // the other clusters. Any other errors should cause a terminate message to nextflow.
     errorStrategy {
-        // 137 == OOM, 140 == timeout
-        task.exitStatus in [137, 140] ? 'ignore' : 'terminate'
+        // 137 == OOM, 139 == segfault, 140 == timeout
+        task.exitStatus in [137, 139, 140] ? 'ignore' : 'terminate'
     }
 
     input:
