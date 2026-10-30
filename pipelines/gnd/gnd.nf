@@ -76,7 +76,7 @@ process run_blast {
         -o init_blast.out
 
     if [[ -s init_blast.out ]]; then
-        awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
+        awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2 -g > blast_hits.tab
     else
         echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence." | tee /dev/stderr
         exit 1
