@@ -166,9 +166,17 @@ process get_source_ids_blast {
 
     // blast_hits.tab is provided as an output to the user
     """
+    # validate the input fasta file
+    cat ${input_file} | seqkit seq --remove-gaps > user_input.fasta
+    # make sure the input fasta file only has one sequence
+    if [ $(grep -c ">" user_input.fasta) -eq 1]; then
+	echo "User input fasta file has more than 1 sequence. Ending the job."
+	exit 1
+    fi
+    # run the initial blast alignment
     blastall \
         -p blastp \
-        -i ${input_file} \
+        -i user_input.fasta \
         -d ${params.import_blast_fasta_db} \
         -m 8 \
         -e "${params.import_blast_evalue}" \
@@ -179,7 +187,7 @@ process get_source_ids_blast {
         awk '! /^#/ {print \$2"\t"\$11}' init_blast.out | sort -k2nr > blast_hits.tab
     else
         echo "BLAST did not return any matches.  Verify that the sequence is a protein and not a nucleotide sequence."
-        exit 1
+        exit 2
     fi
     perl $projectDir/../shared/import/get_sequence_ids.pl \
         ${common_args} \
