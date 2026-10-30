@@ -234,7 +234,7 @@ process validate_fasta_file {
     # validate and clean the input fasta file
     cat ${input_file} | seqkit seq --remove-gaps --upper-case > validated_input.fasta
     # make sure the input fasta file has more than one sequence
-    if [ $(grep -c ">" validated_input.fasta) -gt 1]; then
+    if [[ \$(grep -c ">" validated_input.fasta) -gt 1 ]]; then
         echo "User input fasta file does not have enough sequences. Ending the job."
         exit 1
     fi
