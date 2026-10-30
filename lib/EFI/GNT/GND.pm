@@ -58,7 +58,7 @@ sub save {
         ($unirefSizeMapping, $uniref50IdMapping, $uniref90IdMapping) = $self->{uniref}->computeUnirefMapping($args{metanode_mapping});
     }
 
-    my $sortSeqIds = $args{sort_sequence_ids} // 0;
+    my $sortSeqIds = $args{sort_sequence_ids} // ($args{blast_evalues} ? 1 : 0);
 
     my ($families, $clusterIndex, $idIndexMap, $idClusterMap) = $self->insertClusterData($clusterData, $clusterNames, $sortSeqIds, $unirefSizeMapping, $blastEValues);
     $self->insertMetadata($metadata);
@@ -172,7 +172,7 @@ sub insertClusterData {
         return \%queryData;
     };
 
-    my $sortIdFn = sub { $a->{attributes}->{id} cmp $b->{attributes}->{id} };
+    my $sortIdFn = sub { ($blastEValues->{ $a->{attributes}->{id} } // 1) <=> ($blastEValues->{ $b->{attributes}->{id} } // 1) };
 
     my @clusterNums = sort { $a cmp $b } keys %$clusterData;
     foreach my $clusterNum (@clusterNums) {
