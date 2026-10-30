@@ -22,17 +22,9 @@ def parse_args() -> argparse.Namespace:
 
     args = parser.parse_args()
 
-    has_valid_input = args.input_file and os.path.isfile(args.input_file)
-
-    # Validate arguments based on Perl script's logic
-    if not has_valid_input:
-        if args.min is None or args.min < 1:
-            sys.exit("Error: Need --min since no file is provided")
-        if not args.max:
-            sys.exit("Error: Need --max since no file is provided")
-        # If the file was specified but does not exist, then delete it from the namespace
-        if args.input_file:
-            del args.input_file
+    # Remove from args if the file path is not valid
+    if args.input_file and not os.path.isfile(args.input_file):
+        args.input_file = None
 
     return args
 
@@ -83,8 +75,10 @@ def update_min_max_from_file(args: argparse.Namespace):
                     pass
 
     if not found_min_max:
-        min_val = new_min
-        max_val = new_max
+        if new_min != float("inf"):
+            min_val = new_min
+        if new_max != float("-inf"):
+            max_val = new_max
 
     args.min = min_val
     args.max = max_val
@@ -102,8 +96,27 @@ def plot_color_ramp(args: argparse.Namespace):
     # Setup the figure canvas
     fig, ax = plt.subplots(figsize=(16.5, 1.5), dpi=300)
 
-    if args.min is None or args.max is None or args.min == float('inf'):
-        sys.exit(f"Min/max error {args.min} {args.max}")
+    has_valid_min_max = (
+        args.min is not None
+        and args.max is not None
+        and args.min != float("inf")
+        and args.max != float("-inf")
+        and args.min < args.max
+    )
+
+    if not has_valid_min_max:
+        print(f"Min/max not found or invalid: min={args.min} max={args.max}; creating empty graph")
+
+        ax.axis("off")
+
+        ax.text(0.5, 0.5, "No connectivity found",
+                ha="center", va="center", fontsize=14, color="gray")
+
+        plt.savefig(args.output_file, bbox_inches="tight")
+        plt.close(fig)
+
+        print(f"Successfully wrote empty graph file to {args.output_file}")
+        return
 
     print(f"Found color min {args.min} and max {args.max}")
 
@@ -118,6 +131,7 @@ def plot_color_ramp(args: argparse.Namespace):
     else:
         # Use custom EFI mapping
         cmap = get_nb_conn_colormap()
+
     norm = mpl.colors.Normalize(vmin=args.min, vmax=args.max)
 
     # Draw the color ramp (colorbar)
