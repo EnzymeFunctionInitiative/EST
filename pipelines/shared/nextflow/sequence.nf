@@ -115,6 +115,7 @@ workflow GET_SOURCE_IDS {
 
         } else if (params.import_mode == "fasta") {
             input_file_ch = Channel.fromPath(params.input_file)
+            input_file_ch = validate_fasta_file(input_file_ch)
             import_files = get_source_ids_fasta(input_file_ch)
             seq_mapping_ch = import_files.seq_mapping
 
@@ -219,6 +220,24 @@ process get_source_ids_fasta {
         ${common_args} \
         --fasta ${input_file} \
         --sequence-mapping-file seq_mapping.tab
+    """
+}
+
+process validate_fasta_file {
+    input:
+        path input_file
+    output:
+        path 'validated_input.fasta', emit: 'validated_fasta'
+
+    script:
+    """
+    # validate and clean the input fasta file
+    cat ${input_file} | seqkit seq --remove-gaps --upper-case > validated_input.fasta
+    # make sure the input fasta file has more than one sequence
+    if [[ \$(grep -c ">" validated_input.fasta) -gt 1 ]]; then
+        echo "User input fasta file does not have enough sequences. Ending the job."
+        exit 1
+    fi
     """
 }
 
