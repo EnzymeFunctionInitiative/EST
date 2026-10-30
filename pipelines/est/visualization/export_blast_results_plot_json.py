@@ -71,11 +71,13 @@ def main_plotly():
     groups_to_delete = compute_outlying_groups(df[["alignment_score", "edge_count"]], args.min_edges, args.min_groups)
 
     print(f"Removing {len(groups_to_delete)} outlying groups...")
-    df = delete_outlying_groups(df, groups_to_delete).sort_values(by="alignment_score")
+    filtered_df = delete_outlying_groups(df, groups_to_delete).sort_values(by="alignment_score")
 
-    if df.empty:
-        print("No data remaining after filtering. Exiting.")
-        return
+    # If the filtered frame is not empty, then we use it to plot; otherwise use the original data
+    if not filtered_df.empty:
+        df = filtered_df
+    else:
+        print("Warning: all data groups were filtered out.  Using entire dataset for plots.")
 
     # --- Create the complete Plotly configuration object ---
     x_axis_scores = df["alignment_score"].tolist()
