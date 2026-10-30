@@ -115,7 +115,7 @@ workflow GET_SOURCE_IDS {
 
         } else if (params.import_mode == "fasta") {
             input_file_ch = Channel.fromPath(params.input_file)
-	    input_file_ch = validate_fasta_file(input_file_ch)
+            input_file_ch = validate_fasta_file(input_file_ch)
             import_files = get_source_ids_fasta(input_file_ch)
             seq_mapping_ch = import_files.seq_mapping
 
@@ -167,7 +167,6 @@ process get_source_ids_blast {
 
     // blast_hits.tab is provided as an output to the user
     """
-    # run the initial blast alignment
     blastall \
         -p blastp \
         -i ${input_file} \
