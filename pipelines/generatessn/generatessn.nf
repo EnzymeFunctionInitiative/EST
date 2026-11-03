@@ -1,6 +1,4 @@
 
-include { COMPUTE_COLOR_CLUSTER_WORKFLOW } from "../shared/nextflow/color_workflow.nf"
-include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 include { filter_ids; get_sunburst_data; get_user_filter_file } from "../shared/nextflow/sequence.nf"
 include { memoryBudget; prepareJobName; prepareSsnFilename; merge_stats } from "../shared/nextflow/util.nf"
 
