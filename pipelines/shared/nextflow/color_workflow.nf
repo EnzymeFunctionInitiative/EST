@@ -180,7 +180,7 @@ process get_cluster_stats {
 
 
 process compute_clusters {
-    publishDir params.final_output_dir, mode: "copy", pattern: "{cluster_num_map.txt,cluster_id_map.txt}"
+    publishDir params.final_output_dir, mode: "copy", pattern: "{cluster_num_map.txt,cluster_id_map.txt,singletons.txt}"
 
     input:
         path edgelist
