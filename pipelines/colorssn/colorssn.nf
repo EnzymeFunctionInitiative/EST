@@ -1,15 +1,17 @@
 
-include { COLOR_AND_RETRIEVE } from "../shared/nextflow/color_workflow.nf"
+include { COLOR_AND_RETRIEVE; sanitize_xgmml } from "../shared/nextflow/color_workflow.nf"
 include { merge_stats; unzip_ssn } from "../shared/nextflow/util.nf"
 include { color_ssn } from "../shared/nextflow/color_xgmml.nf"
 
 
 workflow {
     if (params.ssn_input =~ /\.zip$/) {
-        ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
+        raw_ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
     } else {
-        ssn_file = Channel.value(file(params.ssn_input))
+        raw_ssn_file = Channel.value(file(params.ssn_input))
     }
+
+    ssn_file = sanitize_xgmml(raw_ssn_file)
 
     // Files are published to params.final_output_dir by the processes inside the
     // COLOR_AND_RETRIEVE workflow

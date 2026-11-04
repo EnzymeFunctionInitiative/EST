@@ -258,6 +258,22 @@ process zip_fasta_directories {
 }
 
 
+process sanitize_xgmml {
+    input:
+        path ssn_file
+
+    output:
+        path "sanitized_ssn.xgmml"
+
+    script:
+    """
+    python $projectDir/../shared/python/sanitize_xgmml.py \
+        --input ${ssn_file} \
+        --output sanitized_ssn.xgmml
+    """
+}
+
+
 workflow COMPUTE_COLOR_CLUSTER_WORKFLOW {
     take:
         ssn_file

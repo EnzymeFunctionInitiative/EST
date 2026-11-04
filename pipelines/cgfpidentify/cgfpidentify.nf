@@ -1,5 +1,5 @@
 
-include { COMPUTE_COLOR_CLUSTER_WORKFLOW; get_cluster_stats } from "../shared/nextflow/color_workflow.nf"
+include { COMPUTE_COLOR_CLUSTER_WORKFLOW; get_cluster_stats; sanitize_xgmml } from "../shared/nextflow/color_workflow.nf"
 include { get_sequences } from "../shared/nextflow/sequence.nf"
 include { merge_stats; prepareJobName; prepareSsnFilename; unzip_ssn } from "../shared/nextflow/util.nf"
 include { condense_redundant } from "../shared/nextflow/blast.nf"
@@ -151,10 +151,12 @@ process create_cdhit_table {
 
 workflow {
     if (params.ssn_input =~ /\.zip$/) {
-        ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
+        raw_ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
     } else {
-        ssn_file = Channel.value(file(params.ssn_input))
+        raw_ssn_file = Channel.value(file(params.ssn_input))
     }
+
+    ssn_file = sanitize_xgmml(raw_ssn_file)
 
     // Compute the clusters
     color_work = COMPUTE_COLOR_CLUSTER_WORKFLOW(ssn_file)

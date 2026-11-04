@@ -1,4 +1,5 @@
 
+include { sanitize_xgmml } from "../shared/nextflow/color_workflow.nf"
 include { prepareSsnFilename; unzip_ssn } from "../shared/nextflow/util.nf"
 
 process compute_connectivity_from_ssn {
@@ -62,10 +63,12 @@ process make_nc_legend {
 
 workflow {
     if (params.ssn_input =~ /\.zip$/) {
-        ssn_file = unzip_ssn(params.ssn_input)
+        raw_ssn_file = unzip_ssn(params.ssn_input)
     } else {
-        ssn_file = params.ssn_input
+        raw_ssn_file = params.ssn_input
     }
+
+    ssn_file = sanitize_xgmml(raw_ssn_file)
 
     nc_table = compute_connectivity_from_ssn(ssn_file)
 

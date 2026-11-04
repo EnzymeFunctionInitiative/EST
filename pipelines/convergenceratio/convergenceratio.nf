@@ -1,7 +1,7 @@
 
 include { all_by_all_blast; blastreduce; blastreduce_transcode_fasta; condense_redundant; create_blast_db; restore_condensed; sort_and_split_fasta } from "../shared/nextflow/blast.nf"
 include { unzip_ssn } from "../shared/nextflow/util.nf"
-include { compute_clusters; get_id_list; get_ssn_id_info } from "../shared/nextflow/color_workflow.nf"
+include { compute_clusters; get_id_list; get_ssn_id_info; sanitize_xgmml } from "../shared/nextflow/color_workflow.nf"
 
 process compute_blast_conv_ratio {
     input:
@@ -94,10 +94,12 @@ process count_fasta {
 
 workflow {
     if (params.ssn_input =~ /\.zip$/) {
-        ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
+        raw_ssn_file = unzip_ssn(Channel.value(file(params.ssn_input)))
     } else {
-        ssn_file = Channel.value(file(params.ssn_input))
+        raw_ssn_file = Channel.value(file(params.ssn_input))
     }
+
+    ssn_file = sanitize_xgmml(raw_ssn_file)
 
     //
     // STEP 1: GET ID LISTS AND COMPUTE CLUSTERS
