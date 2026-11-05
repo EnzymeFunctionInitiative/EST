@@ -17,3 +17,16 @@ bash $OUTPUT_DIR/run_nextflow.sh
 ./bin/create_generatessn_nextflow_params.py auto --threshold-min-val 87 --ssn-name testssn --job-name test-ssn --est-output-dir $OUTPUT_DIR --nextflow-config $CONFIG_FILE --efi-config $EFI_CONFIG_FILE --efi-db $EFI_DB_NAME
 bash $OUTPUT_DIR/ssn/run_nextflow.sh
 
+SSN_FILE="$OUTPUT_DIR/ssn/full_ssn.xgmml"
+unzip -c "$OUTPUT_DIR/ssn/full_ssn.xgmml.zip" > $SSN_FILE
+
+if ! grep -m1 -q '\<node' $SSN_FILE > /dev/null; then
+    echo "Test failed: no nodes in output file"
+    exit 1
+fi
+
+if ! grep -m1 -q '"[A-Z0-9]\+:[0-9]\+:[0-9]\+"' $SSN_FILE > /dev/null; then
+    echo "Test failed: no domain data in node IDs"
+    exit 1
+fi
+
