@@ -63,7 +63,22 @@ process filter_fasta {
 
     script:
     """
-    seqkit grep -f ${filtered_ids} ${input_fasta} -o filtered_sequences.fasta
+    awk '
+      # Read the master ID list first and populate array
+      NR == FNR { ids[\$1] = 1; next }
+
+      # Process FASTA file.  Check check header lines (ignoring domain) info
+      /^>/ {
+        # Extract actual sequence ID
+        split(substr(\$1, 2), a, ":")
+
+        # Check if extracted accession exists in master ID list
+        keep = (a[1] in ids)
+      }
+
+      # Print line if the current sequence record matched
+      keep
+    ' ${filtered_ids} ${input_fasta} > filtered_sequences.fasta
     """
 }
 
