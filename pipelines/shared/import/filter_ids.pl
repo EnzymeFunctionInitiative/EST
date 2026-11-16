@@ -120,8 +120,11 @@ $seqData->updateUnirefMetadata();
 $seqData->save($opts->{sequence_meta_file}, $opts->{accession_table_file});
 
 
+my $domains = getDomains($seqData);
+
+
 # Save the IDs that are to be retrieved, i.e. those that are not FASTA
-my @retrievalIds = getRetrievalIds($seqData);
+my @retrievalIds = addDomains($domains, getRetrievalIds($seqData));
 open my $rfh, ">", $opts->{retrieval_ids_file} or die "Unable to write to retrieval IDs file '$opts->{retrieval_ids_file}': $!";
 map { $rfh->print("$_\n"); } @retrievalIds;
 close $rfh;
@@ -129,7 +132,7 @@ close $rfh;
 
 # Save master ID list, of all "primary" IDs (e.g. if input is UniRef, UniRef IDs).  Needed by
 # SSN pipeline
-my @masterIds = $seqData->getSequenceIds();
+my @masterIds = addDomains($domains, $seqData->getSequenceIds());
 open my $mfh, ">", $opts->{master_ids_file} or die "Unable to write to master IDs file '$opts->{master_ids_file}': $!";
 map { $mfh->print("$_\n"); } @masterIds;
 close $mfh;
@@ -154,9 +157,13 @@ sub getRetrievalIds {
     my %userSources = (&FIELD_SEQ_SRC_VALUE_FASTA => 1,
                        &FIELD_SEQ_SRC_VALUE_FASTA_FAMILY => 1);
 
-    my $domains = getDomains($seqData);
+    return grep { not exists $userSources{$sourceAttr->{$_}} } keys %$sourceAttr;
+}
 
-    my @ids = grep { not exists $userSources{$sourceAttr->{$_}} } keys %$sourceAttr;
+
+sub addDomains {
+    my $domains = shift;
+    my @ids = @_;
 
     if (keys %$domains) {
         my @domainIds;

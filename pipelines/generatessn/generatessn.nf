@@ -69,11 +69,8 @@ process filter_fasta {
 
       # Process FASTA file.  Check check header lines (ignoring domain) info
       /^>/ {
-        # Extract actual sequence ID
-        split(substr(\$1, 2), a, ":")
-
         # Check if extracted accession exists in master ID list
-        keep = (a[1] in ids)
+        keep = (substr(\$1, 2) in ids)
       }
 
       # Print line if the current sequence record matched
