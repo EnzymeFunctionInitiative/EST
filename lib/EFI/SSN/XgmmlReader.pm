@@ -75,7 +75,9 @@ sub parse {
         if ($nname eq "edge") {
             my $source = $reader->getAttribute("source");
             my $target = $reader->getAttribute("target");
-            $edgelistFh->print($id_idx->{$source}, " ", $id_idx->{$target}, "\n");
+            warn "Missing source index for edge (source=$source, target=$target)" if not exists $id_idx->{$source};
+            warn "Missing target index for edge (source=$source, target=$target)" if not exists $id_idx->{$target};
+            $edgelistFh->print($id_idx->{$source}, " ", $id_idx->{$target}, "\n") if (exists $id_idx->{$source} and exists $id_idx->{$target});
         } elsif ($nname eq "node") {
             $self->processNode($reader);
         } elsif ($nname eq "att") {
