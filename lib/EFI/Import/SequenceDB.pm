@@ -34,10 +34,11 @@ sub getSequences {
     my $idFile = shift;
     my $fastaFile = shift;
     my $domainIdMap = shift || {}; # optional
+    my $userSequences = shift || {};
 
     my $tempFasta = "$fastaFile.tmp";
 
-    my ($tempIdFile, $domains) = $self->parseIdFile($idFile);
+    my ($tempIdFile, $domains, $allInputIds) = $self->parseIdFile($idFile);
 
     my @parms = ("fastacmd", "-d", $self->{fasta_db}, "-i", $tempIdFile, "-o", $tempFasta);
     my ($fastacmdOutput, $fastaErr) = capture {
@@ -49,12 +50,14 @@ sub getSequences {
         return -1;
     }
 
-    my $numIds = $self->convertSequences($tempFasta, $fastaFile, keys %$domainIdMap ? $domainIdMap : $domains);
+    my $processedIds = $self->convertSequences($tempFasta, $fastaFile, keys %$domainIdMap ? $domainIdMap : $domains, $userSequences);
+
+    $self->writeUserSequences($fastaFile, $allInputIds, $processedIds, $userSequences);
 
     unlink($tempFasta);
     unlink($tempIdFile);
 
-    return $numIds;
+    return scalar keys %$processedIds;
 }
 
 
@@ -75,17 +78,37 @@ sub parseIdFile {
         my ($id, @p) = split(m/:/, $line);
         if (@p == 2) {
             push @{ $domains->{$id} }, [@p];
-            $out->print("$id\n") if not $ids{$id};
-            $ids{$id} = 1;
+            $out->print("$id\n") if not exists $ids{$id};
         } else {
-            $out->print("$line\n") if not $ids{$id};
+            $out->print("$line\n") if not exists $ids{$id};
         }
+        $ids{$id} = undef;
     }
 
     close $out;
     close $in;
 
-    return $tempIdFile, $domains;
+    return $tempIdFile, $domains, \%ids;
+}
+
+
+sub writeUserSequences {
+    my $self = shift;
+    my $fastaFile = shift;
+    my $allInputIds = shift;
+    my $processedIds = shift;
+    my $userSequences = shift;
+
+    open my $out, ">>", $fastaFile or die "Unable to append to $fastaFile fasta file: $!";
+
+    foreach my $id (sort keys %$allInputIds) {
+        if (not exists $processedIds->{$id} and $userSequences->{$id}) {
+            my $fasta = format_sequence($id, $userSequences->{$id});
+            $out->print($fasta);
+        }
+    }
+
+    close $out;
 }
 
 
@@ -94,10 +117,10 @@ sub convertSequences {
     my $input = shift;
     my $output = shift;
     my $domains = shift;
+    my $userSequences = shift;
 
     open my $in, "<", $input or die "Unable to read $input fasta file: $!";
 
-    my $numIds = 0;
     my %data;
     my $curId = "";
 
@@ -105,7 +128,6 @@ sub convertSequences {
         chomp($line);
         if ($line =~ m/^>(\w\w\|)?([A-Za-z0-9_\.]+).*?$/) {
             $curId = $2;
-            $numIds++;
         } elsif ($line !~ m/^\s*$/) {
             $data{$curId} .= $line;
         }
@@ -114,6 +136,8 @@ sub convertSequences {
     close $in;
 
     open my $out, ">", $output or die "Unable to write to $output fasta file: $!";
+
+    my %processedIds;
 
     foreach my $id (sort keys %data) {
         if ($domains->{$id}) {
@@ -127,15 +151,19 @@ sub convertSequences {
                 my $fasta = format_sequence("$id:$start:$end", $seq);
                 $out->print($fasta);
             }
+        } elsif ($userSequences->{$id}) {
+            my $fasta = format_sequence($id, $userSequences->{$id});
+            $out->print($fasta);
         } else {
             my $fasta = format_sequence($id, $data{$id});
             $out->print($fasta);
         }
+        $processedIds{$id} = undef;
     }
 
     close $out;
 
-    return $numIds;
+    return \%processedIds;
 }
 
 

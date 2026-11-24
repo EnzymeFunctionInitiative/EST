@@ -11,6 +11,7 @@ use lib "$FindBin::Bin/../../../lib";
 use EFI::Import::Config::Sequences;
 use EFI::Import::SequenceDB;
 use EFI::Import::Logger;
+use EFI::Util::FASTA qw(read_fasta_file);
 
 
 
@@ -43,10 +44,17 @@ if ($config->{domain_id_map}) {
 }
 
 
+my $userSequences = {};
+if ($config->{user_sequence_file}) {
+    print "parsing seq file\n";
+    $userSequences = read_fasta_file($config->{user_sequence_file});
+}
+
+
 my $_start = time();
 
 $logger->message("Retrieving the sequences from the IDs in $inputIdsFile from " . $config->{fasta_db});
-my $numIds = $seqDb->getSequences($inputIdsFile, $outputFile, $domainIdMap);
+my ($numIds, $allIds) = $seqDb->getSequences($inputIdsFile, $outputFile, $domainIdMap, $userSequences);
 
 my $_elapsed = int((time() - $_start) * 1000);
 

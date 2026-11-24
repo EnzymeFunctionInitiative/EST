@@ -59,6 +59,7 @@ process get_fasta {
         tuple val(version), path(id_file)
         val sequence_type
         path domain_id_map
+        path ssn_sequences
 
     // Output a tuple with the sequence version (e.g. uniprot, uniref50, uniref90) and the fasta file
     output:
@@ -76,6 +77,7 @@ process get_fasta {
         --fasta-db ${params.fasta_db} \
         --sequence-ids-file ${id_file} \
         ${domain_map_arg} \
+        --user-sequence-file ${ssn_sequences} \
         --output-sequence-file \${fasta_file}
     """
 }
@@ -333,7 +335,7 @@ workflow COLOR_AND_RETRIEVE {
                                       id_list_data.uniref50_domain_tuples.transpose())
 
         // Get the FASTA files for each cluster
-        fasta_files = get_fasta(id_list, computed.sequence_type, computed.domain_id_map)
+        fasta_files = get_fasta(id_list, computed.sequence_type, computed.domain_id_map, computed.ssn_sequences)
 
         //
         // STEP 3: ASSIGN COLORS AND RETRIEVE METADATA
