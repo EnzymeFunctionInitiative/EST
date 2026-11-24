@@ -32,6 +32,7 @@ sub addImportOptions {
     $self->addOption("sequence-ids-file=s", 1, "path to text file containing list of accession IDs", OPT_FILE);
     $self->addOption("output-sequence-file=s", 0, "path to output file to put sequences in; defaults into --output-dir", OPT_FILE);
     $self->addOption("domain-id-map=s", 0, "optional path to a file that maps sequence IDs to domain regions", OPT_FILE);
+    $self->addOption("user-sequence-file=s", 0, "optional path to a FASTA file that contains user-provided sequences; prioritized over the --fasta-db", OPT_FILE);
 }
 
 

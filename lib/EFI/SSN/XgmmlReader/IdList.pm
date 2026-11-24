@@ -95,9 +95,14 @@ sub processNodeAttribute {
     my $value = shift;
     my $type = shift;
 
+    if ($name eq FIELD_SEQ_KEY) {
+        $self->{sequences}->{$seqId} = $value if $value;
+        return;
+    }
+
+    my $fieldName = $self->{id_list_fields}->{$name};
     # Check if we are to process the given attribute; only process the attributes
     # that we want to process
-    my $fieldName = $self->{id_list_fields}->{$name};
     return if not $fieldName;
 
     if ($fieldName eq FIELD_REPNODE_IDS or
@@ -119,8 +124,6 @@ sub processNodeAttribute {
         # (in that case there will be duplicates because of the FIELD_REPNODE_IDS values)
         $self->{meta_map}->{$seqId}->{$value} = undef;
 
-    } elsif ($fieldName eq FIELD_SEQ_KEY) {
-        $self->{sequences}->{$seqId} = $value if $value;
     }
 }
 
